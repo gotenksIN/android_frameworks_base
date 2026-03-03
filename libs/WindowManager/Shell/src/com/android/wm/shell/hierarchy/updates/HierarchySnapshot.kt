@@ -81,12 +81,19 @@ class HierarchySnapshot {
     }
 
     /**
+     * Returns whether the given container specifically has changed.
+     */
+    fun hasChanges(container: Container): Boolean {
+        return !getChanges(container).isEmpty
+    }
+
+    /**
      * Returns whether the given container, or any of its ancestors have changed.
      */
     fun hasChangesIncludingAncestors(container: Container): Boolean {
         var c: Container? = container
         while (c != null) {
-            if (!getChanges(c).isEmpty) {
+            if (hasChanges(c)) {
                 return true
             }
             c = c.parent
@@ -95,7 +102,8 @@ class HierarchySnapshot {
     }
 
     companion object {
-        // Flags describing changes to a generic container
+        // Flags describing changes to a generic container.
+        // Changes to the below should also be reflected in `HierarchyDebugUtils.flagsToStr()`.
         const val CHANGED_PARENT = 1
         const val CHANGED_MODE = 2
         const val CHANGED_CHILDREN = 3
@@ -108,6 +116,15 @@ class HierarchySnapshot {
         const val ROOT_CONTAINER_OFFSET = 200
         const val CHANGED_ROOT_EXAMPLE_SHELL_PROPERTY = ROOT_CONTAINER_OFFSET + 1
         const val CHANGED_FOCUS = ROOT_CONTAINER_OFFSET + 2
+
+        // Changes to a display container
+        const val DISPLAY_CONTAINER_OFFSET = 300
+        const val CHANGED_INSETS = DISPLAY_CONTAINER_OFFSET + 1
+
+        // Changes to a task container
+        const val TASK_CONTAINER_OFFSET = 400
+        const val CHANGED_TASK_DESCRIPTION = TASK_CONTAINER_OFFSET + 1
+        const val CHANGED_PIP_PARAMS = TASK_CONTAINER_OFFSET + 2
 
         // Can be used by form factors to extend and provide their own set of change flags
         const val CUSTOM_CHANGE_OFFSET = 1000

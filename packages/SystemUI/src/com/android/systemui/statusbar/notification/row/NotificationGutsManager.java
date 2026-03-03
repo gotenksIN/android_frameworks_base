@@ -29,6 +29,7 @@ import android.content.pm.ShortcutManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -53,10 +54,12 @@ import com.android.systemui.CoreStartable;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.notifications.content.icon.AppIconProvider;
 import com.android.systemui.people.widget.PeopleSpaceWidgetManager;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInteractor;
 import com.android.systemui.settings.UserContextProvider;
@@ -73,7 +76,6 @@ import com.android.systemui.statusbar.notification.collection.render.NotifGutsVi
 import com.android.systemui.statusbar.notification.collection.render.NotifGutsViewManager;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpManager;
 import com.android.systemui.statusbar.notification.promoted.domain.interactor.PackageDemotionInteractor;
-import com.android.systemui.statusbar.notification.row.icon.AppIconProvider;
 import com.android.systemui.statusbar.notification.row.icon.NotificationIconStyleProvider;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -137,6 +139,7 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
     private final HeadsUpManager mHeadsUpManager;
     private final ActivityStarter mActivityStarter;
     private final ActivityManagerWrapper mActivityManagerWrapper;
+    private final PowerInteractor mPowerInteractor;
 
     @Inject
     public NotificationGutsManager(
@@ -167,7 +170,8 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
             MetricsLogger metricsLogger,
             HeadsUpManager headsUpManager,
             ActivityStarter activityStarter,
-            ActivityManagerWrapper activityManagerWrapper) {
+            ActivityManagerWrapper activityManagerWrapper,
+            PowerInteractor powerInteractor) {
         mContext = context;
         mMainHandler = mainHandler;
         mBgHandler = bgHandler;
@@ -196,6 +200,7 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
         mHeadsUpManager = headsUpManager;
         mActivityStarter = activityStarter;
         mActivityManagerWrapper = activityManagerWrapper;
+        mPowerInteractor = powerInteractor;
     }
 
     public void setUpWithPresenter(NotificationPresenter presenter,
@@ -698,6 +703,10 @@ public class NotificationGutsManager implements NotifGutsViewManager, CoreStarta
                         false /* dismissShade */,
                         true /* afterKeyguardGone */,
                         true /* deferred */);
+                mPowerInteractor.wakeUpIfDozing(
+                        "NOTIFICATION_GUTS",
+                        PowerManager.WAKE_REASON_GESTURE
+                );
                 return true;
             }
         }

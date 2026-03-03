@@ -68,6 +68,7 @@ import com.android.systemui.util.time.DateFormatUtil
 import com.android.systemui.util.time.FakeSystemClock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -410,7 +411,7 @@ class PhoneStatusBarPolicyTest : SysuiTestCase() {
             flow.value = value
         }
 
-        override val connectedDisplayState: Flow<State>
+        override val connectedDisplayState: StateFlow<State>
             get() = flow
 
         override val connectedDisplayAddition: Flow<Unit>

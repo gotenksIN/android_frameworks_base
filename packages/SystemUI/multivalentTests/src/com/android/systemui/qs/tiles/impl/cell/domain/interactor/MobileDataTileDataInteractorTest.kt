@@ -284,7 +284,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionRepo.setAllRoaming(false)
             runCurrent()
 
-            val satelliteText = context.getString(R.string.qs_tile_satellite_label)
+            val satelliteText = context.getString(com.android.internal.R.string.satellite_indicator)
             val expectedSatelliteSecondaryLabel =
                 context.getString(R.string.mobile_carrier_text_format, networkName, satelliteText)
             assertThat(tileData?.secondaryLabel.toString())
@@ -358,7 +358,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionRepo.isNonTerrestrial.value = true
             runCurrent()
 
-            val satelliteText = context.getString(R.string.qs_tile_satellite_label)
+            val satelliteText = context.getString(com.android.internal.R.string.satellite_indicator)
             val expectedSatelliteSecondaryLabel =
                 context.getString(R.string.mobile_carrier_text_format, networkName, satelliteText)
             assertThat(tileData?.secondaryLabel.toString())

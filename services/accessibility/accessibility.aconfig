@@ -55,6 +55,16 @@ flag {
 }
 
 flag {
+    name: "enable_magnification_hide_settings_button_in_temporary_mode"
+    namespace: "accessibility"
+    description: "When enabled, hides the magnification settings button while the user is interacting in temporary magnification mode."
+    bug: "473710664"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_magnification_joystick"
     namespace: "accessibility"
     description: "Whether to enable joystick controls for magnification"
@@ -187,16 +197,6 @@ flag {
     namespace: "accessibility"
     description: "Reduces the delay for single-tap interactions when full-screen magnification is active but the triple-tap shortcut is disabled."
     bug: "479569749"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "release_a11y_lock_before_input_filter_call"
-    namespace: "accessibility"
-    description: "Releases the AccessibilityManagerService lock before calling into AccessibilityInputFilter to prevent deadlocks with the Input system."
-    bug: "465546957"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

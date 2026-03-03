@@ -28,18 +28,22 @@ import android.annotation.PermissionManuallyEnforced;
 import android.annotation.RequiresNoPermission;
 import android.annotation.UserIdInt;
 import android.app.contentrestriction.ClassifiableContent;
+import android.app.contentrestriction.ContentRestrictionManager;
 import android.app.contentrestriction.IContentRestrictionCallback;
 import android.app.contentrestriction.IContentRestrictionManager;
 import android.app.contentrestriction.IContentRestrictionAppService;
 import android.app.role.OnRoleHoldersChangedListener;
 import android.app.role.RoleManager;
 import android.content.Context;
+import android.content.Intent;
+import android.content.LocusId;
 import android.content.pm.UserInfo;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
@@ -148,6 +152,12 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
                 public void onResult(boolean isContentAllowed) {
                     dispatchIsContentAllowedCallback(callback, isContentAllowed);
                 }
+
+                @Override
+                @RequiresNoPermission
+                public void onError(int error, String message) {
+                    dispatchOnErrorCallback(callback, error, message);
+                }
             };
 
             dispatchContentRestrictionAppServiceEvent(userId, service -> {
@@ -182,6 +192,14 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
         mAllowContentRestrictionDevicePolicyBypassing = enabled;
     }
 
+    @Override
+    @RequiresNoPermission
+    public Intent createContentRestrictedIntent(LocusId locusId) {
+        Intent intent = new Intent(Settings.ACTION_SHOW_RESTRICTED_CONTENT);
+        intent.putExtra(ContentRestrictionManager.EXTRA_CONTENT_LOCUS_ID, locusId);
+        return intent;
+    }
+
     private void dispatchIsContentAllowedCallback(IContentRestrictionCallback callback,
             boolean isContentAllowed) {
         if (callback == null) {
@@ -190,6 +208,20 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
         BackgroundThread.getExecutor().execute(() -> {
             try {
                 callback.onResult(isContentAllowed);
+            } catch (RemoteException e) {
+                // Client died, the service should have logged it.
+            }
+        });
+    }
+
+    private void dispatchOnErrorCallback(IContentRestrictionCallback callback,
+            int error, String message) {
+        if (callback == null) {
+            return;
+        }
+        BackgroundThread.getExecutor().execute(() -> {
+            try {
+                callback.onError(error, message);
             } catch (RemoteException e) {
                 // Client died, the service should have logged it.
             }

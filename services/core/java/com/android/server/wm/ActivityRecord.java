@@ -944,9 +944,16 @@ public final class ActivityRecord extends WindowToken {
             Slog.w(TAG, "Activity pause timeout for " + ActivityRecord.this);
             synchronized (mAtmService.mGlobalLock) {
                 if (!hasProcess()) {
+                    Slog.w(TAG, "Pause timeout: " + ActivityRecord.this
+                            + " no longer has a process, aborting.");
                     return;
                 }
-                activityPaused(true);
+                if (!isAttached()) {
+                    Slog.w(TAG, "Pause timeout: " + ActivityRecord.this
+                            + " is no longer attached, aborting.");
+                    return;
+                }
+                activityPaused(true /* timeout */);
             }
         }
     };
@@ -3746,10 +3753,6 @@ public final class ActivityRecord extends WindowToken {
                     getTaskFragment().startPausing(false /* userLeaving */, false /* uiSleeping */,
                             null /* resuming */, "finish");
                 }
-
-                if (endTask && !Flags.clearLockTaskWhenTaskEnd()) {
-                    mAtmService.getLockTaskController().clearLockedTask(task);
-                }
             } else if (!isState(PAUSING)) {
                 if (wasVisibleRequested) {
                     // Prepare and execute close transition.
@@ -4146,12 +4149,10 @@ public final class ActivityRecord extends WindowToken {
         }
         finishing = true;
 
-        if (Flags.clearLockTaskWhenTaskEnd()) {
-            // Clear the lock task if needed when the task ends.
-            if (task != null && task.getTopNonFinishingActivity() == null
-                    && !task.isClearingToReuseTask()) {
-                mAtmService.getLockTaskController().clearLockedTask(task);
-            }
+        // Clear the lock task if needed when the task ends.
+        if (task != null && task.getTopNonFinishingActivity() == null
+                && !task.isClearingToReuseTask()) {
+            mAtmService.getLockTaskController().clearLockedTask(task);
         }
 
         // Transfer the launch cookie to the next running activity above this in the same task.
@@ -8705,7 +8706,7 @@ public final class ActivityRecord extends WindowToken {
                 ws.updateSurfacePositionNonOrganized();
             }
         }
-        updateReportedConfigurationAndSend();
+        ensureActivityConfiguration();
         return true;
     }
 
@@ -9201,6 +9202,13 @@ public final class ActivityRecord extends WindowToken {
         mTaskSupervisor.mStoppingActivities.remove(this);
     }
 
+    void resetCompatConfiguration() {
+        // Reset the existing override configuration so it can be updated according to the latest
+        // configuration.
+        mAppCompatController.getSizeCompatModePolicy().clearSizeCompatMode();
+        mAppCompatController.getDisplayCompatPolicy().onProcessRestarted();
+    }
+
     /**
      * Request the process of the activity to restart with its saved state (from
      * {@link android.app.Activity#onSaveInstanceState}) if possible. It also forces to recompute
@@ -9211,10 +9219,7 @@ public final class ActivityRecord extends WindowToken {
         if (finishing) return;
         Slog.i(TAG, "Request to restart process of " + this);
 
-        // Reset the existing override configuration so it can be updated according to the latest
-        // configuration.
-        mAppCompatController.getSizeCompatModePolicy().clearSizeCompatMode();
-        mAppCompatController.getDisplayCompatPolicy().onProcessRestarted();
+        resetCompatConfiguration();
 
         if (!attachedToProcess()) {
             return;

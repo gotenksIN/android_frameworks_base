@@ -36,6 +36,7 @@ import static android.content.res.Configuration.UI_MODE_TYPE_DESK;
 import static android.content.res.Configuration.UI_MODE_TYPE_MASK;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
+import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE;
 import static android.window.ConfigurationHelper.freeTextLayoutCachesIfNeeded;
 import static android.window.ConfigurationHelper.isDifferentDisplay;
 import static android.window.ConfigurationHelper.shouldUpdateResources;
@@ -8081,7 +8082,7 @@ public final class ActivityThread extends ClientTransactionHandler
             handleAttachAgent(agent, data.info);
         }
 
-        /**
+        /*
          * Switch this process to density compatibility mode if needed.
          */
 // QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
@@ -8418,8 +8419,20 @@ public final class ActivityThread extends ClientTransactionHandler
         // Initialize embedding if needed.
         if (com.android.window.flags.Flags.virtualGamepadOverride()
                 && CompatChanges.isChangeEnabled(OVERRIDE_ENABLE_VIRTUAL_GAMEPAD)
+                && isVirtualGamepadOverrideAllowed(app)
                 && !Process.isIsolated()) {
             WindowExtensionsHelper.initEmbedding(app);
+        }
+    }
+
+    private static boolean isVirtualGamepadOverrideAllowed(Application app) {
+        try {
+            return app.getPackageManager().getProperty(
+                    PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE,
+                    app.getPackageName()).getBoolean();
+        } catch (PackageManager.NameNotFoundException e) {
+            // Default to true if the property is not specified.
+            return true;
         }
     }
 

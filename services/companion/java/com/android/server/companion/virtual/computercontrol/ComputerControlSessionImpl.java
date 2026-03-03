@@ -53,7 +53,6 @@ import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.ResolveInfoFlags;
 import android.content.pm.ResolveInfo;
-import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.VirtualDisplay;
@@ -77,7 +76,6 @@ import android.view.DisplayInfo;
 import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.SurfaceControl;
-import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
@@ -92,6 +90,7 @@ import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
+import com.android.server.wm.ActivityAssistInfo;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
@@ -232,6 +231,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @GuardedBy("mAllowlistedPackages")
     private final Set<String> mAllowlistedPackages = new ArraySet<>();
+
+    /** Task IDs that are authorized for content visibility. */
+    @GuardedBy("mAllowedTaskIds")
+    private final Set<Integer> mAllowedTaskIds = new ArraySet<>();
+
+    /** Whether screenshot is allowed depending on if the top activity is allowlisted. */
+    @GuardedBy("mAllowedTaskIds")
+    private boolean mIsTopActivityScreenshotAllowed = false;
 
     // Handle state transitions for the session lifecycle.
     // NOTE: Do not make lifecycle transitions from these callbacks.
@@ -478,29 +485,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mAppOpsManager = mOwnerContext.getSystemService(AppOpsManager.class);
         mAppOpsManager.startWatchingMode(AppOpsManager.OP_COMPUTER_CONTROL, mOwnerPackageName,
                 this);
-
-        addVirtualDisplayOverlay(context);
-    }
-
-    /**
-     * Add a transparent 1x1 overlay view to the virtual display as a short-term workaround for
-     * handling screenshot timeouts resulting from not being able to force native activities and
-     * windows to draw a new frame. Adding this view ensures there will be at least one window on
-     * the display that will produce a new frame when a screenshot is taken that will result in SF
-     * composition to produce a VirtualDisplay frame.
-     */
-    // TODO: b/484055252 - Remove after a long-term solution is in place.
-    private void addVirtualDisplayOverlay(Context context) {
-        final var displayContext = context.createDisplayContext(mVirtualDisplay.getDisplay());
-        final var wm = displayContext.getSystemService(WindowManager.class);
-
-        final var lp = new WindowManager.LayoutParams(1, 1,
-                WindowManager.LayoutParams.TYPE_DISPLAY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                PixelFormat.TRANSPARENT);
-        wm.addView(new View(displayContext), lp);
     }
 
     private DisplayInfo getTargetDisplayInfo() {
@@ -590,6 +574,21 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         return mIsTestSession;
     }
 
+    void monitor() {
+        synchronized (mAllowlistedPackages) { /* no-op */ }
+        synchronized (mAllowedTaskIds) { /* no-op */ }
+        synchronized (mNotificationLock) { /* no-op */ }
+        synchronized (mPreviewIntentLock) { /* no-op */ }
+        synchronized (mWindowDrawLock) { /* no-op */ }
+        synchronized (mInteractiveMirrors) {
+            for (int i = 0; i < mInteractiveMirrors.size(); i++) {
+                mInteractiveMirrors.get(i).monitor();
+            }
+        }
+        mLifecycle.monitor();
+        mStatsController.monitor();
+    }
+
     @Override
     public void initialize(IComputerControlLifecycleCallback callback, Surface clientSurface) {
         if (mClientSurface != null) {
@@ -615,11 +614,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     "Trying to launch " + packageName + " which is not allowlisted");
         }
 
-        if (!mAllowlistedPackages.contains(packageName)) {
-            throw new IllegalArgumentException(
-                    "Trying to launch "
-                            + packageName
-                            + " which is not a target package for the current session");
+        synchronized (mAllowlistedPackages) {
+            if (!mAllowlistedPackages.contains(packageName)) {
+                throw new IllegalArgumentException(
+                        "Trying to launch "
+                                + packageName
+                                + " which is not a target package for the current session");
+            }
         }
 
         // TODO(b/444600407): Remove this once the consent model is per-target app. While the
@@ -973,6 +974,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             Slog.e(TAG, "Cannot request screenshot: Session is closed");
             return false;
         }
+
+        // Limit screenshots to the task of allowlisted packages of the automated apps.
+        // In the Blocked state, this check ensures the agent only sees authorized content.
+        synchronized (mAllowedTaskIds) {
+            if (!mIsTopActivityScreenshotAllowed) {
+                Slog.w(TAG, "Screenshot blocked: Top task not part of the initial automated set.");
+                return false;
+            }
+        }
+
         synchronized (mWindowDrawLock) {
             if (mIsWaitingForWindowDraw) {
                 Slog.w(TAG, "Cannot request screenshot: Window draw is already in progress");
@@ -987,6 +998,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             }
             return mIsWaitingForWindowDraw;
         }
+    }
+
+    /** Retrieves the Task ID for the top activity on a given display. */
+    private int getTopTaskId(int displayId) {
+        List<ActivityAssistInfo> topActivities =
+                mActivityTaskManagerInternal.getTopVisibleActivities(displayId);
+        if (topActivities != null && !topActivities.isEmpty()) {
+            return topActivities.get(0).getTaskId();
+        }
+        return -1;
     }
 
     private void onWindowsDrawnCallback(boolean success) {
@@ -1228,6 +1249,20 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             Slog.v(TAG, "Top activity changed to " + topActivity + " for user " + userId);
             cancelDisplayEmptyScheduledAction();
 
+            // If this new activity belongs to a package the session is authorized to control,
+            // we should trust it, even if it's a secondary task (like a new Chrome window).
+            synchronized (mAllowedTaskIds) {
+                boolean isPackageAllowed = mParams.getTargetPackageNames()
+                        .contains(topActivity.getPackageName());
+                int taskId = isPackageAllowed ? getTopTaskId(mVirtualDisplayId) : -1;
+                if (taskId != -1) {
+                    mAllowedTaskIds.add(taskId);
+                }
+
+                // Screenshots are only allowed if the package is valid AND we have a valid Task ID
+                mIsTopActivityScreenshotAllowed = (taskId != -1);
+            }
+
             // If we have a new top activity which is allowed, then attempt a transition to the
             // active state.
             if (isActivityLaunchAllowed(topActivity, userId)) {
@@ -1250,6 +1285,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     () -> close(CLOSE_REASON_SESSION_EMPTY),
                     CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS,
                     TimeUnit.MILLISECONDS);
+            synchronized (mAllowedTaskIds) {
+                mAllowedTaskIds.clear();
+                mIsTopActivityScreenshotAllowed = false;
+            }
         }
 
         @Override

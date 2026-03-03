@@ -235,8 +235,11 @@ public class BubbleTransitions {
         if (BubbleFlagHelper.enableRootTaskForBubble()) {
             final TransitionHandler transitionHandler = mEnterTransitions.get(transition);
             if (transitionHandler != null) {
-                wct.merge(transitionHandler.handleRequest(transition, request),
-                        true /* transfer */);
+                final Transitions.RequestResult result =
+                        transitionHandler.handleRequestOnly(transition, request);
+                if (result != null) {
+                    wct.merge(result.mWct, true /* transfer */);
+                }
             }
         }
     }
@@ -1284,9 +1287,6 @@ public class BubbleTransitions {
                 @NonNull SurfaceControl.Transaction finishT,
                 @NonNull IBinder mergeTarget,
                 @NonNull Transitions.TransitionFinishCallback finishCallback) {
-            if (!com.android.window.flags.Flags.enableForceOpaque()) {
-                return;
-            }
             if (info.getType() != TRANSIT_SPLIT_DISMISS) {
                 return;
             }

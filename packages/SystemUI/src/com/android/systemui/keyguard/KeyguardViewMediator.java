@@ -88,6 +88,7 @@ import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
+import android.uilatencystats.UiLatencyStatsManager;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
@@ -143,9 +144,13 @@ import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollector;
+import com.android.compose.animation.scene.ObservableTransitionState;
 import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor;
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor;
 import com.android.systemui.communal.ui.viewmodel.CommunalTransitionViewModel;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
+import com.android.systemui.scene.shared.model.Overlays;
+import com.android.systemui.scene.shared.model.Scenes;
 import com.android.systemui.dagger.qualifiers.Application;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.display.flags.DisplayComponentRepositoryFlag;
@@ -195,6 +200,7 @@ import com.android.wm.shell.shared.compat.SurfaceTransition;
 import dagger.Lazy;
 
 import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.Job;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -203,7 +209,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -375,6 +383,7 @@ public class KeyguardViewMediator implements CoreStartable,
     private final Lazy<ShadeController> mShadeController;
     private final Lazy<CommunalSceneInteractor> mCommunalSceneInteractor;
     private final Lazy<CommunalSettingsInteractor> mCommunalSettingsInteractor;
+    private final Lazy<SceneInteractor> mSceneInteractor;
     /*
      * Records the user id on request to go away, for validation when WM calls back to start the
      * exit animation.
@@ -716,18 +725,48 @@ public class KeyguardViewMediator implements CoreStartable,
         }
     }
 
-    /**
-     * Handle {@link #USER_SWITCHING}
-     */
+    /** Handle {@link #USER_SWITCHING} */
     @VisibleForTesting
     void handleUserSwitching(int userId, Runnable resultCallback) {
         Log.d(TAG, String.format("onUserSwitching %d", userId));
         synchronized (KeyguardViewMediator.this) {
-            if (!mLockPatternUtils.isSecure(userId)) {
+            if(!mLockPatternUtils.isSecure(userId)) {
                 dismiss(null, null);
+                resultCallback.run();
+            } else if(transitionToBouncerWhileSwitchingUsersFlagEnabled()){
+                // Calling dismiss on a secure user will show the bouncer.
+                dismiss(null, null);
+                waitForTransitionToBouncer(resultCallback);
+            } else {
+                resultCallback.run();
             }
-            resultCallback.run();
         }
+    }
+
+    /**
+     * Waits for the scene transition to the bouncer to complete before running the result callback.
+     */
+    private void waitForTransitionToBouncer(Runnable resultCallback) {
+        if (!transitionToBouncerWhileSwitchingUsersFlagEnabled()) {
+            throw new IllegalStateException(
+                    "waitForTransitionToBouncer not supported when flag is disabled");
+        }
+
+        final AtomicReference<Job> jobRef = new AtomicReference<>();
+        jobRef.set(
+            mJavaAdapter.alwaysCollectFlow(
+                mSceneInteractor.get().getTransitionStateFlow(),
+                (ObservableTransitionState state) -> {
+                    if (state.isIdle(Overlays.Bouncer)) {
+                        resultCallback.run();
+                        Job job = jobRef.get();
+                        if (job != null) {
+                            job.cancel(null);
+                        }
+                    }
+                }
+            )
+        );
     }
 
     /**
@@ -736,17 +775,24 @@ public class KeyguardViewMediator implements CoreStartable,
     @VisibleForTesting
     void handleUserSwitchComplete(int userId) {
         Log.d(TAG, String.format("onUserSwitchComplete %d", userId));
-        // Calling dismiss on a secure user will show the bouncer
-        if (mLockPatternUtils.isSecure(userId)) {
-            // We are calling dismiss with a delay as there are race conditions in some scenarios
-            // caused by async layout listeners
-            mHandler.postDelayed(() -> dismiss(null /* callback */, null /* message */),
-                    mDismissToken, 500);
+        if (!transitionToBouncerWhileSwitchingUsersFlagEnabled()) {
+            // Calling dismiss on a secure user will show the bouncer
+            if (mLockPatternUtils.isSecure(userId)) {
+                // We are calling dismiss with a delay as there are race conditions in some
+                // scenarios caused by async layout listeners
+                mHandler.postDelayed(
+                        () -> dismiss(null /* callback */, null /* message */), mDismissToken, 500);
+            }
         }
         // We need to adjust the status bar in case there are race conditions where the
         // previous adjust event was sent before the user switch completed.
         Log.d(TAG, String.format("onUserSwitchComplete, adjustStatusBarLocked  %d", userId));
         adjustStatusBarLocked();
+    }
+
+    private boolean transitionToBouncerWhileSwitchingUsersFlagEnabled() {
+        return SceneContainerFlag.isEnabled()
+            && com.android.systemui.Flags.transitionToBouncerWhileSwitchingUsers();
     }
 
     KeyguardUpdateMonitorCallback mUpdateCallback = new KeyguardUpdateMonitorCallback() {
@@ -970,6 +1016,9 @@ public class KeyguardViewMediator implements CoreStartable,
                 return;
             }
             Trace.beginSection("KeyguardViewMediator.mViewMediatorCallback#keyguardDonePending");
+            mUiLatencyStatsManager.ifPresent(m -> m.reportEvent(
+                    UiLatencyStatsManager.EVENT_LOCK_SCREEN_UNLOCK_START,
+                    mSystemClock.elapsedRealtime()));
             mKeyguardDonePendingForUser = targetUserId;
             mHideAnimationRun = true;
             mHideAnimationRunning = true;
@@ -1598,6 +1647,8 @@ public class KeyguardViewMediator implements CoreStartable,
     private final Lazy<WindowManagerLockscreenVisibilityManager> mWmLockscreenVisibilityManager;
 
     private WindowManagerOcclusionManager mWmOcclusionManager;
+    private final Optional<UiLatencyStatsManager> mUiLatencyStatsManager;
+
     /**
 
      * Injected constructor. See {@link KeyguardModule}.
@@ -1652,7 +1703,9 @@ public class KeyguardViewMediator implements CoreStartable,
             KeyguardTransitionBootInteractor transitionBootInteractor,
             Lazy<CommunalSceneInteractor> communalSceneInteractor,
             Lazy<CommunalSettingsInteractor> communalSettingsInteractor,
-            WindowManagerOcclusionManager wmOcclusionManager) {
+            WindowManagerOcclusionManager wmOcclusionManager,
+            Optional<UiLatencyStatsManager> uiLatencyStatsManager,
+            Lazy<SceneInteractor> sceneInteractor) {
         mContext = context;
         mUserTracker = userTracker;
         mFalsingCollector = falsingCollector;
@@ -1695,6 +1748,7 @@ public class KeyguardViewMediator implements CoreStartable,
         mTransitionBootInteractor = transitionBootInteractor;
         mCommunalSceneInteractor = communalSceneInteractor;
         mCommunalSettingsInteractor = communalSettingsInteractor;
+        mSceneInteractor = sceneInteractor;
 
         mStatusBarStateController = statusBarStateController;
         statusBarStateController.addCallback(this);
@@ -1733,6 +1787,7 @@ public class KeyguardViewMediator implements CoreStartable,
         mShowKeyguardWakeLock.setReferenceCounted(false);
 
         mWmOcclusionManager = wmOcclusionManager;
+        mUiLatencyStatsManager = uiLatencyStatsManager;
     }
 
     public void userActivity() {

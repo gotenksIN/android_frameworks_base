@@ -225,7 +225,7 @@ flag {
   name: "set_source_invisible_on_multi_window_mode"
   namespace: "input_method"
   description: "Feature flag to fix the race between invalidateInput and restartInput"
-  bug: "396066692"
+  bug: "420907225"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -288,4 +288,28 @@ flag {
   namespace: "input_method"
   description: "Give users the option to decide whether or not to display the IME switcher button in the IME navigation bar"
   bug: "467625078"
+}
+
+flag {
+  name: "fix_jank_tracker_ime_animation_delay"
+  namespace: "input_method"
+  description: "Fix IME inset animation delay because of IME Jank Tracker"
+  bug: "483298748"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "ime_switcher_menu_systemui_style_update"
+  namespace: "input_method"
+  description: "Update styling and layout of the IME Switcher Menu implemented in SystemUi"
+  bug: "481673341"
+}
+
+flag {
+  name: "ime_switcher_menu_systemui_style_update_desktop"
+  namespace: "input_method"
+  description: "Update styling and layout of the IME Switcher Menu implemented in SystemUi for Desktop Android"
+  bug: "481673341"
 }

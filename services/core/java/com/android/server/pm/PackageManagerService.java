@@ -5697,7 +5697,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId);
+            // Public API implementation, pass in the calling uid
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId,
+                    Binder.getCallingUid());
         }
 
         @Override
@@ -7641,7 +7643,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
+            // Use Process.myUid here because this is the PackageManagerInternal implementation, it
+            // isn't called outside of system_server
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId,
+                    Process.myUid());
         }
 
         @Override

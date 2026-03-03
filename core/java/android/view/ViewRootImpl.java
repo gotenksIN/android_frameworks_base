@@ -401,13 +401,6 @@ public final class ViewRootImpl implements ViewParent,
      */
     private static final boolean MT_RENDERER_AVAILABLE = true;
 
-
-    /**
-     * Allow enabling IPC rendering on a per-package basis for debugging.
-     * Use a comma-separated list of packages.
-     */
-    private static final String IPC_RENDERING_PACKAGES =
-            SystemProperties.get("viewroot.ipc_rendering_packages", "");
     private boolean mIpcRenderingEnabled = false;
     private boolean mPerfHintSessionDisabled = false;
 
@@ -571,7 +564,7 @@ public final class ViewRootImpl implements ViewParent,
      * target SDK versions.
      */
     private static boolean sCompatibilityDone = false;
-    private static int sCalledFromWrongThreadCount = 0;
+    private static boolean sCalledFromWrongThreadLogged = false;
 
     /**
      * Always assign focus if a focusable View is available.
@@ -604,6 +597,10 @@ public final class ViewRootImpl implements ViewParent,
     final TypedValue mTmpValue = new TypedValue();
 
     final Thread mThread;
+
+    /** The throwable with the stack trace filled when this ViewRootImpl was initialized. */
+    @Nullable
+    private final Throwable mInitStack;
 
     final WindowLeaked mLocation;
 
@@ -1403,6 +1400,7 @@ public final class ViewRootImpl implements ViewParent,
         final String name = DisplayProperties.debug_vri_package().orElse(null);
         mExtraDisplayListenerLogging = !TextUtils.isEmpty(name) && name.equals(mBasePackageName);
         mThread = Thread.currentThread();
+        mInitStack = Build.isDebuggable() ? new Throwable("Created") : null;
         mLocation = new WindowLeaked(null);
         mWidth = -1;
         mHeight = -1;
@@ -2162,12 +2160,15 @@ public final class ViewRootImpl implements ViewParent,
             // sRendererDisabled will be set.  In addition, the system process
             // itself should never do accelerated rendering.  In that case, both
             // sRendererDisabled and sSystemRendererDisabled are set.  When
-            // sSystemRendererDisabled is set, PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED
+            // sSystemRendererDisabled is set, RENDERING_HINT_FORCE_HARDWARE_ACCELERATED
             // can be used by code on the system process to escape that and enable
             // HW accelerated drawing.  (This is basically for the lock screen.)
 
-            final boolean forceHwAccelerated = (attrs.privateFlags &
-                    WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED) != 0;
+            final boolean forceHwAccelerated =
+                    (attrs.renderingHints
+                                    & WindowManager.LayoutParams
+                                            .RENDERING_HINT_FORCE_HARDWARE_ACCELERATED)
+                            != 0;
 
             if (ThreadedRenderer.sRendererEnabled || forceHwAccelerated) {
                 if (mAttachInfo.mThreadedRenderer != null) {
@@ -2295,11 +2296,11 @@ public final class ViewRootImpl implements ViewParent,
         final boolean shouldDisablePerfHint = mIsDisablingViewAnimationsRequested;
 
         if (shouldDisablePerfHint) {
-            mWindowAttributes.privateFlags |=
-                    WindowManager.LayoutParams.PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT;
+            mWindowAttributes.renderingHints |=
+                    WindowManager.LayoutParams.RENDERING_HINT_DISABLE_PERFORMANCE_HINT;
         } else {
-            mWindowAttributes.privateFlags &=
-                    ~WindowManager.LayoutParams.PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT;
+            mWindowAttributes.renderingHints &=
+                    ~WindowManager.LayoutParams.RENDERING_HINT_DISABLE_PERFORMANCE_HINT;
         }
         updatePerformanceHintSession();
     }
@@ -7552,7 +7553,7 @@ public final class ViewRootImpl implements ViewParent,
                     break;
                 }
                 case MSG_TOUCH_BOOST_TIMEOUT:
-                    /**
+                    /*
                      * Lower the frame rate after the boosting period (FRAME_RATE_TOUCH_BOOST_TIME).
                      */
                     mIsFrameRateBoosting = false;
@@ -8697,7 +8698,7 @@ public final class ViewRootImpl implements ViewParent,
                 }
                 setPreferredFrameRateCategory(mLastPreferredFrameRateCategory);
             }
-            /**
+            /*
              * We want to lower the refresh rate when MotionEvent.ACTION_UP,
              * MotionEvent.ACTION_CANCEL is detected.
              * Not using ACTION_MOVE to avoid checking and sending messages too frequently.
@@ -10257,10 +10258,18 @@ public final class ViewRootImpl implements ViewParent,
                 // resizing to a larger size).
                 mTransaction.setWindowCrop(mSurfaceControl,
                         mWinFrameInScreen.width(), mWinFrameInScreen.height());
-            } else if (!HardwareRenderer.isDrawingEnabled()) {
-                // When drawing is disabled the window layer won't have a valid buffer.
-                // Set a window crop so input can get delivered to the window.
-                mTransaction.setWindowCrop(mSurfaceControl, mSurfaceSize.x, mSurfaceSize.y).apply();
+            } else {
+                if (!HardwareRenderer.isDrawingEnabled()) {
+                    // When drawing is disabled the window layer won't have a valid buffer.
+                    // Set a window crop so input can get delivered to the window.
+                    mTransaction.setWindowCrop(mSurfaceControl, mSurfaceSize.x, mSurfaceSize.y)
+                            .apply();
+                } else if (!mPendingDragResizing) {
+                    // During the fluid resizing, the temporary crop bounds set on VRI.
+                    // The clean up is necessary here since the crop would break window content
+                    // if windowing mode change.
+                    mTransaction.setWindowCrop(mSurfaceControl, null);
+                }
             }
         }
 
@@ -12026,7 +12035,7 @@ public final class ViewRootImpl implements ViewParent,
         return new CalledFromWrongThreadException(
                 "Only the original thread that created a view hierarchy can touch its views."
                         + " Expected: " + mThread.getName()
-                        + " Calling: " + Thread.currentThread().getName());
+                        + " Calling: " + Thread.currentThread().getName(), mInitStack);
     }
 
     /**
@@ -12055,11 +12064,11 @@ public final class ViewRootImpl implements ViewParent,
         if (mEnforceThreadChecksCompat) {
             throwCalledFromWrongThreadException();
         } else {
-            // Log the issue, but not too many times per process.
-            // Note that this counter is not atomic, so it's possible we log more than the requisite
-            // times per process lifetime. That's fine because the precise number of logs isn't
-            // important so long as we eventually stop logging.
-            if (++sCalledFromWrongThreadCount <= 10) {
+            // Log the issue, but at most once per process, since WTF logs are expensive.
+            // Note that this is potentially racy, but considered benign.
+            // If two or more threads race to log, it's not much of a concern.
+            if (!sCalledFromWrongThreadLogged) {
+                sCalledFromWrongThreadLogged = true;
                 final CalledFromWrongThreadException e = newCalledFromWrongThreadException();
                 Log.wtf(
                         TAG,
@@ -12834,6 +12843,11 @@ public final class ViewRootImpl implements ViewParent,
         public CalledFromWrongThreadException(String msg) {
             super(msg);
         }
+
+        @UnsupportedAppUsage
+        public CalledFromWrongThreadException(String msg, @Nullable Throwable cause) {
+            super(msg, cause);
+        }
     }
 
     static HandlerActionQueue getRunQueue() {
@@ -13328,7 +13342,8 @@ public final class ViewRootImpl implements ViewParent,
         public void runOrPost(View source, int changeType) {
             if (mLooper != Looper.myLooper()) {
                 CalledFromWrongThreadException e = new CalledFromWrongThreadException("Only the "
-                        + "original thread that created a view hierarchy can touch its views.");
+                        + "original thread that created a view hierarchy can touch its views.",
+                        mInitStack);
                 // TODO: Throw the exception
                 Log.e(TAG, "Accessibility content change on non-UI thread. Future Android "
                         + "versions will throw an exception.", e);
@@ -14599,7 +14614,8 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean useIpcRendering() {
-        if (IPC_RENDERING_PACKAGES.contains(mBasePackageName)) {
+        if (SystemProperties.get("viewroot.ipc_rendering_packages", "")
+                        .contains(mBasePackageName)) {
             return true;
         }
         return false;

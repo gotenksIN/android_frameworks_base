@@ -48,7 +48,6 @@ import static com.android.server.wm.AppCompatCameraOverrides.REQUESTED;
 import static com.android.server.wm.AppCompatConfiguration.MIN_FIXED_ORIENTATION_LETTERBOX_ASPECT_RATIO;
 import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_LANDSCAPE_CAMERA_SUPPORT;
 import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES;
-import static com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_COMPATIBILITY_INFO_ROTATE_AND_CROP_BUGFIX;
 import static com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX;
 
 import static org.junit.Assert.assertEquals;
@@ -444,7 +443,6 @@ public class AppCompatCameraSimReqOrientationPolicyTests extends WindowTestsBase
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_CAMERA_COMPAT_COMPATIBILITY_INFO_ROTATE_AND_CROP_BUGFIX)
     @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT})
     public void testOnCameraOpened_portraitActivity90_sendsRotateAndCrop270InCompatibilityInfo() {
         runTestScenario((robot) -> {
@@ -460,7 +458,6 @@ public class AppCompatCameraSimReqOrientationPolicyTests extends WindowTestsBase
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_CAMERA_COMPAT_COMPATIBILITY_INFO_ROTATE_AND_CROP_BUGFIX)
     @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT})
     public void testOnCameraOpened_portraitActivity270_sendsRotateAndCrop90InCompatibilityInfo() {
         runTestScenario((robot) -> {
@@ -667,6 +664,43 @@ public class AppCompatCameraSimReqOrientationPolicyTests extends WindowTestsBase
 
             // Make sure no errors are thrown here.
             robot.onCameraClosed(CAMERA_ID_1);
+        });
+    }
+
+    @Test
+    public void testShouldIgnoreReqOrientationForCameraCompat_cameraOpened_returnsTrue() {
+        runTestScenario((robot) -> {
+            robot.configureActivity(SCREEN_ORIENTATION_PORTRAIT);
+            robot.activity().rotateDisplayForTopActivity(ROTATION_270);
+
+            robot.onCameraOpened(CAMERA_ID_1, TEST_PACKAGE_1);
+
+            robot.checkShouldIgnoreReqOrientationForCameraCompat(true);
+        });
+    }
+
+    @Test
+    public void testShouldIgnoreReqOrientationForCameraCompat_cameraOpened_returnsFalse() {
+        runTestScenario((robot) -> {
+            robot.configureActivity(SCREEN_ORIENTATION_FULL_USER);
+            robot.activity().rotateDisplayForTopActivity(ROTATION_270);
+
+            robot.onCameraOpened(CAMERA_ID_1, TEST_PACKAGE_1);
+
+            robot.checkShouldIgnoreReqOrientationForCameraCompat(false);
+        });
+    }
+
+    @Test
+    public void testShouldIgnoreReqOrientationForCameraCompat_cameraClosed_returnsFalse() {
+        runTestScenario((robot) -> {
+            robot.configureActivity(SCREEN_ORIENTATION_PORTRAIT);
+            robot.activity().rotateDisplayForTopActivity(ROTATION_270);
+
+            robot.onCameraOpened(CAMERA_ID_1, TEST_PACKAGE_1);
+            robot.onCameraClosed(CAMERA_ID_1);
+
+            robot.checkShouldIgnoreReqOrientationForCameraCompat(false);
         });
     }
 
@@ -891,6 +925,11 @@ public class AppCompatCameraSimReqOrientationPolicyTests extends WindowTestsBase
             assertEquals(active,
                     cameraCompatFreeformPolicy().isCompatibilityTreatmentEnabledForActivity(
                             activity().top(), /* checkOrientation */ true));
+        }
+
+        void checkShouldIgnoreReqOrientationForCameraCompat(boolean expected) {
+            assertEquals(expected, cameraCompatFreeformPolicy()
+                    .shouldIgnoreReqOrientationForCameraCompat(activity().top()));
         }
 
         void setOverrideMinAspectRatioEnabled(boolean enabled) {

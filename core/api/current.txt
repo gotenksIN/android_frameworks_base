@@ -14,6 +14,7 @@ package android {
     field public static final String ACCESS_CHECKIN_PROPERTIES = "android.permission.ACCESS_CHECKIN_PROPERTIES";
     field public static final String ACCESS_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION";
     field public static final String ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION";
+    field @FlaggedApi("com.android.hardware.input.hid_api") public static final String ACCESS_HID = "android.permission.ACCESS_HID";
     field @FlaggedApi("android.multiuser.enable_permission_to_access_hidden_profiles") public static final String ACCESS_HIDDEN_PROFILES = "android.permission.ACCESS_HIDDEN_PROFILES";
     field @FlaggedApi("android.provider.launcher_data_access") public static final String ACCESS_LAUNCHER_DATA = "android.permission.ACCESS_LAUNCHER_DATA";
     field @FlaggedApi("android.permission.flags.access_local_network_permission_enabled") public static final String ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK";
@@ -8461,6 +8462,7 @@ package android.app.admin {
     field public static final String CAMERA_DISABLED_POLICY = "cameraDisabled";
     field @FlaggedApi("android.app.admin.flags.common_criteria_mode_coexistence") public static final String COMMON_CRITERIA_MODE_POLICY = "commonCriteriaMode";
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String CONTENT_PROTECTION_POLICY = "contentProtection";
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final String CONTENT_RESTRICTION_APPS_POLICY = "contentRestrictionApps";
     field @FlaggedApi("android.app.admin.flags.cross_profile_widget_provider_bulk_apis") public static final String CROSS_PROFILE_WIDGET_PROVIDER_POLICY = "crossProfileWidgetProvider";
     field public static final String KEYGUARD_DISABLED_FEATURES_POLICY = "keyguardDisabledFeatures";
     field public static final String LOCK_TASK_POLICY = "lockTask";
@@ -9064,12 +9066,20 @@ package android.app.admin {
   }
 
   @FlaggedApi("android.app.admin.flags.policy_streamlining") public final class PolicyIdentifier<T> {
+    ctor public PolicyIdentifier(@NonNull String);
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> AUTO_TIME;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED = 3; // 0x3
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED_UNENFORCED = 1; // 0x1
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_ENABLED = 4; // 0x4
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_ENABLED_UNENFORCED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_USER_CHOICE = 0; // 0x0
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> AUTO_TIME_ZONE;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_DISABLED = 3; // 0x3
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_DISABLED_UNENFORCED = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_ENABLED = 4; // 0x4
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_ENABLED_UNENFORCED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_USER_CHOICE = 0; // 0x0
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.util.List<java.lang.String>> CONTENT_RESTRICTION_APPS;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.String> LOCKSCREEN_MESSAGE;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> SCREEN_CAPTURE;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") public static final int SCREEN_CAPTURE_ALLOWED = 2; // 0x2
@@ -9790,8 +9800,9 @@ package android.app.contentrestriction {
   }
 
   @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionManager {
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") @NonNull public android.content.Intent createContentRestrictedIntent(@NonNull android.content.LocusId);
     method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public boolean isContentRestrictionEnabled();
-    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void requestClassification(@NonNull android.app.contentrestriction.ClassifiableContent, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void requestClassification(@NonNull android.app.contentrestriction.ClassifiableContent, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     field public static final String ACTION_SHOW_RESTRICTED_CONTENT_DETAILS = "android.app.contentrestriction.action.SHOW_RESTRICTED_CONTENT_DETAILS";
     field public static final String EXTRA_CONTENT_LOCUS_ID = "android.app.contentrestriction.extra.CONTENT_LOCUS_ID";
   }
@@ -11885,6 +11896,7 @@ package android.content {
     field public static final String CONNECTIVITY_SERVICE = "connectivity";
     field public static final String CONSUMER_IR_SERVICE = "consumer_ir";
     field @FlaggedApi("android.provider.user_keys") public static final String CONTACT_KEYS_SERVICE = "contact_keys";
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final String CONTENT_RESTRICTION_SERVICE = "content_restriction";
     field public static final int CONTEXT_IGNORE_SECURITY = 2; // 0x2
     field public static final int CONTEXT_INCLUDE_CODE = 1; // 0x1
     field public static final int CONTEXT_RESTRICTED = 4; // 0x4
@@ -12384,6 +12396,7 @@ package android.content {
     field public static final String ACTION_GTALK_SERVICE_CONNECTED = "android.intent.action.GTALK_CONNECTED";
     field public static final String ACTION_GTALK_SERVICE_DISCONNECTED = "android.intent.action.GTALK_DISCONNECTED";
     field public static final String ACTION_HEADSET_PLUG = "android.intent.action.HEADSET_PLUG";
+    field @FlaggedApi("android.timezone.flags.enable_home_time_zone_api") public static final String ACTION_HOME_TIME_ZONE_CHANGED = "android.intent.action.HOME_TIME_ZONE_CHANGED";
     field public static final String ACTION_INPUT_METHOD_CHANGED = "android.intent.action.INPUT_METHOD_CHANGED";
     field public static final String ACTION_INSERT = "android.intent.action.INSERT";
     field public static final String ACTION_INSERT_OR_EDIT = "android.intent.action.INSERT_OR_EDIT";
@@ -12587,6 +12600,7 @@ package android.content {
     field public static final String EXTRA_END_TIME = "android.intent.extra.END_TIME";
     field public static final String EXTRA_EXCLUDE_COMPONENTS = "android.intent.extra.EXCLUDE_COMPONENTS";
     field public static final String EXTRA_FROM_STORAGE = "android.intent.extra.FROM_STORAGE";
+    field @FlaggedApi("android.timezone.flags.enable_home_time_zone_api") public static final String EXTRA_HOME_TIME_ZONE_ID = "android.intent.extra.HOME_TIME_ZONE_ID";
     field public static final String EXTRA_HTML_TEXT = "android.intent.extra.HTML_TEXT";
     field public static final String EXTRA_INDEX = "android.intent.extra.INDEX";
     field public static final String EXTRA_INITIAL_INTENTS = "android.intent.extra.INITIAL_INTENTS";
@@ -21788,6 +21802,7 @@ package android.hardware.display {
     field public static final int BRIGHTNESS_UNIT_PERCENTAGE = 1; // 0x1
     field @FlaggedApi("com.android.server.display.feature.flags.display_category_built_in") public static final String DISPLAY_CATEGORY_BUILT_IN_DISPLAYS = "android.hardware.display.category.BUILT_IN_DISPLAYS";
     field public static final String DISPLAY_CATEGORY_PRESENTATION = "android.hardware.display.category.PRESENTATION";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String DISPLAY_CATEGORY_XR_PROJECTED = "android.hardware.display.category.XR_PROJECTED";
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_ADDED = 1L; // 0x1L
     field public static final long EVENT_TYPE_DISPLAY_BRIGHTNESS = 32L; // 0x20L
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_CHANGED = 4L; // 0x4L
@@ -21879,6 +21894,14 @@ package android.hardware.display {
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setFlags(int);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setRequestedRefreshRate(@FloatRange(from=0.0f) float);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setSurface(@Nullable android.view.Surface);
+  }
+
+}
+
+package android.hardware.hid {
+
+  @FlaggedApi("com.android.hardware.input.hid_api") public final class HidManager {
+    method public boolean canEnumerateDevices();
   }
 
 }
@@ -34975,7 +34998,7 @@ package android.os {
     field public static final int BAKLAVA = 36; // 0x24
     field public static final int BASE = 1; // 0x1
     field public static final int BASE_1_1 = 2; // 0x2
-    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 10000; // 0x2710
+    field public static final int CINNAMON_BUN = 37; // 0x25
     field public static final int CUPCAKE = 3; // 0x3
     field public static final int CUR_DEVELOPMENT = 10000; // 0x2710
     field public static final int DONUT = 4; // 0x4
@@ -35017,7 +35040,7 @@ package android.os {
     field public static final int BAKLAVA_1 = 3600001; // 0x36ee81
     field public static final int BASE = 100000; // 0x186a0
     field public static final int BASE_1_1 = 200000; // 0x30d40
-    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 1000000000; // 0x3b9aca00
+    field public static final int CINNAMON_BUN = 3700000; // 0x387520
     field public static final int CUPCAKE = 300000; // 0x493e0
     field public static final int DONUT = 400000; // 0x61a80
     field public static final int ECLAIR = 500000; // 0x7a120
@@ -45534,6 +45557,7 @@ package android.telephony {
     field public static final String KEY_ALLOW_MERGE_WIFI_CALLS_WHEN_VOWIFI_OFF_BOOL = "allow_merge_wifi_calls_when_vowifi_off_bool";
     field public static final String KEY_ALLOW_NON_EMERGENCY_CALLS_IN_ECM_BOOL = "allow_non_emergency_calls_in_ecm_bool";
     field public static final String KEY_ALLOW_VIDEO_CALLING_FALLBACK_BOOL = "allow_video_calling_fallback_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_vt_call_low_battery_config") public static final String KEY_ALLOW_VIDEO_CALL_IN_LOW_BATTERY_BOOL = "allow_video_call_in_low_battery_bool";
     field public static final String KEY_ALWAYS_SHOW_DATA_RAT_ICON_BOOL = "always_show_data_rat_icon_bool";
     field @Deprecated public static final String KEY_ALWAYS_SHOW_EMERGENCY_ALERT_ONOFF_BOOL = "always_show_emergency_alert_onoff_bool";
     field public static final String KEY_ALWAYS_SHOW_PRIMARY_SIGNAL_BAR_IN_OPPORTUNISTIC_NETWORK_BOOLEAN = "always_show_primary_signal_bar_in_opportunistic_network_boolean";
@@ -49121,15 +49145,15 @@ package android.telephony.ims {
     method public int describeContents();
     method public int getAttributeFlags();
     method @NonNull public java.util.Set<java.lang.String> getFeatureTags();
-    method @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public boolean getFlagRegistrationTypeEmergency();
-    method @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public boolean getFlagVirtualRegistrationForEmergencyCall();
+    method public boolean getFlagRegistrationTypeEmergency();
+    method public boolean getFlagVirtualRegistrationForEmergencyCall();
     method @FlaggedApi("com.android.internal.telephony.flags.pcscf_address") @Nullable public String getPcscfAddress();
     method @Nullable public android.telephony.ims.SipDetails getSipDetails();
     method public int getTransportType();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field public static final int ATTR_EPDG_OVER_CELL_INTERNET = 1; // 0x1
-    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_REGISTRATION_TYPE_EMERGENCY = 2; // 0x2
-    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_VIRTUAL_FOR_ANONYMOUS_EMERGENCY_CALL = 4; // 0x4
+    field public static final int ATTR_REGISTRATION_TYPE_EMERGENCY = 2; // 0x2
+    field public static final int ATTR_VIRTUAL_FOR_ANONYMOUS_EMERGENCY_CALL = 4; // 0x4
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.ims.ImsRegistrationAttributes> CREATOR;
   }
 
@@ -54349,7 +54373,7 @@ package android.view {
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getDesiredMaxRate();
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getDesiredMinRate();
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getFixedSourceRate();
-    field @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static final android.view.Surface.FrameRateParams IGNORE;
+    field @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") @NonNull public static final android.view.Surface.FrameRateParams IGNORE;
   }
 
   @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static final class Surface.FrameRateParams.Builder {

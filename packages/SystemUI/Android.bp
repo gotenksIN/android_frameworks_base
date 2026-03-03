@@ -436,6 +436,7 @@ android_library {
         "android.app.flags-aconfig",
         "android.net.platform.flags-aconfig",
         "com_android_systemui_flags",
+        "uilatencystats_flags",
     ],
 }
 
@@ -574,6 +575,7 @@ android_library {
         "displaylib",
         "aconfig_settings_flags_lib",
         "SurfaceEffectsComposeLib",
+        "uilatencystats_flags_core_java_lib",
     ],
     enable_ksp: true,
     annotation_processor_flags: [
@@ -748,7 +750,6 @@ android_library {
         "monet",
         "libmonet",
         "lottie_compose",
-        "dagger2",
         "jsr330",
         "WindowManager-Shell",
         "LowLightDreamLib",
@@ -879,7 +880,6 @@ android_app {
         "--extra-packages",
         "com.android.systemui",
     ],
-    dont_merge_manifests: true,
     platform_apis: true,
     system_ext_specific: true,
     certificate: "platform",
@@ -895,14 +895,11 @@ android_app {
             ":sysui_proguard_common_and_kotlin",
         ],
     },
-
-    plugins: ["dagger2-compiler"],
 }
 
 java_library {
     name: "RoboTestLibraries",
     static_libs: [
-        "dagger2",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
@@ -950,9 +947,6 @@ android_robolectric_test {
 
     instrumentation_for: "SystemUIRobo-stub",
     java_resource_dirs: ["tests/robolectric/config"],
-    plugins: [
-        "dagger2-compiler",
-    ],
     strict_mode: false,
 }
 
@@ -989,9 +983,6 @@ android_robolectric_test {
 
     instrumentation_for: "SystemUIRobo-stub",
     java_resource_dirs: ["tests/robolectric/config"],
-    plugins: [
-        "dagger2-compiler",
-    ],
     strict_mode: false,
 }
 
@@ -1026,11 +1017,6 @@ android_ravenwood_test {
     aaptflags: [
         "--extra-packages",
         "com.android.systemui",
-    ],
-    enable_ksp: true,
-    plugins: ["dagger2-compiler"],
-    annotation_processor_flags: [
-        "dagger.useBindingGraphFix=ENABLED",
     ],
     team: "trendy_team_ravenwood",
 }

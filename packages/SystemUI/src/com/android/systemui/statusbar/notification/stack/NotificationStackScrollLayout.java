@@ -1271,7 +1271,8 @@ public class NotificationStackScrollLayout
 
     @Override
     public void setPlaceholderAlpha(float alpha) {
-        mController.setMaxAlphaFromPlaceholder(alpha);
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        mAmbientState.setPlaceholderAlpha(alpha);
     }
 
     @Override
@@ -3966,6 +3967,10 @@ public class NotificationStackScrollLayout
         if (!SceneContainerFlag.isEnabled()) {
             return false;
         }
+        if (!isRootViewVisible()) {
+            debugShadeLog("NSSL's root view is not visible. Refusing touch event");
+            return true;
+        }
         boolean interactive = mScrollViewFields.interactive;
         boolean isOutBounds = isOutBoundsDownEvent(ev);
         boolean result = !interactive || isOutBounds;
@@ -3974,6 +3979,10 @@ public class NotificationStackScrollLayout
                     isOutBounds);
         }
         return result;
+    }
+
+    private boolean isRootViewVisible() {
+        return getRootView().getVisibility() == View.VISIBLE;
     }
 
     /**
@@ -4030,6 +4039,10 @@ public class NotificationStackScrollLayout
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         if (SceneContainerFlag.isEnabled()) {
+            if (!isRootViewVisible()) {
+                debugShadeLog("NSSL's root view is not visible. Touch not dispatched.");
+                return false;
+            }
             int action = ev.getActionMasked();
             boolean isTouchInGuts = mController.isTouchInGutsView(ev);
             if (action == ACTION_DOWN && !isTouchInGuts) {

@@ -143,3 +143,99 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
 }
+policy_metadata {
+  identifier {
+    field_name: "CONTENT_RESTRICTION_APPS"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "List"
+    package_name: "java.util"
+  }
+  documentation: "Policy that sets the list of packages that are enforced as content restriction role holders.\nThis allows admins to designate specific apps responsible for filtering and monitoring\ncontent for the user.\n<p>\nIf the value is {@code null}, the admin's enforcement is cleared, and the system\nre-evaluates the role holders based on other active policies.\n<p>\nDesignation as a content restriction app is a privileged state that allows\nthe package to perform sensitive filtering actions."
+  type_specific_metadata {
+    list_metadata {
+      string_metadata {
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+}
+policy_metadata {
+  identifier {
+    field_name: "AUTO_TIME_ZONE"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether the device's time zone is set automatically, e.g. obtained from\nnetwork or location."
+  type_specific_metadata {
+    enum_metadata {
+      int_def_name: "android.app.admin.PolicyIdentifier.AutoTimeValue"
+      documentation: "Possible values {@link AUTO_TIME_ZONE}\n\n@hide"
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_USER_CHOICE"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        documentation: "The user can choose whether the device's time zone is set automatically or not."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_DISABLED_UNENFORCED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "The admin has disabled automatic time zone detection. This is\nnot enforced and the user can still enable it."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_ENABLED_UNENFORCED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "The admin has enabled the time zone to be automatically obtained from the network. This is\nnot enforced and the user can still disable it."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_DISABLED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 3
+        documentation: "The admin has disabled automatic time zone detection. This is enforced and the user cannot\nenable it."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_ENABLED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 4
+        documentation: "The admin has enabled the time zone to be automatically obtained from the network. This is\nenforced and the user cannot disable it."
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_DEVICE
+  affected_resource: RESOURCE_DEVICE_WIDE
+  required_permission: "android.permission.SET_TIME_ZONE"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+}

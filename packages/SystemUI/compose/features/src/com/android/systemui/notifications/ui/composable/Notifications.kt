@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -768,8 +769,7 @@ private fun NotificationRulesEntryPoint(
         ) {
             Icon(
                 imageVector = Icons.Filled.FilterList,
-                // TODO: b/478225883 - Translate the content description.
-                contentDescription = "Notification rules",
+                contentDescription = stringResource(R.string.notification_rules_activity_title),
                 modifier = Modifier.size(18.dp),
             )
         }

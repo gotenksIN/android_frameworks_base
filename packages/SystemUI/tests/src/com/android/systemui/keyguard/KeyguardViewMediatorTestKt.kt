@@ -31,6 +31,7 @@ import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper
 import android.testing.TestableLooper.RunWithLooper
+import android.uilatencystats.UiLatencyStatsManager
 import android.view.IRemoteAnimationFinishedCallback
 import android.view.RemoteAnimationTarget
 import android.view.SurfaceControl
@@ -87,6 +88,7 @@ import com.android.systemui.plugins.statusbar.statusBarStateController
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
 import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.process.processWrapper
+import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.settings.userTracker
 import com.android.systemui.shade.shadeController
 import com.android.systemui.statusbar.notificationShadeDepthController
@@ -109,6 +111,7 @@ import com.android.systemui.util.time.systemClock
 import com.android.systemui.wallpapers.data.repository.wallpaperRepository
 import com.android.wm.shell.keyguard.KeyguardTransitions
 import com.google.common.truth.Truth.assertThat
+import java.util.Optional
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -205,6 +208,8 @@ class KeyguardViewMediatorTestKt : SysuiTestCase() {
                 { communalSceneInteractor },
                 { communalSettingsInteractor },
                 mock<WindowManagerOcclusionManager>(),
+                Optional.of(mock<UiLatencyStatsManager>()),
+                { kosmos.sceneInteractor },
             )
         }
 

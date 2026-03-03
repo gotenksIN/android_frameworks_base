@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.bubbles;
 
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.service.notification.NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_DELETED;
 import static android.service.notification.NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_UPDATED;
 import static android.service.notification.NotificationListenerService.REASON_CANCEL;
@@ -2360,6 +2361,28 @@ public class BubbleController implements ConfigurationChangeListener,
     }
 
     /**
+     * Removes the bubble with the given key if it has the given taskId.
+     * <p>
+     * Task id check is ignored if the bubble with the given key is not associated with a task.
+     */
+    @MainThread
+    public void removeBubble(String key, int taskId, @Bubbles.DismissReason int reason) {
+        Bubble bubble = mBubbleData.getBubbleInStackWithKey(key);
+        if (bubble != null) {
+            int bubbleTaskId = bubble.getTaskId();
+            if (bubbleTaskId == taskId || bubbleTaskId == INVALID_TASK_ID) {
+                mBubbleData.dismissBubbleWithKey(key, reason);
+            } else {
+                BubbleLog.d("BubbleController.removeBubble() key=%s taskId=%d bubbleTaskId=%d "
+                        + "no bubble for given key and taskId", key, taskId, bubbleTaskId);
+            }
+        } else {
+            BubbleLog.d("BubbleController.removeBubble() key=%s taskId=%d no bubble for given key",
+                    key, taskId);
+        }
+    }
+
+    /**
      * Removes all the bubbles.
      * <p>
      * Must be called from the main thread.
@@ -3223,12 +3246,16 @@ public class BubbleController implements ConfigurationChangeListener,
                 return IME_ANIMATION_DEFAULT;
             }
 
-            int height = hiddenTop - shownTop;
+            // the ime height from the bottom of the screen
+            int imeHeight = hiddenTop - shownTop;
+            // the ime height in BubblePositioner excludes the screen bottom inset. to compare the
+            // previous height in BubblePositioner with the new height we have to add back the
+            // bottom inset.
             int previousImeHeight =
                     mBubblePositioner.getImeHeight() + mBubblePositioner.getInsets().bottom;
-            boolean heightChanged = height != previousImeHeight;
+            boolean heightChanged = imeHeight != previousImeHeight;
             if (showing) {
-                mBubblePositioner.setImeVisible(true, hiddenTop - shownTop);
+                mBubblePositioner.setImeVisible(true, imeHeight);
             } else {
                 mBubblePositioner.setImeVisible(false, 0);
             }

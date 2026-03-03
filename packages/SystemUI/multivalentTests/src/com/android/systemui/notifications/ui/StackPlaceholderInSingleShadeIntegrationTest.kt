@@ -19,6 +19,7 @@ package com.android.systemui.notifications.ui
 import android.content.res.mainResources
 import android.platform.test.annotations.MotionTest
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.TouchInjectionScope
@@ -60,6 +61,7 @@ import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.GoneScene
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.scene.ui.viewmodel.GoneUserActionsViewModel
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
@@ -125,7 +127,7 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
     }
 
     fun setupMediaForShade() {
-        kosmos.fakeMediaRepository.currentMedia = listOf(kosmos.fakeActiveMedia)
+        kosmos.fakeMediaRepository.currentMedia = mutableStateListOf(kosmos.fakeActiveMedia)
         val userMedia = MediaData(active = true)
         kosmos.mediaPipelineRepository.addCurrentUserMediaEntry(userMedia)
     }
@@ -261,6 +263,7 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )

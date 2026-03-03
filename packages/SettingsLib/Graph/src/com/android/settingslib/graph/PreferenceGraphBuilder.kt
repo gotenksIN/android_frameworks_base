@@ -36,16 +36,19 @@ import com.android.settingslib.graph.PreferenceGetterFlags.forceIncludeAllScreen
 import com.android.settingslib.graph.PreferenceGetterFlags.includeMetadata
 import com.android.settingslib.graph.PreferenceGetterFlags.includeValue
 import com.android.settingslib.graph.PreferenceGetterFlags.includeValueDescriptor
+import com.android.settingslib.graph.proto.KeyParametersSchemaProto
+import com.android.settingslib.graph.proto.ParameterDefinitionProto
 import com.android.settingslib.graph.proto.PreferenceGraphProto
 import com.android.settingslib.graph.proto.PreferenceGroupProto
 import com.android.settingslib.graph.proto.PreferenceProto
 import com.android.settingslib.graph.proto.PreferenceProto.ActionTarget
 import com.android.settingslib.graph.proto.PreferenceScreenProto
+import com.android.settingslib.graph.proto.PreferenceValueDescriptorProto
 import com.android.settingslib.graph.proto.TextProto
 import com.android.settingslib.metadata.CatalystFlagProviderFactory
 import com.android.settingslib.metadata.EXTRA_BINDING_SCREEN_ARGS
 import com.android.settingslib.metadata.IntRangeValuePreference
-import com.android.settingslib.metadata.ValidatedKeyParameters
+import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.PersistentPreference
 import com.android.settingslib.metadata.KEY_PACKAGE_NAME
 import com.android.settingslib.metadata.PreferenceAvailabilityProvider
@@ -61,13 +64,17 @@ import com.android.settingslib.metadata.PreferenceScreenRegistry
 import com.android.settingslib.metadata.PreferenceSummaryProvider
 import com.android.settingslib.metadata.PreferenceTitleProvider
 import com.android.settingslib.metadata.ReadWritePermit
-import com.android.settingslib.metadata.SensitivityLevel.Companion.HIGH_SENSITIVITY
-import com.android.settingslib.metadata.SensitivityLevel.Companion.UNKNOWN_SENSITIVITY
-import com.android.settingslib.metadata.preferencesapi.ApiPreference
-import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen
+import com.android.settingslib.metadata.SensitivityLevel.Companion.DEEP_LINK_ONLY
+import com.android.settingslib.metadata.SensitivityLevel.Companion.DO_NOT_EXPOSE
+import com.android.settingslib.metadata.ValidatedKeyParameters
 import com.android.settingslib.metadata.getPreferenceIcon
 import com.android.settingslib.metadata.isPreferenceIndexable
 import com.android.settingslib.metadata.isUiOnlyPreference
+import com.android.settingslib.metadata.preferencesapi.ApiPreference
+import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen
+import com.android.settingslib.metadata.preferencesapi.types.ApiType
+import com.android.settingslib.metadata.preferencesapi.types.FiniteOptionsType
+import com.android.settingslib.metadata.preferencesapi.types.IntInRange
 import com.android.settingslib.preference.PreferenceScreenCreator
 import com.android.settingslib.preference.PreferenceScreenFactory
 import com.android.settingslib.preference.PreferenceScreenProvider
@@ -77,6 +84,7 @@ import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 private const val TAG = "PreferenceGraphBuilder"
@@ -94,17 +102,20 @@ private constructor(
         PreferenceScreenFactory(context.ofLocale(request.locale))
     }
     private val builder by lazy { PreferenceGraphProto.newBuilder() }
+    private val valueDescriptors = mutableMapOf<String, PreferenceValueDescriptorProto>()
     private val visitedScreens = request.visitedScreens.toMutableSet()
     private val screens = mutableMapOf<String, PreferenceScreenProto.Builder>()
     private val forceIncludeAllScreens = request.flags.forceIncludeAllScreens()
     private val includeParameters = (request.flags and PreferenceGetterFlags.PARAMETERS) != 0
     private val includeHierarchy = (request.flags and PreferenceGetterFlags.EXCLUDE_HIERARCHY) == 0
     private val shrinkHierarchy = (request.flags and PreferenceGetterFlags.SHRINK_HIERARCHY) != 0
-    private val excludeUiOnlyPreferences = !AppUtils.isDebuggable() || Settings.Global.getInt(
-        context.contentResolver,
-        "com.android.settings.EXCLUDE_UI_ONLY_PREFERENCES",
-        1
-    ) == 1
+    private val excludeUiOnlyPreferences =
+        !AppUtils.isDebuggable() ||
+            Settings.Global.getInt(
+                context.contentResolver,
+                "com.android.settings.EXCLUDE_UI_ONLY_PREFERENCES",
+                1,
+            ) == 1
 
     private val HIERARCHY_CHILD_LIMIT = 50
 
@@ -113,11 +124,12 @@ private constructor(
         for (screen in request.screens) {
             val screenKey = screen.screenKey
             val factory = factories[screenKey] ?: continue
-            val hasParameters = if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
-                screen.keyParameters != null
-            } else {
-                screen.args != null
-            }
+            val hasParameters =
+                if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
+                    screen.keyParameters != null
+                } else {
+                    screen.args != null
+                }
             if (!hasParameters && factory is PreferenceScreenMetadataParameterizedFactory) {
                 addPreferenceScreen(screenKey, factory)
             } else {
@@ -128,6 +140,7 @@ private constructor(
 
     fun build(): PreferenceGraphProto {
         for ((key, screenBuilder) in screens) builder.putScreens(key, screenBuilder.build())
+        builder.putAllValueDescriptors(valueDescriptors)
         return builder.build()
     }
 
@@ -266,13 +279,13 @@ private constructor(
             screen.root = preferenceGroupProto { preference = preferenceProto { key = screenKey } }
             screen.parameterized = true
             if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
-                screen.parametersSchema = factory.parametersSchema.toJsonString(context)
+                screen.parametersSchema =
+                    factory.parametersSchema.toProto(context, valueDescriptors)
             }
             if (includeParameters) {
                 if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
                     factory.keyParameters(context).collect {
-                        screen.addKeyParameters(it.toProto())
-                    }
+                        screen.addKeyParameters(it.toProto()) }
                 } else {
                     factory.parameters(context).collect { screen.addParameters(it.toProto()) }
                 }
@@ -307,33 +320,41 @@ private constructor(
         return if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
             addPreferenceScreenWithKeyParameters(metadata.key, metadata.keyParameters) {
                 completeHierarchy = metadata.hasCompleteHierarchy()
-                root = if (includeHierarchy) {
-                    metadata.getPreferenceHierarchy(context, coroutineScope).toProto(metadata, true)
-                } else {
-                    preferenceGroupProto { preference = toProto(metadata, metadata, true) }
-                }
+                root =
+                    if (includeHierarchy) {
+                        metadata
+                            .getPreferenceHierarchy(context, coroutineScope)
+                            .toProto(metadata, true)
+                    } else {
+                        preferenceGroupProto { preference = toProto(metadata, metadata, true) }
+                    }
             }
         } else {
             addPreferenceScreen(metadata.key, metadata.arguments) {
                 completeHierarchy = metadata.hasCompleteHierarchy()
-                root = if (includeHierarchy) {
-                    metadata.getPreferenceHierarchy(context, coroutineScope).toProto(metadata, true)
-                } else {
-                    preferenceGroupProto { preference = toProto(metadata, metadata, true) }
-                }
+                root =
+                    if (includeHierarchy) {
+                        metadata
+                            .getPreferenceHierarchy(context, coroutineScope)
+                            .toProto(metadata, true)
+                    } else {
+                        preferenceGroupProto { preference = toProto(metadata, metadata, true) }
+                    }
             }
         }
     }
 
     private fun checkScreenFlag(metadata: PreferenceScreenMetadata): Boolean {
-        val isFlagDisabled = when (metadata) {
-            is PreferenceScreenCreator, is PreferencesApiScreen -> {
-                !metadata.isFlagEnabled(context)
+        val isFlagDisabled =
+            when (metadata) {
+                is PreferenceScreenCreator,
+                is PreferencesApiScreen -> {
+                    !metadata.isFlagEnabled(context)
+                }
+                else -> {
+                    false
+                }
             }
-            else -> {
-                false
-            }
-        }
 
         if (!forceIncludeAllScreens && isFlagDisabled) {
             Log.w(TAG, "Ignore ${metadata.key} as the flag is disabled")
@@ -379,7 +400,7 @@ private constructor(
             PreferenceScreenProto.newBuilder().also {
                 it.parameterized = true
                 PreferenceScreenRegistry.getScreenParametersSchema(key)?.let { schema ->
-                    it.parametersSchema = schema.toJsonString(context)
+                    it.parametersSchema = schema.toProto(context, valueDescriptors)
                 }
             }
 
@@ -463,7 +484,15 @@ private constructor(
     ) =
         try {
             metadata
-                .toProto(context, callingPid, callingUid, screenMetadata, isRoot, request.flags)
+                .toProto(
+                    context,
+                    callingPid,
+                    callingUid,
+                    screenMetadata,
+                    isRoot,
+                    request.flags,
+                    valueDescriptors,
+                )
                 .also {
                     if (!isRoot && shrinkHierarchy) return@also
                     if (metadata is PreferenceScreenMetadata) {
@@ -523,7 +552,9 @@ private constructor(
                 val screenKey = screen?.key
                 if (!screenKey.isNullOrEmpty()) {
                     if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
-                        addPreferenceScreenWithKeyParameters(screenKey, null) { root = screen.toProto() }
+                        addPreferenceScreenWithKeyParameters(screenKey, null) {
+                            root = screen.toProto()
+                        }
                     } else {
                         @Suppress("CheckReturnValue")
                         addPreferenceScreen(screenKey, null) { root = screen.toProto() }
@@ -567,9 +598,10 @@ fun PreferenceMetadata.toProto(
     screenMetadata: PreferenceScreenMetadata,
     isRoot: Boolean,
     flags: Int,
+    valueDescriptors: MutableMap<String, PreferenceValueDescriptorProto>? = null,
 ) = preferenceProto {
     val metadata = this@toProto
-    key = metadata.bindingKey
+    key = metadata.key
     if (flags.includeMetadata()) {
         metadata.getTitleTextProto(context, isRoot)?.let { title = it }
         if (metadata.summary != 0) {
@@ -580,11 +612,12 @@ fun PreferenceMetadata.toProto(
             }
         }
         val metadataIcon = metadata.getPreferenceIcon(context)
-        writable = if (metadata is ApiPreference<*>) {
-            metadata.set != null
-        } else {
-            false // Legacy preferences are not writable
-        }
+        writable =
+            if (metadata is ApiPreference<*>) {
+                metadata.set != null
+            } else {
+                false // Legacy preferences are not writable
+            }
 
         if (metadataIcon != 0) icon = metadataIcon
         if (metadata.keywords != 0) keywords = metadata.keywords
@@ -610,6 +643,21 @@ fun PreferenceMetadata.toProto(
         } else {
             metadata.intent(context)?.let { actionTarget = it.toActionTarget(context) }
         }
+
+        if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
+            if (metadata is PreferenceScreenMetadata) {
+                metadata.keyParametersSchema?.let {
+                    parametersSchema = it.toProto(context, valueDescriptors)
+                }
+                metadata.keyParameters?.let { keyParameters = it.toProto() }
+            } else if (metadata is ApiPreference<*>) {
+                metadata.getParametersSchema()?.let {
+                    parametersSchema = it.toProto(context, valueDescriptors)
+                }
+                metadata.getParameters()?.let { keyParameters = it.toProto() }
+            }
+        }
+
         val launchTarget = if (screenMetadata != metadata) metadata else null
         screenMetadata.getLaunchIntent(context, launchTarget)?.let { launchIntent = it.toProto() }
         for (tag in metadata.tags(context)) addTags(tag)
@@ -642,32 +690,51 @@ fun PreferenceMetadata.toProto(
     ) {
         val storage = metadata.storage(context)
         value = preferenceValueProto {
-            val key = metadata.bindingKey
+            val key = metadata.key
             when (metadata.valueType) {
+                Int::class.java,
                 Int::class.javaObjectType -> storage.getInt(key)?.let { intValue = it }
+                Boolean::class.java,
                 Boolean::class.javaObjectType -> storage.getBoolean(key)?.let { booleanValue = it }
+                Float::class.java,
                 Float::class.javaObjectType -> storage.getFloat(key)?.let { floatValue = it }
+                Long::class.java,
                 Long::class.javaObjectType -> storage.getLong(key)?.let { longValue = it }
-                String::class.javaObjectType -> storage.getString(key) ?.let {stringValue = it}
-                else -> {}
+                String::class.java,
+                String::class.javaObjectType -> storage.getString(key)?.let { stringValue = it }
+                else -> error("Error: Unsupported type ${metadata.valueType}")
             }
         }
     }
     if (flags.includeValueDescriptor()) {
-        valueDescriptor = preferenceValueDescriptorProto {
-            when (metadata) {
-                is IntRangeValuePreference -> rangeValue = rangeValueProto {
+        if (metadata is ApiPreference<*>) {
+            valueDescriptor = metadata.type.toProto(context, valueDescriptors)
+        } else {
+            valueDescriptor = preferenceValueDescriptorProto {
+                if (metadata is IntRangeValuePreference) {
+                    rangeValue = rangeValueProto {
                         min = metadata.getMinValue(context)
                         max = metadata.getMaxValue(context)
                         step = metadata.getIncrementStep(context)
                     }
-                else -> {}
-            }
-            when (metadata.valueType) {
-                Boolean::class.javaObjectType -> booleanType = true
-                Float::class.javaObjectType -> floatType = true
-                Long::class.javaObjectType -> longType = true
-                String::class.javaObjectType -> stringType = true
+                }
+                when (metadata.valueType) {
+                    Int::class.java,
+                    Int::class.javaObjectType -> {
+                        if (!hasRangeValue()) {
+                            rangeValue = rangeValueProto {}
+                        }
+                    }
+                    Boolean::class.java,
+                    Boolean::class.javaObjectType -> booleanType = true
+                    Float::class.java,
+                    Float::class.javaObjectType -> floatType = true
+                    Long::class.java,
+                    Long::class.javaObjectType -> longType = true
+                    String::class.java,
+                    String::class.javaObjectType -> stringType = true
+                    else -> error("Error: Unsupported type ${metadata.valueType}")
+                }
             }
         }
     }
@@ -694,20 +761,21 @@ fun <T> PersistentPreference<T>.evalWritePermit(
     val isDebuggable = AppUtils.isDebuggable()
 
     // Use the global setting as a gate for debug environments
-    val hasUnknownSensitivitySettings = Settings.Global.getInt(
-        context.contentResolver,
-        "com.android.settings.UNKNOWN_SENSITIVITY_IS_AVAILABLE",
-        0
-    ) == 1
+    val hasUnknownSensitivitySettings =
+        Settings.Global.getInt(
+            context.contentResolver,
+            "com.android.settings.UNKNOWN_SENSITIVITY_IS_AVAILABLE",
+            0,
+        ) == 1
 
     return when {
         // High sensitivity is strictly disallowed.
-        sensitivityLevel == HIGH_SENSITIVITY -> ReadWritePermit.DISALLOW
+        sensitivityLevel == DEEP_LINK_ONLY -> ReadWritePermit.DISALLOW
 
         // Unknown sensitivity is disallowed, unless we are on a debuggable build
         // and the caller holds the WRITE_SECURE_SETTINGS permission.
-        sensitivityLevel == UNKNOWN_SENSITIVITY &&
-                !(isDebuggable && hasUnknownSensitivitySettings) -> ReadWritePermit.DISALLOW
+        sensitivityLevel == DO_NOT_EXPOSE &&
+            !(isDebuggable && hasUnknownSensitivitySettings) -> ReadWritePermit.DISALLOW
 
         // If the app lacks the required permissions, require them.
         getWritePermissions(context)?.check(context, callingPid, callingUid) == false ->
@@ -744,6 +812,108 @@ private fun Intent.toActionTarget(context: Context): ActionTarget {
         setClassName(context, component!!.className)
     }
     return actionTargetProto { intent = toProto() }
+}
+
+private fun KeyParametersSchema.toProto(
+    context: Context,
+    valueDescriptors: MutableMap<String, PreferenceValueDescriptorProto>? = null,
+): KeyParametersSchemaProto {
+    val builder = KeyParametersSchemaProto.newBuilder()
+    getParameters().forEach { (name, definition) ->
+        val schemaMap = definition.toParameterSchemaMap(context)
+        val purpose = schemaMap[KeyParametersSchema.ParameterDefinition.PURPOSE_KEY] as? String
+        val required =
+            schemaMap[KeyParametersSchema.ParameterDefinition.REQUIRED_KEY] as? Boolean ?: false
+        val paramProto = ParameterDefinitionProto.newBuilder().setRequired(required)
+        purpose?.let { paramProto.setPurpose(it) }
+
+        paramProto.setValueDescriptor(definition.type.toProto(context, valueDescriptors))
+
+        builder.putParameters(name, paramProto.build())
+    }
+    return builder.build()
+}
+
+private fun ApiType<*>.toProto(
+    context: Context,
+    valueDescriptors: MutableMap<String, PreferenceValueDescriptorProto>?,
+): PreferenceValueDescriptorProto {
+    val descriptorKey = getKey()
+
+    fun PreferenceValueDescriptorProto.Builder.setType() {
+        if (this@toProto is IntInRange) {
+            rangeValue = rangeValueProto {
+                this@toProto.min?.let { min = it }
+                this@toProto.max?.let { max = it }
+                this@toProto.step.let { step = it }
+            }
+        }
+        when (val valueType = this@toProto.getType()) {
+            Int::class.java,
+            Int::class.javaObjectType -> {
+                if (!hasRangeValue()) {
+                    rangeValue = rangeValueProto {}
+                }
+            }
+            Boolean::class.java,
+            Boolean::class.javaObjectType -> booleanType = true
+            Float::class.java,
+            Float::class.javaObjectType -> floatType = true
+            Long::class.java,
+            Long::class.javaObjectType -> longType = true
+            String::class.java,
+            String::class.javaObjectType -> stringType = true
+            else -> error("Error: Unsupported type $valueType")
+        }
+    }
+
+    fun createFullDescriptor() = preferenceValueDescriptorProto {
+        valueDescriptorKey = descriptorKey
+        description = this@toProto.getDescription(context)
+        this@toProto.getParametersSchema()?.let {
+            parametersSchema = it.toProto(context, valueDescriptors)
+        }
+        this@toProto.getParameters()?.let { parameters = it.toProto() }
+
+        setType()
+
+        if (this@toProto is FiniteOptionsType<*>) {
+            runBlocking {
+                this@toProto.getOptions(context).forEach {
+                    addPossibleValues(
+                        possibleValueProto {
+                            value = preferenceValueProto {
+                                when (this@toProto.getType()) {
+                                    Int::class.java,
+                                    Int::class.javaObjectType -> intValue = it.first as Int
+                                    Boolean::class.java,
+                                    Boolean::class.javaObjectType -> booleanValue = it.first as Boolean
+                                    Float::class.java,
+                                    Float::class.javaObjectType -> floatValue = it.first as Float
+                                    Long::class.java,
+                                    Long::class.javaObjectType -> longValue = it.first as Long
+                                    String::class.java,
+                                    String::class.javaObjectType -> stringValue = it.first as String
+                                    else -> error("Error: Unsupported type ${this@toProto.getType()}")
+                                }
+                            }
+                            description = it.second
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    if (valueDescriptors != null) {
+        valueDescriptors.getOrPut(descriptorKey) { createFullDescriptor() }
+        return preferenceValueDescriptorProto {
+            valueDescriptorKey = descriptorKey
+            setType()
+        }
+    } else {
+        return createFullDescriptor()
+    }
 }
 
 @SuppressLint("AppBundleLocaleChanges")

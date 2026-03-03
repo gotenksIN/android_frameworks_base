@@ -1206,10 +1206,11 @@ public final class ActiveServices {
             boolean isBgFgsRestrictionEnabledForService =  isBgFgsRestrictionEnabled(r, callingUid);
             logFgsBackgroundStart(r, isBgFgsRestrictionEnabledForService);
             if (!r.isFgsAllowedStart() && isBgFgsRestrictionEnabledForService) {
-                String msg = "startForegroundService() not allowed due to "
-                        + "mAllowStartForeground false: service "
+                final String msg = "startForegroundService() not allowed: "
+                        + "service "
                         + r.shortInstanceName;
-                Slog.w(TAG, msg);
+                Slog.w(TAG, msg + (r.mInfoAllowStartForeground != null
+                        ? "; " + r.mInfoAllowStartForeground : ""));
                 showFgsBgRestrictedNotificationLocked(r);
                 logFGSStateChangeLocked(r,
                         FOREGROUND_SERVICE_STATE_CHANGED__STATE__DENIED,
@@ -2759,11 +2760,12 @@ public final class ActiveServices {
                         logFgsBackgroundStart(r, isBgFgsRestrictionEnabledForService);
                         if (!r.isFgsAllowedStart()
                                 && isBgFgsRestrictionEnabledForService) {
-                            final String msg = "Service.startForeground() not allowed due to "
-                                    + "mAllowStartForeground false: service "
+                            final String msg = "Service.startForeground() not allowed: "
+                                    + "service "
                                     + r.shortInstanceName
                                     + (isOldTypeShortFgs ? " (Called on SHORT_SERVICE)" : "");
-                            Slog.w(TAG, msg);
+                            Slog.w(TAG, msg + (r.mInfoAllowStartForeground != null
+                                    ? "; " + r.mInfoAllowStartForeground : ""));
                             showFgsBgRestrictedNotificationLocked(r);
                             updateServiceForegroundLocked(psr, true);
                             ignoreForeground = true;
@@ -6518,8 +6520,14 @@ public final class ActiveServices {
         final boolean isolated = (r.serviceInfo.flags&ServiceInfo.FLAG_ISOLATED_PROCESS) != 0;
         final String procName = r.processName;
         final boolean isPcc = (r.serviceInfo.flags & ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX) != 0;
+        final String hostingType;
+        if (r.isStartRequested()) {
+            hostingType = HostingRecord.HOSTING_TYPE_STARTED_SERVICE;
+        } else {
+            hostingType = HostingRecord.HOSTING_TYPE_BOUND_SERVICE;
+        }
         HostingRecord hostingRecord = new HostingRecord(
-                HostingRecord.HOSTING_TYPE_SERVICE, r.instanceName,
+                hostingType, r.instanceName,
                 r.definingPackageName, r.definingUid, r.serviceInfo.processName,
                 getHostingRecordTriggerType(r), isPcc, r.mRecentCallingUid,
                 r.getRecentCallerProcessName());
@@ -6599,7 +6607,7 @@ public final class ActiveServices {
                 app = r.isolationHostProc;
                 if (WebViewZygote.isMultiprocessEnabled()
                         && r.serviceInfo.packageName.equals(WebViewZygote.getPackageName())) {
-                    hostingRecord = HostingRecord.byWebviewZygote(r.instanceName,
+                    hostingRecord = HostingRecord.byWebviewZygote(hostingType, r.instanceName,
                             r.definingPackageName,
                             r.definingUid, r.serviceInfo.processName,
                             r.mRecentCallingUid, r.getRecentCallerProcessName());
@@ -6607,7 +6615,8 @@ public final class ActiveServices {
                 if ((r.serviceInfo.flags & ServiceInfo.FLAG_USE_APP_ZYGOTE) != 0) {
                     boolean isNativeService =
                             android.os.Flags.nativeAppZygote() && r.mIsNativeIsolated;
-                    hostingRecord = HostingRecord.byAppZygote(r.instanceName, r.definingPackageName,
+                    hostingRecord = HostingRecord.byAppZygote(hostingType, r.instanceName,
+                            r.definingPackageName,
                             r.definingUid, r.serviceInfo.processName, isNativeService,
                             r.mRecentCallingUid, r.getRecentCallerProcessName());
                 }
@@ -9839,6 +9848,7 @@ public final class ActiveServices {
                         + "; callingUid: " + callingUid
                         + "; uidState: " + ProcessList.makeProcStateString(uidState)
                         + "; uidBFSL: " + (uidBfsl ? "[BFSL]" : "n/a")
+                        + "; BFGS denied: " + (ret == REASON_DENIED)
                         + "; intent: " + intent
                         + "; code:" + reasonCodeToString(ret)
                         + "; tempAllowListReason:<"
@@ -9854,7 +9864,7 @@ public final class ActiveServices {
                         + "; callerTargetSdkVersion:" + callerTargetSdkVersion
                         + "; startForegroundCount:" + r.mStartForegroundCount
                         + "; bindFromPackage:" + bindFromPackage
-                        + ": isBindService:" + isBindService
+                        + "; isBindService:" + isBindService
                         + "]";
         if (!debugInfo.equals(r.mInfoAllowStartForeground)) {
             r.mLoggedInfoAllowStartForeground = false;

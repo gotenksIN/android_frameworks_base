@@ -23,6 +23,7 @@
 #include "Bitmap.h"
 
 #include <android-base/file.h>
+#include <com_android_graphics_surfaceflinger_flags.h>
 #include <utils/Trace.h>
 
 #include "FeatureFlags.h"
@@ -30,9 +31,7 @@
 #include "OutOfProcessRendering.h"
 #include "Properties.h"
 #include "utils/Color.h"
-
 #ifdef __ANDROID__  // Layoutlib does not support render thread
-#include <com_android_graphics_surfaceflinger_flags.h>
 #include <private/android/AHardwareBufferHelpers.h>
 #include <ui/GraphicBuffer.h>
 #include <ui/GraphicBufferMapper.h>
@@ -71,8 +70,6 @@
 #include <atomic>
 #include <format>
 #include <limits>
-
-namespace hwui_flags = com::android::graphics::hwui::flags;
 
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 #include <cutils/properties.h>
@@ -170,8 +167,7 @@ static sk_sp<Bitmap> allocateBitmap(SkBitmap* bitmap, AllocPixelRef alloc) {
 
 std::string Bitmap::getAshmemId(const char* tag, uint64_t bitmapId,
                                 int width, int height, size_t size) {
-    if (!hwui_flags::bitmap_ashmem_long_name() ||
-        !uirenderer::Properties::bitmapAshmemLongName) {
+    if (!uirenderer::Properties::bitmapAshmemLongName) {
         return "bitmap";
     }
     static std::string sCmdline = [] {
@@ -385,7 +381,8 @@ Bitmap::Bitmap(AHardwareBuffer* buffer, const SkImageInfo& info, size_t rowBytes
     setImmutable();  // HW bitmaps are always immutable
     mImage = SkImages::DeferredFromAHardwareBuffer(buffer, mInfo.alphaType(),
                                                    mInfo.refColorSpace());
-    uirenderer::oopr::registerBuffer(GraphicBuffer::fromAHardwareBuffer(buffer), mImage);
+    uirenderer::OoprClient::getInstance()->registerBuffer(
+            GraphicBuffer::fromAHardwareBuffer(buffer), mImage);
     traceBitmapCreate();
 }
 #endif
@@ -410,7 +407,7 @@ Bitmap::~Bitmap() {
             break;
         case PixelStorageType::Hardware:
 #ifdef __ANDROID__ // Layoutlib does not support hardware acceleration
-            uirenderer::oopr::deregisterBuffer(mImage);
+            uirenderer::OoprClient::getInstance()->deregisterBuffer(mImage);
             auto buffer = mPixelStorage.hardware.buffer;
             AHardwareBuffer_release(buffer);
             mPixelStorage.hardware.buffer = nullptr;
@@ -502,6 +499,28 @@ sk_sp<SkImage> Bitmap::makeImage() {
 #ifdef __ANDROID__
         // pinnable images are only supported with the Ganesh GPU backend compiled in.
         image = SkImages::PinnableRasterFromBitmap(skiaBitmap);
+
+        if (mPixelStorageType == PixelStorageType::Heap) {
+            // TODO(b/448196792): Improve OOPR handling for heap-based Bitmaps.
+            //
+            // To support Out-of-Process Rasterization (OOPR), a shadow buffer
+            // (e.g., GraphicBuffer) is currently created when makeImage is called for
+            // heap-based Bitmaps. This buffer captures a snapshot of the Bitmap's data
+            // at that specific moment.
+            //
+            // This is a temporary approach. Since Android allows mutations to the
+            // Bitmap's data after SkImage creation, the contents of this shadow buffer
+            // may not always match the data that would be uploaded by the RenderThread
+            // in the standard rendering path (which typically happens later during
+            // CanvasContext::prepareTree). Future improvements will aim to better
+            // synchronize or handle these potential divergences.
+            //
+            // Additionally, because the GraphicBuffer is created with an usage flag like
+            // GRALLOC_USAGE_SW_WRITE_RARELY, this may result in a suboptimal format for GPU
+            // sampling (e.g., non-tiled layout, disabled compression). This can negatively
+            // impact performance and should be addressed in future improvements.
+            mOoprResources.createAndRegisterShadowBuffer(skiaBitmap, image);
+        }
 #else
         image = SkImages::RasterFromBitmapNoCopy(skiaBitmap);
 #endif
@@ -648,7 +667,6 @@ BitmapPalette Bitmap::computePalette(const SkImageInfo& info, const void* addr, 
 }
 
 bool Bitmap::compress(JavaCompressFormat format, int32_t quality, SkWStream* stream) {
-#ifdef __ANDROID__  // TODO: This isn't built for host for some reason?
     if (hasGainmap()) {
         SkBitmap baseBitmap = getSkBitmap();
         SkBitmap gainmapBitmap = gainmap()->bitmap->getSkBitmap();
@@ -679,7 +697,6 @@ bool Bitmap::compress(JavaCompressFormat format, int32_t quality, SkWStream* str
                 ALOGI("Format: %d doesn't support gainmap compression!", format);
         }
     }
-#endif
     SkBitmap skbitmap;
     getSkBitmap(&skbitmap);
     return compress(skbitmap, format, quality, stream);

@@ -54,6 +54,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import com.android.server.wm.flicker.helpers.MotionEventHelper.InputMethod.TOUCH
+import com.android.window.flags.Flags
 import java.time.Duration
 import kotlin.math.abs
 
@@ -305,6 +306,16 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
             .waitForAndVerify()
     }
 
+    private fun openMaximizeMenu(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+    ) {
+        val caption = getCaptionForTheApp(wmHelper, device)
+        val maximizeButton = getMaximizeButtonForTheApp(caption)
+        maximizeButton.longClick()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+    }
+
     /** Open maximize menu and click snap resize button on the app header for the given app. */
     fun snapResizeDesktopApp(
         wmHelper: WindowManagerStateHelper,
@@ -312,10 +323,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         context: Context,
         toLeft: Boolean
     ) {
-        val caption = getCaptionForTheApp(wmHelper, device)
-        val maximizeButton = getMaximizeButtonForTheApp(caption)
-        maximizeButton.longClick()
-        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+        openMaximizeMenu(wmHelper, device)
 
         val buttonResId = if (toLeft) SNAP_LEFT_BUTTON else SNAP_RIGHT_BUTTON
         val layoutMenu = getDesktopAppViewByRes(LAYOUT_MENU)
@@ -388,12 +396,13 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         wmHelper: WindowManagerStateHelper,
         device: UiDevice
     ): UiObject2? {
+        val window = wmHelper.getWindow(innerHelper) ?: error("Unable to find the window\n")
         if (
-            wmHelper.getWindow(innerHelper)?.windowingMode !=
-            WindowingMode.WINDOWING_MODE_FREEFORM.value
+            window.windowingMode != WindowingMode.WINDOWING_MODE_FREEFORM.value
         ) error("expected a freeform window with caption but window is not in freeform mode")
+        val displayId = window.displayId
         val captions =
-            device.wait(Until.findObjects(caption), TIMEOUT.toMillis())
+            device.wait(Until.findObjects(caption.displayId(displayId)), TIMEOUT.toMillis())
                 ?: error("Unable to find view $caption\n")
 
         return captions.find {
@@ -721,13 +730,23 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
     }
 
     /** Moves the given app to Fullscreen if it isn't already there. */
-    fun exitDesktopModeToFullScreenIfNeeded(wmHelper: WindowManagerStateHelper) {
+    fun exitDesktopModeToFullScreenIfNeeded(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+    ) {
         if (isInFullscreenMode(wmHelper)) return
-        exitDesktopModeToFullScreenWithAppHeader(wmHelper)
+        exitDesktopModeToFullScreenWithDesktopLayoutMenu(wmHelper, device)
     }
 
-    fun exitDesktopModeToFullScreenWithAppHeader(wmHelper: WindowManagerStateHelper) {
-        clickOpenMenuButton(wmHelper)
+    fun exitDesktopModeToFullScreenWithDesktopLayoutMenu(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+    ) {
+        if (Flags.enableConsolidatedWindowOptions()) {
+            openMaximizeMenu(wmHelper, device)
+        } else {
+            clickOpenMenuButton(wmHelper)
+        }
 
         val pill = getDesktopAppViewByRes(PILL_CONTAINER)
         val fullScreenModeButton =
@@ -739,8 +758,15 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         waitForTransitionToFullscreen(wmHelper)
     }
 
-    fun exitDesktopModeToSplitScreenWithAppHeader(wmHelper: WindowManagerStateHelper) {
-        clickOpenMenuButton(wmHelper)
+    fun exitDesktopModeToSplitScreenWithDesktopLayoutMenu(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+    ) {
+        if (Flags.enableConsolidatedWindowOptions()) {
+            openMaximizeMenu(wmHelper, device)
+        } else {
+            clickOpenMenuButton(wmHelper)
+        }
 
         val pill = getDesktopAppViewByRes(PILL_CONTAINER)
         val splitScreenModeButton =

@@ -1313,10 +1313,11 @@ class DesktopRepository(
         if (!Flags.enableRememberedBounds()) {
             return
         }
-        rememberedBoundsRatioByPackageName.remove(packageName)
-        // The display ID doesn't matter actually because only [rememberedBoundsRatioByPackageName]
-        // needs to be updated.
-        updatePersistentRepository(DEFAULT_DISPLAY)
+        rememberedBoundsRatioByPackageName.remove(packageName)?.let {
+            // The display ID doesn't matter actually because only
+            // [rememberedBoundsRatioByPackageName] needs to be updated.
+            updatePersistentRepository(DEFAULT_DISPLAY)
+        }
     }
 
     /** Clears the remembered bounds ratio for all package. */
@@ -1344,16 +1345,19 @@ class DesktopRepository(
             logD("updatePersistentRepository: displayId=%d", displayId)
             if (displayId == INVALID_DISPLAY) return
 
-            val desks = desktopData.desksSequence(displayId).map { it.deepCopy() }.toList()
+            val desks = desktopData.desksSequence().map { it.deepCopy() }.toList()
             if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
                 persistentUpdateQueue.post {
                     Trace.beginSection("DesktopRepository#UpdateRepoWork")
-                    logD("updatePersistentRepository user=%d display=%d", userId, displayId)
+                    logD("updatePersistentRepository user=%d", userId)
                     try {
                         persistentRepository.addOrUpdateRepository(
                             userId,
                             desks,
-                            getActiveDeskId(displayId),
+                            desktopData
+                                .getAllActiveDesks()
+                                .map { desk -> desk.uniqueDisplayId to desk.deskId }
+                                .toMap(),
                             preservedDisplaysByUniqueId,
                             rememberedBoundsRatioByPackageName,
                         )

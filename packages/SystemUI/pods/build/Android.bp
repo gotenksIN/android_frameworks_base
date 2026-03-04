@@ -46,9 +46,6 @@ java_defaults {
     libs: [
         "jsr330", // javax.inject.*
     ],
-    kotlincflags: [
-        "-Xexplicit-api=strict",
-    ],
     visibility: ["//visibility:public"],
     defaults_visibility: ["//frameworks/base/packages/SystemUI/pods:__subpackages__"],
 }
@@ -112,6 +109,19 @@ filegroup_defaults {
         "src/testFixtures/**/*.kt",
     ],
     visibility: ["//frameworks/base/packages/SystemUI/pods"],
+    defaults_visibility: ["//frameworks/base/packages/SystemUI/pods:__subpackages__"],
+}
+
+// Represents code in the "preview" folder of a pod
+java_defaults {
+    name: "sysui_preview",
+    defaults: ["sysui_pod_defaults"],
+    srcs: [
+        "src/preview/**/*.kt",
+    ],
+    libs: [
+        "androidx.compose.ui_ui-tooling-preview",
+    ],
     defaults_visibility: ["//frameworks/base/packages/SystemUI/pods:__subpackages__"],
 }
 

@@ -53,6 +53,7 @@ import static com.android.media.audio.Flags.FLAG_HARDENING_BFGS;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_ACTIVITY;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_ADDED_APPLICATION;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_BACKUP;
+import static com.android.server.am.HostingRecord.HOSTING_TYPE_BOUND_SERVICE;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_BROADCAST;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_CONTENT_PROVIDER;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_EMPTY;
@@ -61,7 +62,7 @@ import static com.android.server.am.HostingRecord.HOSTING_TYPE_NEXT_ACTIVITY;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_NEXT_TOP_ACTIVITY;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_ON_HOLD;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_RESTART;
-import static com.android.server.am.HostingRecord.HOSTING_TYPE_SERVICE;
+import static com.android.server.am.HostingRecord.HOSTING_TYPE_STARTED_SERVICE;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_SYSTEM;
 import static com.android.server.am.HostingRecord.HOSTING_TYPE_TOP_ACTIVITY;
 import static com.android.server.am.MockingOomAdjusterTests.ProcessStateAssert.assertThatProcess;
@@ -5348,8 +5349,15 @@ public class MockingOomAdjusterTests {
     @SuppressWarnings("GuardedBy")
     @Test
     @EnableFlags(Flags.FLAG_SET_INITIAL_OOM_SCORE_ADJ)
-    public void testSetAttachingProcessStates_InitialOomScore_Service() {
-        testInitialOomScore(HOSTING_TYPE_SERVICE, FOREGROUND_APP_ADJ);
+    public void testSetAttachingProcessStates_InitialOomScore_StartedService() {
+        testInitialOomScore(HOSTING_TYPE_STARTED_SERVICE, FOREGROUND_APP_ADJ);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    @EnableFlags(Flags.FLAG_SET_INITIAL_OOM_SCORE_ADJ)
+    public void testSetAttachingProcessStates_InitialOomScore_BoundService() {
+        testInitialOomScore(HOSTING_TYPE_BOUND_SERVICE, FOREGROUND_APP_ADJ);
     }
 
     @SuppressWarnings("GuardedBy")

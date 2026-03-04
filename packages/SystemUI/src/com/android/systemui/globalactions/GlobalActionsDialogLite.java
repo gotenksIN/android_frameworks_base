@@ -27,7 +27,7 @@ import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.SOME_AUTH_REQUIRED_AFTER_USER_REQUEST;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_NOT_REQUIRED;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
-import static com.android.systemui.Flags.blurOnMoreSurfaces;
+import static com.android.systemui.shared.system.BlurUtils.isVolumeAndPowerBlurEnabled;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
 import android.animation.Animator;
@@ -269,6 +269,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     private final boolean mIsTv;
     private final boolean mHasVibrator;
     private final boolean mShowSilentToggle;
+    private final boolean mTranslucentPowerMenu;
     @NonNull
     private final EmergencyAffordanceManager mEmergencyAffordanceManager;
     @NonNull
@@ -449,6 +450,9 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mPowerManager = powerManager;
         mPackageManager = packageManager;
         mDelegateFactory = delegateFactory;
+        mTranslucentPowerMenu =
+                resources.getBoolean(
+                        com.android.systemui.res.R.bool.config_translucentStandalonePowerMenu);
 
         mHandler = new Handler(mMainHandler.getLooper()) {
             public void handleMessage(@NonNull Message msg) {
@@ -599,7 +603,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         WindowManager.LayoutParams attrs = dialog.getWindow().getAttributes();
         attrs.setTitle("GlobalActionsDialogLite");
         attrs.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        if (blurOnMoreSurfaces()) {
+        if (isVolumeAndPowerBlurEnabled() && mTranslucentPowerMenu) {
             attrs.flags |= WindowManager.LayoutParams.FLAG_BLUR_BEHIND;
             attrs.setBlurBehindRadius(mContext.getResources().getDimensionPixelSize(
                     com.android.systemui.res.R.dimen.global_actions_blur_radius));

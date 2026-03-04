@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.android.systemui.screencapture
 
 import android.content.Context
+import android.os.UserHandle
 import android.util.Log
 import android.view.Display
 import com.android.app.tracing.coroutines.launchInTraced
 import com.android.systemui.CoreStartable
+import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.display.data.repository.DisplayRepository
@@ -41,8 +45,8 @@ import com.android.systemui.screenrecord.shared.model.ScreenRecording
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
@@ -50,6 +54,8 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+
+private const val TAG = "ScreenCapture"
 
 @SysUISingleton
 class ScreenCaptureCoreStartable
@@ -66,6 +72,8 @@ constructor(
     private val activityStarter: ActivityStarter,
     private val screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
     private val screenCaptureTracingInteractor: ScreenCaptureTracingInteractor,
+    private val broadcastDispatcher: BroadcastDispatcher,
+    private val screenCaptureUiReceiver: ScreenCaptureUiReceiver,
 ) : CoreStartable {
 
     override fun start() {
@@ -73,6 +81,11 @@ constructor(
         ScreenCaptureType.entries.forEach { observeUiState(it) }
         setupSmallScreenPostRecordings()
         setupLargeScreenPostRecordings()
+        broadcastDispatcher.registerReceiver(
+            receiver = screenCaptureUiReceiver,
+            filter = ScreenCaptureUiReceiver.intentFilter(),
+            user = UserHandle.ALL,
+        )
     }
 
     private fun observeUiState(type: ScreenCaptureType) {
@@ -86,11 +99,8 @@ constructor(
                     .onEach { it.start() },
             ) { state, screenCaptureComponent ->
                 if (state is ScreenCaptureUiState.Visible) {
-                    val displayId = focusedDisplayRepository.focusedDisplayId.value
-                    val display = displayRepository.getDisplay(displayId)
-
+                    val display = getDisplayToShowUi()
                     if (display == null) {
-                        Log.e("ScreenCapture", "Couldn't find display for id=$displayId")
                         screenCaptureUiInteractor.hide(type)
                         null
                     } else {
@@ -113,7 +123,7 @@ constructor(
     }
 
     /**
-     * Shows the UI and suspends until it's is dismissed. Cancelling the suspension dismisses the UI
+     * Shows the UI and suspends until it's dismissed. Cancelling the suspension dismisses the UI
      */
     private suspend fun ScreenCaptureUiContext.showUi(type: ScreenCaptureType): Unit =
         suspendCancellableCoroutine { invocation ->
@@ -131,12 +141,13 @@ constructor(
         if (!screenCaptureRecordFeaturesInteractor.isSmallScreenRecordingEnabled) return
 
         screenRecordingServiceInteractor.screenRecordings
-            .filter { it is ScreenRecording.Saving }
+            .filterIsInstance(ScreenRecording.Saving::class)
             .onEach { recording ->
                 activityStarter.startActivityDismissingKeyguard(
                     /* intent = */ SmallScreenPostRecordingActivity.waitForRecording(
                         context = context,
                         videoUri = recording.uri,
+                        notificationId = recording.notificationId,
                     ),
                     /* onlyProvisioned = */ true,
                     /* dismissShade = */ true,
@@ -152,20 +163,14 @@ constructor(
         screenRecordingServiceInteractor.screenRecordings
             .filterIsInstance<ScreenRecording.Saved>()
             .onEach { recording ->
-                val displayId = focusedDisplayRepository.focusedDisplayId.value
-                val display = displayRepository.getDisplay(displayId)
-
-                if (display == null) {
-                    Log.e(
-                        "ScreenCapture",
-                        "PostRecordingShelf: Couldn't find display for id=$displayId",
-                    )
-                } else {
+                val display = getDisplayToShowUi()
+                if (display != null) {
                     val shelf =
                         postRecordingShelfFactory.create(
-                            recording.uri,
-                            recording.thumbnail,
-                            display,
+                            uri = recording.uri,
+                            thumbnail = recording.thumbnail,
+                            display = display,
+                            notificationId = recording.notificationId,
                         )
                     shelf.show()
                 }
@@ -182,6 +187,20 @@ constructor(
                 }
             }
             .launchInTraced("ScreenCaptureOverlayStateInteractor#show", coroutineScope())
+    }
+
+    private fun getDisplayToShowUi(): Display? {
+        val displayId = focusedDisplayRepository.focusedDisplayId.value
+        val display =
+            displayRepository.getDisplay(displayId)
+                ?: run {
+                    Log.w(TAG, "Couldn't find display for focused id=$displayId")
+                    displayRepository.displays.value.firstOrNull()
+                }
+        if (display == null) {
+            Log.w(TAG, "Couldn't find display to show the ui")
+        }
+        return display
     }
 }
 

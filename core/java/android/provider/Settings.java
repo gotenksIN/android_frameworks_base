@@ -3150,6 +3150,20 @@ public final class Settings {
     public static final String ACTION_PERSONAL_CONTEXT_SETTINGS =
             "android.settings.PERSONAL_CONTEXT_SETTINGS";
 
+    /**
+     * Activity Action: Show a dialog with a restricted content message.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @FlaggedApi("android.app.contentrestriction.flags.enable_content_restriction_api")
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SHOW_RESTRICTED_CONTENT =
+            "android.settings.SHOW_RESTRICTED_CONTENT";
+
     // End of Intent actions for Settings
 
     /**
@@ -14279,6 +14293,7 @@ public final class Settings {
          * (0 disabled, 1 - enabled)
          * @hide
          */
+        @Readable
         public static final String AIRPLANE_MODE_SYNC = "airplane_mode_sync";
 
         /**
@@ -14504,6 +14519,22 @@ public final class Settings {
          */
         public static final String TIME_ZONE_OFFSET_CHANGE_NOTIFICATIONS =
                 "time_zone_offset_change_notifications";
+
+        /**
+         * The user's home time zone ID.
+         *
+         * <p>This value can be used to display a specific "home" time zone in UI elements when the
+         * user's current time zone differs from this value.
+         *
+         * <p>This setting is independent of the system time zone; it does not affect the
+         * device's system clock or the behavior of {@link #AUTO_TIME_ZONE}.
+         *
+         * <p>The value is a standard time zone ID string (e.g. "America/Los_Angeles").
+         * It may be {@code null} if no preference is set.
+         *
+         * @hide
+         */
+        public static final String USER_HOME_TIME_ZONE_ID = "user_home_time_zone_id";
 
         /**
          * URI for the car dock "in" event sound.

@@ -323,10 +323,30 @@ flag {
 }
 
 flag {
+    name: "bbev_square_corners_fix"
+    namespace: "multitasking"
+    description: "Fixes square corners when expanding Bubbles from PiP"
+    bug: "475068406"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "update_bubble_bounds_during_rotation"
     namespace: "multitasking"
     description: "Update the bounds of the expanded bubble task as part of the rotation transition"
     bug: "471756214"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "bubble_dismiss_magnetize_collision_prevention"
+    namespace: "multitasking"
+    description: "Move the dismiss view higher so it`s magnetize zone does not collide with the bubble bar"
+    bug: "481701224"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -357,6 +377,36 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where bubble bar stashes incorrectly when a hardware keyboard is connected"
     bug: "461660471"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_swipe_up_notification_shade_with_bubble_bar"
+    namespace: "multitasking"
+    description: "Fixes an issue where swiping from the bottom of the notification shade while bubbles were expanded below wouldn't work"
+    bug: "483561405"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_verify_bubble_task_id_on_removal"
+    namespace: "multitasking"
+    description: "Fixes a bug where we remove a bubble based on package name after the bubble task has changed"
+    bug: "482877474"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "bubbles_fix_issues_with_repeated_fold_unfold"
+    namespace: "multitasking"
+    description: "Fixes bubble issues when transitioning between modes due to repeated folding and unfolding"
+    bug: "450107220"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

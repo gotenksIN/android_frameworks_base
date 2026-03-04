@@ -42,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
@@ -49,16 +50,18 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.DraftR
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel.Companion.toDraft
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesScreenViewModel
+import com.android.systemui.res.R
 import kotlinx.coroutines.launch
 
 @Composable
 fun CurrentRulesScreen(
     viewModel: NotificationRulesScreenViewModel,
-    dismissRulesScreen: () -> Unit,
+    onDismissCurrentRulesScreen: () -> Unit,
+    onNavigateToEditScreen: (DraftRuleModel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    BackHandler(enabled = true, onBack = dismissRulesScreen)
+    BackHandler(enabled = true, onBack = onDismissCurrentRulesScreen)
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.Top),
@@ -69,16 +72,14 @@ fun CurrentRulesScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Button(onClick = dismissRulesScreen, modifier = Modifier) {
+                Button(onClick = onDismissCurrentRulesScreen, modifier = Modifier) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        // TODO: b/478225883 - Translate content description (requires moving
-                        // resources to pods)
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.accessibility_back),
                     )
                 }
                 Text(
-                    text = "Notification Rules",
+                    text = stringResource(R.string.notification_rules_activity_title),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
@@ -88,14 +89,16 @@ fun CurrentRulesScreen(
         }
 
         viewModel.rules.forEach { rule ->
-            item(rule.toString()) { CurrentRule(rule = rule, screenViewModel = viewModel) }
+            item(rule.toString()) {
+                CurrentRule(rule = rule, onNavigateToEditScreen = onNavigateToEditScreen)
+            }
         }
 
         item("Create new rule") {
             Button(
                 onClick = {
                     scope.launch {
-                        viewModel.launchEditRuleScreen(
+                        onNavigateToEditScreen(
                             DraftRuleModel(
                                 action = ActionModel.Highlight,
                                 contacts = null,
@@ -105,14 +108,14 @@ fun CurrentRulesScreen(
                     }
                 }
             ) {
-                Text("Create new rule")
+                Text(stringResource(R.string.notification_rules_create_new_rule))
             }
         }
     }
 }
 
 @Composable
-private fun CurrentRule(rule: RuleModel, screenViewModel: NotificationRulesScreenViewModel) {
+private fun CurrentRule(rule: RuleModel, onNavigateToEditScreen: (DraftRuleModel) -> Unit) {
     var isExpanded by remember { mutableStateOf(false) }
 
     Column(
@@ -144,8 +147,8 @@ private fun CurrentRule(rule: RuleModel, screenViewModel: NotificationRulesScree
         }
 
         if (isExpanded) {
-            Button(onClick = { screenViewModel.launchEditRuleScreen(rule.toDraft()) }) {
-                Text("Edit")
+            Button(onClick = { onNavigateToEditScreen(rule.toDraft()) }) {
+                Text(stringResource(R.string.notification_rules_edit))
             }
         }
     }
@@ -157,7 +160,7 @@ private fun RuleModel.toText(): String {
     val contactsList = filter.contacts?.contacts
     val contactsString =
         if (contactsList != null) {
-            " from ${contactsList.joinToString { it.name }}"
+            " from ${contactsList.joinToString { it.name }} [TK]"
         } else {
             ""
         }
@@ -165,10 +168,10 @@ private fun RuleModel.toText(): String {
     val includedAppsList = filter.includedApps?.apps
     val includedAppsString =
         if (includedAppsList != null) {
-            " from ${includedAppsList.joinToString { it.label }}"
+            " from ${includedAppsList.joinToString { it.label }} [TK]"
         } else {
             ""
         }
 
-    return "${action.name} notifications$contactsString$includedAppsString"
+    return "${action.name} notifications$contactsString$includedAppsString [TK]"
 }

@@ -604,6 +604,10 @@
         <item name="android:windowElevation">0dp</item>
     </style>
 
+    <style name="Theme.SystemUI.Dialog.SelectDream" parent="Theme.SystemUI.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
     <style name="Theme.SystemUI.BottomSheet" parent="Theme.SystemUI.Dialog">
         <!-- default dialog background has insets -->
         <item name="android:windowBackground">@android:color/transparent</item>
@@ -989,9 +993,10 @@
         <item name="android:windowNoTitle">true</item>
     </style>
 
-    <style name="ScreenCapture.PostRecord" parent="@style/Theme.AppCompat.NoActionBar">
+    <style name="ScreenCapture.PostRecord" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@color/materialColorSurface</item>
+        <item name="android:windowLightStatusBar">@bool/post_recording_light_toolbar</item>
     </style>
 
     <style name="ScreenCapture.PostRecord.SnackbarDialog" parent="@style/Theme.SystemUI.Dialog">

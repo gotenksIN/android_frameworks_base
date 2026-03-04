@@ -20,6 +20,7 @@ import com.android.wm.shell.RootDisplayAreaOrganizer
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.DisplayController
+import com.android.wm.shell.common.DisplayInsetsController
 import com.android.wm.shell.dagger.WMShellConcurrencyModule
 import com.android.wm.shell.dagger.WMShellCoroutinesModule
 import com.android.wm.shell.dagger.WMSingleton
@@ -99,6 +100,7 @@ abstract class ContainerHierarchyModule {
         fun provideHierarchyUpdater(
             shellTaskOrganizer: ShellTaskOrganizer,
             transitions: Transitions,
+            displayInsetsController: DisplayInsetsController,
             hierarchy: ContainerHierarchy,
             formFactorModes: FormFactorModes,
             shellInit: ShellInit,
@@ -106,6 +108,7 @@ abstract class ContainerHierarchyModule {
             return HierarchyUpdater(
                 shellTaskOrganizer,
                 transitions,
+                displayInsetsController,
                 hierarchy,
                 formFactorModes,
                 shellInit
@@ -168,6 +171,17 @@ abstract class ContainerHierarchyModule {
                     hierarchy,
                 )
             )
+        }
+
+        @WMSingleton
+        @Provides
+        fun provideContainerHierarchyDependency(
+            initialHierarchyPopulator: InitialHierarchyPopulator,
+        ): Optional<ContainerHierarchyDependency> {
+            // Depending on InitialHierarchyPopulator (and indirectly HierarchyUpdater) ensures that
+            // we add the root task hook and populate the hierarchy before any other shell component
+            // creates their own root tasks.
+            return Optional.empty()
         }
 
         //

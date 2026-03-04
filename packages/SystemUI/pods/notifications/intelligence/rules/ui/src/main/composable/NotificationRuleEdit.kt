@@ -16,6 +16,7 @@
 
 package com.android.systemui.notifications.intelligence.rules.ui.composable
 
+import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -40,61 +44,56 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.IncludedAppsModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleValue
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRuleEditViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.RulesScreenViewState
+import com.android.systemui.res.R
 
 /**
  * A composable rendering a page to edit a specific notification rule.
  *
  * This is still a work-in-progress.
+ *
+ * @param onDismissRuleEditScreen invoked when the user dismisses this current screen.
+ * @param onEnterEditField invoked when the user starts editing a particular field of the rule.
+ * @param onExitEditField invoked when the user finishes editing a particular field of the rule.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NotificationRuleEdit(
     viewModel: NotificationRuleEditViewModel,
-    dismissEditScreen: () -> Unit,
+    onDismissRuleEditScreen: () -> Unit,
+    onEnterEditField: (RulesScreenViewState.EditField) -> Unit,
+    onExitEditField: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var shownDialogType: EditDialogType by
-        remember(viewModel) { mutableStateOf(EditDialogType.None) }
-
-    // When the user edits a particular field, [draftRule] will be updated with the new value.
-    var draftRule: DraftRuleModel by remember(viewModel) { mutableStateOf(viewModel.rule) }
-    val selectedAction = draftRule.action
-    val selectedContacts = draftRule.contacts
-    val selectedIncludedApps = draftRule.includedApps
-    val addFieldOptions: List<EditDialogType> = buildAddFieldOptions(draftRule)
+    val addFieldOptions: List<RulesScreenViewState.EditField> =
+        buildAddFieldOptions(viewModel, onExitEditField = onExitEditField)
+    var isAddFieldDialogShowing by remember { mutableStateOf(false) }
 
     val textStyles = rememberTextStyles()
+    val resources = LocalResources.current
     val text =
-        remember(
-            selectedAction,
-            selectedContacts,
-            selectedIncludedApps,
-            shownDialogType,
-            textStyles,
-        ) {
+        remember(viewModel, onEnterEditField, onExitEditField, textStyles, resources) {
             buildAnnotatedText(
-                selectedAction = selectedAction,
-                selectedContacts = selectedContacts,
-                selectedIncludedApps = selectedIncludedApps,
-                shownDialogType = shownDialogType,
-                changeEditDialog = { shownDialogType = it },
+                viewModel = viewModel,
+                onEnterEditField = onEnterEditField,
+                onExitEditField = onExitEditField,
                 textStyles = textStyles,
+                resources = resources,
             )
         }
 
-    BackHandler(enabled = true, onBack = dismissEditScreen)
+    BackHandler(enabled = true, onBack = onDismissRuleEditScreen)
     Column(modifier = modifier) {
-        Button(onClick = dismissEditScreen) {
+        Button(onClick = onDismissRuleEditScreen) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                // TODO: b/478225883 - Translate content description (requires moving
-                // resources to pods)
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.accessibility_back),
             )
         }
 
@@ -102,49 +101,14 @@ fun NotificationRuleEdit(
 
         AddButton(
             addFieldOptions = addFieldOptions,
-            currentEditDialogShowing = shownDialogType,
-            changeEditDialog = { shownDialogType = it },
+            toggleAddFieldDialogShowing = { isAddFieldDialogShowing = !isAddFieldDialogShowing },
         )
-
-        when (val dialogShowing = shownDialogType) {
-            is EditDialogType.Action -> {
-                ActionChoiceDialog(
-                    onDismissRequest = { shownDialogType = EditDialogType.None },
-                    onActionSelected = { action -> draftRule = draftRule.copy(action = action) },
-                )
-            }
-            is EditDialogType.Contact -> {
-                ContactChoiceDialog(
-                    initialSearchQuery = dialogShowing.initialQuery,
-                    initialSelection = dialogShowing.initialSelectedContacts,
-                    onContactsSaved = { newContacts ->
-                        draftRule =
-                            draftRule.copy(
-                                contacts =
-                                    if (newContacts.isNotEmpty()) {
-                                        RuleValue.Specified(ContactsModel(newContacts))
-                                    } else {
-                                        // Saving with no selected contacts is effectively removing
-                                        // contacts from the filter.
-                                        null
-                                    }
-                            )
-                        shownDialogType = EditDialogType.None
-                    },
-                    viewModel = viewModel,
-                )
-            }
-            is EditDialogType.IncludedApps -> {
-                AppChoiceDialog(viewModel = viewModel)
-            }
-            is EditDialogType.AddField -> {
-                AddFieldDialog(
-                    options = dialogShowing.addFieldOptions,
-                    onDismissRequest = { shownDialogType = EditDialogType.None },
-                    onOptionSelected = { shownDialogType = it },
-                )
-            }
-            is EditDialogType.None -> {}
+        if (isAddFieldDialogShowing) {
+            AddFieldDialog(
+                options = addFieldOptions,
+                onDismissRequest = { isAddFieldDialogShowing = false },
+                onOptionSelected = { editField -> onEnterEditField(editField) },
+            )
         }
     }
 }
@@ -152,80 +116,69 @@ fun NotificationRuleEdit(
 /**
  * Builds the text shown to the user, including clickable spans where the user can modify aspects of
  * the rule.
- *
- * @param changeEditDialog invoked when a certain edit dialog should be shown or hidden based on
- *   what part of the rule the user clicked.
  */
 private fun buildAnnotatedText(
-    selectedAction: ActionModel,
-    selectedContacts: RuleValue<ContactsModel>?,
-    selectedIncludedApps: RuleValue<IncludedAppsModel>?,
-    shownDialogType: EditDialogType,
-    changeEditDialog: (EditDialogType) -> Unit,
+    viewModel: NotificationRuleEditViewModel,
+    onEnterEditField: (RulesScreenViewState.EditField) -> Unit,
+    onExitEditField: () -> Unit,
     textStyles: TextStyles,
+    resources: Resources,
 ): AnnotatedString {
     return buildAnnotatedString {
         clickableText(
-            text = selectedAction.name,
+            text = viewModel.rule.action.toText(resources),
             isAmbiguous = false,
             onClick = {
-                toggleEditDialogShown(
-                    desiredType = EditDialogType.Action,
-                    currentEditDialogShowing = shownDialogType,
-                    changeEditDialog = changeEditDialog,
+                onEnterEditField(
+                    RulesScreenViewState.EditField.Action(
+                        onActionSaved = { newAction ->
+                            viewModel.rule = viewModel.rule.copy(action = newAction)
+                        }
+                    )
                 )
             },
             textStyles = textStyles,
         )
 
-        append(" all Conversation notifications")
+        append(" all Conversation notifications [TK]")
 
-        selectedIncludedApps?.let {
-            append(" from ")
+        viewModel.rule.includedApps?.let {
+            append(" from [TK]")
             createIncludedAppsText(
-                selectedIncludedApps = selectedIncludedApps,
-                editDialogShowing = shownDialogType,
-                changeEditDialog = changeEditDialog,
+                selectedIncludedApps = it,
+                viewModel = viewModel,
+                onEnterEditField = onEnterEditField,
+                onExitEditField,
                 textStyles = textStyles,
             )
         }
 
-        selectedContacts?.let {
-            append(" from ")
+        viewModel.rule.contacts?.let {
+            append(" from [TK]")
             createContactsText(
                 selectedContacts = it,
-                editDialogShowing = shownDialogType,
-                changeEditDialog = changeEditDialog,
+                viewModel = viewModel,
+                onEnterEditField = onEnterEditField,
+                onExitEditField = onExitEditField,
                 textStyles = textStyles,
             )
         }
 
-        append(" on weekdays")
+        append(" on weekdays [TK]")
     }
 }
 
 /** Renders a '+' button letting users add additional fields to the rule. */
 @Composable
 private fun AddButton(
-    addFieldOptions: List<EditDialogType>,
-    currentEditDialogShowing: EditDialogType,
-    changeEditDialog: (EditDialogType) -> Unit,
+    addFieldOptions: List<RulesScreenViewState.EditField>,
+    toggleAddFieldDialogShowing: () -> Unit,
 ) {
     if (addFieldOptions.isEmpty()) {
         return
     }
 
-    Button(
-        onClick = {
-            toggleEditDialogShown(
-                desiredType = EditDialogType.AddField(addFieldOptions),
-                currentEditDialogShowing = currentEditDialogShowing,
-                changeEditDialog = changeEditDialog,
-            )
-        }
-    ) {
-        Text("+ Add")
-    }
+    Button(onClick = { toggleAddFieldDialogShowing() }) { Text(stringResource(R.string.add)) }
 }
 
 /**
@@ -233,35 +186,38 @@ private fun AddButton(
  * that *aren't* present in the rule yet. (Types that *are* present can be edited by clicking their
  * text.)
  */
-private fun buildAddFieldOptions(draftRule: DraftRuleModel): List<EditDialogType> {
-    return mutableListOf<EditDialogType>().apply {
-        if (draftRule.contacts == null) {
-            add(EditDialogType.Contact(initialSelectedContacts = emptyList()))
+private fun buildAddFieldOptions(
+    viewModel: NotificationRuleEditViewModel,
+    onExitEditField: () -> Unit,
+): List<RulesScreenViewState.EditField> {
+    return mutableListOf<RulesScreenViewState.EditField>().apply {
+        if (viewModel.rule.contacts == null) {
+            add(
+                RulesScreenViewState.EditField.Contacts(
+                    onContactsSaved = { newContacts ->
+                        onContactsSaved(newContacts, viewModel, onExitEditField)
+                    },
+                    viewModel = viewModel,
+                )
+            )
         }
-        if (draftRule.includedApps == null) {
-            add(EditDialogType.IncludedApps)
+        if (viewModel.rule.includedApps == null) {
+            add(
+                RulesScreenViewState.EditField.Apps(
+                    viewModel = viewModel,
+                    onAppsSaved = { newApps -> onAppsSaved(newApps, viewModel, onExitEditField) },
+                )
+            )
         }
-    }
-}
-
-/** Shows/hides the [desiredType] edit dialog, depending on whether it's currently open or not. */
-private fun toggleEditDialogShown(
-    desiredType: EditDialogType,
-    currentEditDialogShowing: EditDialogType,
-    changeEditDialog: (EditDialogType) -> Unit,
-) {
-    if (currentEditDialogShowing == desiredType) {
-        changeEditDialog.invoke(EditDialogType.None)
-    } else {
-        changeEditDialog.invoke(desiredType)
     }
 }
 
 /** Creates annotated text for the included apps filter field. */
 private fun AnnotatedString.Builder.createIncludedAppsText(
     selectedIncludedApps: RuleValue<IncludedAppsModel>,
-    editDialogShowing: EditDialogType,
-    changeEditDialog: (EditDialogType) -> Unit,
+    viewModel: NotificationRuleEditViewModel,
+    onEnterEditField: (RulesScreenViewState.EditField) -> Unit,
+    onExitEditField: () -> Unit,
     textStyles: TextStyles,
 ) {
     val text =
@@ -271,7 +227,7 @@ private fun AnnotatedString.Builder.createIncludedAppsText(
                 check(apps.isNotEmpty()) { "IncludedAppsModel.apps must be non-empty" }
                 val first = apps[0].label
                 if (apps.size > 1) {
-                    "$first +${apps.size - 1} more"
+                    "$first +${apps.size - 1} more [TK]"
                 } else {
                     first
                 }
@@ -284,10 +240,11 @@ private fun AnnotatedString.Builder.createIncludedAppsText(
         text = text,
         isAmbiguous = selectedIncludedApps is RuleValue.Ambiguous,
         onClick = {
-            toggleEditDialogShown(
-                desiredType = EditDialogType.IncludedApps,
-                currentEditDialogShowing = editDialogShowing,
-                changeEditDialog = changeEditDialog,
+            onEnterEditField(
+                RulesScreenViewState.EditField.Apps(
+                    viewModel = viewModel,
+                    onAppsSaved = { newApps -> onAppsSaved(newApps, viewModel, onExitEditField) },
+                )
             )
         },
         textStyles = textStyles,
@@ -297,10 +254,21 @@ private fun AnnotatedString.Builder.createIncludedAppsText(
 /** Creates annotated text for the contacts filter field. */
 private fun AnnotatedString.Builder.createContactsText(
     selectedContacts: RuleValue<ContactsModel>,
-    editDialogShowing: EditDialogType,
-    changeEditDialog: (EditDialogType) -> Unit,
+    viewModel: NotificationRuleEditViewModel,
+    onEnterEditField: (RulesScreenViewState.EditField) -> Unit,
+    onExitEditField: () -> Unit,
     textStyles: TextStyles,
 ) {
+    val onClick: () -> Unit = {
+        onEnterEditField(
+            RulesScreenViewState.EditField.Contacts(
+                onContactsSaved = { newContacts ->
+                    onContactsSaved(newContacts, viewModel, onExitEditField)
+                },
+                viewModel = viewModel,
+            )
+        )
+    }
     when (selectedContacts) {
         is RuleValue.Specified -> {
             val contacts = selectedContacts.value.contacts
@@ -309,7 +277,7 @@ private fun AnnotatedString.Builder.createContactsText(
             val first = contacts[0].name
             val text =
                 if (contacts.size > 1) {
-                    "$first +${contacts.size - 1} more"
+                    "$first +${contacts.size - 1} more [TK]"
                 } else {
                     first
                 }
@@ -317,17 +285,7 @@ private fun AnnotatedString.Builder.createContactsText(
             clickableText(
                 text = text,
                 isAmbiguous = false,
-                onClick = {
-                    toggleEditDialogShown(
-                        desiredType =
-                            EditDialogType.Contact(
-                                initialQuery = "",
-                                initialSelectedContacts = contacts,
-                            ),
-                        currentEditDialogShowing = editDialogShowing,
-                        changeEditDialog = changeEditDialog,
-                    )
-                },
+                onClick = onClick,
                 textStyles = textStyles,
             )
         }
@@ -335,17 +293,7 @@ private fun AnnotatedString.Builder.createContactsText(
             clickableText(
                 text = selectedContacts.placeholderText,
                 isAmbiguous = true,
-                onClick = {
-                    toggleEditDialogShown(
-                        desiredType =
-                            EditDialogType.Contact(
-                                initialQuery = selectedContacts.placeholderText,
-                                initialSelectedContacts = emptyList(),
-                            ),
-                        currentEditDialogShowing = editDialogShowing,
-                        changeEditDialog = changeEditDialog,
-                    )
-                },
+                onClick = onClick,
                 textStyles = textStyles,
             )
         }
@@ -376,6 +324,43 @@ private fun AnnotatedString.Builder.clickableText(
     ) {
         append(text)
     }
+}
+
+private fun onContactsSaved(
+    newContacts: List<ContactModel>,
+    viewModel: NotificationRuleEditViewModel,
+    onExitEditField: () -> Unit,
+) {
+    viewModel.rule =
+        viewModel.rule.copy(
+            contacts =
+                if (newContacts.isNotEmpty()) {
+                    RuleValue.Specified(ContactsModel(newContacts))
+                } else {
+                    // Saving with no selected contacts is effectively removing contacts from the
+                    // filter.
+                    null
+                }
+        )
+    onExitEditField()
+}
+
+private fun onAppsSaved(
+    newApps: List<AppModel>,
+    viewModel: NotificationRuleEditViewModel,
+    onExitEditField: () -> Unit,
+) {
+    viewModel.rule =
+        viewModel.rule.copy(
+            includedApps =
+                if (newApps.isNotEmpty()) {
+                    RuleValue.Specified(IncludedAppsModel(newApps))
+                } else {
+                    // Saving with no selected apps is effectively removing apps from the filter.
+                    null
+                }
+        )
+    onExitEditField()
 }
 
 private data class TextStyles(val default: SpanStyle, val ambiguous: SpanStyle)

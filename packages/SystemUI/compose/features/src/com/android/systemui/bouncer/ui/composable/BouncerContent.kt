@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -512,7 +513,7 @@ private fun ContentScope.BesideUserSwitcherLayout(
         LocalWindowSizeClass.current.isHeightAtLeastBreakpoint(
             WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
         )
-    val isContainerized = shouldBeContainerized()
+    val isContainerized = calculateContainerLayout() != null
     val padding =
         when {
             isContainerized -> PaddingValues(vertical = 96.dp)
@@ -945,7 +946,7 @@ private fun ActionArea(viewModel: BouncerOverlayContentViewModel, modifier: Modi
                         actionAreaTranslationY exportAs
                             BouncerMotionTestKeys.bouncerActionButtonTranslationY
                     }
-                    .height(48.dp)
+                    .heightIn(min = 48.dp)
                     .clip(ButtonDefaults.shape)
                     .background(color = MaterialTheme.colorScheme.secondaryContainer)
                     .semantics { role = Role.Button }

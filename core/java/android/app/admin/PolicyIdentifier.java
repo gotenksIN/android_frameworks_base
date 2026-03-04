@@ -17,15 +17,19 @@
 package android.app.admin;
 
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_LOCKSCREEN_MESSAGE;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_SCREEN_CAPTURE;
 import static android.Manifest.permission.SET_TIME;
+import static android.Manifest.permission.SET_TIME_ZONE;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_DEVICE;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER;
 import static android.app.admin.DevicePolicyManager.RESOURCE_DEVICE_WIDE;
 import static android.app.admin.DevicePolicyManager.RESOURCE_PER_USER;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE;
 import static android.processor.devicepolicy.AllowedDpcTypes.ALLOWED;
 import static android.processor.devicepolicy.AllowedDpcTypes.DISALLOWED;
 
@@ -37,11 +41,13 @@ import android.os.UserManager;
 import android.processor.devicepolicy.AllowedDpcTypes;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.EnumResolutionMechanism;
+import android.processor.devicepolicy.ListOfStringPolicyDefinition;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.List;
 
 /**
  * Represents a type safe identifier for a policy. Use it as a key for {@link
@@ -68,7 +74,8 @@ public final class PolicyIdentifier<T> {
      * Create an instance of PolicyIdentifier. Should only be used to create the static definitions
      * below.
      *
-     * @hide
+     * <b>This API is only public for testing purposes. Real applications should only use the static
+     * instances defined below.
      */
     public PolicyIdentifier(@NonNull String id) {
         this.mId = id;
@@ -169,16 +176,14 @@ public final class PolicyIdentifier<T> {
 
     /**
      * The admin has disabled the time to be automatically obtained from the network. This is not
-     * enforced and the user can still enable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME}
-     * to enforce the policy.
+     * enforced and the user can still enable it.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME)
     public static final int AUTO_TIME_DISABLED_UNENFORCED = 1;
 
     /**
      * The admin has enabled the time to be automatically obtained from the network. This is not
-     * enforced and the user can still disable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME}
-     * to enforce the policy.
+     * enforced and the user can still disable it.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME)
     public static final int AUTO_TIME_ENABLED_UNENFORCED = 2;
@@ -271,6 +276,116 @@ public final class PolicyIdentifier<T> {
             emptyStringAllowed = false)
     public static final PolicyIdentifier<String> LOCKSCREEN_MESSAGE =
             new PolicyIdentifier<>("LOCKSCREEN_MESSAGE");
+
+    /**
+     * Policy that sets the list of packages as the holders of the {@link
+     * android.app.role.RoleManager#ROLE_CONTENT_RESTRICTION} role.
+     *
+     * <p>If the value is {@code null}, any previously set role holder set through this policy will
+     * be removed.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @NonNull
+    @ListOfStringPolicyDefinition(
+            base =
+                    @StringPolicyDefinition(
+                            base =
+                                    @PolicyDefinition(
+                                            allowedScopes = {POLICY_SCOPE_USER},
+                                            affectedResource = RESOURCE_PER_USER,
+                                            requiredPermission =
+                                                    MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS,
+                                            requiredCrossUserPermission =
+                                                    MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL,
+                                            allowedDpcTypes =
+                                            @AllowedDpcTypes(
+                                                    deviceOwner = ALLOWED,
+                                                    managedProfileOwnerOfOrganizationOwnedDevice =
+                                                            ALLOWED,
+                                                    managedProfileOwnerOfPersonalOwnedDevice =
+                                                            DISALLOWED,
+                                                    unaffiliatedFullUserProfileOwner =
+                                                            DISALLOWED))))
+    public static final PolicyIdentifier<List<String>> CONTENT_RESTRICTION_APPS =
+            new PolicyIdentifier<>("CONTENT_RESTRICTION_APPS");
+
+    /**
+     * The user can choose whether the device's time zone is set automatically or not.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
+    public static final int AUTO_TIME_ZONE_USER_CHOICE = 0;
+
+    /**
+     * The admin has disabled automatic time zone detection. This is not enforced and the user can
+     * still enable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME} to enforce the policy.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
+    public static final int AUTO_TIME_ZONE_DISABLED_UNENFORCED = 1;
+
+    /**
+     * The admin has enabled the time zone to be automatically obtained from the network. This is
+     * not enforced and the user can still disable it. Use {@link
+     * UserManager#DISALLOW_CONFIG_DATE_TIME} to enforce the policy.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
+    public static final int AUTO_TIME_ZONE_ENABLED_UNENFORCED = 2;
+
+    /**
+     * The admin has disabled automatic time zone detection. This is enforced and the user cannot
+     * enable it.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
+    public static final int AUTO_TIME_ZONE_DISABLED = 3;
+
+    /**
+     * The admin has enabled the time zone to be automatically obtained from the network. This is
+     * enforced and the user cannot disable it.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
+    public static final int AUTO_TIME_ZONE_ENABLED = 4;
+
+    /**
+     * Possible values {@link #AUTO_TIME_ZONE}
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            prefix = {"AUTO_TIME_ZONE_"},
+            value = {
+                AUTO_TIME_ZONE_USER_CHOICE,
+                AUTO_TIME_ZONE_DISABLED_UNENFORCED,
+                AUTO_TIME_ZONE_ENABLED_UNENFORCED,
+                AUTO_TIME_ZONE_DISABLED,
+                AUTO_TIME_ZONE_ENABLED,
+            })
+    public @interface AutoTimeZoneValue {}
+
+    /**
+     * Policy that controls whether the device's time zone is set automatically, e.g. obtained from
+     * network or location.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
+    @NonNull
+    @EnumPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_DEVICE},
+                            affectedResource = RESOURCE_DEVICE_WIDE,
+                            requiredPermission = SET_TIME_ZONE,
+                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED,
+                                            profileOwnerOnUser0 = ALLOWED)),
+            intDef = AutoTimeZoneValue.class,
+            defaultValue = AUTO_TIME_ZONE_USER_CHOICE,
+            resolutionMechanism = @EnumResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<Integer> AUTO_TIME_ZONE =
+            new PolicyIdentifier<>("AUTO_TIME_ZONE");
 
     // LINT.ThenChange(/tools/policymetadata/policies.textproto)
 }

@@ -956,6 +956,9 @@ public class AudioDeviceInventory {
 
             // device restore done, notify AudioDeviceBroker
             mDeviceBroker.setWaitingForDeviceRestore(false);
+            if (!failedReconnectionDeviceList.isEmpty()) {
+                mDeviceBroker.postOnConnectedDevicesChanged();
+            }
         }
 
         reapplyExternalDevicesRoles();
@@ -1571,6 +1574,12 @@ public class AudioDeviceInventory {
     /*package*/ int removePreferredDevicesForStrategyInt(int strategy) {
         return clearDevicesRoleForStrategy(
                     strategy, AudioSystem.DEVICE_ROLE_PREFERRED, true /*internal */);
+    }
+
+    /*package*/ List<AudioDeviceAttributes> getExternalPreferredDevicesForStrategy(int strategy) {
+        synchronized (mDevicesLock) {
+            return mPreferredDevices.getOrDefault(strategy, new ArrayList<>());
+        }
     }
 
     /*package*/ List<AudioDeviceAttributes> getPreferredDevicesForStrategy(int strategy) {
@@ -3578,6 +3587,7 @@ public class AudioDeviceInventory {
             }
         }
         updateAlwaysRingDeviceConnected();
+        mDeviceBroker.postOnConnectedDevicesChanged();
     }
 
     @GuardedBy("mDevicesLock")
@@ -3621,6 +3631,7 @@ public class AudioDeviceInventory {
             }
         }
         updateAlwaysRingDeviceConnected();
+        mDeviceBroker.postOnConnectedDevicesChanged();
     }
 
     //----------------------------------------------------------

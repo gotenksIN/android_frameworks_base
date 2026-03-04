@@ -19,6 +19,7 @@ package com.android.settingslib.metadata.preferencesapi
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import com.android.settingslib.datastore.Permissions
@@ -43,6 +44,7 @@ import com.android.settingslib.metadata.preferencesapi.multiusers.ManagementScop
 import com.android.settingslib.metadata.preferencesapi.multiusers.ManagementScope.OWN_USER
 import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget
 import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget.USER
+import com.android.settingslib.metadata.preferencesapi.preconditions.Disallowed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -54,7 +56,17 @@ import kotlin.reflect.KClass
  * Interface for preference screens that provide parameters in a non-static method.
  */
 interface ProvidesParametersNonStatically {
-    fun getAllPossibleParameters(context: Context): Flow<ValidatedKeyParameters>
+    suspend fun getAllPossibleParameters(context: Context): Flow<ValidatedKeyParameters>
+
+    /**
+    * Synchronous version of [getAllPossibleParameters] for Java.
+    *
+    * This should go away soon once we support suspending calls throughout.
+    */
+    // TODO(469317113): Remove this once suspending calls are supported.
+    fun getAllPossibleParametersSync(context: Context) = runBlocking {
+        getAllPossibleParameters(context)
+    }
 }
 
 /**
@@ -120,7 +132,7 @@ class ParameterizationConfig {
      */
     internal fun buildSchema(): KeyParametersSchema = KeyParametersSchema {
         parameters.values.map {
-            parameter(name = it.name, purpose = it.purpose, required = it.required)
+            parameter(name = it.name, purpose = it.purpose, required = it.required, type = it.type)
         }
     }
 }
@@ -250,6 +262,9 @@ abstract class PreferencesApiScreen private constructor(
             runBlocking { screenPreconditions?.check(opContext) } ?: Allowed
 
         if (checkScreenPreconditions != Allowed) {
+            if (checkScreenPreconditions is Disallowed) {
+                Log.d(TAG, "Screen precondition failed: ${checkScreenPreconditions.getReason(context)}")
+            }
             return null
         }
 
@@ -261,6 +276,9 @@ abstract class PreferencesApiScreen private constructor(
     var screenPermissions: Permissions? = null
     var screenPreconditions: PreconditionsConfig? = null
     var screenTags: List<String>? = null
+
+    override val keyParametersSchema: KeyParametersSchema?
+        get() = parametersSchema
 
     override val keyParameters: ValidatedKeyParameters?
         get() = if (::screenParameters.isInitialized) screenParameters else super.keyParameters
@@ -285,7 +303,7 @@ abstract class PreferencesApiScreen private constructor(
     private lateinit var screenParameters: ValidatedKeyParameters
     private var prepareScreenExtras: ((ValidatedKeyParameters, Bundle) -> Unit)? = null
     private var prepareSpaRoute: ((ValidatedKeyParameters) -> String)? = null
-    private var allPossibleParameters: ((Context) -> Collection<ValidatedKeyParameters>) = { emptyList() }
+    private var allPossibleParameters: suspend ((Context) -> Collection<ValidatedKeyParameters>) = { emptyList() }
 
     val preferencesPermissions = mutableListOf<String>()
 
@@ -353,7 +371,7 @@ abstract class PreferencesApiScreen private constructor(
      * }
      * ```
      */
-    protected inline fun <reified V : Any> preference(
+    protected fun <V : Any> preference(
         key: String,
         purpose: Int,
         type: ApiType<V>,
@@ -364,10 +382,10 @@ abstract class PreferencesApiScreen private constructor(
             key,
             purpose,
             type,
-            V::class.java,
             appliesTo,
             screenPermissions,
             screenPreconditions,
+            { keyParametersSchema },
             { keyParameters },
         )
         builder.lambda()
@@ -393,7 +411,7 @@ abstract class PreferencesApiScreen private constructor(
      * @param context The application context.
      * @return A [Flow] emitting all possible [ValidatedKeyParameters].
      */
-    override fun getAllPossibleParameters(context: Context) = allPossibleParameters(context).asFlow()
+    override suspend fun getAllPossibleParameters(context: Context) = allPossibleParameters(context).asFlow()
 
     /**
      * Returns the SPA route for this screen, generating it dynamically if parameters are present.
@@ -581,6 +599,8 @@ abstract class PreferencesApiScreen private constructor(
     }
 
     companion object {
+        private const val TAG = "PreferencesApiScreen"
+
         const val PARTIALLY_MIGRATED_PREFIX = "api_"
 
         // Matches DeviceStateConfig.DeviceStateAppFunctionType

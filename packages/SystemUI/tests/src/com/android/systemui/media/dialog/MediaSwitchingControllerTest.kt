@@ -89,6 +89,7 @@ import com.android.systemui.volume.panel.domain.interactor.volumePanelGlobalStat
 import com.google.common.truth.Truth.assertThat
 import java.util.function.Consumer
 import kotlin.jvm.java
+import kotlin.test.fail
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Before
 import org.junit.Test
@@ -404,6 +405,38 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
         mMediaSwitchingController.tryToLaunchInAppRoutingIntent(TEST_DEVICE_1_ID, mDialogLaunchView)
 
         verify(mStarter).startActivity(any<Intent>(), any(), eq(mController))
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    fun tryToLaunchMissingPermissionsResolveIntent_noMissingPermissions_doesNothing() {
+        whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(null)
+        mMediaSwitchingController.start(mCallback)
+
+        mMediaSwitchingController.tryToLaunchMissingPermissionsResolveIntent()
+
+        verify(mCallback, never()).dismissDialog()
+        verify(mSpyContext, never()).startActivityAsUser(any(), any())
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    fun tryToLaunchMissingPermissionsResolveIntent_hasMissingPermissions_launchesActivity() {
+        val componentName = ComponentName(mPackageName, "class")
+        val perms = setOf("perm1", "perm2")
+        val info = MissingPermissionsInfo(componentName, perms)
+        whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(info)
+        val user = UserHandle.of(123)
+        whenever(mLocalMediaManager.userHandle).thenReturn(user)
+        mMediaSwitchingController.start(mCallback)
+
+        mMediaSwitchingController.tryToLaunchMissingPermissionsResolveIntent()
+
+        verify(mCallback).dismissDialog()
+        val intentCaptor = argumentCaptor<Intent>()
+        verify(mSpyContext).startActivityAsUser(intentCaptor.capture(), eq(user))
+        assertThat(intentCaptor.firstValue.action)
+            .isEqualTo(RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS)
     }
 
     @Test
@@ -791,7 +824,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_groupPlaybackAndExpanded_allSelectedDevicesOnTop() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(true)
@@ -825,7 +857,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_groupPlaybackAndCollapsed_groupControlAtTheTop() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(true)
@@ -854,7 +885,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_sessionVolumeUnavailable_noGroupControl() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(true)
@@ -887,7 +917,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_groupPlaybackCreatedLater_noGroupControl() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(false)
@@ -1857,10 +1886,7 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_USE_OF_SESSION_RELEASE_TYPE_FOR_STOP_BUTTON,
-        Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_USE_OF_SESSION_RELEASE_TYPE_FOR_STOP_BUTTON)
     fun getStopButtonText_sessionReleaseSharing_returnsSharingText() {
         doReturn(RoutingSessionInfo.RELEASE_TYPE_SHARING)
             .whenever(mLocalMediaManager)
@@ -1868,17 +1894,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
 
         assertThat(mMediaSwitchingController.getStopButtonStringRes())
             .isEqualTo(R.string.media_output_dialog_button_stop_sharing)
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_USE_OF_SESSION_RELEASE_TYPE_FOR_STOP_BUTTON)
-    @DisableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
-    fun getStopButtonText_sessionReleaseSharingDisabled_returnsNull() {
-        doReturn(RoutingSessionInfo.RELEASE_TYPE_SHARING)
-            .whenever(mLocalMediaManager)
-            .sessionReleaseType
-
-        assertThat(mMediaSwitchingController.getStopButtonStringRes()).isNull()
     }
 
     @Test

@@ -34,6 +34,7 @@
 #include <meminfo/procmeminfo.h>
 #include <meminfo/sysmeminfo.h>
 #include <processgroup/processgroup.h>
+#include <processgroup/processgroup_platform.h>
 #include <processgroup/sched_policy.h>
 #include <android-base/logging.h>
 #include <android-base/unique_fd.h>
@@ -1455,14 +1456,14 @@ jintArray android_os_Process_getPidsForCommands(JNIEnv* env, jobject clazz,
     return pidArray;
 }
 
-jint android_os_Process_killProcessGroup(JNIEnv* env, jobject clazz, jint uid, jint pid)
+jboolean android_os_Process_killProcessGroup(JNIEnv* env, jobject clazz, jint uid, jint pid)
 {
     if (uid < 0) {
         return jniThrowExceptionFmt(env, "java/lang/IllegalArgumentException",
                                     "uid is negative: %d", uid);
     }
 
-    return killProcessGroup(uid, pid, SIGKILL);
+    return libprocessgroup_platform::killProcessGroup(uid, pid);
 }
 
 jboolean android_os_Process_sendSignalToProcessGroup(JNIEnv* env, jobject clazz, jint uid, jint pid,
@@ -1647,7 +1648,7 @@ static const JNINativeMethod methods[] = {
          (void*)android_os_Process_getPidsForCommands},
         //{"setApplicationObject", "(Landroid/os/IBinder;)V",
         //(void*)android_os_Process_setApplicationObject},
-        {"killProcessGroup", "(II)I", (void*)android_os_Process_killProcessGroup},
+        {"killProcessGroup", "(II)Z", (void*)android_os_Process_killProcessGroup},
         {"sendSignalToProcessGroup", "(III)Z", (void*)android_os_Process_sendSignalToProcessGroup},
         {"removeAllProcessGroups", "()V", (void*)android_os_Process_removeAllProcessGroups},
         {"nativePidFdOpen", "(II)I", (void*)android_os_Process_nativePidFdOpen},

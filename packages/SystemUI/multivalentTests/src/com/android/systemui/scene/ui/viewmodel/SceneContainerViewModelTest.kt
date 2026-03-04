@@ -43,6 +43,7 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.power.data.repository.fakePowerRepository
+import com.android.systemui.res.R
 import com.android.systemui.scene.data.repository.unlockDevice
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.fakeOverlaysByKeys
@@ -531,8 +532,8 @@ class SceneContainerViewModelTest : SysuiTestCase() {
             sceneInteractor.showOverlay(Overlays.QuickSettingsShade, "test")
             assertThat(currentOverlays).isNotEmpty()
 
-            // WHEN a touch event occurs outside the shade window
-            underTest.onEmptySpaceMotionEvent(MotionEvent.obtain(0, 0, ACTION_OUTSIDE, 0f, 0f, 0))
+            // WHEN a touch event occurs outside the shade window and status bar
+            underTest.onEmptySpaceMotionEvent(MotionEvent.obtain(0, 0, ACTION_OUTSIDE, 0f, 200f, 0))
 
             // THEN the overlay is hidden
             assertThat(currentOverlays).isEmpty()
@@ -613,5 +614,52 @@ class SceneContainerViewModelTest : SysuiTestCase() {
             )
 
             verify(windowInsetsController).show(eq(WindowInsetsCompat.Type.navigationBars()))
+        }
+
+    @Test
+    fun accessibilityTitle_bouncerOverLockscreen() =
+        kosmos.runTest {
+            sceneInteractor.changeScene(Scenes.Lockscreen, "Switch to Lockscreen for test pre-req")
+            fakeSceneDataSource.showOverlay(Overlays.Bouncer)
+
+            assertThat(underTest.accessibilityTitle).isEqualTo(null)
+        }
+
+    @Test
+    fun accessibilityTitle_lockscreen() =
+        kosmos.runTest {
+            sceneInteractor.changeScene(Scenes.Lockscreen, "Switch to Lockscreen for test pre-req")
+
+            assertThat(underTest.accessibilityTitle)
+                .isEqualTo(R.string.accessibility_desc_lock_screen)
+        }
+
+    @Test
+    fun accessibilityTitle_singleShade() =
+        kosmos.runTest {
+            enableSingleShade()
+
+            sceneInteractor.changeScene(Scenes.Shade, "Switch to NotificationShade for test")
+            assertThat(underTest.accessibilityTitle)
+                .isEqualTo(R.string.accessibility_desc_notification_shade)
+
+            sceneInteractor.changeScene(Scenes.QuickSettings, "Switch to Quicksettings for test")
+            assertThat(underTest.accessibilityTitle)
+                .isEqualTo(R.string.accessibility_desc_quick_settings)
+        }
+
+    @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
+    fun accessibilityTitle_dualShade() =
+        kosmos.runTest {
+            enableDualShade()
+
+            fakeSceneDataSource.showOverlay(Overlays.NotificationsShade)
+            assertThat(underTest.accessibilityTitle)
+                .isEqualTo(R.string.accessibility_desc_notification_shade)
+
+            fakeSceneDataSource.showOverlay(Overlays.QuickSettingsShade)
+            assertThat(underTest.accessibilityTitle)
+                .isEqualTo(R.string.accessibility_desc_quick_settings)
         }
 }

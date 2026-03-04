@@ -2048,6 +2048,8 @@
     <dimen name="dream_overlay_entry_y_offset">40dp</dimen>
     <dimen name="dream_overlay_exit_y_offset">40dp</dimen>
 
+    <dimen name="dream_switcher_swipe_edge_width_default">30dp</dimen>
+
     <!-- Media output broadcast dialog QR code picture size -->
     <dimen name="media_output_qrcode_size">216dp</dimen>
     <dimen name="media_output_broadcast_info">21dp</dimen>
@@ -2182,14 +2184,22 @@
     <dimen name="volume_dialog_button_size">48dp</dimen>
     <dimen name="volume_dialog_slider_width">52dp</dimen>
     <dimen name="volume_dialog_slider_height">254dp</dimen>
+
+    <dimen name="volume_dialog_horizontal_height">56dp</dimen>
+    <dimen name="volume_dialog_horizontal_background_corner_radius">28dp</dimen>
+    <dimen name="volume_dialog_horizontal_background_margin_negative">-4dp</dimen>
+    <dimen name="volume_dialog_horizontal_background_top_margin">-12dp</dimen>
+    <dimen name="volume_dialog_horizontal_slider_container_height">32dp</dimen>
+    <dimen name="volume_dialog_horizontal_slider_width">296dp</dimen>
+    <dimen name="volume_dialog_horizontal_slider_width_with_captions">252dp</dimen>
     <!--
         A primary goal of this margin is to vertically constraint slider height in the landscape
         orientation when the vertical space is limited
     -->
     <dimen name="volume_dialog_slider_vertical_margin">124dp</dimen>
     <dimen name="volume_dialog_slider_vertical_margin_with_captions_toggle">130dp</dimen>
-    <dimen name="volume_dialog_slider_horizontal_margin">82dp</dimen>
-    <dimen name="volume_dialog_slider_horizontal_margin_with_captions_toggle">130dp</dimen>
+    <dimen name="volume_dialog_slider_horizontal_margin">81dp</dimen>
+    <dimen name="volume_dialog_slider_horizontal_margin_with_captions_toggle">124dp</dimen>
     <dimen name="volume_dialog_half_opened_offset">-128dp</dimen>
     <dimen name="volume_dialog_slider_max_deviation">56dp</dimen>
     <dimen name="volume_dialog_floating_slider_background_corner_radius">20dp</dimen>
@@ -2259,11 +2269,11 @@
     <!-- Tile Details entry end -->
 
     <!-- Bouncer containerization on large screens -->
-    <dimen name="bouncer_container_min_width">1280dp</dimen>
-    <dimen name="bouncer_container_max_width">1440dp</dimen>
-    <dimen name="bouncer_container_min_height">720dp</dimen>
-    <dimen name="bouncer_container_max_height">810dp</dimen>
-    <item name="bouncer_container_size_percentage" format="float" type="dimen">0.72</item>
+    <dimen name="bouncer_container_min_long_edge">1280dp</dimen>
+    <dimen name="bouncer_container_max_long_edge">1440dp</dimen>
+    <dimen name="bouncer_container_min_short_edge">720dp</dimen>
+    <dimen name="bouncer_container_max_short_edge">810dp</dimen>
+    <item name="bouncer_container_size_fraction" format="float" type="dimen">0.72</item>
     <!-- Bouncer containerization on large screens end -->
 
     <!-- Lockscreen blur values -->
@@ -2280,7 +2290,6 @@
     <dimen name="usb_device_dialog_button_padding_vertical">10dp</dimen>
     <dimen name="usb_device_dialog_always_use_checkbox_corners_radius">20dp</dimen>
     <dimen name="usb_device_dialog_always_use_checkbox_padding_vertical">12dp</dimen>
-    <dimen name="usb_device_dialog_always_use_checkbox_margin_horizontal">16dp</dimen>
     <dimen name="usb_device_dialog_icon_size">32dp</dimen>
     <dimen name="usb_device_dialog_button_height">40dp</dimen>
 

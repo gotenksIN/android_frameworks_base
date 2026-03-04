@@ -20,19 +20,21 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.RulesScreenViewState
+import com.android.systemui.res.R
 
-/** Renders a menu to choose a new field to add to the rule. */
+/** Renders an inline menu to choose a new field to add to the rule. */
 @Composable
 fun AddFieldDialog(
-    options: List<EditDialogType>,
+    options: List<RulesScreenViewState.EditField>,
     onDismissRequest: () -> Unit,
-    onOptionSelected: (EditDialogType) -> Unit,
+    onOptionSelected: (RulesScreenViewState.EditField) -> Unit,
 ) {
     DropdownMenu(expanded = true, onDismissRequest = onDismissRequest) {
         for (option in options) {
             DropdownMenuItem(
-                // TODO: b/478225883 - Add translated strings describing the options.
-                text = { Text(text = option.javaClass.simpleName) },
+                text = { Text(option.toText()) },
                 onClick = {
                     onDismissRequest.invoke()
                     onOptionSelected.invoke(option)
@@ -40,4 +42,18 @@ fun AddFieldDialog(
             )
         }
     }
+}
+
+@Composable
+private fun RulesScreenViewState.EditField.toText(): String {
+    val resourceId =
+        when (this) {
+            is RulesScreenViewState.EditField.Contacts -> R.string.notification_rules_field_people
+            is RulesScreenViewState.EditField.Apps -> R.string.notification_rules_field_app
+            is RulesScreenViewState.EditField.Action ->
+                throw IllegalStateException(
+                    "Actions should always be edited inline, not via the `Add` button"
+                )
+        }
+    return stringResource(resourceId)
 }

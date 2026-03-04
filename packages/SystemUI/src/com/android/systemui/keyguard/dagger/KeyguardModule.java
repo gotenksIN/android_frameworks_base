@@ -21,6 +21,7 @@ import android.app.trust.TrustManager;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.PowerManager;
+import android.uilatencystats.UiLatencyStatsManager;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.UiEventLogger;
@@ -76,6 +77,7 @@ import com.android.systemui.log.SessionTracker;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.process.ProcessWrapper;
 import com.android.systemui.res.R;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeDisplayAware;
@@ -106,6 +108,7 @@ import dagger.multibindings.IntoMap;
 
 import kotlinx.coroutines.CoroutineScope;
 
+import java.util.Optional;
 import java.util.concurrent.Executor;
 
 /**
@@ -192,7 +195,9 @@ public interface KeyguardModule {
             KeyguardTransitionBootInteractor transitionBootInteractor,
             Lazy<CommunalSceneInteractor> communalSceneInteractor,
             Lazy<CommunalSettingsInteractor> communalSettingsInteractor,
-            WindowManagerOcclusionManager windowManagerOcclusionManager) {
+            WindowManagerOcclusionManager windowManagerOcclusionManager,
+            Optional<UiLatencyStatsManager> uiLatencyStatsManager,
+            Lazy<SceneInteractor> sceneInteractor) {
         return new KeyguardViewMediator(
                 context,
                 uiEventLogger,
@@ -245,7 +250,9 @@ public interface KeyguardModule {
                 transitionBootInteractor,
                 communalSceneInteractor,
                 communalSettingsInteractor,
-                windowManagerOcclusionManager);
+                windowManagerOcclusionManager,
+                uiLatencyStatsManager,
+                sceneInteractor);
     }
 
     /** */

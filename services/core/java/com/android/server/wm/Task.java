@@ -78,6 +78,8 @@ import static android.window.DisplayAreaOrganizer.FEATURE_UNDEFINED;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_LOCKTASK;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_PACKAGE_UPDATE;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_RESIZE;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STATES;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
 import static com.android.server.wm.ActivityRecord.State.PAUSED;
@@ -1319,6 +1321,23 @@ class Task extends TaskFragment {
         mRootWindowContainer.updateUIDsPresentOnDisplay();
     }
 
+    /**
+     * Finds the top visible app window at the given x-coordinate.
+     */
+    @Nullable
+    WindowState getTopVisibleAppWindowAt(int x) {
+        return getWindow(w -> {
+            if (w.mActivityRecord == null) {
+                return false;
+            }
+            if (!w.isVisible()) {
+                return false;
+            }
+            final Rect bounds = w.getBounds();
+            return x >= bounds.left && x < bounds.right;
+        });
+    }
+
     boolean isOverrideBoundsAllowed() {
         Task parentTask = getParent() != null ? getParent().asTask() : null;
         while (parentTask != null) {
@@ -1343,6 +1362,7 @@ class Task extends TaskFragment {
 
     @Override
     void onResize() {
+        ProtoLog.v(WM_DEBUG_RESIZE, "onResize to %s on %s", getBounds(), this);
         super.onResize();
         mLeafTaskBoundsFromOptions = false;
         onTaskBoundsChangedForFreeform();
@@ -1350,6 +1370,7 @@ class Task extends TaskFragment {
 
     @Override
     void onMovedByResize() {
+        ProtoLog.v(WM_DEBUG_RESIZE, "onMovedByResize to %s on %s", getBounds(), this);
         super.onMovedByResize();
         mLeafTaskBoundsFromOptions = false;
         onTaskBoundsChangedForFreeform();
@@ -6254,7 +6275,20 @@ class Task extends TaskFragment {
 
     void continuePackageUpdate() {
         // If the task is not marked to be handled, do nothing.
-        if (Flags.enableAppRestartAfterUpdate() && !mHandlePackageUpdate) {
+        if (!Flags.enableAppRestartAfterUpdate()) {
+            return;
+        }
+
+        final Task rootTask = getRootTask();
+        if (rootTask == null) {
+            ProtoLog.w(WM_DEBUG_PACKAGE_UPDATE,
+                    "Continue package update called but task has no root %d", mTaskId);
+            return;
+        }
+
+        if (!getRootTask().mHandlePackageUpdate) {
+            ProtoLog.w(WM_DEBUG_PACKAGE_UPDATE,
+                    "Root task of %d not registered as handle package update.", mTaskId);
             return;
         }
 
@@ -6262,7 +6296,15 @@ class Task extends TaskFragment {
         if (rootActivity == null) {
             return;
         }
-        rootActivity.app.onTaskPackageUpdateHandled(this);
+
+        if (rootActivity.hasProcess()) {
+            rootActivity.app.onTaskPackageUpdateHandled(this);
+        } else {
+            ProtoLog.w(WM_DEBUG_PACKAGE_UPDATE,
+                    "Root Activity %s of task %d has no process.",
+                    rootActivity.mActivityComponent,
+                    mTaskId);
+        }
     }
 
     boolean dump(FileDescriptor fd, PrintWriter pw, boolean dumpAll, boolean dumpClient,

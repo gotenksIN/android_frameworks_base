@@ -46,6 +46,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
@@ -72,9 +74,10 @@ private enum class RowType {
 fun ShortcutSingleSelectRow(
     target: AccessibilityTargetModel,
     modifier: Modifier = Modifier,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
-    ShortcutTargetRow(target, RowType.RADIO, modifier, onClick)
+    ShortcutTargetRow(target, RowType.RADIO, modifier, selected, onClick)
 }
 
 /** A shortcut target row that uses a checkbox to represent a multi-selectable option. */
@@ -84,7 +87,7 @@ fun ShortcutMultiSelectRow(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    ShortcutTargetRow(target, RowType.CHECKBOX, modifier, onClick)
+    ShortcutTargetRow(target, RowType.CHECKBOX, modifier, selected = target.isAssigned, onClick)
 }
 
 /**
@@ -98,14 +101,22 @@ fun ShortcutToggleRow(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    ShortcutTargetRow(target, RowType.TOGGLE, modifier, onClick)
+    ShortcutTargetRow(target, RowType.TOGGLE, modifier, selected = target.isAssigned, onClick)
 }
 
+/**
+ * Internal composable for rendering a row representing an accessibility shortcut target.
+ *
+ * @param selected For [RowType.RADIO] and [RowType.CHECKBOX], this determines the selection state
+ *   of the control. For [RowType.TOGGLE], this parameter is ignored and [target.isStateOn] is used
+ *   instead to determine the switch state.
+ */
 @Composable
 private fun ShortcutTargetRow(
     target: AccessibilityTargetModel,
     rowType: RowType,
     modifier: Modifier = Modifier,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
@@ -116,15 +127,15 @@ private fun ShortcutTargetRow(
                 .clip(RoundedCornerShape(8.dp))
                 .testTag(target.targetName)
                 // Add interactable before padding so the entire row is clickable.
-                .interactable(target, rowType, onClick)
+                .interactable(target, selected, rowType, onClick)
                 .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(space = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (rowType == RowType.CHECKBOX) {
-            Checkbox(checked = target.isAssigned, onCheckedChange = null)
+            Checkbox(checked = selected, onCheckedChange = null)
         } else if (rowType == RowType.RADIO) {
-            RadioButton(selected = target.isAssigned, onClick = null)
+            RadioButton(selected = selected, onClick = null)
         }
 
         Image(
@@ -136,7 +147,16 @@ private fun ShortcutTargetRow(
         Text(
             target.featureName,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
+            style =
+                MaterialTheme.typography.titleMedium.copy(
+                    hyphens = Hyphens.Auto,
+                    lineBreak =
+                        LineBreak(
+                            strategy = LineBreak.Strategy.HighQuality,
+                            strictness = LineBreak.Strictness.Normal,
+                            wordBreak = LineBreak.WordBreak.Phrase,
+                        ),
+                ),
         )
 
         if (rowType == RowType.TOGGLE && target.isToggleable) {
@@ -147,28 +167,21 @@ private fun ShortcutTargetRow(
 
 private fun Modifier.interactable(
     target: AccessibilityTargetModel,
+    selected: Boolean,
     rowType: RowType,
     onClick: () -> Unit,
 ): Modifier =
     when (rowType) {
         RowType.RADIO ->
-            selectable(
-                selected = target.isAssigned,
-                role = Role.RadioButton,
-                onClick = { onClick() },
-            )
+            selectable(selected = selected, role = Role.RadioButton, onClick = { onClick() })
         RowType.CHECKBOX ->
-            toggleable(
-                value = target.isAssigned,
-                role = Role.Checkbox,
-                onValueChange = { onClick() },
-            )
+            toggleable(value = selected, role = Role.Checkbox, onValueChange = { _ -> onClick() })
         RowType.TOGGLE ->
             if (target.isToggleable) {
                 toggleable(
                     value = target.isStateOn,
                     role = Role.Switch,
-                    onValueChange = { onClick() },
+                    onValueChange = { _ -> onClick() },
                 )
             } else {
                 clickable { onClick() }

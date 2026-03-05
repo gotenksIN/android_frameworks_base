@@ -50,7 +50,6 @@ package android {
     field public static final String BIND_INCALL_SERVICE = "android.permission.BIND_INCALL_SERVICE";
     field public static final String BIND_INPUT_METHOD = "android.permission.BIND_INPUT_METHOD";
     field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_INSIGHT_RENDERER_SERVICE = "android.permission.BIND_INSIGHT_RENDERER_SERVICE";
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE = "android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE";
     field public static final String BIND_MIDI_DEVICE_SERVICE = "android.permission.BIND_MIDI_DEVICE_SERVICE";
     field public static final String BIND_NFC_SERVICE = "android.permission.BIND_NFC_SERVICE";
     field public static final String BIND_NOTIFICATION_LISTENER_SERVICE = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE";
@@ -569,6 +568,7 @@ package android {
     field public static final int backdropColor = 16844402; // 0x1010672
     field public static final int background = 16842964; // 0x10100d4
     field public static final int backgroundDimAmount = 16842802; // 0x1010032
+    field @FlaggedApi("com.android.window.flags.support_custom_dim_color") public static final int backgroundDimColor;
     field public static final int backgroundDimEnabled = 16843295; // 0x101021f
     field public static final int backgroundSplit = 16843659; // 0x101038b
     field public static final int backgroundStacked = 16843658; // 0x101038a
@@ -6945,6 +6945,7 @@ package android.app {
     field public static final int BRIDGED_METADATA_TYPE_TV = 5; // 0x5
     field public static final int BRIDGED_METADATA_TYPE_UNKNOWN = 0; // 0x0
     field public static final int BRIDGED_METADATA_TYPE_WATCH = 4; // 0x4
+    field public static final int BRIDGED_METADATA_TYPE_XR = 6; // 0x6
     field @NonNull public static final android.os.Parcelable.Creator<android.app.Notification.BridgedNotificationMetadata> CREATOR;
   }
 
@@ -9358,7 +9359,7 @@ package android.app.appfunctions {
   @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public final class AppFunctionName implements android.os.Parcelable {
     ctor public AppFunctionName(@NonNull String, @NonNull String);
     method public int describeContents();
-    method @NonNull public String getFunctionId();
+    method @NonNull public String getFunctionIdentifier();
     method @NonNull public String getPackageName();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.appfunctions.AppFunctionName> CREATOR;
@@ -9755,21 +9756,21 @@ package android.app.blob {
 
 package android.app.contentrestriction {
 
-  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public final class Content implements android.os.Parcelable {
+  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public final class ClassifiableContent implements android.os.Parcelable {
     method public int describeContents();
     method @Nullable public android.os.ParcelFileDescriptor getData();
     method @NonNull public android.content.LocusId getId();
     method @NonNull public String getMimeType();
     method @Nullable public android.net.Uri getUri();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.app.contentrestriction.Content> CREATOR;
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.contentrestriction.ClassifiableContent> CREATOR;
   }
 
-  public static final class Content.Builder {
-    ctor public Content.Builder(@NonNull android.content.LocusId, @NonNull String);
-    method @NonNull public android.app.contentrestriction.Content build();
-    method @NonNull public android.app.contentrestriction.Content.Builder setData(@NonNull android.os.ParcelFileDescriptor);
-    method @NonNull public android.app.contentrestriction.Content.Builder setUri(@NonNull android.net.Uri);
+  public static final class ClassifiableContent.Builder {
+    ctor public ClassifiableContent.Builder(@NonNull android.content.LocusId, @NonNull String);
+    method @NonNull public android.app.contentrestriction.ClassifiableContent build();
+    method @NonNull public android.app.contentrestriction.ClassifiableContent.Builder setData(@NonNull android.os.ParcelFileDescriptor);
+    method @NonNull public android.app.contentrestriction.ClassifiableContent.Builder setUri(@NonNull android.net.Uri);
   }
 
   @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public final class ContentClassificationResult implements android.os.Parcelable {
@@ -9788,15 +9789,15 @@ package android.app.contentrestriction {
   @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionAppService extends android.app.Service {
     ctor public ContentRestrictionAppService();
     method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
-    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") @Nullable public android.app.contentrestriction.ContentClassificationResult onClassifyContent(@NonNull android.app.contentrestriction.Content);
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") @Nullable public android.app.contentrestriction.ContentClassificationResult onClassifyContent(@NonNull android.app.contentrestriction.ClassifiableContent);
     method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void onContentRestrictionDisabled();
     method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void onContentRestrictionEnabled();
     field public static final String ACTION_CONTENT_RESTRICTION_APP_SERVICE = "android.app.action.CONTENT_RESTRICTION_SERVICE";
   }
 
   @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionManager {
-    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void isContentAllowed(@NonNull android.app.contentrestriction.Content, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
     method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public boolean isContentRestrictionEnabled();
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void requestClassification(@NonNull android.app.contentrestriction.ClassifiableContent, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
   }
 
 }
@@ -10220,7 +10221,7 @@ package android.app.privatecompute {
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public abstract class DataMigrationToPccService extends android.app.Service {
     ctor public DataMigrationToPccService();
     method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
-    method public abstract void onMigrationRequested(@NonNull android.app.privatecompute.MigrationRequestResultSender);
+    method public abstract void onMigrationRequested(@NonNull java.util.function.Consumer<android.app.privatecompute.MigrationRequestResult>);
     field public static final long MIGRATION_TIMEOUT_MS = 60000L; // 0xea60L
     field public static final String SERVICE_INTERFACE = "android.app.privatecompute.DataMigrationToPccService";
   }
@@ -10241,10 +10242,6 @@ package android.app.privatecompute {
     field @NonNull public static final android.os.Parcelable.Creator<android.app.privatecompute.MigrationRequestResult> CREATOR;
     field public static final int MIGRATION_REQUEST_ACCEPTED = 1; // 0x1
     field public static final int MIGRATION_REQUEST_REJECTED = 2; // 0x2
-  }
-
-  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class MigrationRequestResultSender {
-    method public void sendResult(@NonNull android.app.privatecompute.MigrationRequestResult);
   }
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public class PccClient {
@@ -11907,8 +11904,8 @@ package android.content {
     field public static final String DOWNLOAD_SERVICE = "download";
     field public static final String DROPBOX_SERVICE = "dropbox";
     field public static final String EUICC_SERVICE = "euicc";
-    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final String FILES_SERVICE = "files";
     field public static final String FILE_INTEGRITY_SERVICE = "file_integrity";
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final String FILE_SERVICE = "file";
     field public static final String GAME_SERVICE = "game";
     field public static final String GRAMMATICAL_INFLECTION_SERVICE = "grammatical_inflection";
     field public static final String HARDWARE_PROPERTIES_SERVICE = "hardware_properties";
@@ -17430,6 +17427,7 @@ package android.graphics {
     method @NonNull @WorkerThread public static android.graphics.Bitmap decodeBitmap(@NonNull android.graphics.ImageDecoder.Source) throws java.io.IOException;
     method @NonNull @WorkerThread public static android.graphics.drawable.Drawable decodeDrawable(@NonNull android.graphics.ImageDecoder.Source, @NonNull android.graphics.ImageDecoder.OnHeaderDecodedListener) throws java.io.IOException;
     method @NonNull @WorkerThread public static android.graphics.drawable.Drawable decodeDrawable(@NonNull android.graphics.ImageDecoder.Source) throws java.io.IOException;
+    method @FlaggedApi("com.android.graphics.hwui.flags.image_decoder_allocation_limit") public long getAllocationLimit();
     method public int getAllocator();
     method @Nullable public android.graphics.Rect getCrop();
     method @FlaggedApi("com.android.graphics.hwui.flags.image_decoder_default_listener") @Nullable public static android.graphics.ImageDecoder.OnHeaderDecodedListener getDefaultProcessListener();
@@ -17441,6 +17439,7 @@ package android.graphics {
     method public static boolean isMimeTypeSupported(@NonNull String);
     method public boolean isMutableRequired();
     method public boolean isUnpremultipliedRequired();
+    method @FlaggedApi("com.android.graphics.hwui.flags.image_decoder_allocation_limit") public void setAllocationLimit(long);
     method public void setAllocator(int);
     method public void setCrop(@Nullable android.graphics.Rect);
     method public void setDecodeAsAlphaMaskEnabled(boolean);
@@ -26082,8 +26081,8 @@ package android.media {
     method public int getConnectionState();
     method @NonNull public java.util.Set<java.lang.String> getDeduplicationIds();
     method @Nullable public CharSequence getDescription();
-    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @NonNull public String getDeviceManufacturer();
-    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @NonNull public String getDeviceModel();
+    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @Nullable public String getDeviceManufacturer();
+    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @Nullable public String getDeviceModel();
     method @Nullable public android.os.Bundle getExtras();
     method @NonNull public java.util.List<java.lang.String> getFeatures();
     method @Nullable public android.net.Uri getIconUri();
@@ -26157,8 +26156,8 @@ package android.media {
     method @NonNull public android.media.MediaRoute2Info.Builder setConnectionState(int);
     method @NonNull public android.media.MediaRoute2Info.Builder setDeduplicationIds(@NonNull java.util.Set<java.lang.String>);
     method @NonNull public android.media.MediaRoute2Info.Builder setDescription(@Nullable CharSequence);
-    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @NonNull public android.media.MediaRoute2Info.Builder setDeviceManufacturer(@NonNull String);
-    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @NonNull public android.media.MediaRoute2Info.Builder setDeviceModel(@NonNull String);
+    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @NonNull public android.media.MediaRoute2Info.Builder setDeviceManufacturer(@Nullable String);
+    method @FlaggedApi("com.android.media.flags.enable_device_manufacturer_and_model_info") @NonNull public android.media.MediaRoute2Info.Builder setDeviceModel(@Nullable String);
     method @NonNull public android.media.MediaRoute2Info.Builder setExtras(@Nullable android.os.Bundle);
     method @NonNull public android.media.MediaRoute2Info.Builder setIconUri(@Nullable android.net.Uri);
     method @FlaggedApi("com.android.media.flags.enable_route_visibility_control_api") @NonNull public android.media.MediaRoute2Info.Builder setRequiredPermissions(@NonNull java.util.Set<java.lang.String>);
@@ -28560,12 +28559,14 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_SPACE_OFF = "OFF";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_SPACE_ON = "ON";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_SPACE_S_RGB_BT_709 = "S_RGB_BT_709";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_SPACE_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_COOL = "color_temp_cool";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_COOL_HDR10PLUS = "color_temp_cool_hdr10plus";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_FMMHDR = "color_temp_fmmhdr";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_FMMSDR = "color_temp_fmmsdr";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_STANDARD = "color_temp_standard";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_STANDARD_HDR10PLUS = "color_temp_standard_hdr10plus";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_UNKNOWN = "color_temp_unknown";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_USER = "color_temp_user";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_USER_HDR10PLUS = "color_temp_user_hdr10plus";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_TEMP_WARM = "color_temp_warm";
@@ -28576,22 +28577,27 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DIGITAL_OUTPUT_MODE_DOLBY_DIGITAL_PLUS = "DolbyDigitalPlus";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DIGITAL_OUTPUT_MODE_DOLBY_MAT = "DolbyMat";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DIGITAL_OUTPUT_MODE_PCM = "PCM";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DIGITAL_OUTPUT_MODE_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_GAME = "GAME";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_MOVIE = "MOVIE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_MUSIC = "MUSIC";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_NEWS = "NEWS";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_STADIUM = "STADIUM";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_STANDARD = "STANDARD";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOLBY_SOUND_MODE_USER = "USER";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOWN_MIX_MODE_STEREO = "STEREO";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOWN_MIX_MODE_SURROUND = "SURROUND";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String DOWN_MIX_MODE_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String EXTRA_PICTURE_QUALITY_EVENT_TYPE_FRAME_CHANGE = "android.media.quality.extra.PICTURE_QUALITY_EVENT_TYPE_FRAME_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String GAMMA_BRIGHT = "BRIGHT";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String GAMMA_DARK = "DARK";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String GAMMA_MIDDLE = "MIDDLE";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String GAMMA_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String HDMIRGB_RANGE_AUTO = "AUTO";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String HDMIRGB_RANGE_FULL = "FULL";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String HDMIRGB_RANGE_LIMITED = "LIMITED";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String HDMIRGB_RANGE_UNKNOWN = "UNKNOWN";
     field public static final String LEVEL_HIGH = "level_high";
     field public static final String LEVEL_LOW = "level_low";
     field public static final String LEVEL_MEDIUM = "level_medium";
@@ -28599,13 +28605,17 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_AUTO = "AUTO";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_FULL = "FULL";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_LIMITED = "LIMITED";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_UNKNOWN = "UNKNOWN";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_UNKNOWN = "level_unknown";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_USER = "level_user";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final int PANEL_TECHNOLOGY_OLED = 0; // 0x0
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final int PANEL_TECHNOLOGY_UNKNOWN = -1; // 0xffffffff
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_BBD_RESULT = "BBD_RESULT";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_CAPTUREPOINT_INFO_CHANGE = "CAPTUREPOINT_INFO_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_DOLBY_APO_CHANGE = "DOLBY_APO_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_DOLBY_IQ_CHANGE = "DOLBY_IQ_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_NONE = "NONE";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_VIDEOPATH_CHANGE = "VIDEOPATH_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_VIDEO_DELAY_CHANGE = "VIDEO_DELAY_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_AUTO = "AUTO";
@@ -28614,6 +28624,7 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_NEWS = "NEWS";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_SPORTS = "SPORTS";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_STANDARD = "STANDARD";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_USER = "USER";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String SOUND_STYLE_VIVID = "VIVID";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_DOLBY_VISION = "DOLBYVISION";
@@ -28633,10 +28644,12 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_IMAX_SDR = "IMAXSDR";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_SDR = "SDR";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_TCH = "TCH";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_UNKNOWN = "UNKNOWN";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_FRAME_PACKING = "frame_packing";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_OFF = "off";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_SIDE_BY_SIDE = "side_by_side";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_TOP_AND_BOTTOM = "top_and_bottom";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_UNKNOWN = "unknown";
   }
 
   public static final class MediaQualityContract.PictureQuality {
@@ -28877,6 +28890,7 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_MOVIE = "movie";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_SPORTS = "sports";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_STANDARD = "standard";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_UNKNOWN = "unknown";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_USER = "user";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_VIVID = "vivid";
     field public static final int TYPE_APPLICATION = 2; // 0x2
@@ -36869,7 +36883,7 @@ package android.os.multisensory {
 
 package android.os.storage {
 
-  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class FilesManager {
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class FileManager {
     method @NonNull public android.os.storage.operations.FileOperationEnqueueResult enqueueOperation(@NonNull android.os.storage.operations.FileOperationRequest);
     method @Nullable public android.os.storage.operations.FileOperationResult fetchResult(@NonNull String);
     method public void registerCompletionListener(@NonNull String);
@@ -44214,10 +44228,10 @@ package android.service.personalcontext {
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RenderToken implements java.lang.Comparable<android.service.personalcontext.RenderToken> android.os.Parcelable {
-    ctor public RenderToken(@NonNull java.util.UUID);
     method public int compareTo(@NonNull android.service.personalcontext.RenderToken);
     method public int describeContents();
     method @NonNull public java.util.UUID getRendererComponentId();
+    method @Nullable public String getTag();
     method @NonNull public java.util.UUID getTokenId();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.RenderToken> CREATOR;
@@ -44275,6 +44289,7 @@ package android.service.personalcontext.hint {
     method public int getModality();
     method @NonNull public java.util.Set<android.app.Person> getParticipants();
     field public static final int MODALITY_AUDIO = 1; // 0x1
+    field public static final int MODALITY_UNKNOWN = -1; // 0xffffffff
     field public static final int MODALITY_VIDEO = 2; // 0x2
   }
 
@@ -44393,8 +44408,8 @@ package android.service.personalcontext.hint {
     method @NonNull public final java.util.Set<android.service.personalcontext.Token> getTokens();
   }
 
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public class ContextHintWithSignature {
-    method @NonNull public java.util.List<android.service.personalcontext.hint.ContextHintWithSignature> getAttributionHints();
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ContextHintWithSignature {
+    method @NonNull public java.util.Set<android.service.personalcontext.hint.ContextHintWithSignature> getAttributionHints();
     method @NonNull public android.service.personalcontext.hint.ContextHint getContextHint();
     method @Nullable public String getOriginatingPackage();
     method @NonNull public java.util.Set<android.service.personalcontext.RenderToken> getRenderTokens();
@@ -50497,11 +50512,11 @@ package android.text {
     field public static final Object SELECTION_START;
   }
 
-  @FlaggedApi("com.android.text.flags.split_show_passwords_to_touch_and_physical") public class ShowSecretsSetting {
-    method @NonNull public static android.net.Uri getPhysicalUri();
-    method @NonNull public static android.net.Uri getTouchUri();
-    method public static boolean shouldShowPhysicalInputForUser(@NonNull android.content.ContentResolver, @NonNull android.os.UserHandle);
-    method public static boolean shouldShowTouchInputForUser(@NonNull android.content.ContentResolver, @NonNull android.os.UserHandle);
+  @FlaggedApi("com.android.text.flags.split_show_passwords_to_touch_and_physical") public final class ShowSecretsSetting {
+    method @NonNull public static Runnable registerCallback(@NonNull android.content.Context, @NonNull Runnable);
+    method @NonNull public static Runnable registerCallback(@NonNull android.content.Context, @NonNull java.util.concurrent.Executor, @NonNull Runnable);
+    method public static boolean shouldShowPhysicalInput(@NonNull android.content.Context);
+    method public static boolean shouldShowTouchInput(@NonNull android.content.Context);
   }
 
   public interface SpanWatcher extends android.text.NoCopySpan {
@@ -56865,6 +56880,7 @@ package android.view {
     method protected void setDefaultWindowFormat(int);
     method public void setDesiredHdrHeadroom(@FloatRange(from=0.0f, to=10000.0) float);
     method public void setDimAmount(float);
+    method @FlaggedApi("com.android.window.flags.support_custom_dim_color") public void setDimColor(@ColorLong long);
     method public void setElevation(float);
     method public void setEnterTransition(android.transition.Transition);
     method public void setExitTransition(android.transition.Transition);
@@ -57374,6 +57390,7 @@ package android.view {
     field public float alpha;
     field public float buttonBrightness;
     field public float dimAmount;
+    field @FlaggedApi("com.android.window.flags.support_custom_dim_color") public long dimColor;
     field public int flags;
     field public int format;
     field public int gravity;

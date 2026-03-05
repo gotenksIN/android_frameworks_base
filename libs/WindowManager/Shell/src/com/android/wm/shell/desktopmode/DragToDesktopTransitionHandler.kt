@@ -14,7 +14,6 @@ import android.app.PendingIntent.FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT
 import android.app.PendingIntent.FLAG_MUTABLE
 import android.app.WindowConfiguration.ACTIVITY_TYPE_HOME
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
-import android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.FILL_IN_COMPONENT
@@ -31,7 +30,6 @@ import android.view.SurfaceControl.Transaction
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManager.TRANSIT_CLOSE
 import android.window.DesktopExperienceFlags
-import android.window.DesktopModeFlags
 import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import android.window.TransitionRequestInfo
@@ -57,7 +55,7 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.TransitionUtil
 import com.android.wm.shell.shared.animation.Interpolators
 import com.android.wm.shell.shared.animation.PhysicsAnimator
-import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
+import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 import com.android.wm.shell.shared.desktopmode.DesktopConfig
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
@@ -302,17 +300,31 @@ sealed class DragToDesktopTransitionHandler(
                 }
             logV(
                 "cancelDragToDesktop finishing start-transition and starting split-select " +
-                    "request to position=%s with state=%s",
+                    "request to position=%d with state=%s",
                 splitPosition,
                 state,
             )
-            state.startTransitionFinishTransaction?.apply()
-            val finishWCT = WindowContainerTransaction()
-            val taskInfo = state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
-            finishWCT.setDoNotPip(taskInfo.token)
-            state.startTransitionFinishCb?.onTransitionFinished(finishWCT)
-            requestSplitFromScaledTask(splitPosition, homeRunning = true)
-            clearState()
+            val finishRunnable = {
+                val finishWCT = WindowContainerTransaction()
+                val taskInfo =
+                    state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
+                finishWCT.setDoNotPip(taskInfo.token)
+                state.startTransitionFinishCb?.onTransitionFinished(finishWCT)
+                clearState()
+            }
+            // If split select animation is not handled, finish the transition and reset state.
+            // Otherwise, wait for split select animation to start before finishing the transition
+            // to prevent any flashes.
+            val requestHandled = requestSplitFromScaledTask(splitPosition, homeRunning = true)
+            if (requestHandled) {
+                state.onSplitSelectAnimationStarted = finishRunnable
+            } else {
+                logW(
+                    "cancelDragToDesktop: split select request was rejected for task=%d.",
+                    draggingTaskId,
+                )
+                finishRunnable()
+            }
         } else if (
             state.draggedTaskChange != null &&
                 (cancelState == CancelState.CANCEL_BUBBLE_LEFT ||
@@ -336,16 +348,28 @@ sealed class DragToDesktopTransitionHandler(
         }
     }
 
-    /** Calculate the bounds of a scaled task, then use those bounds to request split select. */
+    /**
+     * Calculate the bounds of a scaled task, then use those bounds to request split select and
+     * return [true] if split select request was handled.
+     */
     private fun requestSplitFromScaledTask(
         @SplitPosition splitPosition: Int,
         homeRunning: Boolean,
-    ) {
+    ): Boolean {
         val state = requireTransitionState()
         val taskInfo = state.draggedTaskChange?.taskInfo ?: error("Expected non-null taskInfo")
         val animatedTaskBounds = getAnimatedTaskBounds()
         state.dragAnimator.cancelAnimator()
-        requestSplitSelect(taskInfo, splitPosition, animatedTaskBounds, homeRunning)
+        return requestSplitSelect(taskInfo, splitPosition, animatedTaskBounds, homeRunning)
+    }
+
+    /** Finishes the previous transitions if it was the one to trigger split select. */
+    fun onSplitSelectAnimationStarted(taskId: Int) {
+        // Return if no transition is running or if the transition running is unrelated to the task
+        // entering split select
+        if (taskId == INVALID_TASK_ID || transitionState?.draggedTaskId != taskId) return
+        val state = requireTransitionState()
+        state.onSplitSelectAnimationStarted?.invoke()
     }
 
     private fun getAnimatedTaskBounds(): Rect {
@@ -369,7 +393,7 @@ sealed class DragToDesktopTransitionHandler(
         @SplitPosition splitPosition: Int,
         taskBounds: Rect = Rect(taskInfo.configuration.windowConfiguration.bounds),
         homeRunning: Boolean,
-    ) {
+    ): Boolean {
         val wct = WindowContainerTransaction()
         // The task's density may have been overridden in freeform; revert it here as we don't
         // want it overridden in multi-window.
@@ -383,7 +407,7 @@ sealed class DragToDesktopTransitionHandler(
             // Split-select won't start a transition, so apply |wct| here.
             transitions.startTransition(TRANSIT_CHANGE, wct, /* handler= */ null)
         }
-        splitScreenController.requestEnterSplitSelect(
+        return splitScreenController.requestEnterSplitSelect(
             taskInfo,
             splitPosition,
             taskBounds,
@@ -677,7 +701,7 @@ sealed class DragToDesktopTransitionHandler(
      * index.
      */
     protected fun calculateStartDragLayers(info: TransitionInfo): DragToDesktopLayers {
-        if (BubbleAnythingFlagHelper.enableBubbleToFullscreen()) {
+        if (BubbleFlagHelper.enableBubbleToFullscreen()) {
             val hasDesktop = desktopState.isDesktopModeSupportedOnDisplay(info.getRoot(0).displayId)
             if (!hasDesktop) {
                 return calculateStartDragLayersWithoutDesktop(info)
@@ -1181,6 +1205,7 @@ sealed class DragToDesktopTransitionHandler(
         abstract var mergedEndTransition: Boolean
         abstract var activeCancelAnimation: Animator?
         abstract var dragCancelCallback: Runnable?
+        abstract var onSplitSelectAnimationStarted: (() -> Unit)?
 
         data class FromFullscreen(
             override val draggedTaskId: Int,
@@ -1201,6 +1226,7 @@ sealed class DragToDesktopTransitionHandler(
             override var mergedEndTransition: Boolean = false,
             override var activeCancelAnimation: Animator? = null,
             override var dragCancelCallback: Runnable? = null,
+            override var onSplitSelectAnimationStarted: (() -> Unit)? = null,
             var otherRootChanges: MutableList<Change> = mutableListOf(),
         ) : TransitionState()
 
@@ -1223,6 +1249,7 @@ sealed class DragToDesktopTransitionHandler(
             override var mergedEndTransition: Boolean = false,
             override var activeCancelAnimation: Animator? = null,
             override var dragCancelCallback: Runnable? = null,
+            override var onSplitSelectAnimationStarted: (() -> Unit)? = null,
             var splitRootChange: Change? = null,
             var otherSplitTask: Int,
         ) : TransitionState()

@@ -17,6 +17,7 @@
 package android.media;
 
 import static android.annotation.SystemApi.Client.MODULE_LIBRARIES;
+import static android.media.AudioManager.AudioMode;
 import static android.media.audio.Flags.FLAG_FUSED_TELECOM_ROUTE_API;
 
 import android.annotation.IntDef;
@@ -30,8 +31,11 @@ import android.media.audio.DeviceIdentity;
 import android.media.audio.IAudioModeSession;
 import android.os.RemoteException;
 
+import com.android.internal.util.ArrayUtils;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -223,7 +227,7 @@ public final class AudioModeSession implements AutoCloseable {
         /**
          * @return the initial mode set for this request.
          */
-        public int getInitialMode() {
+        public @AudioMode int getInitialMode() {
             return mParcelable.mode;
         }
 
@@ -255,7 +259,11 @@ public final class AudioModeSession implements AutoCloseable {
             if (mParcelable.noFocusModes == null) {
                 return Collections.emptyList();
             }
-            return java.util.Arrays.stream(mParcelable.noFocusModes).boxed().toList();
+            ArrayList<Integer> list = new ArrayList<>(mParcelable.noFocusModes.length);
+            for (int mode : mParcelable.noFocusModes) {
+                list.add(mode);
+            }
+            return list;
         }
 
         /**
@@ -277,7 +285,7 @@ public final class AudioModeSession implements AutoCloseable {
              * @return This builder.
              */
             @NonNull
-            public Builder setInitialMode(int mode) {
+            public Builder setInitialMode(@AudioMode int mode) {
                 switch (mode) {
                     case AudioManager.MODE_NORMAL,
                     AudioManager.MODE_RINGTONE,
@@ -348,7 +356,7 @@ public final class AudioModeSession implements AutoCloseable {
                 if (mClientAttribution != null) {
                     request.clientAttribution = mClientAttribution.asState();
                 }
-                request.noFocusModes = mNoFocusModes.stream().mapToInt(Integer::intValue).toArray();
+                request.noFocusModes = ArrayUtils.convertToIntArray(mNoFocusModes);
                 return new Request(request);
             }
         }
@@ -443,7 +451,7 @@ public final class AudioModeSession implements AutoCloseable {
      *
      * @param mode The desired session mode.
      */
-    public void setMode(int mode) {
+    public void setMode(@AudioMode int mode) {
         try {
             switch (mode) {
                 case AudioManager.MODE_NORMAL,
@@ -483,8 +491,9 @@ public final class AudioModeSession implements AutoCloseable {
      * was successfully set in the hardware, will be reported via
      * {@link Callback#onRoutingResult} with the returned {@code requestId}.
      *
-     * <p> This function should be used for 'explicit' route requests (e.g. triggered by the user)
-     * as this preference will override the internal routing preferences across
+     * <p> This function should only be used for 'explicit' route requests (i.e. triggered by the
+     * user) as this preference will override the internal strategy which considers contextual
+     * factors and user preferences.
      *
      * @param route The desired {@link AudioRoute}. Should be one of the routes
      *              returned by {@link #getAvailableRoutes()}. {@code null} returns
@@ -526,9 +535,12 @@ public final class AudioModeSession implements AutoCloseable {
     @NonNull
     public List<AudioRoute> getAvailableRoutes() {
         try {
-            return mSession.getAvailableRoutes().stream()
-                    .map(AudioRoute::new)
-                    .toList();
+            var routes = mSession.getAvailableRoutes();
+            List<AudioRoute> audioRoutes = new ArrayList<>(routes.size());
+            for (var route : routes) {
+                audioRoutes.add(new AudioRoute(route));
+            }
+            return audioRoutes;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

@@ -37,7 +37,6 @@ import android.view.InsetsSource.FLAG_FORCE_CONSUMING
 import android.view.InsetsSource.FLAG_FORCE_CONSUMING_OPAQUE_CAPTION_BAR
 import android.view.MotionEvent
 import android.view.SurfaceControl
-import android.view.View.OnClickListener
 import android.view.View.OnGenericMotionListener
 import android.view.View.OnLongClickListener
 import android.view.View.OnTouchListener
@@ -169,7 +168,6 @@ constructor(
         mainScope,
         transitions,
     ) {
-    private lateinit var onClickListener: OnClickListener
     private lateinit var onTouchListener: OnTouchListener
     private lateinit var onLongClickListener: OnLongClickListener
     private lateinit var onGenericMotionListener: OnGenericMotionListener
@@ -260,12 +258,10 @@ constructor(
 
     /** Set the listeners for the decorations. */
     fun setListeners(
-        onClickListener: OnClickListener,
         onTouchListener: OnTouchListener,
         onLongClickListener: OnLongClickListener,
         onGenericMotionListener: OnGenericMotionListener,
     ) {
-        this.onClickListener = onClickListener
         this.onTouchListener = onTouchListener
         this.onLongClickListener = onLongClickListener
         this.onGenericMotionListener = onGenericMotionListener
@@ -527,9 +523,7 @@ constructor(
             }
             inputFeatures =
                 inputFeatures or WindowManager.LayoutParams.INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE
-        } else if (
-            isAppHandle && DesktopExperienceFlags.ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER.isTrue
-        ) {
+        } else if (isAppHandle) {
             // Add input feature spy flag if caption is an app handle so that input is not stolen
             // when motion event exits caption view.
             inputFeatures = inputFeatures or INPUT_FEATURE_SPY
@@ -1064,7 +1058,6 @@ constructor(
                     windowDecorationActions = windowDecorationActions,
                     decorWindowContext = decorWindowContext,
                     onCaptionTouchListener = onTouchListener,
-                    onCaptionButtonClickListener = onClickListener,
                     onLongClickListener = onLongClickListener,
                     onCaptionGenericMotionListener = onGenericMotionListener,
                     appToWebRepository = appToWebRepository,
@@ -1100,7 +1093,6 @@ constructor(
                     windowDecorationActions,
                     decorWindowContext,
                     onTouchListener,
-                    onClickListener,
                     appToWebRepository,
                 )
             }
@@ -1114,6 +1106,7 @@ constructor(
                     onTouchListener = onTouchListener,
                     onGenericMotionEventListener = onGenericMotionListener,
                     windowDecorationActions,
+                    taskResourceLoader,
                     taskOrganizer,
                     bgScope,
                 )

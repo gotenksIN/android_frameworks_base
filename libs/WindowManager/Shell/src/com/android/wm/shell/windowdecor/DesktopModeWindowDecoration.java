@@ -107,7 +107,7 @@ import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
-import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
+import com.android.wm.shell.shared.bubbles.BubbleFlagHelper;
 import com.android.wm.shell.shared.desktopmode.DesktopConfig;
 import com.android.wm.shell.shared.desktopmode.DesktopState;
 import com.android.wm.shell.shared.multiinstance.ManageWindowsViewContainer;
@@ -126,7 +126,7 @@ import com.android.wm.shell.windowdecor.viewholder.AppHandleIdentifier;
 import com.android.wm.shell.windowdecor.viewholder.AppHandleViewHolder;
 import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder;
 import com.android.wm.shell.windowdecor.viewholder.WindowDecorationViewHolder;
-import com.android.wm.shell.windowdecor.viewholder.util.LargeAppHeaderDimensions;
+import com.android.wm.shell.windowdecor.viewholder.util.LargeHeaderDimensions;
 
 import kotlin.Pair;
 import kotlin.Unit;
@@ -400,11 +400,9 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     }
 
     void setCaptionListeners(
-            View.OnClickListener onCaptionButtonClickListener,
             View.OnTouchListener onCaptionTouchListener,
             View.OnLongClickListener onLongClickListener,
             View.OnGenericMotionListener onGenericMotionListener) {
-        mOnCaptionButtonClickListener = onCaptionButtonClickListener;
         mOnCaptionTouchListener = onCaptionTouchListener;
         mOnCaptionLongClickListener = onLongClickListener;
         mOnCaptionGenericMotionListener = onGenericMotionListener;
@@ -923,7 +921,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
      * task does not have an app handle
      */
     private AppHandleWindowingMode getAppHandleIdentifierWindowingMode() {
-        if (BubbleAnythingFlagHelper.enableBubbleToFullscreen()
+        if (BubbleFlagHelper.enableBubbleToFullscreen()
                 && !mDesktopState.isDesktopModeSupportedOnDisplay(mDisplay)) {
             return AppHandleWindowingMode.APP_HANDLE_WINDOWING_MODE_BUBBLE;
         }
@@ -1015,8 +1013,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             return mAppHandleViewHolderFactory.create(
                     mResult.mRootView,
                     mDecorWindowContext,
+                    mWindowDecorationActions,
                     mOnCaptionTouchListener,
-                    mOnCaptionButtonClickListener,
                     mWindowManagerWrapper,
                     mHandler,
                     mDesktopModeUiEventLogger
@@ -1027,7 +1025,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                     mDecorWindowContext,
                     mWindowDecorationActions,
                     mOnCaptionTouchListener,
-                    mOnCaptionButtonClickListener,
                     mOnCaptionLongClickListener,
                     mOnCaptionGenericMotionListener,
                     /* onMaximizeHoverAnimationFinishedListener= */ () -> {
@@ -1035,7 +1032,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                         return Unit.INSTANCE;
                     },
                     mDesktopModeUiEventLogger,
-                    /* dimensions= */ new LargeAppHeaderDimensions(
+                    /* dimensions= */ new LargeHeaderDimensions(
                             mDecorWindowContext.getResources()),
                     mFocusTransitionObserver
                     );
@@ -1192,11 +1189,9 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 relayoutParams.mInputFeatures
                         |= WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL;
             }
-            if (DesktopExperienceFlags.ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER.isTrue()) {
-                // Add input feature spy flag if caption is an app handle so that input is not
-                // stolen when motion event exits caption view.
-                relayoutParams.mInputFeatures |= WindowManager.LayoutParams.INPUT_FEATURE_SPY;
-            }
+            // Add input feature spy flag if caption is an app handle so that input is not
+            // stolen when motion event exits caption view.
+            relayoutParams.mInputFeatures |= WindowManager.LayoutParams.INPUT_FEATURE_SPY;
         }
         if (isAppHeader
                 && desktopConfig.useWindowShadow(/* isFocusedWindow= */ hasGlobalFocus)) {
@@ -1648,8 +1643,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 shouldShowGameControlsButton,
                 mDesktopState.isDesktopModeSupportedOnDisplay(mDisplay),
                 shouldShowRestartButton,
-                isBrowserApp,
-                openInAppOrBrowserIntent,
+                new HandleMenu.AppToWebData(isBrowserApp, openInAppOrBrowserIntent),
                 mDesktopModeUiEventLogger,
                 captionView,
                 mResult.mCaptionWidth,

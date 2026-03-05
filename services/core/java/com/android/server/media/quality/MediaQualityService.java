@@ -795,8 +795,10 @@ public class MediaQualityService extends SystemService {
                     pp.pictureParameters = pictureParameters;
 
                     mMediaQuality.sendDefaultPictureParameters(pp);
-                    mMediaQuality.sendDefaultPictureProfile(
-                            mHalNotifier.convertToHalPictureProfile(longId, params));
+                    if (mMediaQuality.getInterfaceVersion() > 1) {
+                        mMediaQuality.sendDefaultPictureProfile(
+                                mHalNotifier.convertToHalPictureProfile(longId, params));
+                    }
                     parcel.recycle();
                     return true;
                 }
@@ -923,7 +925,7 @@ public class MediaQualityService extends SystemService {
 
         @GuardedBy("mPictureProfileLock")
         @Override
-        public List<PictureProfileHandle> getPictureProfileHandleList(String[] ids, int userId) {
+        public List<PictureProfileHandle> getPictureProfileHandles(String[] ids, int userId) {
             List<PictureProfileHandle> toReturn = new ArrayList<>();
             synchronized (mPictureProfileLock) {
                 for (String id : ids) {
@@ -1211,10 +1213,10 @@ public class MediaQualityService extends SystemService {
 
         @GuardedBy("mSoundProfileLock")
         @Override
-        public List<SoundProfileHandle> getSoundProfileHandleList(
+        public List<SoundProfileHandle> getSoundProfileHandles(
                 @NonNull String[] ids, int userId) {
             if (DEBUG) {
-                Slog.d(TAG, "getSoundProfileHandle");
+                Slog.d(TAG, "getSoundProfileHandles");
             }
             List<SoundProfileHandle> toReturn = new ArrayList<>();
             synchronized (mSoundProfileLock) {
@@ -1520,8 +1522,10 @@ public class MediaQualityService extends SystemService {
                     sp.soundParameters = soundParameters;
 
                     mMediaQuality.sendDefaultSoundParameters(sp);
-                    mMediaQuality.sendDefaultSoundProfile(
-                            mHalNotifier.convertToHalSoundProfile(longId, params));
+                    if (mMediaQuality.getInterfaceVersion() > 1) {
+                        mMediaQuality.sendDefaultSoundProfile(
+                                mHalNotifier.convertToHalSoundProfile(longId, params));
+                    }
                     return true;
                 }
             } catch (RemoteException e) {

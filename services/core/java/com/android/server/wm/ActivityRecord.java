@@ -461,6 +461,8 @@ public final class ActivityRecord extends WindowToken {
     final int launchedFromUid; // always the uid who started the activity.
     final String launchedFromPackage; // always the package who started the activity.
     @Nullable
+    final String launchedFromProcessName; // always the process who started the activity.
+    @Nullable
     final String launchedFromFeatureId; // always the feature in launchedFromPackage
     @LaunchSourceType
     int mLaunchSourceType; // latest launch source type
@@ -1999,6 +2001,7 @@ public final class ActivityRecord extends WindowToken {
         launchedFromPid = _launchedFromPid;
         launchedFromUid = _launchedFromUid;
         launchedFromPackage = _launchedFromPackage;
+        launchedFromProcessName = _caller != null ? _caller.mName : null;
         launchedFromFeatureId = _launchedFromFeature;
         mLaunchSourceType = determineLaunchSourceType(_launchedFromUid, _caller);
         shortComponentName = _intent.getComponent().flattenToShortString();
@@ -4430,7 +4433,14 @@ public final class ActivityRecord extends WindowToken {
     @Override
     void removeImmediately() {
         if (mState != DESTROYED) {
-            Slog.w(TAG, "Force remove immediately " + this + " state=" + mState);
+            if (isVisibleRequested()) {
+                // Log the trace to help debug if the activity was forced removed when it was still
+                // visible.
+                Slog.w(TAG, "Force remove immediately " + this + " state=" + mState,
+                        new Throwable());
+            } else {
+                Slog.w(TAG, "Force remove immediately " + this + " state=" + mState);
+            }
             // If Task#removeImmediately is called directly with alive activities, ensure that the
             // activities are destroyed and detached from process.
             destroyImmediately("removeImmediately");

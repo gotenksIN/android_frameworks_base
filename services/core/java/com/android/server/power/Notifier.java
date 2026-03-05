@@ -253,13 +253,14 @@ public class Notifier {
                     // We only care about changing the attribution if an associated UID is cached
                     // in the worksource. If the owner is cached, the complete wakelock needs to
                     // be disabled which is done via PowerManagerService
-                    if (uid == wakeLock.mOwnerUid) {
+                    if (wakeLock == null || uid == wakeLock.mOwnerUid) {
                         continue;
                     }
 
-                    if (wakeLock.mWorkSource.size() <= 1
-                            || (wakeLock.mWorkSource.getWorkChains() != null
-                            && wakeLock.mWorkSource.getWorkChains().size() <= 1)) {
+                    WorkSource worksource = wakeLock.mWorkSource;
+                    if (worksource != null && (worksource.size() <= 1
+                            || (worksource.getWorkChains() != null
+                            && worksource.getWorkChains().size() <= 1))) {
                         wakeLock.setAttributedUidCached(true);
                         if (mWakeLockChangedListener != null) {
                             final WakeLockChangedListener listener = mWakeLockChangedListener;
@@ -296,13 +297,14 @@ public class Notifier {
                     // We only care about changing the attribution if an associated UID is cached
                     // in the worksource. If the owner is cached, the complete wakelock needs to
                     // be disabled which is done via PowerManagerService
-                    if (uid == wakeLock.mOwnerUid) {
+                    if (wakeLock == null || uid == wakeLock.mOwnerUid) {
                         continue;
                     }
 
-                    if (wakeLock.mWorkSource.size() <= 1
-                            || (wakeLock.mWorkSource.getWorkChains() != null
-                            && wakeLock.mWorkSource.getWorkChains().size() <= 1)) {
+                    WorkSource workSource = wakeLock.mWorkSource;
+                    if (workSource != null && (workSource.size() <= 1
+                            || (workSource.getWorkChains() != null
+                            && workSource.getWorkChains().size() <= 1))) {
                         wakeLock.setAttributedUidCached(cached);
                         if (mWakeLockChangedListener != null) {
                             final WakeLockChangedListener listener = mWakeLockChangedListener;
@@ -311,11 +313,11 @@ public class Notifier {
                         continue;
                     }
                     onWakeLockChanging(wakeLock.mFlags, wakeLock.mTag, wakeLock.mPackageName,
-                            wakeLock.mOwnerUid, wakeLock.mOwnerPid, wakeLock.mWorkSource,
+                            wakeLock.mOwnerUid, wakeLock.mOwnerPid, workSource,
                             wakeLock.mHistoryTag,
                             wakeLock.mCallback, wakeLock.mFlags, wakeLock.mTag,
                             wakeLock.mPackageName, wakeLock.mOwnerUid, wakeLock.mOwnerPid,
-                            wakeLock.mWorkSource, wakeLock.mHistoryTag, wakeLock.mCallback,
+                            workSource, wakeLock.mHistoryTag, wakeLock.mCallback,
                             /* isCached */ true, cached, uid);
                 }
             }
@@ -664,6 +666,7 @@ public class Notifier {
      * which case it will assume that the state did not fully converge before the
      * next transition began and will recover accordingly.
      */
+    @SuppressWarnings("AndroidFrameworkSystemServerLock")
     public void onGlobalWakefulnessChangeStarted(final int wakefulness, int reason,
             long eventTime) {
         final boolean interactive = PowerManagerInternal.isInteractive(wakefulness);
@@ -871,6 +874,7 @@ public class Notifier {
      *
      * @param groupId The group id of the DisplayGroup to update display interactivities for.
      */
+    @SuppressWarnings("AndroidFrameworkSystemServerLock")
     private void updateDisplayInteractivities(int groupId, boolean interactive) {
         final int[] displayIds = mDisplayManagerInternal.getDisplayIdsForGroup(groupId);
         for (int displayId : displayIds) {
@@ -879,6 +883,7 @@ public class Notifier {
 
     }
 
+    @SuppressWarnings("AndroidFrameworkSystemServerLock")
     private void resetDisplayInteractivities() {
         final SparseArray<int[]> displaysByGroupId =
                 mDisplayManagerInternal.getDisplayIdsByGroupsIds();
@@ -905,6 +910,7 @@ public class Notifier {
     /**
      * Called when an individual PowerGroup changes wakefulness.
      */
+    @SuppressWarnings("AndroidFrameworkSystemServerLock")
     public void onGroupWakefulnessChangeStarted(int groupId, int wakefulness, int changeReason,
             long eventTime) {
         final boolean isInteractive = PowerManagerInternal.isInteractive(wakefulness);
@@ -1462,6 +1468,7 @@ public class Notifier {
      * @param displayGroupId the id of the display group to report
      * @param screenTimeoutPolicy screen timeout policy
      */
+    @SuppressWarnings("AndroidFrameworkSystemServerLock")
     void notifyScreenTimeoutPolicyChanges(int displayGroupId,
             @ScreenTimeoutPolicy int screenTimeoutPolicy) {
         synchronized (mLock) {

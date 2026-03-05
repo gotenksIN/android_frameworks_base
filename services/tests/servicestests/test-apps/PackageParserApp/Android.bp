@@ -129,7 +129,7 @@ android_test_helper_app {
     },
     resource_dirs: ["res"],
     aaptflags: [
-        "--feature-flags my.flag1,my.flag2,my.flag3,my.flag4,unknown.flag",
+        "--feature-flags my.flag1=false,my.flag2=false,my.flag3=false,my.flag4=false,unknown.flag=false",
     ],
     manifest: "AndroidManifestApp8.xml",
 }
@@ -219,6 +219,22 @@ android_test_helper_app {
         "android.app.privatecompute.flags-aconfig",
     ],
     manifest: "AndroidManifestAllowComponentAccess.xml",
+}
+
+android_test_helper_app {
+    name: "PackageParserAppAllowComponentAccessMultiCert",
+    sdk_version: "current",
+    srcs: ["**/*.java"],
+    dex_preopt: {
+        enabled: false,
+    },
+    optimize: {
+        enabled: false,
+    },
+    flags_packages: [
+        "android.app.privatecompute.flags-aconfig",
+    ],
+    manifest: "AndroidManifestAllowComponentAccessMultiCert.xml",
 }
 
 android_test_helper_app {

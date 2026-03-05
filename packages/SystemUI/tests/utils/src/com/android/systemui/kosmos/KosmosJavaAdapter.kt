@@ -47,6 +47,7 @@ import com.android.systemui.deviceentry.domain.interactor.deviceEntryFingerprint
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryUdfpsInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
+import com.android.systemui.display.data.repository.displayPhoneSubcomponentPerDisplayRepository
 import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
 import com.android.systemui.globalactions.actionsDialogLiteDelegateFactory
@@ -127,6 +128,7 @@ import com.android.systemui.statusbar.notification.stack.domain.interactor.heads
 import com.android.systemui.statusbar.phone.fakeAutoHideControllerStore
 import com.android.systemui.statusbar.phone.keyguardBypassController
 import com.android.systemui.statusbar.phone.scrimController
+import com.android.systemui.statusbar.phone.systemUIDialogDotFactory
 import com.android.systemui.statusbar.phone.systemUIDialogManager
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.mobileConnectionsRepository
 import com.android.systemui.statusbar.pipeline.wifi.data.repository.fakeWifiRepository
@@ -192,6 +194,9 @@ class KosmosJavaAdapter() {
     val statusBarModePerDisplayRepository by lazy { kosmos.fakeStatusBarModePerDisplayRepository }
     val systemUiDisplaySubcomponentRepository by lazy {
         kosmos.displaySubcomponentPerDisplayRepository
+    }
+    val systemUiReferenceDisplaySubcomponentRepository by lazy {
+        kosmos.displayPhoneSubcomponentPerDisplayRepository
     }
     val shadeLayoutParams by lazy { kosmos.shadeLayoutParams }
     val autoHideControllerStore by lazy { kosmos.fakeAutoHideControllerStore }
@@ -290,6 +295,7 @@ class KosmosJavaAdapter() {
     val uiEventLoggerFake by lazy { kosmos.uiEventLoggerFake }
     val actionsDialogLiteDelegateFactory by lazy { kosmos.actionsDialogLiteDelegateFactory }
     val fakeGlobalSettings by lazy { kosmos.fakeGlobalSettings }
+    val systemUIDialogDotFactory by lazy { kosmos.systemUIDialogDotFactory }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {

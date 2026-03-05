@@ -88,6 +88,7 @@ import static android.os.PowerExemptionManager.REASON_SYSTEM_EXEMPT_APP_OP;
 import static android.os.PowerExemptionManager.REASON_SYSTEM_MODULE;
 import static android.os.PowerExemptionManager.REASON_SYSTEM_UID;
 import static android.os.PowerExemptionManager.REASON_TEMP_ALLOWED_WHILE_IN_USE;
+import static android.os.PowerExemptionManager.REASON_TILE_ONCLICK;
 import static android.os.PowerExemptionManager.REASON_UID_VISIBLE;
 import static android.os.PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED;
 import static android.os.PowerExemptionManager.getReasonCodeFromProcState;
@@ -266,6 +267,7 @@ import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.ServiceRecord.NeededReason;
 import com.android.server.am.ServiceRecord.ShortFgsInfo;
 import com.android.server.am.ServiceRecord.TimeLimitedFgsInfo;
+import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.SyncBatchSession;
 import com.android.server.pm.KnownPackages;
 import com.android.server.privatecompute.PccSandboxManagerInternal;
@@ -1041,17 +1043,6 @@ public final class ActiveServices {
             return appStateTracker.isAppBackgroundRestricted(uid, packageName);
         }
         return false;
-    }
-
-    void updateAppRestrictedAnyInBackgroundLocked(final int uid, final String packageName) {
-        final boolean restricted = appRestrictedAnyInBackground(uid, packageName);
-        final UidRecord uidRec = mAm.mProcessList.getUidRecordLOSP(uid);
-        if (uidRec != null) {
-            final ProcessRecord app = uidRec.getProcessInPackage(packageName);
-            if (app != null) {
-                app.setBackgroundRestricted(restricted);
-            }
-        }
     }
 
     static String getProcessNameForService(ServiceInfo sInfo, ComponentName name,
@@ -4928,11 +4919,11 @@ public final class ActiveServices {
                 if (srec.getHostProcess() != null) {
                     final ProcessServiceRecord psr = srec.getHostProcess().mServices;
                     if (group > 0) {
-                        psr.setConnectionGroup(group);
-                        psr.setConnectionImportance(importance);
+                        mAm.mProcessStateController.setConnectionGroup(psr, group);
+                        mAm.mProcessStateController.setConnectionImportance(psr, importance);
                     } else {
-                        psr.setConnectionGroup(0);
-                        psr.setConnectionImportance(0);
+                        mAm.mProcessStateController.setConnectionGroup(psr, 0);
+                        mAm.mProcessStateController.setConnectionImportance(psr, 0);
                     }
                 } else {
                     if (group > 0) {
@@ -5057,7 +5048,7 @@ public final class ActiveServices {
             final ConnectionRecord r = clist.get(i);
             final long updatedFlags = r.getFlags() ^ flags;
             if (updatedFlags != (updatedFlags & Context.BIND_UPDATEABLE_FLAGS)) {
-                throw new IllegalArgumentException("Attempting to update non-updatedable flags");
+                throw new IllegalArgumentException("Attempting to update non-updatable flags");
             }
             if (mAm.mProcessStateController.updateConnectionFlags(r, flags)) {
                 final ProcessRecord app = r.binding.service.getHostProcess();
@@ -5432,8 +5423,7 @@ public final class ActiveServices {
                 smap.mServicesByInstanceName.put(cn, r);
                 smap.mServicesByIntent.put(filter, r);
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Retrieve created new service: " + r);
-                r.mRecentCallingPackage = callingPackage;
-                r.mRecentCallingUid = callingUid;
+                r.updateRecentCallingAppInfo(callingPackage, callingUid);
             }
             r.appInfo.seInfo += generateAdditionalSeInfoFromService(service, r);
             return new ServiceLookupResult(r, resolution.getAlias());
@@ -5635,14 +5625,7 @@ public final class ActiveServices {
             }
         }
         if (r != null) {
-            r.mRecentCallingPackage = callingPackage;
-            r.mRecentCallingUid = callingUid;
-            try {
-                r.mRecentCallerApplicationInfo =
-                        mAm.mContext.getPackageManager().getApplicationInfoAsUser(callingPackage,
-                                0, UserHandle.getUserId(callingUid));
-            } catch (PackageManager.NameNotFoundException e) {
-            }
+            r.updateRecentCallingAppInfo(callingPackage, callingUid);
             if (!mAm.validateAssociationAllowedLocked(callingPackage, callingUid,
                     r.packageName, getServiceUid(r),
                     ActivityManagerService.ASSOCIATION_TYPE_SERVICE,
@@ -6543,7 +6526,8 @@ public final class ActiveServices {
         HostingRecord hostingRecord = new HostingRecord(
                 HostingRecord.HOSTING_TYPE_SERVICE, r.instanceName,
                 r.definingPackageName, r.definingUid, r.serviceInfo.processName,
-                getHostingRecordTriggerType(r), isPcc);
+                getHostingRecordTriggerType(r), isPcc, r.mRecentCallingUid,
+                r.getRecentCallerProcessName());
         ProcessRecord app;
 
         if (!isolated) {
@@ -6622,13 +6606,15 @@ public final class ActiveServices {
                         && r.serviceInfo.packageName.equals(WebViewZygote.getPackageName())) {
                     hostingRecord = HostingRecord.byWebviewZygote(r.instanceName,
                             r.definingPackageName,
-                            r.definingUid, r.serviceInfo.processName);
+                            r.definingUid, r.serviceInfo.processName,
+                            r.mRecentCallingUid, r.getRecentCallerProcessName());
                 }
                 if ((r.serviceInfo.flags & ServiceInfo.FLAG_USE_APP_ZYGOTE) != 0) {
                     boolean isNativeService =
                             android.os.Flags.nativeAppZygote() && r.mIsNativeIsolated;
                     hostingRecord = HostingRecord.byAppZygote(r.instanceName, r.definingPackageName,
-                            r.definingUid, r.serviceInfo.processName, isNativeService);
+                            r.definingUid, r.serviceInfo.processName, isNativeService,
+                            r.mRecentCallingUid, r.getRecentCallerProcessName());
                 }
             }
         }
@@ -7805,7 +7791,8 @@ public final class ActiveServices {
         boolean didSomething = false;
 
         // Update the app background restriction of the caller
-        proc.setBackgroundRestricted(appRestrictedAnyInBackground(proc.uid, proc.info.packageName));
+        mAm.mProcessStateController.setBackgroundRestricted(proc,
+                appRestrictedAnyInBackground(proc.uid, proc.info.packageName));
 
         // Collect any services that are waiting for this process to come up.
         if (mPendingServices.size() > 0) {
@@ -7920,7 +7907,7 @@ public final class ActiveServices {
     }
 
     private boolean collectPackageServicesLocked(String packageName, Set<String> filterByClasses,
-            boolean evenPersistent, boolean doit, int minOomAdj,
+            boolean evenPersistent, boolean doit, @OomAdjust int minOomAdj,
             ArrayMap<ComponentName, ServiceRecord> services) {
         boolean didSomething = false;
         for (int i = services.size() - 1; i >= 0; i--) {
@@ -7964,7 +7951,8 @@ public final class ActiveServices {
     }
 
     boolean bringDownDisabledPackageServicesLocked(String packageName, Set<String> filterByClasses,
-            int userId, boolean evenPersistent, boolean fullStop, boolean doit, int minOomAdj) {
+            int userId, boolean evenPersistent, boolean fullStop, boolean doit,
+            @OomAdjust int minOomAdj) {
         boolean didSomething = false;
 
         if (mTmpCollectionResults != null) {
@@ -9549,6 +9537,15 @@ public final class ActiveServices {
             int callingPid, int callingUid, @Nullable ProcessRecord targetProcess,
             BackgroundStartPrivileges backgroundStartPrivileges) {
         int ret = REASON_DENIED;
+
+        // Allow FGS while-in-use if the FGS start is allowed by the tile onclick logic.
+        if (com.android.server.am.Flags.fgsWiuQsTileClicked()) {
+            final ActivityManagerService.FgsTempAllowListItem item =
+                    mAm.isAllowlistedForFgsStartLOSP(callingUid);
+            if (item != null && item.mReasonCode == REASON_TILE_ONCLICK) {
+                return REASON_TILE_ONCLICK;
+            }
+        }
 
         final int uidState = mAm.getUidStateLocked(callingUid);
         if (ret == REASON_DENIED) {

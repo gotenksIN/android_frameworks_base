@@ -20,12 +20,13 @@ import static android.service.personalcontext.embedded.ClientUpdateException.UPD
 
 import android.annotation.FlaggedApi;
 import android.annotation.SystemApi;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.OutcomeReceiver;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.service.personalcontext.Flags;
-import android.service.personalcontext.hint.ContextHint;
+import android.service.personalcontext.PersonalContextManager;
 import android.util.Log;
 import android.view.SurfaceControlViewHost;
 
@@ -35,8 +36,6 @@ import androidx.annotation.Nullable;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.lang.ref.WeakReference;
-import java.util.Set;
-import java.util.function.Consumer;
 
 /**
  * This class represents an open session between an {@link InsightSurfaceClient} and an
@@ -51,6 +50,7 @@ import java.util.function.Consumer;
 public class InsightSurfaceSession implements AutoCloseable {
     private static final String TAG = "InsightSurfaceSession";
 
+    private final Context mContext;
     private final WeakReference<InsightSurfaceClient> mClient;
     private SurfaceControlViewHost.SurfacePackage mSurfacePackage;
     private final IInsightSurfaceSession mSession;
@@ -61,9 +61,11 @@ public class InsightSurfaceSession implements AutoCloseable {
      */
     @VisibleForTesting
     public InsightSurfaceSession(
+            Context context,
             InsightSurfaceClient client,
             SurfaceControlViewHost.SurfacePackage surfacePackage,
             IInsightSurfaceSession session) {
+        mContext = context;
         mClient = new WeakReference<>(client);
         mSurfacePackage = surfacePackage;
         mSession = session;
@@ -100,31 +102,49 @@ public class InsightSurfaceSession implements AutoCloseable {
     public void update(
             @NonNull InsightSurfaceClientUpdate update,
             @Nullable OutcomeReceiver<InsightSurfaceClientUpdate, ClientUpdateException> callback) {
-        performActionOnClient(client -> {
-            final InsightSurfaceClientInfo oldClientInfo = client.updateClientInfo(update);
-            // Tell the session (visualizer) that the client has been updated.
-            try {
-                final ResultReceiver receiver =
-                        callback != null
-                            ? new ResultReceiver(null) {
-                                @Override
-                                public void onReceiveResult(int resultCode, Bundle result) {
-                                    super.onReceiveResult(resultCode, result);
-                                    if (resultCode == IInsightSurfaceSession.UPDATE_OK) {
-                                        callback.onResult(update);
-                                    } else {
-                                        callback.onError(
-                                                new ClientUpdateException(
-                                                        UPDATE_ERROR_DECLINED_BY_VISUALIZER,
-                                                        update));
-                                    }
+        final InsightSurfaceClient client = mClient.get();
+        if (client == null) {
+            return;
+        }
+
+        final InsightSurfaceClientInfo oldClientInfo = client.updateClientInfo(update);
+        final InsightSurfaceClientInfo newClientInfo = client.getClientInfo();
+
+        final PersonalContextManager personalContextManager =
+                mContext.getSystemService(PersonalContextManager.class);
+
+        // Tell the embedded renderer that the client has been updated.
+        personalContextManager.updateEmbeddedClientInfo(oldClientInfo, newClientInfo);
+
+        // Tell the session (visualizer) that the client has been updated.
+        try {
+            final ResultReceiver receiver =
+                    callback != null
+                        ? new ResultReceiver(null) {
+                            @Override
+                            public void onReceiveResult(int resultCode, Bundle result) {
+                                super.onReceiveResult(resultCode, result);
+                                if (resultCode == IInsightSurfaceSession.UPDATE_OK) {
+                                    callback.onResult(update);
+                                } else {
+                                    callback.onError(
+                                            new ClientUpdateException(
+                                                    UPDATE_ERROR_DECLINED_BY_VISUALIZER,
+                                                    update));
                                 }
-                            } : null;
-                mSession.onClientUpdated(oldClientInfo, client.getClientInfo(), receiver);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error updating session client", e);
-            }
-        });
+                            }
+                        } : null;
+
+            mSession.onClientUpdated(oldClientInfo, newClientInfo, receiver);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error updating session client", e);
+        }
+
+        // If there are hints in the update, publish them.
+        if (!update.getHints().isEmpty()) {
+            personalContextManager.publishInsightSurfaceHints(
+                    update.getHints(), newClientInfo);
+        }
     }
 
     /**
@@ -137,21 +157,5 @@ public class InsightSurfaceSession implements AutoCloseable {
             mSurfacePackage = null;
         }
         mClient.clear();
-    }
-
-    /**
-     * Publish new hints to the context engine for this session.
-     *
-     * @param hints a list of {@link ContextHint}s
-     */
-    public void publishHints(@NonNull Set<ContextHint> hints) {
-        performActionOnClient(client -> client.publishHints(hints));
-    }
-
-    private void performActionOnClient(Consumer<InsightSurfaceClient> action) {
-        final InsightSurfaceClient client = mClient.get();
-        if (client != null) {
-            action.accept(client);
-        }
     }
 }

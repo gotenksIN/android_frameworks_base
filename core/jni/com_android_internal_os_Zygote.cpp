@@ -40,6 +40,7 @@
 #include <grp.h>
 #include <inttypes.h>
 #include <link.h>
+#include <logger.h>
 #include <malloc.h>
 #include <mntent.h>
 #include <nativehelper/JNIHelp.h>
@@ -2938,6 +2939,12 @@ static void com_android_internal_os_Zygote_nativeInitNativeState(JNIEnv* env, jc
   if (!SetTaskProfiles(0, {})) {
     zygote::ZygoteFailure(env, "zygote", nullptr, "Zygote SetTaskProfiles failed");
   }
+
+  /*
+   * Initialize logging for applications that use Rust for JNI, so that the
+   * Rust logs are sent to logcat.
+   */
+  rust_android_logger_init();
 }
 
 /**

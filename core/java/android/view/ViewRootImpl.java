@@ -896,6 +896,8 @@ public final class ViewRootImpl implements ViewParent,
     // Surface can never be reassigned or cleared (use Surface.clear()).
     @UnsupportedAppUsage
     public final Surface mSurface = new Surface();
+
+    private boolean mRenderTargetIsValid = false;
     /**
      * The SurfaceControl for this window.
      * <p>Note: This instance is final to ensure that internal accesses of
@@ -2279,6 +2281,21 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
+    private void recalculatePerformanceHintSessionNeeded() {
+        // For now, disable performance hint sessions for this window whenever
+        // view animations are requested to be disabled.
+        final boolean shouldDisablePerfHint = mIsDisablingViewAnimationsRequested;
+
+        if (shouldDisablePerfHint) {
+            mWindowAttributes.privateFlags |=
+                    WindowManager.LayoutParams.PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT;
+        } else {
+            mWindowAttributes.privateFlags &=
+                    ~WindowManager.LayoutParams.PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT;
+        }
+        updatePerformanceHintSession();
+    }
+
     private void updatePerformanceHintSession() {
         if (mAttachInfo.mThreadedRenderer == null) return;
         boolean disable = mWindowAttributes.isPerfHintSessionDisabled();
@@ -2909,7 +2926,7 @@ public final class ViewRootImpl implements ViewParent,
                     renderer.destroyHardwareResources(mView);
                 }
 
-                if (mSurface.isValid()) {
+                if (mRenderTargetIsValid) {
                     if (mSurfaceHolder != null) {
                         notifyHolderSurfaceDestroyed();
                     }
@@ -2997,7 +3014,7 @@ public final class ViewRootImpl implements ViewParent,
        return mBoundsLayer;
     }
 
-    void updateBlastSurfaceIfNeeded() {
+    void updateRenderTargetIfNeeded() {
         if (!mSurfaceControl.isValid()) {
             return;
         }
@@ -3005,7 +3022,13 @@ public final class ViewRootImpl implements ViewParent,
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.updateRenderTargetSize(mSurfaceSize.x, mSurfaceSize.y);
         }
+        // TODO(b/483110996): Avoid calling this when using IPC rendering.
+        updateBlastSurfaceIfNeeded();
 
+        mRenderTargetIsValid = true;
+    }
+
+    void updateBlastSurfaceIfNeeded() {
         if (mBlastBufferQueue != null && mBlastBufferQueue.isSameSurfaceControl(mSurfaceControl)) {
             mBlastBufferQueue.update(mSurfaceControl,
                 mSurfaceSize.x, mSurfaceSize.y,
@@ -3095,6 +3118,7 @@ public final class ViewRootImpl implements ViewParent,
             mBoundsLayer.release();
             mBoundsLayer = null;
         }
+        mRenderTargetIsValid = false;
         mSurface.release();
         mSurfaceControl.release();
 
@@ -4072,7 +4096,7 @@ public final class ViewRootImpl implements ViewParent,
 
             boolean hwInitialized = false;
             boolean dispatchApplyInsets = false;
-            boolean hadSurface = mSurface.isValid();
+            boolean hadSurface = mRenderTargetIsValid;
 
             try {
                 if (DEBUG_LAYOUT) {
@@ -4193,15 +4217,15 @@ public final class ViewRootImpl implements ViewParent,
                     mLastSurfaceSize.set(mSurfaceSize.x, mSurfaceSize.y);
                 }
                 updateColorModeIfNeeded(lp.getColorMode(), lp.getDesiredHdrHeadroom());
-                surfaceCreated = !hadSurface && mSurface.isValid();
-                surfaceDestroyed = hadSurface && !mSurface.isValid();
+                surfaceCreated = !hadSurface && mRenderTargetIsValid;
+                surfaceDestroyed = hadSurface && !mRenderTargetIsValid;
 
                 // When using Blast, the surface generation id may not change when there's a new
                 // SurfaceControl. In that case, we also check relayout flag
                 // RELAYOUT_RES_SURFACE_CHANGED since it should indicate that WMS created a new
                 // SurfaceControl.
                 surfaceReplaced = (surfaceGenerationId != mSurface.getGenerationId()
-                        || surfaceControlChanged) && mSurface.isValid();
+                        || surfaceControlChanged) && mRenderTargetIsValid;
                 if (surfaceReplaced) {
                     mSurfaceReplaced = true;
                     mSurfaceSequenceId++;
@@ -4262,7 +4286,7 @@ public final class ViewRootImpl implements ViewParent,
                 } else if ((surfaceReplaced || surfaceSizeChanged || updateSurfaceNeeded)
                         && mSurfaceHolder == null
                         && mAttachInfo.mThreadedRenderer != null
-                        && mSurface.isValid()) {
+                        && mRenderTargetIsValid) {
                     mFullRedrawNeeded = true;
                     try {
                         // Need to do updateSurface (which leads to CanvasContext::setSurface and
@@ -4320,7 +4344,7 @@ public final class ViewRootImpl implements ViewParent,
 
             if (mSurfaceHolder != null) {
                 // The app owns the surface; tell it about what is going on.
-                if (mSurface.isValid()) {
+                if (mRenderTargetIsValid) {
                     // XXX .copyFrom() doesn't work!
                     //mSurfaceHolder.mSurface.copyFrom(mSurface);
                     mSurfaceHolder.mSurface = mSurface;
@@ -4340,7 +4364,7 @@ public final class ViewRootImpl implements ViewParent,
                 }
 
                 if ((surfaceCreated || surfaceReplaced || surfaceSizeChanged
-                        || windowAttributesChanged) && mSurface.isValid()) {
+                        || windowAttributesChanged) && mRenderTargetIsValid) {
                     SurfaceHolder.Callback[] callbacks = mSurfaceHolder.getCallbacks();
                     if (callbacks != null) {
                         for (SurfaceHolder.Callback c : callbacks) {
@@ -5154,7 +5178,7 @@ public final class ViewRootImpl implements ViewParent,
 
     private void dispatchFocusEvent(boolean hasWindowFocus, boolean fakeFocus) {
         profileRendering(hasWindowFocus);
-        if (hasWindowFocus && mAttachInfo.mThreadedRenderer != null && mSurface.isValid()) {
+        if (hasWindowFocus && mAttachInfo.mThreadedRenderer != null && mRenderTargetIsValid) {
             mFullRedrawNeeded = true;
             try {
                 final Rect surfaceInsets = mWindowAttributes.surfaceInsets;
@@ -5850,7 +5874,7 @@ public final class ViewRootImpl implements ViewParent,
                 Log.v(mTag, "FINISHED DRAWING: " + mWindowAttributes.getTitle());
             }
 
-            if (mSurfaceHolder != null && mSurface.isValid()) {
+            if (mSurfaceHolder != null && mRenderTargetIsValid) {
                 usingAsyncReport = true;
                 SurfaceCallbackHelper sch = new SurfaceCallbackHelper(() -> {
                     handleSyncRequestWhenNoAsyncDraw(surfaceSyncGroup, pendingTransaction != null,
@@ -6171,7 +6195,7 @@ public final class ViewRootImpl implements ViewParent,
                 if (mAttachInfo.mThreadedRenderer != null &&
                         !mAttachInfo.mThreadedRenderer.isEnabled() &&
                         mAttachInfo.mThreadedRenderer.isRequested() &&
-                        mSurface.isValid()) {
+                        mRenderTargetIsValid) {
 
                     try {
                         mAttachInfo.mThreadedRenderer.initializeIfNeeded(
@@ -7568,6 +7592,7 @@ public final class ViewRootImpl implements ViewParent,
                     mIsDisablingViewAnimationsRequested = disabled;
                     WindowManagerGlobal.getInstance()
                             .onAnimationDisableRequestChangedForViewRoot();
+                    recalculatePerformanceHintSessionNeeded();
                     break;
                 }
             }
@@ -9974,32 +9999,74 @@ public final class ViewRootImpl implements ViewParent,
         return relayoutResult;
     }
 
+    private boolean canRelayoutAsync(StringBuilder denialReason) {
+        if (!WindowManager.useClientSurface()
+                && (mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) != 0) {
+            if (denialReason != null) {
+                denialReason.append("visChanged");
+            }
+            // The new surface needs to be obtained from window manager.
+            return false;
+        }
+        if (mWindowAttributes.type == TYPE_APPLICATION_STARTING) {
+            if (denialReason != null) {
+                denialReason.append("startingWin");
+            }
+            // The window configuration of the starting window won't be overridden during the fixed
+            // rotation. There is not enough information to compute the frames locally.
+            return false;
+        }
+        if (com.android.window.flags.Flags.improveFluidResizingPerformance()
+                && (mDragResizing || mPendingDragResizing)) {
+            // It is fine that the client only draws the latest state of what it acknowledges now
+            // during drag-resizing and doesn't need to obtain the latest state from window manager.
+            return true;
+        }
+        if (mSyncSeqId > mLastSyncSeqId) {
+            if (denialReason != null) {
+                denialReason.append("syncId").append(mSyncSeqId).append(">").append(mLastSyncSeqId);
+            }
+            // There is a BLAST sync resize request, and the latest state needs to be obtained from
+            // window manager.
+            return false;
+        }
+        if (NoPreloadHolder.sAlwaysSeqId && mSeqId > mLastSeqId) {
+            if (denialReason != null) {
+                denialReason.append("seqId").append(mSeqId).append(">").append(mLastSeqId);
+            }
+            // There is a resize request, and the latest state needs to be obtained from window
+            // manager.
+            return false;
+        }
+        final WindowConfiguration winConfigFromAm = getConfiguration().windowConfiguration;
+        final WindowConfiguration winConfigFromWm =
+                mLastReportedMergedConfiguration.getMergedConfiguration().windowConfiguration;
+        if (winConfigFromAm.diff(winConfigFromWm, false /* compareUndefined */) != 0) {
+            if (denialReason != null) {
+                denialReason.append("configDiff=").append(WindowConfiguration.diffToString(
+                        winConfigFromAm.diff(winConfigFromWm, false /* compareUndefined */)));
+            }
+            // The latest window configuration (winConfigFromAm or winConfigFromWm) is unknown and
+            // needed to obtained from window manager.
+            return false;
+        }
+        return true;
+    }
+
     private int relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,
             boolean insetsPending) throws RemoteException {
         int relayoutResult = 0;
         if (WindowManager.useClientSurface() && !mWindowLayout.isLocallyManaged()) {
             relayoutResult = updateSurfaceControl(viewVisibility);
         }
-
-        final WindowConfiguration winConfigFromAm = getConfiguration().windowConfiguration;
-        final WindowConfiguration winConfigFromWm =
-                mLastReportedMergedConfiguration.getMergedConfiguration().windowConfiguration;
         final WindowConfiguration winConfig = getCompatWindowConfiguration();
-        final boolean relayAsyncDuringDragResizing =
-                com.android.window.flags.Flags.improveFluidResizingPerformance()
-                        && (mDragResizing || mPendingDragResizing);
         final int measuredWidth = mMeasuredWidth;
         final int measuredHeight = mMeasuredHeight;
-        final boolean viewVisibilityChanged =
-                (mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) != 0;
         final boolean relayoutAsync;
-        if ((!viewVisibilityChanged || WindowManager.useClientSurface())
-                && mWindowAttributes.type != TYPE_APPLICATION_STARTING
-                && mSyncSeqId <= mLastSyncSeqId
-                && (!NoPreloadHolder.sAlwaysSeqId
-                    || mSeqId <= mLastSeqId)
-                && (relayAsyncDuringDragResizing || winConfigFromAm.diff(
-                        winConfigFromWm, false /* compareUndefined */) == 0)) {
+        final StringBuilder relayoutSyncReason = Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)
+                ? new StringBuilder()
+                : null;
+        if (canRelayoutAsync(relayoutSyncReason)) {
             final InsetsState state = mInsetsController.getState();
             final Rect displayCutoutSafe = mTempRect;
             state.getDisplayCutoutSafe(displayCutoutSafe);
@@ -10048,14 +10115,7 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             relayoutAsync = false;
             if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
-                Trace.instant(Trace.TRACE_TAG_VIEW, "relayoutSync visChange="
-                        + viewVisibilityChanged
-                        + " starting=" + (mWindowAttributes.type == TYPE_APPLICATION_STARTING)
-                        + " bufferId=" + mSyncSeqId + ">" + mLastSyncSeqId
-                        + " seqId=" + mSeqId + ">" + mLastSeqId
-                        + " winCfg=" + WindowConfiguration.diffToString(
-                                winConfigFromAm.diff(winConfigFromWm, false /* compareUndefined */))
-                );
+                Trace.instant(Trace.TRACE_TAG_VIEW, "relayoutSync " + relayoutSyncReason);
             }
         }
 
@@ -10091,7 +10151,8 @@ public final class ViewRootImpl implements ViewParent,
                         requestedWidth, requestedHeight, viewVisibility,
                         insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
                         mRelayoutSeq, seqId, surfaceControl);
-                if (surfaceControl != null && viewVisibilityChanged
+                if (surfaceControl != null
+                        && (mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) != 0
                         && !mWindowLayout.isLocallyManaged()) {
                     relayoutResult |= RELAYOUT_RES_FIRST_TIME;
                 }
@@ -10193,7 +10254,7 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         if (mSurfaceControl.isValid()) {
-            updateBlastSurfaceIfNeeded();
+            updateRenderTargetIfNeeded();
             if (mAttachInfo.mThreadedRenderer != null) {
                 mAttachInfo.mThreadedRenderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
             }
@@ -12725,6 +12786,29 @@ public final class ViewRootImpl implements ViewParent,
                         /* arg1 */ disabled ? 1 : 0, /* arg2 */ 0).sendToTarget();
             }
         }
+
+        @Override
+        public void dispatchScrollToTop(int x) {
+            final ViewRootImpl viewAncestor = mViewAncestor.get();
+            if (viewAncestor != null) {
+                viewAncestor.dispatchScrollToTop(x);
+            }
+        }
+    }
+
+    /**
+     * Dispatches a command to scroll the main content to the top.
+     *
+     * @param x The x-coordinate of the scroll-to-top command, in the coordinate space of this
+     *          window. This coordinate can be used by the view hierarchy to determine the most
+     *          relevant scrollable container.
+     */
+    public void dispatchScrollToTop(int x) {
+        mHandler.post(() -> {
+            if (mView != null) {
+                mView.dispatchScrollToTop(x);
+            }
+        });
     }
 
     public static final class CalledFromWrongThreadException extends AndroidRuntimeException {
@@ -14118,14 +14202,14 @@ public final class ViewRootImpl implements ViewParent,
     private boolean shouldSetFrameRateCategory() {
         // We only want to call setFrameRateCategory when it supports ARR.
         if (sToolkitDisableCategoryOnMrrFlagValue) {
-            return shouldEnableDvrr() && mSurface.isValid() && mDisplay.hasArrSupport();
+            return shouldEnableDvrr() && mRenderTargetIsValid && mDisplay.hasArrSupport();
         }
-        return shouldEnableDvrr() && mSurface.isValid();
+        return shouldEnableDvrr() && mRenderTargetIsValid;
     }
 
     private boolean shouldSetFrameRate() {
         // use toolkitSetFrameRate flag to gate the change
-        return shouldEnableDvrr() && mSurface.isValid() && mPreferredFrameRate >= 0
+        return shouldEnableDvrr() && mRenderTargetIsValid && mPreferredFrameRate >= 0
                 && !mIsFrameRateConflicted;
     }
 

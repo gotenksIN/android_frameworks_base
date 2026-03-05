@@ -66,6 +66,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
@@ -97,7 +98,7 @@ public class SerialManagerService extends ISerialManager.Stub implements
 
     private final String[] mPortsInConfig;
 
-    private final String[] mBlockedPortsInConfig;
+    private final String[] mBlockedUsbIdsInConfig;
 
     private final String mDialogComponent;
 
@@ -129,7 +130,7 @@ public class SerialManagerService extends ISerialManager.Stub implements
 
     private SerialManagerService(Context context) {
         this(context, context.getResources().getStringArray(R.array.config_serialPorts),
-                context.getResources().getStringArray(R.array.config_blockedSerialPorts),
+                context.getResources().getStringArray(R.array.config_blockedUsbSerialIds),
                 context.getResources().getString(R.string.config_portAccessDialogComponent),
                 () -> android.hardware.serialservice.ISerialManager.Stub.asInterface(
                         ServiceManager.waitForService(NATIVE_SERIAL_SERVICE_NAME)),
@@ -140,7 +141,7 @@ public class SerialManagerService extends ISerialManager.Stub implements
     }
 
     @VisibleForTesting
-    SerialManagerService(Context context, String[] portsInConfig, String[] blockedPortsInConfig,
+    SerialManagerService(Context context, String[] portsInConfig, String[] blockedUsbIdsInConfig,
             String dialogComponent,
             Supplier<android.hardware.serialservice.ISerialManager> nativeServiceSupplier,
             SerialUserAccessManagerFactory accessManagerFactory,
@@ -149,7 +150,7 @@ public class SerialManagerService extends ISerialManager.Stub implements
         mContext = context;
         mDialogComponent = dialogComponent;
         mPortsInConfig = stripDevPrefix(portsInConfig);
-        mBlockedPortsInConfig = stripDevPrefix(blockedPortsInConfig);
+        mBlockedUsbIdsInConfig = blockedUsbIdsInConfig;
         mNativeServiceSupplier = nativeServiceSupplier;
         mAccessManagerFactory = accessManagerFactory;
         mPortAccessSerializer = portAccessSerializer;
@@ -442,7 +443,7 @@ public class SerialManagerService extends ISerialManager.Stub implements
         }
         traceBegin("createDeviceFilter", 0);
         try {
-            mSerialDeviceFilter = new SerialDeviceFilter(mContext, mBlockedPortsInConfig,
+            mSerialDeviceFilter = new SerialDeviceFilter(mContext, mBlockedUsbIdsInConfig,
                     mNativeService, mLock);
         } catch (RemoteException e) {
             Slog.e(TAG, "Error communicating with native service", e);
@@ -494,6 +495,13 @@ public class SerialManagerService extends ISerialManager.Stub implements
             return;
         }
         synchronized (mLock) {
+            if (mBlockedUsbIdsInConfig.length > 0) {
+                pw.println("Blocked USB IDs: " + Arrays.deepToString(mBlockedUsbIdsInConfig));
+            }
+            if (!mIsConnectedToNativeService) {
+                pw.println("Not connected to native service");
+                return;
+            }
             var ports = mSerialDeviceFilter.getAvailablePorts();
             pw.println("Available ports (" + ports.size() + "):");
             for (SerialPortInfo port : ports.values()) {

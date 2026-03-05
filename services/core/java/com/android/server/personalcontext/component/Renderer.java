@@ -16,14 +16,11 @@
 
 package com.android.server.personalcontext.component;
 
-import android.annotation.IntDef;
+import android.annotation.Nullable;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.insight.ContextInsight;
 
 import androidx.annotation.NonNull;
-
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 
 /**
  * Interface to abstract away in-process / service-based refiners.
@@ -31,29 +28,6 @@ import java.lang.annotation.RetentionPolicy;
  * @hide
  */
 public interface Renderer extends Component {
-    /** @hide */
-    @IntDef(flag = true, prefix = { "PROPERTY_" }, value = {
-            PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS,
-    })
-    @Retention(RetentionPolicy.SOURCE)
-    @interface RendererProperty {}
-
-    int PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS = 1;
-
-    /**
-     * Returns whether the {@link Renderer} has the given properties.
-     */
-    default boolean hasProperties(int properties) {
-        return (getProperties() & properties) == properties;
-    }
-
-    /**
-     * Returns the properties for this {@link Renderer}.
-     */
-    default int getProperties() {
-        return 0;
-    }
-
     /** Gets the insights this renderer is interested in. */
     boolean isInterestedInInsight(ContextInsight insight);
 
@@ -62,6 +36,11 @@ public interface Renderer extends Component {
 
     /** Mints a RenderToken for this renderer. */
     default RenderToken mintRenderToken() {
-        return new RenderToken(getComponentId());
+        return new RenderToken(getComponentId(), null);
+    }
+
+    /** Mints a RenderToken with given tag for this renderer. */
+    default RenderToken mintRenderToken(@Nullable String tag) {
+        return new RenderToken(getComponentId(), tag);
     }
 }

@@ -52,12 +52,6 @@ import java.util.UUID;
  * and include an intent filter with the necessary action indicating that it is an
  * {@link InsightRendererService} ({@link #SERVICE_INTERFACE}).
  *
- * <p>You can indicate support for insights resulting from
- * {@link android.service.personalcontext.hint.NotificationHint}} by adding a meta-data tag named
- * "android.service.personalcontext.renderer.receive_notification_insights" set to "true". The
- * service package must be granted the {@link android.permission.RECEIVE_SENSITIVE_NOTIFICATIONS}
- * permission as well.</p>
- *
  * <p>For example:
  * <pre>
  *     &lt;service android:name=".ExampleInsightRendererService"
@@ -68,9 +62,6 @@ import java.util.UUID;
  *             android:name="android.service.personalcontext.renderer.InsightRendererService"
  *             /&gt;
  *         &lt;/intent-filter&gt;
- *         &lt;meta-data
- *             android:name="android.service.personalcontext.renderer.receive_notification_insights"
- *             android:value="true"/&gt;
  *     &lt;/service&gt;
  * </pre>
  *
@@ -107,6 +98,24 @@ public abstract class InsightRendererService extends Service {
      * those hints are meant to be rendered by the renderer that minted that token. This method
      * will throw an error if it is called before {@link #onConnected} is called.
      *
+     * @param tag An optional {@link String} value that can be associated with the token for future
+     *            identification.
+     *
+     * @return a token that uniquely identifies this renderer
+     */
+    @NonNull
+    public final RenderToken mintRenderToken(@Nullable String tag) {
+        if (mComponentId == null) {
+            throw new IllegalStateException(
+                    "RenderTokens can not be minted until after onConnected has been called");
+        }
+        return new RenderToken(mComponentId, tag);
+    }
+
+    /**
+     * Mint and return a new {@link RenderToken} without a specified tag.
+     *
+     * @see #mintRenderToken(String)
      * @return a token that uniquely identifies this renderer
      */
     @NonNull
@@ -115,7 +124,7 @@ public abstract class InsightRendererService extends Service {
             throw new IllegalStateException(
                     "RenderTokens can not be minted until after onConnected has been called");
         }
-        return new RenderToken(mComponentId);
+        return new RenderToken(mComponentId, null);
     }
 
     private void configure(UUID componentId) {

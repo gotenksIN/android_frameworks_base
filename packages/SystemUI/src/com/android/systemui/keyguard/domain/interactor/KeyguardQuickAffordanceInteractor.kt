@@ -26,7 +26,6 @@ import com.android.app.tracing.coroutines.withContextTraced as withContext
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.internal.widget.LockPatternUtils
 import com.android.keyguard.logging.KeyguardQuickAffordancesLogger
-import com.android.systemui.Flags.msdlFeedback
 import com.android.systemui.accessibility.domain.interactor.AccessibilityInteractor
 import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.animation.Expandable
@@ -38,6 +37,7 @@ import com.android.systemui.dock.DockManager
 import com.android.systemui.dock.retrieveIsDocked
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.inputdevice.domain.interactor.PointerDeviceInteractor
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceConfig
 import com.android.systemui.keyguard.data.repository.BiometricSettingsRepository
 import com.android.systemui.keyguard.data.repository.KeyguardQuickAffordanceRepository
@@ -94,6 +94,7 @@ constructor(
     private val devicePolicyManager: DevicePolicyManager,
     private val secureLockDeviceInteractor: Lazy<SecureLockDeviceInteractor>,
     private val dockManager: DockManager,
+    private val pointerDeviceInteractor: PointerDeviceInteractor,
     private val biometricSettingsRepository: BiometricSettingsRepository,
     private val accessibilityInteractor: AccessibilityInteractor,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
@@ -113,10 +114,12 @@ constructor(
      * If `false`, the UI goes back to using single taps.
      */
     fun useLongPress(): Flow<Boolean> =
-        combine(dockManager.retrieveIsDocked(), accessibilityInteractor.isEnabledFiltered) {
-            isDocked,
-            isAccessibilityEnabled ->
-            !isDocked && !isAccessibilityEnabled
+        combine(
+            dockManager.retrieveIsDocked(),
+            accessibilityInteractor.isEnabledFiltered,
+            pointerDeviceInteractor.isAnyPointerDeviceConnected,
+        ) { isDocked, isAccessibilityEnabled, isPointerDeviceConnected ->
+            !isDocked && !isAccessibilityEnabled && !isPointerDeviceConnected
         }
 
     /** Returns an observable for the quick affordance at the given position. */
@@ -218,19 +221,15 @@ constructor(
                     canShowWhileLocked = result.canShowWhileLocked,
                     expandable = expandable,
                 )
-                if (msdlFeedback()) {
-                    msdlPlayer.playToken(MSDLToken.LONG_PRESS)
-                }
+                msdlPlayer.playToken(MSDLToken.LONG_PRESS)
             }
             is KeyguardQuickAffordanceConfig.OnTriggeredResult.Handled -> {
-                if (result.actionLaunched && msdlFeedback()) {
+                if (result.actionLaunched) {
                     msdlPlayer.playToken(MSDLToken.LONG_PRESS)
                 }
             }
             is KeyguardQuickAffordanceConfig.OnTriggeredResult.ShowDialog -> {
-                if (msdlFeedback()) {
-                    msdlPlayer.playToken(MSDLToken.LONG_PRESS)
-                }
+                msdlPlayer.playToken(MSDLToken.LONG_PRESS)
                 showDialog(result.dialog, result.expandable)
             }
         }

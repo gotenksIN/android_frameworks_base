@@ -34,7 +34,8 @@ import android.view.SurfaceControlViewHost;
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
+
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.util.UUID;
 
@@ -65,6 +66,7 @@ public final class InsightSurfaceClientInfo implements Parcelable {
     /**
      * Create a new insight surface client info object.
      *
+     * @param id the client's unique id
      * @param displayId the client app's {@link android.view.Display#getDisplayId}
      * @param measureSpecWidth the width MeasureSpec of the client surface
      * @param measureSpecHeight the height MeasureSpec of the client surface
@@ -81,6 +83,7 @@ public final class InsightSurfaceClientInfo implements Parcelable {
      */
     @VisibleForTesting
     public InsightSurfaceClientInfo(
+            UUID id,
             int displayId,
             int measureSpecWidth,
             int measureSpecHeight,
@@ -92,7 +95,7 @@ public final class InsightSurfaceClientInfo implements Parcelable {
             @NonNull String packageName,
             @NonNull Configuration configuration,
             @NonNull IInsightSurfaceClient client) {
-        mId = UUID.randomUUID();
+        mId = id;
         mDisplayId = displayId;
         mMeasureSpecWidth = measureSpecWidth;
         mMeasureSpecHeight = measureSpecHeight;
@@ -360,9 +363,13 @@ public final class InsightSurfaceClientInfo implements Parcelable {
     /**
      * Returns a new {@link InsightSurfaceClientInfo} from this info and the updated values in the
      * given {@link InsightSurfaceClientUpdate}.
+     *
+     * @hide
      */
-    InsightSurfaceClientInfo createInfoFromUpdate(InsightSurfaceClientUpdate update) {
+    @VisibleForTesting
+    public InsightSurfaceClientInfo createInfoFromUpdate(InsightSurfaceClientUpdate update) {
         return new InsightSurfaceClientInfo(
+                mId,
                 mDisplayId,
                 update.hasUpdate(InsightSurfaceClientUpdate.KEY_MEASURE_SPEC_WIDTH)
                         ? update.getMeasureSpecWidth() : mMeasureSpecWidth,
@@ -375,7 +382,7 @@ public final class InsightSurfaceClientInfo implements Parcelable {
                 update.hasUpdate(InsightSurfaceClientUpdate.KEY_NESTED_SCROLL_AXIS_LOCKED)
                         ? update.isNestedScrollAxisLocked() : mNestedScrollAxisLocked,
                 update.hasUpdate(InsightSurfaceClientUpdate.KEY_SHOULD_BLUR)
-                        ? update.isNestedScrollAxisLocked() : mShouldBlur,
+                        ? update.shouldBlur() : mShouldBlur,
                 update.hasUpdate(InsightSurfaceClientUpdate.KEY_THEME_RESOURCE_NAME)
                         ? update.getThemeResourceName() : mThemeResourceName,
                 mPackageName,

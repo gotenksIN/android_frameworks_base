@@ -58,6 +58,16 @@ flag {
 }
 
 flag {
+    name: "async_notification_launch_ipc"
+    namespace: "systemui"
+    description: "Makes StatusBarNotificationActivityStarter do binder transactions on background"
+    bug: "462728621"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "av_controls_chip_per_display"
     namespace: "systemui"
     description: "Makes Av Controls Chip related code per display."
@@ -783,16 +793,6 @@ flag {
 }
 
 flag {
-   name: "global_actions_emphasized_font"
-   namespace: "systemui"
-   description: "Use emphasized font for global actions."
-   bug: "393616338"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
     name: "global_actions_feedback_action"
     namespace: "systemui"
     description: "When enabled at build-time, the feedback global action will be available on "
@@ -995,6 +995,16 @@ flag {
 }
 
 flag {
+  name: "low_light_sensor_while_screen_on"
+  namespace: "systemui"
+  description: "Enables low light sensor listener while screen is on and not dreaming"
+  bug: "467654358"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "media_controls_button_media3"
   namespace: "systemui"
   description: "Enable media action buttons updates using media3"
@@ -1092,17 +1102,6 @@ flag {
     namespace: "systemui"
     description: "Switches to the new volume panel (without Slices)."
     bug: "202262476"
-}
-
-flag {
-   name: "no_expansion_on_overscroll"
-   namespace: "systemui"
-   description: "Enable the fix where QS Expansion is set to zero on overscroll. This should"
-        "prevent unnecessary work and remove jank when overscrolling."
-   bug: "414346597"
-  metadata {
-      purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1266,6 +1265,13 @@ flag {
 }
 
 flag {
+    name: "opaque_status_bar"
+    namespace: "systemui"
+    description: "Ensure the status bar applies an opaque background in specific contexts, such as the maximized window state"
+    bug: "479261500"
+}
+
+flag {
     name: "optimize_flow_map_operators"
     namespace: "systemui"
     description: "Use map instead of mapLatest for non-suspend flow transformations"
@@ -1325,6 +1331,16 @@ flag {
     namespace: "systemui"
     description: "When a TileService package is uninstalled, remove the tile completely and all associated data."
     bug: "362234193"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "qs_edit_mode_focus_fixes"
+    namespace: "systemui"
+    description: "Various fixes for the focus states of the quick settings edit mode"
+    bug: "481033294"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1661,6 +1677,16 @@ flag {
 }
 
 flag {
+    name: "standalone_fingerprint_lock_screen_ux_fix"
+    namespace: "systemui"
+    description: "Fix standalone fingerprint sensor lock screen UX"
+    bug: "481645959"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "status_bar_always_check_underlying_networks"
     namespace: "systemui"
     description: "For status bar connectivity UI, always check underlying networks for wifi and "
@@ -1752,6 +1778,16 @@ flag {
 }
 
 flag {
+   name: "status_bar_long_press_gesture_detector_per_display"
+   namespace: "systemui"
+   description: "Makes StatusBarLongPressGestureDetector per-display"
+   bug: "383125226"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "status_bar_mobile_icon_kairos"
     namespace: "systemui"
     description: "Refactors the mobile connection icon in the status bar to use the Kairos library"
@@ -1834,6 +1870,16 @@ flag {
 }
 
 flag {
+    name: "strong_auth_required_after_sign_out_message_fix"
+    namespace: "systemui"
+    description: "Fix Bouncer message when strong auth is required after sign out"
+    bug: "478831458"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "synchronized_queue_cascade_notify"
     namespace: "systemui"
     description: "Cascade notify() in SynchornizedLinkedBlockingQueue to prevent waking up all threads unnecessarily"
@@ -1875,6 +1921,17 @@ flag {
     bug: "368579013"
     metadata {
         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "touchpad_gesture_tutorial_bug_fixes"
+    namespace: "systemui"
+    description: "Fixes the touchpad gesture tutorial to ensure the latest gesture and "
+            "animation changes are aligned with the touchpad tutorial"
+    bug: "456784841"
+    metadata {
+      purpose: PURPOSE_BUGFIX
     }
 }
 

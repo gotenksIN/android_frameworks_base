@@ -183,7 +183,7 @@ import com.android.server.display.DisplayManagerService;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.dreams.DreamManagerService;
 import com.android.server.emergency.EmergencyAffordanceService;
-import com.android.server.files.FilesService;
+import com.android.server.files.FileService;
 import com.android.server.flags.FeatureFlagsService;
 import com.android.server.gpu.GpuService;
 import com.android.server.grammaticalinflection.GrammaticalInflectionService;
@@ -351,6 +351,8 @@ import java.util.Timer;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
+
+import vendor.qti.applauncher.AppLauncherService;
 
 /**
  * Entry point to {@code system_server}.
@@ -1652,6 +1654,12 @@ public final class SystemServer implements Dumpable {
             ServiceManager.addService("scheduling_policy", new SchedulingPolicyService());
             t.traceEnd();
 
+            if (com.android.server.ui_latency_stats.Flags.uiLatencyStatsService()) {
+                t.traceBegin("StartUiLatencyStatsService");
+                mSystemServiceManager.startService(
+                        com.android.server.uilatencystats.UiLatencyStatsService.class);
+                t.traceEnd();
+            }
 
             // TelecomLoader hooks into classes with defined HFP logic,
             // so check for either telephony or microphone.
@@ -1979,16 +1987,25 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
 
                 if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()) {
-                    t.traceBegin("StartFilesService");
+                    t.traceBegin("StartFileService");
                     try {
-                        mSystemServiceManager.startService(FilesService.class);
+                        mSystemServiceManager.startService(FileService.class);
                     } catch (Throwable e) {
-                        reportWtf("starting FilesService", e);
+                        reportWtf("starting FileService", e);
                     }
                     t.traceEnd();
                 }
             }
         }
+
+        t.traceBegin("StartAppLauncherService");
+                try {
+                    Slog.i(TAG , "*****************SystemServer Add AppLauncherService Service*************************");
+                    ServiceManager.addService("vendor.qti.appLauncherService.IAppLauncherService/default", new AppLauncherService(context));
+                }catch (Throwable e) {
+                    Slog.e(TAG , "Failure starting AppLauncherService", e);
+                }
+        t.traceEnd();
 
         // We start this here so that we update our configuration to set watch or television
         // as appropriate.

@@ -77,7 +77,7 @@ import com.android.wm.shell.windowdecor.extension.identityHashCode
 import com.android.wm.shell.windowdecor.extension.isLightCaptionBarAppearance
 import com.android.wm.shell.windowdecor.extension.isTransparentCaptionBarAppearance
 import com.android.wm.shell.windowdecor.extension.throttleFirstClicks
-import com.android.wm.shell.windowdecor.viewholder.util.AppHeaderDimensions
+import com.android.wm.shell.windowdecor.viewholder.util.HeaderDimensions
 
 /**
  * A desktop mode window decoration used when the window is floating (i.e. freeform). It hosts finer
@@ -88,12 +88,11 @@ class AppHeaderViewHolder(
     private val context: Context,
     windowDecorationActions: WindowDecorationActions,
     onCaptionTouchListener: View.OnTouchListener,
-    onCaptionButtonClickListener: View.OnClickListener,
     private val onLongClickListener: OnLongClickListener,
     onCaptionGenericMotionListener: View.OnGenericMotionListener,
     onMaximizeHoverAnimationFinishedListener: () -> Unit,
     private val desktopModeUiEventLogger: DesktopModeUiEventLogger,
-    private val dimensions: AppHeaderDimensions,
+    private val dimensions: HeaderDimensions,
     private val focusTransitionObserver: FocusTransitionObserver,
 ) : WindowDecorationViewHolder<AppHeaderViewHolder.HeaderData>() {
 
@@ -166,16 +165,20 @@ class AppHeaderViewHolder(
         openMenuButton.setOnTouchListener(onCaptionTouchListener)
 
         closeWindowButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onClose(currentTaskInfo)
         }
         maximizeWindowButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onMaximizeOrRestore(
+                currentTaskInfo.taskId,
+                AmbiguousSource.HEADER_BUTTON,
+                InputMethod.MOUSE,
+            )
         }
         minimizeWindowButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onMinimize(currentTaskInfo)
         }
         openMenuButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onOpenHandleMenu(currentTaskInfo.taskId)
         }
 
         maximizeWindowButton.setOnGenericMotionListener(onCaptionGenericMotionListener)
@@ -450,7 +453,7 @@ class AppHeaderViewHolder(
     /** Populates string variables from string templates which rely on app name */
     private fun populateA11yStrings(name: CharSequence) {
         openMenuButton.contentDescription =
-            context.getString(R.string.desktop_mode_app_header_chip_text, name)
+            context.getString(R.string.desktop_mode_header_chip_text, name)
 
         closeWindowButton.contentDescription = context.getString(R.string.close_button_text, name)
         minimizeWindowButton.contentDescription =
@@ -953,12 +956,11 @@ class AppHeaderViewHolder(
             context: Context,
             windowDecorationActions: WindowDecorationActions,
             onCaptionTouchListener: View.OnTouchListener,
-            onCaptionButtonClickListener: View.OnClickListener,
             onLongClickListener: OnLongClickListener,
             onCaptionGenericMotionListener: View.OnGenericMotionListener,
             onMaximizeHoverAnimationFinishedListener: () -> Unit,
             desktopModeUiEventLogger: DesktopModeUiEventLogger,
-            dimensions: AppHeaderDimensions,
+            dimensions: HeaderDimensions,
             focusTransitionObserver: FocusTransitionObserver,
         ): AppHeaderViewHolder
     }
@@ -970,12 +972,11 @@ class AppHeaderViewHolder(
             context: Context,
             windowDecorationActions: WindowDecorationActions,
             onCaptionTouchListener: View.OnTouchListener,
-            onCaptionButtonClickListener: View.OnClickListener,
             onLongClickListener: OnLongClickListener,
             onCaptionGenericMotionListener: View.OnGenericMotionListener,
             onMaximizeHoverAnimationFinishedListener: () -> Unit,
             desktopModeUiEventLogger: DesktopModeUiEventLogger,
-            dimensions: AppHeaderDimensions,
+            dimensions: HeaderDimensions,
             focusTransitionObserver: FocusTransitionObserver,
         ): AppHeaderViewHolder =
             AppHeaderViewHolder(
@@ -983,7 +984,6 @@ class AppHeaderViewHolder(
                 context,
                 windowDecorationActions,
                 onCaptionTouchListener,
-                onCaptionButtonClickListener,
                 onLongClickListener,
                 onCaptionGenericMotionListener,
                 onMaximizeHoverAnimationFinishedListener,

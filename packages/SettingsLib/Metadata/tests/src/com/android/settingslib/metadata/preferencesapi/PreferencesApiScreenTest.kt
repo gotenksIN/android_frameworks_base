@@ -18,6 +18,7 @@ package com.android.settingslib.metadata.preferencesapi
 
 import android.Manifest
 import android.content.Context
+import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.settingslib.metadata.ValidatedKeyParameters
@@ -52,6 +53,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowBuild
 
 @RunWith(AndroidJUnit4::class)
 class PreferencesApiScreenTest {
@@ -140,6 +142,81 @@ class PreferencesApiScreenTest {
 
         assertThat(preferenceScreen.spaRoutePrefix).isEqualTo(spaRoutePrefix)
         assertThat(preferenceScreen.fragment).isNull()
+    }
+
+    @Test
+    fun getSpaRoute_noParams_returnsStaticPrefix() {
+        val spaRoutePrefix = "static/route"
+        val screen = object : PreferencesApiScreen(
+            key = SCREEN_KEY,
+            topLevelSettingsCategory = Category.SYSTEM,
+            spaRoutePrefix = spaRoutePrefix,
+            purpose = R.string.preference_screen_purpose,
+        ) {}
+
+        assertThat(screen.getSpaRoute()).isEqualTo(spaRoutePrefix)
+    }
+
+    @Test
+    fun getSpaRoute_withParams_noPrepareSpaRoute_returnsStaticPrefix() {
+        val spaRoutePrefix = "static/route"
+        val screen = object : PreferencesApiScreen(
+            key = SCREEN_KEY,
+            topLevelSettingsCategory = Category.SYSTEM,
+            spaRoutePrefix = spaRoutePrefix,
+            purpose = R.string.preference_screen_purpose,
+        ) {
+            init {
+                parameters {
+                    parameter(
+                        "package",
+                        R.string.parameter_purpose1,
+                        true,
+                        GeneratedParameterType(R.string.parameter_type_description) {
+                            listOf(GeneratedValue("value", "type_description"))
+                        },
+                    )
+                }
+            }
+        }
+        val keyParameters = screen.parametersSchema!!.prepare("package" to "com.example.app")
+        screen.initializeParameters(keyParameters)
+
+        assertThat(screen.getSpaRoute()).isEqualTo(spaRoutePrefix)
+    }
+
+    @Test
+    fun getSpaRoute_withParameters_returnsDynamicRoute() {
+        val spaRoutePrefix = "spa/prefix"
+        val packageName = "com.example.app"
+        val screen = object : PreferencesApiScreen(
+            key = SCREEN_KEY,
+            topLevelSettingsCategory = Category.SYSTEM,
+            purpose = R.string.preference_screen_purpose,
+        ) {
+            init {
+                parameters {
+                    parameter(
+                        "package",
+                        R.string.parameter_purpose1,
+                        true,
+                        GeneratedParameterType(R.string.parameter_type_description) {
+                            listOf(GeneratedValue("value", "type_description"))
+                        },
+                    )
+                    prepareSpaRoute { params ->
+                        "$spaRoutePrefix/${params["package"]}"
+                    }
+                }
+            }
+        }
+
+        val keyParameters = screen.parametersSchema!!.prepare("package" to packageName)
+        screen.initializeParameters(keyParameters)
+
+        val route = screen.getSpaRoute()
+
+        assertThat(route).isEqualTo("$spaRoutePrefix/$packageName")
     }
 
     @Test
@@ -821,7 +898,8 @@ class PreferencesApiScreenTest {
                 }
             }
 
-        assertThat(exception.message).isEqualTo(getExceptionMessageMultipleParametersDefined(2))
+        assertThat(exception.message)
+            .isEqualTo(getExceptionMessageMultipleParametersDefined(2))
     }
 
     @Test
@@ -1581,6 +1659,121 @@ class PreferencesApiScreenTest {
             }
 
         assertThat(preferenceScreen.getLaunchIntent(context, null)).isNotNull()
+    }
+
+    @Test
+    fun createPreferencesApiScreen_failingFlag_skipsCheckWhenDebuggableAndSettingEnabled() {
+        ShadowBuild.setType("userdebug")
+        Settings.Global.putInt(
+            context.contentResolver,
+            "com.android.settings.SKIP_CATALYST_FLAG_CHECKS",
+            1
+        )
+
+        val preferenceScreen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    flag { false }
+                }
+            }
+
+        assertThat(preferenceScreen.isFlagEnabled(context)).isTrue()
+    }
+
+    @Test
+    fun createPreferencesApiScreen_failingFlag_returnsFalse_whenNotDebuggableAndSettingEnabled() {
+        ShadowBuild.setType("user")
+        Settings.Global.putInt(
+            context.contentResolver,
+            "com.android.settings.SKIP_CATALYST_FLAG_CHECKS",
+            1
+        )
+
+        val preferenceScreen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    flag { false }
+                }
+            }
+
+        assertThat(preferenceScreen.isFlagEnabled(context)).isFalse()
+    }
+
+    @Test
+    fun createPreferencesApiScreen_failingFlag_returnsFalse_whenDebuggableAndSettingDisabled() {
+        ShadowBuild.setType("userdebug")
+        Settings.Global.putInt(
+            context.contentResolver,
+            "com.android.settings.SKIP_CATALYST_FLAG_CHECKS",
+            0
+        )
+
+        val preferenceScreen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    flag { false }
+                }
+            }
+
+        assertThat(preferenceScreen.isFlagEnabled(context)).isFalse()
+    }
+
+    @Test
+    fun dynamicSpaScreen_missingPrepareSpaRoute_throwsException() {
+        assertThrows(IllegalStateException::class.java) {
+            object : PreferencesApiScreen(
+                key = SCREEN_KEY,
+                topLevelSettingsCategory = Category.SYSTEM,
+                purpose = R.string.preference_screen_purpose,
+            ) {
+                init {
+                    parameters {
+                        parameter(
+                            "package",
+                            R.string.parameter_purpose1,
+                            true,
+                            GeneratedParameterType(R.string.parameter_type_description) {
+                                listOf(GeneratedValue("value", "type_description"))
+                            },
+                        )
+                        // Missing prepareSpaRoute
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun dynamicSpaConstructor_withoutParameters_throwsException() {
+        assertThrows(IllegalStateException::class.java) {
+            val screen = object : PreferencesApiScreen(
+                key = SCREEN_KEY,
+                topLevelSettingsCategory = Category.SYSTEM,
+                purpose = R.string.preference_screen_purpose,
+            ) {
+                // Intentionally empty init block
+            }
+            // The check is performed when the destination is requested
+            screen.fragmentClass()
+        }
     }
 
     companion object {

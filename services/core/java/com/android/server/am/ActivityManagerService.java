@@ -347,7 +347,9 @@ import android.content.pm.ProviderInfoList;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.SharedLibraryInfo;
+import android.content.pm.Signature;
 import android.content.pm.SignedPackage;
+import android.content.pm.SigningDetails;
 import android.content.pm.SystemFeaturesCache;
 import android.content.pm.TestUtilityService;
 import android.content.pm.UserInfo;
@@ -429,6 +431,7 @@ import android.util.IndentingPrintWriter;
 import android.util.IntArray;
 import android.util.Log;
 import android.util.MathUtils;
+import android.util.PackageUtils;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -450,6 +453,7 @@ import android.view.autofill.AutofillManagerInternal;
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.SystemServerLock;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IAppOpsActiveCallback;
 import com.android.internal.app.IAppOpsCallback;
@@ -507,6 +511,7 @@ import com.android.server.ThreadPriorityBooster;
 import com.android.server.Watchdog;
 import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.psc.ActiveUidsInternal;
+import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.OomAdjuster;
 import com.android.server.am.psc.OomAdjusterDebugLogger;
 import com.android.server.am.psc.ProcessListInternal.ProcessChangeItem;
@@ -783,6 +788,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     /**
      * The global lock for AMS, it's de-facto the ActivityManagerService object as of now.
      */
+    @SystemServerLock(LockGuard.INDEX_ACTIVITY)
     final ActivityManagerGlobalLock mGlobalLock = ActivityManagerService.this;
 
     /**
@@ -3079,6 +3085,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             return false;
         }
 
+        final List<String> expectedDigests = new ArrayList<>();
         final List<SignedPackage> rules = policy.getAllowlistedSignedPackages();
         final int rulesSize = rules.size();
         for (int i = 0; i < rulesSize; i++) {
@@ -3090,16 +3097,49 @@ public class ActivityManagerService extends IActivityManager.Stub
                             .hasSha256Certificate(rule.getCertificateDigest())) {
                         return true;
                     }
+                    expectedDigests.add(
+                            HexDump.toHexString(rule.getCertificateDigest()).toUpperCase());
                 } else {
                     return true;
                 }
             }
         }
 
-        Slog.w(TAG, "Access denied: " + policyOwnerPkg + " blocks " + candidatePkg + " (uid "
-                        + candidateUid + ")");
+        logAssociationDenialLocked(policyOwnerPkg, candidatePkg, candidateUid,
+                expectedDigests, candidateInfo.getSigningDetails());
         return false;
     }
+
+    private void logAssociationDenialLocked(String owner, String target, int targetUid,
+            List<String> expectedDigests, SigningDetails details) {
+        if (expectedDigests.isEmpty()) {
+            Slog.w(TAG, "Access denied: " + owner + " blocks " + target
+                    + " (uid " + targetUid + "): package not listed in policy");
+            return;
+        }
+
+        List<String> actualDigests = new ArrayList<>();
+        if (details != null) {
+            final Signature[] signatures = details.getSignatures();
+            if (signatures != null) {
+                for (int i = 0; i < signatures.length; i++) {
+                    final Signature sig = signatures[i];
+                    byte[] digest = PackageUtils.computeSha256DigestBytes(sig.toByteArray());
+                    if (digest != null) {
+                        actualDigests.add(HexDump.toHexString(digest).toUpperCase());
+                    }
+                }
+            }
+        }
+
+        final String actualOutput =
+                actualDigests.isEmpty() ? "unknown" : actualDigests.toString();
+
+        Slog.w(TAG, "Access denied: " + owner + " has a policy for " + target
+                + " but the certificate digest did not match. Expected one of: "
+                + expectedDigests + ". Package on device has: " + actualOutput);
+    }
+
 
     /**
      * Checks if the association is allowed by the App's own Manifest policy (the {@code
@@ -3135,19 +3175,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (UserHandle.getAppId(sourceUid) == Process.SYSTEM_UID
                     || UserHandle.getAppId(targetUid) == Process.SYSTEM_UID) {
                 return true;
-            }
-
-            // PCC UIDs can bypass manifest checks when accessing Trusted Apps.
-            if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()
-                    && Process.isPrivateComputeCoreUid(sourceUid)) {
-
-                PccSandboxManagerInternal pccInternal =
-                        LocalServices.getService(PccSandboxManagerInternal.class);
-
-                if (pccInternal != null
-                        && pccInternal.isPccTrustedSystemComponent(targetUid, targetPkg)) {
-                    return true;
-                }
             }
 
             // Egress: Source must allow Target.
@@ -4924,7 +4951,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     private boolean forceStopPackageInternalLocked(String packageName, int appId,
             boolean callerWillRestart, boolean purgeCache, boolean doit,
             boolean evenPersistent, boolean uninstalling, boolean packageStateStopped,
-            @CanBeALL @UserIdInt int userId, String reasonString, int reason, int minOomAdj) {
+            @CanBeALL @UserIdInt int userId, String reasonString, int reason,
+            @OomAdjust int minOomAdj) {
         int i;
 
         if (userId == UserHandle.USER_ALL && packageName == null) {
@@ -5622,21 +5650,22 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
 
             final HostingRecord hostingRecord = app.getHostingRecord();
-            final String shortAction = getShortAction(hostingRecord.getAction());
             FrameworkStatsLog.write(
                     FrameworkStatsLog.PROCESS_START_TIME,
                     app.info.uid,
                     pid,
-                    app.info.packageName,
+                    app.processName,
                     FrameworkStatsLog.PROCESS_START_TIME__TYPE__COLD,
                     app.getStartElapsedTime(),
                     (int) (app.getBindApplicationTime() - app.getStartUptime()),
                     (int) (SystemClock.uptimeMillis() - app.getStartUptime()),
                     hostingRecord.getType(),
                     hostingRecord.getName(),
-                    shortAction,
+                    hostingRecord.getAction(),
                     HostingRecord.getHostingTypeIdStatsd(hostingRecord.getType()),
-                    HostingRecord.getTriggerTypeForStatsd(hostingRecord.getTriggerType()));
+                    HostingRecord.getTriggerTypeForStatsd(hostingRecord.getTriggerType()),
+                    hostingRecord.getCallerUid(),
+                    hostingRecord.getCallerProcessName());
         }
     }
 
@@ -9001,7 +9030,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     throw new IllegalArgumentException(
                             "Render thread does not belong to process");
                 }
-                proc.setRenderThreadTid(tid);
+                mProcessStateController.setRenderThreadTid(proc, tid);
                 if (DEBUG_OOM_ADJ) {
                     Slog.d("UI_FIFO", "Set RenderThread tid " + tid + " for pid " + pid);
                 }
@@ -13175,7 +13204,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             final ProcessRecord r = procs.get(i);
             final IApplicationThread thread;
             final int pid;
-            final int oomAdj;
+            final @OomAdjust int oomAdj;
             final boolean hasActivities;
             synchronized (mProcLock) {
                 thread = r.getThread();
@@ -13823,7 +13852,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             final ProcessRecord r = procs.get(i);
             final IApplicationThread thread;
             final int pid;
-            final int oomAdj;
+            final @OomAdjust int oomAdj;
             final boolean hasActivities;
             synchronized (mProcLock) {
                 thread = r.getThread();
@@ -18041,7 +18070,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     } else {
                         // We delay killing processes that are not in the background or running a
                         // receiver.
-                        pr.setWaitingToKill("remove task");
+                        mProcessStateController.setWaitingToKill(pr, "remove task");
                     }
 
                     // Send the profiling trigger. This is done both in cases where we kill
@@ -18570,7 +18599,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public void startProcess(String processName, ApplicationInfo info, boolean knownToBeDead,
-                boolean isTop, String hostingType, ComponentName hostingName, boolean isPcc) {
+                boolean isTop, String hostingType, ComponentName hostingName, boolean isPcc,
+                int callerUid, String callerProcessName) {
             try {
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "startProcess:"
@@ -18581,7 +18611,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     // started, the top priority can be applied immediately to avoid cpu being
                     // preempted by other processes before attaching the process of top app.
                     HostingRecord hostingRecord =
-                            new HostingRecord(hostingType, hostingName, isTop, isPcc);
+                            new HostingRecord(hostingType, hostingName, isTop, isPcc,
+                                    callerUid, callerProcessName);
                     ProcessRecord app = startProcessLocked(processName, info, knownToBeDead,
                             0 /* intentFlags */, hostingRecord,
                             ZYGOTE_POLICY_FLAG_LATENCY_SENSITIVE, false /* allowWhileBooting */,
@@ -20283,13 +20314,14 @@ public class ActivityManagerService extends IActivityManager.Stub
     final class OomAdjusterCallback implements OomAdjuster.Callback {
         @Override
         @GuardedBy({"ActivityManagerService.this", "ActivityManagerService.this.mProcLock"})
-        public void onOomAdjustChanged(int oldAdj, int newAdj, ProcessRecordInternal app) {
+        public void onOomAdjustChanged(@OomAdjust int oldAdj, @OomAdjust int newAdj,
+                ProcessRecordInternal app) {
             mCachedAppOptimizer.onOomAdjustChanged(oldAdj, newAdj, (ProcessRecord) app);
         }
 
         @Override
         public void onProcessFreezabilityChanged(ProcessRecordInternal app, boolean freezePolicy,
-                @OomAdjReason int oomAdjReason, boolean immediate, int oldOomAdj) {
+                @OomAdjReason int oomAdjReason, boolean immediate, @OomAdjust int oldOomAdj) {
             if (!mCachedAppOptimizer.useFreezer()) {
                 return;
             }

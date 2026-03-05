@@ -159,6 +159,7 @@ import android.util.Xml;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.SystemServerLock;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.annotations.VisibleForTesting.Visibility;
 import com.android.internal.app.IAppOpsService;
@@ -183,6 +184,7 @@ import com.android.server.StorageManagerInternal;
 import com.android.server.SystemService;
 import com.android.server.am.UserState;
 import com.android.server.locksettings.LockSettingsInternal;
+import com.android.server.pm.GenericAllowlist.AllowlistMode;
 import com.android.server.pm.GenericAllowlist.AllowlistStatus;
 import com.android.server.pm.UserFilter.DeathPredictor;
 import com.android.server.pm.UserManagerInternal.UserLifecycleListener;
@@ -395,15 +397,19 @@ public class UserManagerService extends IUserManager.Stub {
      * Lock for packages. If using with {@link #mUsersLock}, {@link #mPackagesLock} should be
      * acquired first.
      */
+    @SystemServerLock(LockGuard.INDEX_PACKAGES)
     private final Object mPackagesLock;
     private final UserDataPreparer mUserDataPreparer;
     /**
      * Short-term lock for internal state, when interaction/sync with PM is not required. If using
      * with {@link #mPackagesLock}, {@link #mPackagesLock} should be acquired first.
      */
+    @SystemServerLock(LockGuard.INDEX_USER)
     private final Object mUsersLock = LockGuard.installNewLock(LockGuard.INDEX_USER);
+    @SystemServerLock(LockGuard.INDEX_USER_RESTRICTIONS)
     private final Object mRestrictionsLock = NamedLock.create("mRestrictionsLock");
     // Used for serializing access to app restriction files
+    @SystemServerLock(LockGuard.INDEX_USER_APP_RESTRICTIONS)
     private final Object mAppRestrictionsLock = NamedLock.create("mAppRestrictionsLock");
 
     private final Handler mHandler;
@@ -1195,7 +1201,7 @@ public class UserManagerService extends IUserManager.Stub {
             sInstance = this;
         }
         mSystemPackageInstaller = new UserSystemPackageInstaller(this, mUserTypes);
-        mPerUserTypeActivitiesAllowlist = buildActivitiesAllowlist(context, mUserTypes);
+        mPerUserTypeActivitiesAllowlist = buildActivitiesAllowlists(context, mUserTypes);
         // Most common sizes would be 1-3 (HSU, full user, profile), so setting to 4 as it's the
         // closed multiple of 2.
         mPerUserActivitiesAllowlist = Flags.hsuAllowlistActivities()
@@ -4951,7 +4957,7 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     /** This method is called in the constructor once (hence it's static) */
-    private static @Nullable ArrayMap<String, UserActivitiesAllowlist> buildActivitiesAllowlist(
+    private static @Nullable ArrayMap<String, UserActivitiesAllowlist> buildActivitiesAllowlists(
             Context context, ArrayMap<String, UserTypeDetails> userTypes) {
         if (!android.multiuser.Flags.hsuAllowlistActivities()) {
             return null;
@@ -4980,14 +4986,10 @@ public class UserManagerService extends IUserManager.Stub {
 
             }
 
-            final int allowlistMode =
+            final @AllowlistMode int allowlistMode =
                     resources.getInteger(R.integer.config_hsuActivitiesAllowlistMode);
             final UserActivitiesAllowlist allowlist =
                     new UserActivitiesAllowlist(allowlistMode, allowlistedActivities);
-            // TODO(b/477998894): call overrideDisallowedStatus(
-            //   STATUS_ALLOWED_ALLOWLISTING_DISABLED_WHILE_DEVICE_IS_PROVISIONING) if the device is
-            // not provisioned (will be done in a separate CL as it'd also require changing
-            // HsuDeviceProvisioner to reset it later).
             userActivitiesAllowlist.put(userType, allowlist);
         }
         return userActivitiesAllowlist;
@@ -7509,8 +7511,10 @@ public class UserManagerService extends IUserManager.Stub {
 
     @Override
     public Bundle getApplicationRestrictionsForUser(String packageName, @UserIdInt int userId) {
+        final int callingUid = Binder.getCallingUid();
         if (UserHandle.getCallingUserId() != userId
-                || !UserHandle.isSameApp(Binder.getCallingUid(), getUidForPackage(packageName))) {
+                || !getPackageManagerInternal().isSameApp(packageName, callingUid,
+                        UserHandle.getUserId(callingUid))) {
             checkSystemOrRoot("get application restrictions for other user/app " + packageName);
         }
 

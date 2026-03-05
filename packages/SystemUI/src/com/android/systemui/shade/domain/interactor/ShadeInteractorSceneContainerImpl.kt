@@ -24,6 +24,7 @@ import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.TransitionKey
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.keyguard.shared.model.KeyguardTransitionKeys.WithAnimationOverLockscreen
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
@@ -353,24 +354,25 @@ constructor(
                     .flatMapLatestConflated { state ->
                         when (state) {
                             is ObservableTransitionState.Idle ->
-                                if (state.currentScene == resolvedSceneKey) {
-                                    flowOf(1f)
-                                } else {
-                                    flowOf(0f)
-                                }
-                            is ObservableTransitionState.Transition ->
-                                if (state.toContent == resolvedSceneKey) {
-                                    state.progress
-                                } else if (state.fromContent == resolvedSceneKey) {
-                                    if (state.key == ToAlwaysOnDisplay) {
-                                        // Keep the scene expanded during a transition to AOD,
-                                        // because it should fade out in place.
-                                        flowOf(1f)
-                                    } else {
-                                        state.progress.map { progress -> 1 - progress }
-                                    }
-                                } else {
-                                    flowOf(0f)
+                                flowOf(if (state.currentScene == resolvedSceneKey) 1f else 0f)
+                            is ObservableTransitionState.Transition.OverlayTransition ->
+                                flowOf(if (state.currentScene == resolvedSceneKey) 1f else 0f)
+                            is ObservableTransitionState.Transition.ChangeScene ->
+                                when (resolvedSceneKey) {
+                                    state.toContent -> state.progress
+                                    state.fromContent ->
+                                        if (
+                                            state.key == ToAlwaysOnDisplay ||
+                                                state.key == WithAnimationOverLockscreen
+                                        ) {
+                                            // Keep the scene expanded during a transition to AOD to
+                                            // fake out in place, or while running a notification
+                                            // animation to unlock
+                                            flowOf(1f)
+                                        } else {
+                                            state.progress.map { progress -> 1 - progress }
+                                        }
+                                    else -> flowOf(0f)
                                 }
                         }
                     }
@@ -411,9 +413,13 @@ constructor(
                         if (state.toContent == overlay) {
                             state.progress
                         } else if (state.fromContent == overlay) {
-                            if (state.key == ToAlwaysOnDisplay) {
-                                // Keep the scene expanded during a transition to AOD,
-                                // because it should fade out in place.
+                            if (
+                                state.key == ToAlwaysOnDisplay ||
+                                    state.key == WithAnimationOverLockscreen
+                            ) {
+                                // Keep the scene expanded during a transition to AOD to
+                                // fake out in place, or while running a notification
+                                // animation to unlock
                                 flowOf(1f)
                             } else {
                                 state.progress.map { progress -> 1 - progress }

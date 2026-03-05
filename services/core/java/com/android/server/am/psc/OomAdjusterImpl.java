@@ -105,6 +105,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
 import com.android.server.am.ProcessList;
+import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
@@ -663,11 +664,11 @@ public class OomAdjusterImpl extends OomAdjuster {
     }
 
     @GuardedBy("mServiceLock")
-    void onProcessOomAdjChanged(@NonNull ProcessRecordInternal app, int prevAdj) {
+    void onProcessOomAdjChanged(@NonNull ProcessRecordInternal app, @OomAdjust int prevAdj) {
         updateAdjSlotIfNecessary(app, prevAdj);
     }
 
-    private void updateAdjSlotIfNecessary(ProcessRecordInternal app, int prevRawAdj) {
+    private void updateAdjSlotIfNecessary(ProcessRecordInternal app, @OomAdjust int prevRawAdj) {
         if (app.getCurRawAdj() != prevRawAdj) {
             mProcessRecordAdjNodes.offer(app);
         }
@@ -1164,6 +1165,11 @@ public class OomAdjusterImpl extends OomAdjuster {
         app.clearCurCpuTimeReasons();
         app.clearCurImplicitCpuTimeReasons();
 
+        if (Flags.enableCapabilityControllerComputation()) {
+            // We'll set this later when evaluating implicit CPU time capability.
+            app.getGraphNode().setHasIntrinsicImplicitCpuTime(false);
+        }
+
         // Remove any follow up update this process might have. It will be rescheduled if still
         // needed.
         app.setFollowupUpdateUptimeMs(NO_FOLLOW_UP_TIME);
@@ -1202,6 +1208,9 @@ public class OomAdjusterImpl extends OomAdjuster {
             app.setCurCapability(PROCESS_CAPABILITY_ALL); // BFSL allowed
             app.addCurCpuTimeReasons(CPU_TIME_REASON_OTHER);
             app.addCurImplicitCpuTimeReasons(IMPLICIT_CPU_TIME_REASON_OTHER);
+            if (Flags.enableCapabilityControllerComputation()) {
+                app.getGraphNode().setHasIntrinsicImplicitCpuTime(true);
+            }
             app.setCurProcState(ActivityManager.PROCESS_STATE_PERSISTENT);
             // System processes can do UI, and when they do we want to have
             // them trim their memory after the user leaves the UI.  To
@@ -1242,7 +1251,7 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         // Determine the importance of the process, starting with most
         // important to least, and assign an appropriate OOM adjustment.
-        int adj;
+        @OomAdjust int adj;
         @SchedGroup int schedGroup;
         int procState;
         int capability = PROCESS_CAPABILITY_NONE;
@@ -1397,7 +1406,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         if (adj > PERCEPTIBLE_APP_ADJ
                 || procState > PROCESS_STATE_FOREGROUND_SERVICE) {
             String adjType = null;
-            int newAdj = 0;
+            @OomAdjust int newAdj = 0;
             int newProcState = 0;
 
             if (hasForegroundServices && hasNonShortForegroundServices) {
@@ -1666,6 +1675,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                 }
             }
 
+            // LINT.IfChange(getForegroundServiceCapability)
             if (s.isForeground()) {
                 final int fgsType = s.getForegroundServiceType();
                 if (s.isFgsAllowedWiu_forCapabilities()) {
@@ -1694,6 +1704,7 @@ public class OomAdjusterImpl extends OomAdjuster {
                     }
                 }
             }
+            // LINT.ThenChange(CapabilityController.java:getForegroundServiceCapability)
         }
 
         final ProcessProviderRecordInternal ppr = app.getProviders();
@@ -1857,17 +1868,17 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         boolean updated = false;
 
-        int clientAdj = client.getCurRawAdj();
+        @OomAdjust int clientAdj = client.getCurRawAdj();
         int clientProcState = client.getCurRawProcState();
 
         final boolean clientIsSystem = clientProcState < PROCESS_STATE_TOP;
 
-        int adj = app.getCurRawAdj();
+        @OomAdjust int adj = app.getCurRawAdj();
         int procState = app.getCurRawProcState();
         @SchedGroup int schedGroup = app.getCurrentSchedulingGroup();
         int capability = app.getCurCapability();
 
-        final int prevRawAdj = adj;
+        final @OomAdjust int prevRawAdj = adj;
         final int prevProcState = procState;
         final int prevSchedGroup = schedGroup;
         final int prevCapability = capability;
@@ -1976,8 +1987,8 @@ public class OomAdjusterImpl extends OomAdjuster {
                         adjType = "cch-bound-ui-services";
                     }
                 } else {
-                    int newAdj;
-                    int lbAdj = VISIBLE_APP_ADJ; // lower bound of adj.
+                    @OomAdjust int newAdj;
+                    @OomAdjust int lbAdj = VISIBLE_APP_ADJ; // lower bound of adj.
                     if (cr.hasFlag(Context.BIND_ABOVE_CLIENT
                             | Context.BIND_IMPORTANT)) {
                         if (clientAdj >= PERSISTENT_SERVICE_ADJ) {

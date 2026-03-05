@@ -22,12 +22,16 @@ import android.os.Looper;
 import android.util.Log;
 import android.util.Singleton;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.ravenwood.common.StackTrace;
 
 import org.junit.internal.management.ManagementFactory;
+import org.junit.runner.Description;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.lang.StackWalker.StackFrame;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Consumer;
@@ -168,5 +172,112 @@ public class RavenwoodImplUtils {
             RavenwoodErrorHandler.onWarningDetected(msg);
         }
         return bst.toString();
+    }
+
+    /**
+     * Safer version of {@link Description#getTestClass()}, which normally returns
+     * a class. However, it can return null, which we observed with
+     * {@link org.junit.runners.Parameterized}. In this case, the description is a suite
+     * and has children, which do have a test class set. So this method digs into children
+     * recursively and returns the test class that's found first.
+     */
+    @NonNull
+    public static Class<?> getDescriptionTestClass(@NonNull Description desc ) {
+        var ret = getDescriptionTestClassInner(desc);
+        if (ret != null) {
+            return ret;
+        }
+        throw new IllegalStateException("Cannot get test class from Description: " + desc);
+    }
+
+    @Nullable
+    private static Class<?> getDescriptionTestClassInner(@NonNull Description desc ) {
+        // Normally, a Description has a test class.
+        if (desc.getTestClass() != null) {
+            return desc.getTestClass();
+        }
+        // If not, which can happen with some parameterized runner,
+        // we look into children and
+        for (var child : desc.getChildren()) {
+            var childClass = getDescriptionTestClassInner(child);
+            if (childClass != null) {
+                return childClass;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Utility method {@link #dumpStack} which prints the call hierarchy on the current
+     * thread in reverse order. It skips all the top-level methods that are exactly the
+     * same as the previous call to make it less verbose.
+     */
+    public static void dumpStack(String logTag, int skipFrames) {
+        StackDumper.dumpStack(logTag, skipFrames + 1 /* +1 for this method */);
+    }
+
+    private static class StackDumper {
+
+        private static final StackWalker sWalker = StackWalker.getInstance(
+                StackWalker.Option.RETAIN_CLASS_REFERENCE);
+
+        /* Use to remember the last call on the same method. */
+        private static class ThreadInfo {
+            List<StackFrame> mFrames;
+
+            ThreadInfo(List<StackFrame> frames) {
+                mFrames = frames;
+            }
+        }
+
+        private static final ThreadLocal<ThreadInfo> sThreadInfo = ThreadLocal.withInitial(() -> {
+            var frames = new ArrayList<StackFrame>();
+            return new ThreadInfo(frames);
+        });
+
+        private static void dumpStack(String logTag, int skipFrames) {
+            var lastFrames = sThreadInfo.get().mFrames;
+            var curFrames = sWalker.walk((s) ->
+                    s.skip(skipFrames + 1) // "+1" for to skip this method (dumpStack) itself.
+                            .toList());
+
+            var end = findCommonAncestor(curFrames, lastFrames);
+            for (int i = 0; i <= end; i++) {
+                var f = curFrames.get(i);
+                Log.d(logTag, "  " + " ".repeat(i) + f.getClassName()
+                        + "." + f.getMethodName() + f.getDescriptor()
+                        + " (" + f.getFileName() + ":" + f.getLineNumber() + ")");
+            }
+
+            sThreadInfo.get().mFrames = curFrames;
+        }
+    }
+
+    /**
+     * Find the most recent common ancestor between the current stack trace and
+     * the last stack trace.
+     */
+    @VisibleForTesting
+    public static int findCommonAncestor(List<StackFrame> cur, List<StackFrame> last) {
+        var cpos = cur.size();
+        var lpos = last.size();
+        var lastMatch = cur.size() - 1;
+        for (;;) {
+            cpos--;
+            lpos--;
+            if ((cpos < 0) || (lpos < 0)) {
+                break;
+            }
+            var cf = cur.get(cpos);
+            var lf = last.get(lpos);
+            if (!(cf.getClassName().equals(lf.getClassName())
+                    && cf.getMethodName().equals(lf.getMethodName())
+                    && cf.getDescriptor().equals(lf.getDescriptor()))) {
+                break;
+            }
+            lastMatch = cpos;
+            // Compare the parent frame...
+        }
+        return lastMatch;
     }
 }

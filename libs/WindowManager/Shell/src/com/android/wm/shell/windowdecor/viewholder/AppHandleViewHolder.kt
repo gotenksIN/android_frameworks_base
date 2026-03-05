@@ -29,7 +29,6 @@ import android.view.LayoutInflater
 import android.view.MotionEvent.ACTION_DOWN
 import android.view.SurfaceControl
 import android.view.View
-import android.view.View.OnClickListener
 import android.view.ViewDebug
 import android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
 import android.view.WindowManager
@@ -49,8 +48,9 @@ import com.android.wm.shell.R
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger.DesktopUiEventEnum.A11Y_APP_HANDLE_MENU_OPENED
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_WINDOW_DECORATION
-import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
+import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
+import com.android.wm.shell.windowdecor.WindowDecorationActions
 import com.android.wm.shell.windowdecor.WindowManagerWrapper
 import com.android.wm.shell.windowdecor.additionalviewcontainer.AdditionalSystemViewContainer
 import com.android.wm.shell.windowdecor.common.DecorThemeUtil
@@ -65,8 +65,8 @@ import com.android.wm.shell.windowdecor.extension.throttleFirstClicks
 class AppHandleViewHolder(
     appHandleView: View?,
     private val context: Context,
+    windowDecorationActions: WindowDecorationActions,
     onCaptionTouchListener: View.OnTouchListener,
-    onCaptionButtonClickListener: OnClickListener,
     private val windowManagerWrapper: WindowManagerWrapper,
     private val handler: Handler,
     private val desktopModeUiEventLogger: DesktopModeUiEventLogger,
@@ -103,13 +103,12 @@ class AppHandleViewHolder(
     private var statusBarInputLayer: AdditionalSystemViewContainer? = null
     // TODO: b/444730302 - remove config once status bar input layer can be removed for all devices
     private val shouldAddStatusBarInputLayer =
-        !DesktopExperienceFlags.ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER.isTrue ||
-            !context.resources.getBoolean(R.bool.config_removeStatusBarInputLayer)
+        !context.resources.getBoolean(R.bool.config_removeStatusBarInputLayer)
 
     init {
         captionView.setOnTouchListener(onCaptionTouchListener)
         captionHandle.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onOpenHandleMenu(taskInfo.taskId)
         }
         captionHandle.setOnTouchListener(onCaptionTouchListener)
         if (!shouldAddStatusBarInputLayer) {
@@ -201,6 +200,8 @@ class AppHandleViewHolder(
         handleHeight: Int,
     ) {
         if (!DesktopModeFlags.ENABLE_HANDLE_INPUT_FIX.isTrue()) return
+        val ignoreCutouts =
+            Flags.showAppHandleLargeScreens() || BubbleFlagHelper.enableBubbleToFullscreen()
         statusBarInputLayer =
             AdditionalSystemViewContainer(
                 context,
@@ -211,9 +212,7 @@ class AppHandleViewHolder(
                 handleWidth,
                 handleHeight,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                ignoreCutouts =
-                    Flags.showAppHandleLargeScreens() ||
-                        BubbleAnythingFlagHelper.enableBubbleToFullscreen(),
+                ignoreCutouts,
             )
         val view = statusBarInputLayer?.view ?: error("Unable to find statusBarInputLayer View")
         val lp =
@@ -345,14 +344,14 @@ class AppHandleViewHolder(
             when (decorThemeUtil.getAppTheme(description)) {
                 Theme.LIGHT -> {
                     logD(
-                        "color calculation: using light color, reason: light app theme (bgColor=%s)",
+                        "color calculation: using light color, reason: light app theme (bgColor=%d)",
                         bgColor,
                     )
                     return false
                 }
                 Theme.DARK -> {
                     logD(
-                        "color calculation: using dark color, reason: dark app theme (bgColor=%s)",
+                        "color calculation: using dark color, reason: dark app theme (bgColor=%d)",
                         bgColor,
                     )
                     return true
@@ -413,8 +412,8 @@ class AppHandleViewHolder(
         fun create(
             rootView: View?,
             context: Context,
+            windowDecorationActions: WindowDecorationActions,
             onCaptionTouchListener: View.OnTouchListener,
-            onCaptionButtonClickListener: OnClickListener,
             windowManagerWrapper: WindowManagerWrapper,
             handler: Handler,
             desktopModeUiEventLogger: DesktopModeUiEventLogger,
@@ -422,8 +421,8 @@ class AppHandleViewHolder(
             AppHandleViewHolder(
                 rootView,
                 context,
+                windowDecorationActions,
                 onCaptionTouchListener,
-                onCaptionButtonClickListener,
                 windowManagerWrapper,
                 handler,
                 desktopModeUiEventLogger,

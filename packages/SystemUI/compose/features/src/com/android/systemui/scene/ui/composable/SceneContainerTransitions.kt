@@ -296,6 +296,11 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                     )
                 }
             }
+            from(Scenes.Occluded, to = Scenes.Shade) {
+                goneToSingleShadeTransition(
+                    singleShadeMarginHorizontalPx = singleShadeMarginHorizontalPx
+                )
+            }
             from(
                 Scenes.Shade,
                 to = Scenes.Gone,
@@ -343,6 +348,13 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
             ) {
                 shadeToAlwaysOnDisplayTransition()
+            }
+            from(Scenes.Shade, to = Scenes.Occluded) {
+                reversed {
+                    goneToSingleShadeTransition(
+                        singleShadeMarginHorizontalPx = singleShadeMarginHorizontalPx
+                    )
+                }
             }
             from(
                 Scenes.Shade,

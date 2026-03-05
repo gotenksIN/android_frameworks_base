@@ -18,7 +18,6 @@ package com.android.wm.shell.windowdecor.caption
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ActivityInfo.CONFIG_FONT_SCALE
 import android.content.pm.ActivityInfo.CONFIG_LOCALE
 import android.content.pm.ActivityInfo.CONFIG_UI_MODE
@@ -86,7 +85,7 @@ import com.android.wm.shell.windowdecor.extension.requestingImmersive
 import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder
 import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder.HeaderData
 import com.android.wm.shell.windowdecor.viewholder.WindowDecorationViewHolder
-import com.android.wm.shell.windowdecor.viewholder.util.LargeAppHeaderDimensions
+import com.android.wm.shell.windowdecor.viewholder.util.LargeHeaderDimensions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainCoroutineDispatcher
@@ -122,7 +121,6 @@ class AppHeaderController(
     private val windowDecorationActions: WindowDecorationActions,
     private val decorWindowContext: Context,
     private val onCaptionTouchListener: View.OnTouchListener,
-    private val onCaptionButtonClickListener: View.OnClickListener,
     private val onLongClickListener: OnLongClickListener,
     private val onCaptionGenericMotionListener: View.OnGenericMotionListener,
     private val appToWebRepository: AppToWebRepository,
@@ -186,7 +184,7 @@ class AppHeaderController(
             DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
                 .isTrue ||
             DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
-    private val dimensions = LargeAppHeaderDimensions(decorWindowContext.resources)
+    private val dimensions = LargeHeaderDimensions(decorWindowContext.resources)
 
     private var isLayoutMenuHovered = false
     private var isAppHeaderMaximizeButtonHovered = false
@@ -499,8 +497,7 @@ class AppHeaderController(
                         null
                     }
                 createHandleMenu(
-                    openInAppOrBrowserIntent = appToWebIntent,
-                    isBrowserApp = isBrowserApp,
+                    appToWebData = HandleMenu.AppToWebData(isBrowserApp, appToWebIntent),
                     minimumInstancesFound = minimumInstancesFound,
                 )
             }
@@ -508,8 +505,7 @@ class AppHeaderController(
 
     /** Creates and shows the handle menu. */
     private fun createHandleMenu(
-        openInAppOrBrowserIntent: Intent?,
-        isBrowserApp: Boolean,
+        appToWebData: HandleMenu.AppToWebData?,
         minimumInstancesFound: Boolean,
     ) {
         val supportsMultiInstance =
@@ -543,8 +539,7 @@ class AppHeaderController(
                     shouldShowDesktopModeButton =
                         desktopState.isDesktopModeSupportedOnDisplay(display),
                     shouldShowRestartButton = shouldShowRestartButton,
-                    isBrowserApp = isBrowserApp,
-                    openInAppOrBrowserIntent = openInAppOrBrowserIntent,
+                    appToWebData = appToWebData,
                     desktopModeUiEventLogger = desktopModeUiEventLogger,
                     captionView = viewHolder.rootView,
                     captionWidth = captionLayoutResult.captionWidth,
@@ -658,7 +653,6 @@ class AppHeaderController(
                 context = decorWindowContext,
                 windowDecorationActions = windowDecorationActions,
                 onCaptionTouchListener = onCaptionTouchListener,
-                onCaptionButtonClickListener = onCaptionButtonClickListener,
                 onLongClickListener = onLongClickListener,
                 onCaptionGenericMotionListener = onCaptionGenericMotionListener,
                 onMaximizeHoverAnimationFinishedListener = { createLayoutMenu() },

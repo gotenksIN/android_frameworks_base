@@ -109,6 +109,7 @@ import com.android.internal.infra.AndroidFuture;
 import com.android.internal.util.DumpUtils;
 import com.android.server.SystemService.TargetUser;
 import com.android.server.appfunctions.MultiUserDynamicAppFunctionRegistry.RegistrationScopeId;
+import com.android.server.appfunctions.allowlist.SystemAppFunctionAllowlistReader;
 import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
@@ -177,8 +178,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                         context, IAppFunctionService.Stub::asInterface, THREAD_POOL_EXECUTOR),
                 new CallerValidatorImpl(
                         context,
-                        appFunctionAccessServiceInterface,
-                        Objects.requireNonNull(context.getSystemService(UserManager.class))),
+                        Objects.requireNonNull(context.getSystemService(UserManager.class)),
+                        SystemAppFunctionAllowlistReader.getInstance()),
                 new ServiceHelperImpl(context),
                 new ServiceConfigImpl(),
                 loggerWrapper,
@@ -188,7 +189,6 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                 uriGrantsManagerInternal,
                 dynamicAppFunctionRegistry,
                 appFunctionMetadataReader,
-                new AppFunctionMetadataObserver(context, appFunctionMetadataReader),
                 appInteractionService,
                 new VisibilityHelperImpl(context, packageManagerInternal),
                 activityTaskManagerInternal);
@@ -207,7 +207,6 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             UriGrantsManagerInternal uriGrantsManagerInternal,
             MultiUserDynamicAppFunctionRegistry dynamicAppFunctionRegistry,
             AppFunctionMetadataReader appFunctionMetadataReader,
-            AppFunctionMetadataObserver appFunctionMetadataObserver,
             @Nullable AppInteractionService appInteractionService,
             VisibilityHelper visibilityHelper,
             ActivityTaskManagerInternal activityTaskManagerInternal) {
@@ -226,7 +225,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                         mUriGrantsManagerInternal.newUriPermissionOwner("appfunctions"));
         mDynamicAppFunctionRegistry = Objects.requireNonNull(dynamicAppFunctionRegistry);
         mAppFunctionMetadataReader = Objects.requireNonNull(appFunctionMetadataReader);
-        mAppFunctionMetadataObserver = Objects.requireNonNull(appFunctionMetadataObserver);
+        mAppFunctionMetadataObserver =
+                new AppFunctionMetadataObserver(context, appFunctionMetadataReader, serviceConfig);
         mAppInteractionService = appInteractionService;
         mVisibilityHelper = Objects.requireNonNull(visibilityHelper);
         mActivityTaskManagerInternal = Objects.requireNonNull(activityTaskManagerInternal);
@@ -642,7 +642,16 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                     var unused =
                             mAppFunctionMetadataReader
                                     .getAppFunctionActivityStates(activityIds, targetUserId)
-                                    .whenCompleteAsync(
+                                    .thenApplyAsync(
+                                            states ->
+                                                    mVisibilityHelper
+                                                            .filterVisibleAppFunctionActivityStates(
+                                                                    states,
+                                                                    callingPackageName,
+                                                                    callingUid,
+                                                                    callingPid),
+                                            THREAD_POOL_EXECUTOR)
+                                    .whenComplete(
                                             (states, exception) -> {
                                                 try {
                                                     if (exception != null) {
@@ -656,8 +665,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                                 } catch (RemoteException ex) {
                                                     Slog.w(TAG, "Fail to call onError", ex);
                                                 }
-                                            },
-                                            THREAD_POOL_EXECUTOR);
+                                            });
                 });
     }
 

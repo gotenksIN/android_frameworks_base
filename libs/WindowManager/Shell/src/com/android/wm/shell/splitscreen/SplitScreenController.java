@@ -366,6 +366,11 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         return mStageCoordinator.isSplitScreenVisible();
     }
 
+    public boolean isSplitScreenFocused() {
+        return mStageCoordinator.isSplitScreenFocused();
+    }
+
+
     public StageCoordinator getTransitionHandler() {
         return mStageCoordinator;
     }
@@ -616,6 +621,11 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         }
     }
 
+    /** Returns the taskId of the task at the specified x position, or -1 if none. */
+    public int getTaskInSplitAt(int x, int displayId) {
+        return mStageCoordinator.getTaskIdAt(x, displayId);
+    }
+
     /** Move the specified task to fullscreen, regardless of focus state. */
     public void moveTaskToFullscreen(int taskId, int exitReason) {
         mStageCoordinator.moveTaskToFullscreen(taskId, exitReason);
@@ -645,14 +655,15 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
      * @param taskBounds current freeform bounds of the task entering split
      * @param startRecents whether this request should start a recents transition
      * @param withRecentsWct a wct so include in the recents transition
+     * @return true if request was handled
      */
-    public void requestEnterSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
+    public boolean requestEnterSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
             int splitPosition, Rect taskBounds, boolean startRecents,
             @Nullable WindowContainerTransaction withRecentsWct) {
         if (!startRecents && withRecentsWct != null) {
             throw new IllegalArgumentException("Must be starting recents to include a wct");
         }
-        mStageCoordinator.requestEnterSplitSelect(taskInfo, splitPosition, taskBounds,
+        return mStageCoordinator.requestEnterSplitSelect(taskInfo, splitPosition, taskBounds,
                 startRecents, withRecentsWct);
     }
 

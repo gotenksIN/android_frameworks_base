@@ -3428,12 +3428,12 @@
          with admin privileges and admin privileges can be granted/revoked from existing users. -->
     <bool name="config_enableMultipleAdmins">false</bool>
 
-    <!-- Enables or disables multi-user management capabilities.
+    <!-- Enables or disables multiuser management capabilities.
          This is checked by DevicePolicyManager during provisioning. If set to false, provisioning
-         for multi-user managed device and users will fail.
+         for multiuser managed device and users will fail.
          Multi user management capabilities are only possible on Headless System User Mode (HSUM)
          devices. -->
-    <bool name="config_enableMultiUserManagement">false</bool>
+    <bool name="config_enableMultiuserManagement">false</bool>
 
 
     <!-- Whether to start stopped users before their scheduled alarms. If set to true, users will be
@@ -7793,6 +7793,9 @@
     <!-- List of packages which should be exempt from desktop mode. -->
     <string-array name="config_desktopExemptPackages" translatable="false"/>
 
+    <!-- List of packages which should be excluded from transparency based desktop exemptions. -->
+    <string-array name="config_desktopTransparentExemptionIgnoreList" translatable="false"/>
+
     <!-- Frame rate compatibility value for Wallpaper
          FRAME_RATE_COMPATIBILITY_MIN (102) is used by default for lower power consumption -->
     <integer name="config_wallpaperFrameRateCompatibility">102</integer>
@@ -7864,7 +7867,7 @@
     <!-- Package name of the on-device intelligent processor for vendor specific
          features. Examples include the search functionality or the app
          predictor. -->
-    <string name="config_systemVendorIntelligence" translatable="false"></string>
+    <string name="config_systemVendorIntelligence" translatable="false">com.android.personalcontext</string>
 
     <!-- Whether the device supports Wi-Fi USD feature. -->
     <bool name="config_deviceSupportsWifiUsd">false</bool>

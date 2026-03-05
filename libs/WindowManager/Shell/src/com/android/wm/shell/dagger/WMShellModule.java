@@ -117,6 +117,7 @@ import com.android.wm.shell.compatui.letterbox.state.LetterboxTaskListenerAdapte
 import com.android.wm.shell.crashhandling.ShellCrashHandler;
 import com.android.wm.shell.dagger.back.ShellBackAnimationModule;
 import com.android.wm.shell.dagger.desktop.DesktopModule;
+import com.android.wm.shell.dagger.hierarchy.HandheldContainersModule;
 import com.android.wm.shell.dagger.pinnedlayer.PinnedLayerModule;
 import com.android.wm.shell.dagger.pip.PipModule;
 import com.android.wm.shell.desktopai.dagger.DesktopAIModule;
@@ -133,12 +134,12 @@ import com.android.wm.shell.desktopmode.DesktopMinimizationTransitionHandler;
 import com.android.wm.shell.desktopmode.DesktopMixedTransitionHandler;
 import com.android.wm.shell.desktopmode.DesktopModeDragAndDropAnimatorHelper;
 import com.android.wm.shell.desktopmode.DesktopModeDragAndDropTransitionHandler;
-import com.android.wm.shell.desktopmode.DesktopModeEnterExitTransitionListener;
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger;
 import com.android.wm.shell.desktopmode.DesktopModeKeyGestureHandler;
 import com.android.wm.shell.desktopmode.DesktopModeLoggerTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopModeMoveToDisplayTransitionHandler;
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger;
+import com.android.wm.shell.desktopmode.DesktopRemoteListener;
 import com.android.wm.shell.desktopmode.DesktopTaskChangeListener;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopTasksLimiter;
@@ -170,6 +171,7 @@ import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializerImpl;
 import com.android.wm.shell.desktopmode.data.persistence.DesktopPersistentRepository;
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeController;
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopFirstListenerManager;
+import com.android.wm.shell.desktopmode.desktoptaskshandlers.DesktopTasksTransitionHandler;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationFilter;
@@ -208,6 +210,7 @@ import com.android.wm.shell.pip2.phone.PipScheduler;
 import com.android.wm.shell.pip2.phone.PipTransitionState;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
+import com.android.wm.shell.scrolltotop.ScrollToTopController;
 import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.annotations.ShellAnimationThread;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
@@ -215,6 +218,7 @@ import com.android.wm.shell.shared.annotations.ShellDesktopThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.annotations.ShellMainThreadImmediate;
 import com.android.wm.shell.shared.bubbles.BubbleFeatureConfig;
+import com.android.wm.shell.shared.bubbles.BubbleFeatureConfigImpl;
 import com.android.wm.shell.shared.desktopmode.DesktopConfig;
 import com.android.wm.shell.shared.desktopmode.DesktopState;
 import com.android.wm.shell.shared.pip.PipFlags;
@@ -265,13 +269,13 @@ import dagger.Lazy;
 import dagger.Module;
 import dagger.Provides;
 
-import kotlinx.coroutines.CoroutineScope;
-import kotlinx.coroutines.ExperimentalCoroutinesApi;
-import kotlinx.coroutines.MainCoroutineDispatcher;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.ExperimentalCoroutinesApi;
+import kotlinx.coroutines.MainCoroutineDispatcher;
 
 /**
  * Provides dependencies from {@link com.android.wm.shell}, these dependencies are only accessible
@@ -289,7 +293,8 @@ import java.util.Optional;
                 LetterboxModule.class,
                 PinnedLayerModule.class,
                 DesktopModule.class,
-                DesktopAIModule.class
+                DesktopAIModule.class,
+                HandheldContainersModule.class,
         })
 public abstract class WMShellModule {
 
@@ -300,7 +305,7 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static BubbleFeatureConfig providesBubbleFeatureConfig(Context context) {
-        return new BubbleFeatureConfig(context);
+        return new BubbleFeatureConfigImpl(context);
     }
 
     @WMSingleton
@@ -447,7 +452,8 @@ public abstract class WMShellModule {
             BubblesFoldLockSettingsObserver foldLockSettingsObserver,
             BubbleSessionTracker sessionTracker,
             BubbleViewInfoTask.Factory bubbleViewInfoTaskFactory,
-            BubbleHelper bubbleHelper) {
+            BubbleHelper bubbleHelper,
+            BubbleFeatureConfig featureConfig) {
         final WindowManager wm = enableViewCaptureTracing()
                 ? ViewCaptureAwareWindowManagerFactory.getInstance(context)
                 : windowManager;
@@ -492,7 +498,8 @@ public abstract class WMShellModule {
                 foldLockSettingsObserver,
                 sessionTracker,
                 bubbleViewInfoTaskFactory,
-                bubbleHelper);
+                bubbleHelper,
+                featureConfig);
     }
 
     //
@@ -765,6 +772,22 @@ public abstract class WMShellModule {
     }
 
     //
+    // Scroll To Top
+    //
+
+    @WMSingleton
+    @Provides
+    static ScrollToTopController provideScrollToTopController(
+            @ShellMainThread ShellExecutor mainExecutor,
+            IWindowManager windowManager,
+            Optional<SplitScreenController> splitScreenController) {
+        return new ScrollToTopController(mainExecutor, windowManager,
+                splitScreenController);
+    }
+
+
+
+    //
     // Splitscreen
     //
 
@@ -851,6 +874,7 @@ public abstract class WMShellModule {
             Optional<RecentsTransitionHandler> recentsTransitionHandler,
             KeyguardTransitionHandler keyguardTransitionHandler,
             Optional<DesktopTasksController> desktopTasksController,
+            DesktopTasksTransitionHandler desktopTasksTransitionHandler,
             Optional<UnfoldTransitionHandler> unfoldHandler,
             Optional<ActivityEmbeddingController> activityEmbeddingController,
             BubbleTransitions bubbleTransitions,
@@ -867,6 +891,7 @@ public abstract class WMShellModule {
                 recentsTransitionHandler,
                 keyguardTransitionHandler,
                 desktopTasksController,
+                desktopTasksTransitionHandler,
                 unfoldHandler,
                 activityEmbeddingController,
                 bubbleTransitions,
@@ -1095,7 +1120,7 @@ public abstract class WMShellModule {
             DesksController desksController,
             Optional<DesktopTasksTransitionObserver> desktopTasksTransitionObserver,
             SnapController snapController,
-            DesktopModeEnterExitTransitionListener desktopModeEnterExitTransitionListener) {
+            DesktopRemoteListener desktopRemoteListener) {
         return new DesktopTasksController(
                 context,
                 desktopAnimationConfiguration,
@@ -1157,7 +1182,7 @@ public abstract class WMShellModule {
                 desksController,
                 desktopTasksTransitionObserver.get(),
                 snapController,
-                desktopModeEnterExitTransitionListener);
+                desktopRemoteListener);
     }
 
     @WMSingleton
@@ -2360,7 +2385,8 @@ public abstract class WMShellModule {
             Transitions transitions,
             Lazy<DragToBubbleController> dragToBubbleControllerLazy,
             @ShellMainThread ShellExecutor mainExecutor,
-            DesktopState desktopState) {
+            DesktopState desktopState,
+            BubbleFeatureConfig bubbleFeatureConfig) {
         return new DragAndDropController(
                 context,
                 shellInit,
@@ -2374,7 +2400,8 @@ public abstract class WMShellModule {
                 transitions,
                 dragToBubbleControllerLazy,
                 mainExecutor,
-                desktopState);
+                desktopState,
+                bubbleFeatureConfig);
     }
 
     @WMSingleton
@@ -2411,7 +2438,8 @@ public abstract class WMShellModule {
             QuitFocusedAppKeyGestureHandler quitFocusedAppKeyGestureHandler,
             Optional<DesktopAiInitializer> desktopAiInitializer,
             BubbleRootTask bubbleRootTask,
-            IDesktopModeProvider desktopModeProvider) {
+            IDesktopModeProvider desktopModeProvider,
+            DesktopTasksTransitionHandler desktopTasksTransitionHandler) {
         return new Object();
     }
 
@@ -2475,5 +2503,4 @@ public abstract class WMShellModule {
     static HomeIntentProvider provideHomeIntentProvider(Context context) {
         return new HomeIntentProvider(context);
     }
-
 }

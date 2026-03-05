@@ -185,6 +185,7 @@ import android.window.ScreenCapture.ScreenCaptureParams;
 import android.window.ScreenCaptureInternal;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.SystemServerLock;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.display.BrightnessSynchronizer;
 import com.android.internal.display.BrightnessUtils;
@@ -193,10 +194,12 @@ import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FrameworkStatsLog;
+import com.android.internal.util.NamedLock;
 import com.android.internal.util.SettingsWrapper;
 import com.android.server.AnimationThread;
 import com.android.server.DisplayThread;
 import com.android.server.LocalServices;
+import com.android.server.LockGuard;
 import com.android.server.SystemService;
 import com.android.server.UiThread;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
@@ -356,11 +359,15 @@ public final class DisplayManagerService extends SystemService {
     private int mSystemPreferredHdrOutputType = HDR_TYPE_INVALID;
 
 
-    // The synchronization root for the display manager.
-    // This lock guards most of the display manager's state.
-    // NOTE: This is synchronized on while holding WindowManagerService.mWindowMap so never call
-    // into WindowManagerService methods that require mWindowMap while holding this unless you are
-    // very very sure that no deadlock can occur.
+    /**
+     * The synchronization root for the display manager.
+     *
+     * <p>This lock guards most of the display manager's state.
+     * NOTE: This is synchronized on while holding WindowManagerService.mGlobalLock so never call
+     * into WindowManagerService methods while holding this unless you are very very sure that no
+     * deadlock can occur.
+     */
+    @SystemServerLock(LockGuard.INDEX_DISPLAY_MANAGER_SERVICE)
     private final SyncRoot mSyncRoot = new SyncRoot();
 
     // True if in safe mode.
@@ -3496,6 +3503,23 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
+    private void setPowerOptimizationInternal(int displayId, boolean enabled) {
+        synchronized (mSyncRoot) {
+            final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
+            if (display == null) {
+                return;
+            }
+            if (display.isPowerOptimizationEnabledLocked() != enabled) {
+                if (DEBUG) {
+                    Slog.d(TAG, "Display " + displayId
+                            +  " power optimization enabled = " + enabled);
+                }
+                display.setPowerOptimizationLocked(enabled);
+                scheduleTraversalLocked(false);
+            }
+        }
+    }
+
     // Updates the lists of UIDs that are present on displays.
     private void setDisplayAccessUIDsInternal(SparseArray<IntArray> newDisplayAccessUIDs) {
         var displayAccessUIDsCopy = new SparseArray<IntArray>(newDisplayAccessUIDs.size());
@@ -6615,6 +6639,11 @@ public final class DisplayManagerService extends SystemService {
         @Override
         public void setDisplayScalingDisabled(int displayId, boolean disableScaling) {
             setDisplayScalingDisabledInternal(displayId, disableScaling);
+        }
+
+        @Override
+        public void setPowerOptimization(int displayId, boolean enabled) {
+            setPowerOptimizationInternal(displayId, enabled);
         }
 
         @Override

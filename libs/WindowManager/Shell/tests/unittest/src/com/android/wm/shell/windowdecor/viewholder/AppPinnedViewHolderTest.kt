@@ -44,7 +44,8 @@ import org.mockito.kotlin.whenever
 class AppPinnedViewHolderTest : ShellTestCase() {
 
     private val mockView = mock<View>()
-    private val mockImageButton = mock<ImageButton>()
+    private val mockCloseButton = mock<ImageButton>()
+    private val mockSettingsButton = mock<ImageButton>()
     private val mockCaptionView = mock<View>()
     private val mockTouchListener = mock<View.OnTouchListener>()
     private val mockMotionListener = mock<View.OnGenericMotionListener>()
@@ -66,16 +67,16 @@ class AppPinnedViewHolderTest : ShellTestCase() {
         whenever(mockView.requireViewById<View>(R.id.pinned_caption)).thenReturn(mockCaptionView)
         whenever(mockView.requireViewById<View>(R.id.caption_handle)).thenReturn(mockView)
         whenever(mockView.requireViewById<ImageButton>(R.id.settings_button))
-            .thenReturn(mockImageButton)
+            .thenReturn(mockSettingsButton)
         whenever(mockView.requireViewById<ImageButton>(R.id.close_window))
-            .thenReturn(mockImageButton)
+            .thenReturn(mockCloseButton)
     }
 
     @Test
     fun darkBackground() {
         val viewHolder = spy(createViewHolder())
         val taskInfo = WindowDecorationTestHelper.createOpaqueAppHeaderTask()
-        viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo))
+        viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo, /* hasGlobalFocus= */ true))
 
         val darkColor = dynamicDarkColorScheme(mContext).surfaceContainerHigh.toArgb()
 
@@ -86,8 +87,20 @@ class AppPinnedViewHolderTest : ShellTestCase() {
     fun transparentBackground() {
         val viewHolder = spy(createViewHolder())
         val taskInfo = WindowDecorationTestHelper.createCustomAppHeaderTask()
-        viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo))
+        viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo, /* hasGlobalFocus= */ true))
 
         verify(mockCaptionView).setBackgroundColor(Color.TRANSPARENT)
+    }
+
+    @Test
+    fun bindsAppName() {
+        val appName = "Test App"
+        val viewHolder = createViewHolder()
+        val taskInfo = WindowDecorationTestHelper.createCustomAppHeaderTask()
+        viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo, /* hasGlobalFocus= */ true))
+        viewHolder.setAppName(appName)
+
+        verify(mockCloseButton).contentDescription =
+            mContext.getString(R.string.close_button_text, appName)
     }
 }

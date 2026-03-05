@@ -1142,9 +1142,6 @@ public class AudioDeviceInventory {
                 "onBluetoothDeviceConfigChange addr=" + address
                     + " event=" + BtHelper.deviceEventToString(event)));
 
-        int deviceType = BtHelper.getTypeFromProfile(
-                btInfo.mProfile, btInfo.mIsLeOutput, btDevice);
-
         boolean disconnectDevice = false;
         synchronized (mDevicesLock) {
             if (mDeviceBroker.hasScheduledA2dpConnection(btDevice, btInfo.mProfile)) {
@@ -1163,7 +1160,7 @@ public class AudioDeviceInventory {
 // QTI_BEGIN: 2020-12-09: Audio: Update mApmConnectedDevice properly
             }
 // QTI_END: 2020-12-09: Audio: Update mApmConnectedDevice properly
-            final String key = DeviceInfo.makeDeviceListKey(deviceType, address);
+            final String key = DeviceInfo.makeDeviceListKey(btInfo.mAudioSystemDevice, address);
 // QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
             final DeviceInfo di = mConnectedDevices.get(key);
 // QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes

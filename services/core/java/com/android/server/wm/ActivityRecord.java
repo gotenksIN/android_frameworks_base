@@ -320,6 +320,7 @@ import android.view.DisplayInfo;
 import android.view.InputApplicationHandle;
 import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationDefinition;
+import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
 import android.view.WindowInsets;
@@ -6221,18 +6222,23 @@ public final class ActivityRecord extends WindowToken {
             if (DEBUG_VISIBILITY) {
                 Slog.v(TAG_VISIBILITY, "Pause visible activity, " + this);
             }
-            // An activity must be in the {@link PAUSING} state for the system to validate
-            // the move to {@link PAUSED}.
+            if (com.android.window.flags.Flags.pauseActivityByTf()) {
+                getTaskFragment().startPausing(false /* userLeaving */, false /* uiSleeping */,
+                        this /* pausing */, null /* resuming */, "make-active");
+            } else {
+                // An activity must be in the {@link PAUSING} state for the system to validate
+                // the move to {@link PAUSED}.
 // QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
-            callServiceTrackeronActivityStatechange(PAUSING, true);
+                callServiceTrackeronActivityStatechange(PAUSING, true);
 // QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
-            setState(PAUSING, "makeActiveIfNeeded");
-            EventLogTags.writeWmPauseActivity(mUserId, System.identityHashCode(this),
-                    shortComponentName, "userLeaving=false", "make-active");
-            final PauseActivityItem item = new PauseActivityItem(token, finishing,
-                    false /* userLeaving */, false /* dontReport */, mAutoEnteringPip);
-            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(), item);
-            mAutoEnteringPip = false;
+                setState(PAUSING, "makeActiveIfNeeded");
+                EventLogTags.writeWmPauseActivity(mUserId, System.identityHashCode(this),
+                        shortComponentName, "userLeaving=false", "make-active");
+                final PauseActivityItem item = new PauseActivityItem(token, finishing,
+                        false /* userLeaving */, false /* dontReport */, mAutoEnteringPip);
+                mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(), item);
+                mAutoEnteringPip = false;
+            }
         } else if (shouldStartActivity()) {
             if (DEBUG_VISIBILITY) {
                 Slog.v(TAG_VISIBILITY, "Start visible activity, " + this);
@@ -6685,6 +6691,7 @@ public final class ActivityRecord extends WindowToken {
         // stop tracking
         mSplashScreenStyleSolidColor = true;
 
+        mAtmService.mBackNavigationController.removePredictiveSurfaceIfNeeded(this);
         if (mStartingWindow != null) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Finish starting %s"
                     + ": first real window is shown, no animation", win.mToken);
@@ -7698,26 +7705,6 @@ public final class ActivityRecord extends WindowToken {
         mDisplayContent.getDisplayRotation().onSetRequestedOrientation();
     }
 
-    /*
-     * Called from {@link RootWindowContainer#ensureVisibilityAndConfig} to make sure the
-     * orientation is updated before the app becomes visible.
-     */
-    void reportDescendantOrientationChangeIfNeeded() {
-        if (com.android.window.flags.Flags.removeLegacyOrientationReport()) {
-            return;
-        }
-        // Orientation request is exposed only when we're visible. Therefore visibility change
-        // will change requested orientation. Notify upward the hierarchy ladder to adjust
-        // configuration. This is important to cases where activities with incompatible
-        // orientations launch, or user goes back from an activity of bi-orientation to an
-        // activity with specified orientation.
-        if (onDescendantOrientationChanged(this)) {
-            // WM Shell can show additional UI elements, e.g. a restart button for size compat mode
-            // so ensure that WM Shell is called when an activity becomes visible.
-            task.dispatchTaskInfoChangedIfNeeded(/* force= */ true);
-        }
-    }
-
     /**
      * Ignores the activity orientation request if the App is fixed-orientation portrait and has
      * ActivityEmbedding enabled and is currently running on large screen display. Or the display
@@ -8583,6 +8570,7 @@ public final class ActivityRecord extends WindowToken {
 
         final boolean wasInPictureInPicture = inPinnedWindowingMode();
         final DisplayContent display = mDisplayContent;
+        final int oldDisplayRotation = getWindowConfiguration().getDisplayRotation();
         final int activityType = getActivityType();
         if (wasInPictureInPicture && attachedToProcess() && display != null) {
             // If the PIP activity is changing to fullscreen with display orientation change, the
@@ -8630,6 +8618,10 @@ public final class ActivityRecord extends WindowToken {
         if (display == null) {
             return;
         }
+
+        notifyCameraCompatPolicyRotationChangedIfNeeded(oldDisplayRotation, newParentConfig
+                .windowConfiguration.getDisplayRotation());
+
         if (mVisibleRequested) {
             // It may toggle the UI for user to restart the size compatibility mode activity.
             display.handleActivitySizeCompatModeIfNeeded(this);
@@ -8712,6 +8704,17 @@ public final class ActivityRecord extends WindowToken {
 
     boolean isConfigurationDispatchPaused() {
         return mPauseConfigurationDispatchCount > 0;
+    }
+
+    private void notifyCameraCompatPolicyRotationChangedIfNeeded(
+            @Surface.Rotation int oldDisplayRotation,
+            @Surface.Rotation int newDisplayRotation) {
+        if (Flags.cameraCompatUpdateTreatmentOnRotation()
+                && oldDisplayRotation != ROTATION_UNDEFINED
+                && newDisplayRotation != ROTATION_UNDEFINED
+                && oldDisplayRotation != newDisplayRotation) {
+            AppCompatCameraPolicy.onDisplayRotationChanged(this, newDisplayRotation);
+        }
     }
 
     /**

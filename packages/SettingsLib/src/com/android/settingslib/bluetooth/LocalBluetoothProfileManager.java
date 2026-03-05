@@ -838,12 +838,14 @@ public class LocalBluetoothProfileManager {
             removedProfiles.remove(mCsipSetCoordinatorProfile);
         }
 
+// QTI_BEGIN: 2026-02-17: Bluetooth: HAP: Presets are shown in Settings app for LEhearing aid devices
         if (mHapClientProfile != null
                 && ArrayUtils.contains(uuids, BluetoothUuid.HAS)) {
            profiles.add(mHapClientProfile);
            removedProfiles.remove(mHapClientProfile);
         }
 
+// QTI_END: 2026-02-17: Bluetooth: HAP: Presets are shown in Settings app for LEhearing aid devices
         if (DEBUG) {
             Log.d(TAG,"New Profiles" + profiles.toString());
         }

@@ -1274,10 +1274,14 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         r.notifyUnknownVisibilityLaunchedForKeyguardTransition();
 
         final boolean isTop = andResume && r.isTopRunningActivity();
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         if (isTop) {
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
             QtiBackgroundManager.getInstance().freezeProcessLevel(
                     r.processName, QtiBackgroundManager.COLD_LAUNCH_FREEZE);
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         mService.startProcessAsync(r, knownToBeDead, isTop,
                 isTop ? HostingRecord.HOSTING_TYPE_TOP_ACTIVITY
                         : HostingRecord.HOSTING_TYPE_ACTIVITY);

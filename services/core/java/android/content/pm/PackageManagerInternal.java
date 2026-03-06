@@ -419,11 +419,17 @@ public abstract class PackageManagerInternal {
     public abstract ComponentName getSystemUiServiceComponent();
 
     /**
-     * Called by DeviceOwnerManagerService to set the package names of device owner and profile
+     * Called by DevicePolicyManagerService to set the package names of device owner and profile
      * owners.
      */
     public abstract void setDeviceAndProfileOwnerPackages(
             int deviceOwnerUserId, String deviceOwner, SparseArray<String> profileOwners);
+
+    /**
+     * Called by DevicePolicyManagerService to set the package names of DPC apps.
+     */
+    public abstract void setDevicePolicyControllerPackages(
+            @Nullable SparseArray<String> devicePolicyControllerPackages);
 
     /**
      * Marks packages as protected for a given user or all users in case of USER_ALL. Setting
@@ -1516,10 +1522,11 @@ public abstract class PackageManagerInternal {
      * @param packageName The package for which to modify the setting.
      * @param userId The user ID for which to write the package setting.
      * @param mode The new setting value.
+     * @return true if the value was changed, else false.
      * @throws PackageManager.NameNotFoundException if the package is not found
      * @see PersonalContextManager#setPersonalContextModeEnabled(String, boolean)
      */
-    public abstract void setPersonalContextMode(
+    public abstract boolean setPersonalContextMode(
             String packageName,
             int callingUid,
             int userId,

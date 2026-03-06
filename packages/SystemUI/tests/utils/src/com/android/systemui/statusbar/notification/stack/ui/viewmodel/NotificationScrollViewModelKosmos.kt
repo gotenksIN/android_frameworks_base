@@ -16,8 +16,8 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
-import com.android.systemui.bouncer.domain.interactor.bouncerInteractor
 import com.android.systemui.brightness.domain.interactor.brightnessMirrorShowingInteractor
+import com.android.systemui.common.ui.configurationState
 import com.android.systemui.dump.dumpManager
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.kosmos.Kosmos
@@ -34,13 +34,13 @@ import com.android.systemui.statusbar.notification.stack.domain.interactor.notif
 val Kosmos.notificationScrollViewModel by Fixture {
     NotificationScrollViewModel(
         dumpManager = dumpManager,
+        configuration = configurationState,
         placeholderStateStorage = notificationPlaceholderStateStorage,
         lockscreenAppearanceInteractor = lockscreenNotificationDisplayConfigInteractor,
         stackAppearanceInteractor = notificationStackAppearanceInteractor,
         brightnessMirrorShowingInteractorLazy = { brightnessMirrorShowingInteractor },
         shadeInteractor = shadeInteractor,
         shadeModeInteractor = shadeModeInteractor,
-        bouncerInteractor = bouncerInteractor,
         remoteInputInteractor = remoteInputInteractor,
         headsUpNotificationInteractor = headsUpNotificationInteractor,
         sceneInteractor = sceneInteractor,

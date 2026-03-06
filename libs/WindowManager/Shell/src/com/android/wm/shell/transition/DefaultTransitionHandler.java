@@ -354,7 +354,7 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
 
         // Early check if the transition doesn't warrant an animation.
         if (isAnimationsDisabledForAnyDisplay(info) || TransitionUtil.isAllNoAnimation(info)
-                || TransitionUtil.isAllOrderOnly(info)
+                || TransitionUtil.isAllStationary(info)
                 || (info.getFlags() & WindowManager.TRANSIT_FLAG_INVISIBLE) != 0) {
             startTransaction.apply();
             // As a contract, finishTransaction should only be applied in Transitions#onFinish
@@ -1039,7 +1039,8 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
         final SizeChangeAnimation sca = new SizeChangeAnimation(change.getStartAbsBounds(),
                 change.getEndAbsBounds(), /* initialScale= */ 1f, /* scaleFactor= */ 1f);
         sca.initialize(change.getLeash(), change.getSnapshot(), startT);
-        final WindowAnimation winAnim = new WindowAnimation(change, 0 /* cornerRadius */);
+        final WindowAnimation winAnim = new WindowAnimation(change, 0 /* cornerRadius */,
+                sca.getAnimation(), null /* animator */);
         final ValueAnimator va = sca.buildAnimator(change.getLeash(), change.getSnapshot(),
                 (animation) -> mainExecutor.execute(() -> finishCallback.accept(winAnim)));
         va.setDuration(SIZE_CHANGE_ANIMATION_DURATION);

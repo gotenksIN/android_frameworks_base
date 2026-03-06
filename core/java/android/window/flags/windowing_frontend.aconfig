@@ -64,6 +64,16 @@ flag {
 }
 
 flag {
+  name: "use_snapshot_fixed_rotation"
+  namespace: "windowing_frontend"
+  description: "Use known rotation of snapshot to apply fixed rotation"
+  bug: "488963381"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "avoid_intermediate_destroying_state"
   namespace: "windowing_frontend"
   description: "Prevent intermediate destroying state from affecting visibility"
@@ -78,16 +88,6 @@ flag {
   namespace: "windowing_frontend"
   description: "Let regular windows create their own surface"
   bug: "308662081"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "remove_legacy_orientation_report"
-  namespace: "windowing_frontend"
-  description: "Remove legacy task letterbox logic"
-  bug: "464110049"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -130,10 +130,13 @@ flag {
 }
 
 flag {
-  name: "universal_resizable_by_default"
-  namespace: "windowing_frontend"
-  description: "The orientation, aspect ratio, resizability of activity will follow system behavior by default"
-  bug: "357141415"
+    name: "enable_split_dismiss_animation"
+    namespace: "windowing_frontend"
+    description: "Resize animation for expanding and collapsing surfaces when split screen is dismissed"
+    bug: "481965406"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -381,32 +384,12 @@ flag {
 }
 
 flag {
-    name: "defer_snapshot_removal_for_predictive_back_with_ime"
-    namespace: "windowing_frontend"
-    description: "Prevents flicker by keeping the snapshot visible until the input method has drawn"
-    bug: "435285991"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_cross_activity_back_animation_in_bubbles"
     namespace: "windowing_frontend"
     description: "Enables the predictive cross-activity back animation in bubbles"
     bug: "449125591"
     metadata {
         purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "simulate_touch_display_from_navigation_back"
-    namespace: "windowing_frontend"
-    description: "Trigger potential display focus change for non-gesture input because SystemUI won't inject input event."
-    bug: "461642122"
-    metadata {
-      purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -510,4 +493,11 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "sync_before_enabling_screen"
+    namespace: "windowing_frontend"
+    description: "Sync storage before enabling screen during boot"
+    bug: "467888558"
 }

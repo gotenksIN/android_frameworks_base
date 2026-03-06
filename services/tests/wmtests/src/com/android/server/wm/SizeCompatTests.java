@@ -84,7 +84,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -227,12 +226,8 @@ public class SizeCompatTests extends WindowTestsBase {
         doNothing().when(display).updateDisplayInfo(any());
         resizeDisplay(display, displayInfo.logicalWidth, displayInfo.logicalHeight);
         assertTrue(display.isLargeScreen());
-        if (com.android.window.flags.Flags.universalResizableByDefault()) {
-            assertTrue("Large screen must ignore orientation request",
-                    display.getIgnoreOrientationRequest());
-        } else {
-            display.setIgnoreOrientationRequest(true);
-        }
+        assertTrue("Large screen must ignore orientation request",
+                display.getIgnoreOrientationRequest());
         setUpApp(display, null /* appBuilder */);
         spyOn(display.getDisplayRotation());
     }
@@ -2967,12 +2962,6 @@ public class SizeCompatTests extends WindowTestsBase {
                 .setTask(mTask)
                 .build();
 
-        // Update with new activity requested orientation and recompute bounds with no previous
-        // size compat cache.
-        if (!com.android.window.flags.Flags.removeLegacyOrientationReport()) {
-            verify(mTask).onDescendantOrientationChanged(same(newActivity));
-        }
-
         final Rect displayBounds = new Rect(display.getBounds());
         final Rect taskBounds = new Rect(mTask.getBounds());
         final Rect newActivityBounds = new Rect(newActivity.getBounds());
@@ -3034,12 +3023,6 @@ public class SizeCompatTests extends WindowTestsBase {
                 .setScreenOrientation(SCREEN_ORIENTATION_PORTRAIT)
                 .setTask(mTask)
                 .build();
-
-        // Update with new activity requested orientation and recompute bounds with no previous
-        // size compat cache.
-        if (!com.android.window.flags.Flags.removeLegacyOrientationReport()) {
-            verify(mTask).onDescendantOrientationChanged(same(newActivity));
-        }
 
         final Rect displayBounds = new Rect(display.getBounds());
         final Rect taskBounds = new Rect(mTask.getBounds());
@@ -5507,7 +5490,6 @@ public class SizeCompatTests extends WindowTestsBase {
     @Test
     @EnableCompatChanges({ActivityInfo.UNIVERSAL_RESIZABLE_BY_DEFAULT})
     public void testUniversalResizeableByDefault() {
-        mSetFlagsRule.enableFlags(Flags.FLAG_UNIVERSAL_RESIZABLE_BY_DEFAULT);
         mDisplayContent.setIgnoreOrientationRequest(false);
         setUpApp(mDisplayContent, new ActivityBuilder(mAtm)
                 .setResizeMode(RESIZE_MODE_UNRESIZEABLE)

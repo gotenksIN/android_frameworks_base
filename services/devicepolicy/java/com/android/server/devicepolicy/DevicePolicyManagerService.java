@@ -519,6 +519,7 @@ import com.android.server.SystemService;
 import com.android.server.SystemServiceManager;
 import com.android.server.accounts.AccountManagerService;
 import com.android.server.devicepolicy.ActiveAdmin.TrustAgentInfo;
+import com.android.server.devicepolicy.handlers.EnumStoredAsBooleanPolicyHandler;
 import com.android.server.devicepolicy.handlers.PolicyHandler;
 import com.android.server.devicepolicy.handlers.PolicyDefinitionFactory;
 import com.android.server.devicepolicy.handlers.PolicyHandlerFactory;
@@ -879,6 +880,16 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
             DevicePolicyManagerService dpms
     ){
         List<PolicyHandler<?>> handlers = new ArrayList<PolicyHandler<?>>();
+
+        // EASTER_EGGS is mapped to the DISALLOW_FUN user restriction which expects inverted values
+        // (DISALLOW_FUN = false is equal to EASTER_EGGS_ALLOWED and vice versa); that's why
+        // DISALLOWED is the `true` value here.
+        handlers.add(
+                new EnumStoredAsBooleanPolicyHandler(
+                        PolicyIdentifier.EASTER_EGGS,
+                        dpms.getPolicyDefinitionForUserRestriction(UserManager.DISALLOW_FUN),
+                        /* trueValue= */ PolicyIdentifier.EASTER_EGGS_DISALLOWED,
+                        /* falseValue= */ PolicyIdentifier.EASTER_EGGS_ALLOWED));
 
         // NEW HANDLERS SHOULD GO IN {@link PolicyHandlerFactory}, NOT HERE!
         //
@@ -2519,6 +2530,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         }
 
         return handler.getPolicyDefinition();
+    }
+
+    PolicyDefinition<Boolean> getPolicyDefinitionForUserRestriction(
+            @UserManager.UserRestrictionKey String restriction) {
+       return mPolicyDefinitionMap.getPolicyDefinitionForUserRestriction(restriction);
     }
 
     @NonNull ActiveAdmin getParentOfAdminIfRequired(ActiveAdmin admin, boolean parent) {
@@ -13540,6 +13556,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         if (!mHasFeature) {
             return;
         }
+        if (policy != null) {
+            enforcePackagePolicyPackageNamesLength(policy);
+        }
         final CallerIdentity caller = getCallerIdentity();
         Preconditions.checkCallAuthorization((mDeviceAdmins.isProfileOwner(caller)
                 && isManagedProfile(caller.getUserId())));
@@ -13587,6 +13606,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
     public void setManagedProfileContactsAccessPolicy(PackagePolicy policy) {
         if (!mHasFeature) {
             return;
+        }
+        if (policy != null) {
+            enforcePackagePolicyPackageNamesLength(policy);
         }
         final CallerIdentity caller = getCallerIdentity();
         Preconditions.checkCallAuthorization((mDeviceAdmins.isProfileOwner(caller)
@@ -15912,6 +15934,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         if (!mHasFeature) {
             return;
         }
+        if (policy != null) {
+            enforcePackagePolicyPackageNamesLength(policy);
+        }
         final CallerIdentity caller = getCallerIdentity();
         Preconditions.checkCallAuthorization(canWriteCredentialManagerPolicy(caller));
 
@@ -15930,6 +15955,15 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         return (mDeviceAdmins.isProfileOwner(caller) && isManagedProfile(caller.getUserId()))
                         || mDeviceAdmins.isDefaultDeviceOwner(caller)
                         || hasCallingOrSelfPermission(MANAGE_PROFILE_AND_DEVICE_OWNERS);
+    }
+
+    private void enforcePackagePolicyPackageNamesLength(@NonNull PackagePolicy policy) {
+        for (String pkg : policy.getPackageNames()) {
+            if (pkg == null) {
+                continue;
+            }
+            PolicySizeVerifier.enforceMaxPackageNameLength(pkg);
+        }
     }
 
     @Override

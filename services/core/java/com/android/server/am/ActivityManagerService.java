@@ -81,16 +81,16 @@ import static android.content.pm.PackageManager.MATCH_UNINSTALLED_PACKAGES;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.SIGNATURE_NO_MATCH;
 import static android.crashrecovery.flags.Flags.refactorCrashrecovery;
-import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.BINDER_DIED_EVENT;
-import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.PROCESS_START_EVENT;
-import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PROCESS_NAME;
-import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.UID;
-import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PID;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.BIND_APPLICATION_DELAY_MS;
-import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PROCESS_START_DELAY_MS;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.HOSTING_NAME;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.HOSTING_TYPE;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PID;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PROCESS_NAME;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PROCESS_START_DELAY_MS;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.TRIGGER_TYPE;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.UID;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.BINDER_DIED_EVENT;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.PROCESS_START_EVENT;
 import static android.net.ConnectivityManager.BLOCKED_REASON_NONE;
 import static android.os.FactoryTest.FACTORY_TEST_OFF;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
@@ -1533,10 +1533,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy("mProcLock")
     long mLastPowerCheckUptime;
 
-    /**
-     * For some direct access we need to power manager.
-     */
-    private PowerManagerBatchProxy mPowerManagerBatchProxy;
+    /** For some direct access we need to power manager. */
+    private PowerManagerInternal.UidChangesBatch mPowerManagerBatch;
 
     /**
      * State of external calls telling us if the device is awake or asleep.
@@ -2856,9 +2854,9 @@ public class ActivityManagerService extends IActivityManager.Stub
     public void initPowerManagement() {
         mActivityTaskManager.onInitPowerManagement();
         mBatteryStatsService.initPowerManagement();
-        mPowerManagerBatchProxy = new PowerManagerBatchProxy(
-                LocalServices.getService(PowerManagerInternal.class),
-                mHandlerThread.getLooper());
+        mPowerManagerBatch =
+                LocalServices.getService(PowerManagerInternal.class)
+                        .getBatchProxy(mHandlerThread.getLooper());
     }
 
     /**
@@ -5469,6 +5467,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         autofillOptions,
                         contentCaptureOptions,
                         app.getDisabledCompatChanges(),
+                        app.getEnabledCompatChanges(),
                         app.getLoggableCompatChanges(),
                         app.isLogChangeChecksToStatsD(),
                         serializedSystemFontMap,
@@ -16313,19 +16312,19 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         // Directly update the power manager, since we sit on top of it and it is critical
         // it be kept in sync (so wake locks will be held as soon as appropriate).
-        if (mPowerManagerBatchProxy != null) {
+        if (mPowerManagerBatch != null) {
             // TODO: dispatch cached/uncached changes here, so we don't need to report
             // all proc state changes.
             if ((enqueuedChange & UidRecord.CHANGE_ACTIVE) != 0) {
-                mPowerManagerBatchProxy.uidActive(uid);
+                mPowerManagerBatch.uidActive(uid);
             }
             if ((enqueuedChange & UidRecord.CHANGE_IDLE) != 0) {
-                mPowerManagerBatchProxy.uidIdle(uid);
+                mPowerManagerBatch.uidIdle(uid);
             }
             if ((enqueuedChange & UidRecord.CHANGE_GONE) != 0) {
-                mPowerManagerBatchProxy.uidGone(uid);
+                mPowerManagerBatch.uidGone(uid);
             } else if ((enqueuedChange & UidRecord.CHANGE_PROCSTATE) != 0) {
-                mPowerManagerBatchProxy.updateUidProcState(uid, procState);
+                mPowerManagerBatch.updateUidProcState(uid, procState);
             }
         }
         if (mAppLockLocalService != null) {
@@ -16336,6 +16335,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy(anyOf = {"this", "mProcLock"})
     final void setProcessTrackerStateLOSP(ProcessRecord proc, int memFactor) {
         if (proc.getThread() != null) {
+            // TODO: b/488960938 - Switch to use newProcState from the onProcStateUpdated().
             proc.mProfile.setProcessTrackerState(proc.getReportedProcState(), memFactor);
         }
     }
@@ -16526,8 +16526,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             synchronized (mGlobalLock) {
                 try {
-                    if (mPowerManagerBatchProxy != null) {
-                        mPowerManagerBatchProxy.startUidChanges();
+                    if (mPowerManagerBatch != null) {
+                        mPowerManagerBatch.startUidChanges();
                     }
                     final int appId = UserHandle.getAppId(pkgUid);
                     for (int i = mProcessList.mActiveUids.size() - 1; i >= 0; i--) {
@@ -16551,8 +16551,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                         }
                     }
                 } finally {
-                    if (mPowerManagerBatchProxy != null) {
-                        mPowerManagerBatchProxy.finishUidChanges();
+                    if (mPowerManagerBatch != null) {
+                        mPowerManagerBatch.finishUidChanges();
                     }
                 }
             }
@@ -16591,8 +16591,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         final long maxBgTime = nowElapsed - mConstants.BACKGROUND_SETTLE_TIME;
         long nextTime = 0;
         boolean shouldLogMisc = false;
-        if (mPowerManagerBatchProxy != null) {
-            mPowerManagerBatchProxy.startUidChanges();
+        if (mPowerManagerBatch != null) {
+            mPowerManagerBatch.startUidChanges();
         }
         for (int i = uidSize - 1; i >= 0; i--) {
             final UidRecord uidRec = mProcessList.mActiveUids.valueAt(i);
@@ -16617,8 +16617,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             }
         }
-        if (mPowerManagerBatchProxy != null) {
-            mPowerManagerBatchProxy.finishUidChanges();
+        if (mPowerManagerBatch != null) {
+            mPowerManagerBatch.finishUidChanges();
         }
 
         // Also check if there are any apps in cached and background restricted mode,
@@ -20494,36 +20494,39 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public void onProcStateUpdated(ProcessRecordInternal appInternal, long now, long nowElapsed,
-                boolean forceUpdatePssTime, boolean doingAll, boolean reportDebugMsgs) {
+        public void onProcStateUpdated(ProcessRecordInternal appInternal,
+                @ActivityManager.ProcessState int oldProcState,
+                @ActivityManager.ProcessState int newProcState,
+                long now, long nowElapsed, boolean forceUpdatePssTime, boolean doingAll,
+                boolean reportDebugMsgs) {
             final ProcessRecord app = (ProcessRecord) appInternal;
 
             synchronized (mAppProfiler.mProfilerLock) {
-                app.mProfile.updateProcState(app);
-                mAppProfiler.updateNextPssTimeLPf(app.getCurProcState(), app.mProfile, now,
+                app.mProfile.updateProcState(app, newProcState);
+                mAppProfiler.updateNextPssTimeLPf(newProcState, app.mProfile, now,
                         forceUpdatePssTime);
             }
 
-            if (!doingAll && app.getSetProcState() != app.getCurProcState()) {
+            if (!doingAll && oldProcState != newProcState) {
                 synchronized (mProcessStats.mLock) {
                     setProcessTrackerStateLOSP(app, mProcessStats.getMemFactorLocked());
                 }
             }
 
-            if (app.getSetProcState() != app.getCurProcState()) {
+            if (oldProcState != newProcState) {
                 if (reportDebugMsgs) {
                     String msg = "Proc state change of " + app.processName
-                            + " to " + ProcessList.makeProcStateString(app.getCurProcState())
-                            + " (" + app.getCurProcState() + ")" + ": " + app.getAdjType();
+                            + " to " + ProcessList.makeProcStateString(newProcState)
+                            + " (" + newProcState + ")" + ": " + app.getAdjType();
                     Slog.d(TAG_OOM_ADJ, msg);
                     reportOomAdjMessageLocked(msg);
                 }
 
-                app.onProcStateUpdated();
+                app.onProcStateUpdated(newProcState);
 
-                final boolean setImportant = app.getSetProcState() < PROCESS_STATE_SERVICE;
-                final boolean curImportant = app.getCurProcState() < PROCESS_STATE_SERVICE;
-                if (setImportant && !curImportant) {
+                final boolean oldImportant = oldProcState < PROCESS_STATE_SERVICE;
+                final boolean newImportant = newProcState < PROCESS_STATE_SERVICE;
+                if (oldImportant && !newImportant) {
                     // This app is no longer something we consider important enough to allow to use
                     // arbitrary amounts of battery power. Note its current CPU time to later know
                     // to kill it if it is not behaving well.
@@ -20533,7 +20536,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                 // Inform UsageStats of important process state change
                 // Must be called before updating setProcState
-                maybeUpdateUsageStatsLSP(app, nowElapsed);
+                maybeUpdateUsageStatsLSP(app, oldProcState, newProcState, nowElapsed);
             } else {
                 final boolean fgsInteractionChangeEnabled = app.getCachedCompatChange(
                         CACHED_COMPAT_CHANGE_USE_SHORT_FGS_USAGE_INTERACTION_TIME);
@@ -20544,13 +20547,13 @@ public class ActivityManagerService extends IActivityManager.Stub
                     // For apps that sit around for a long time in the interactive state, we need
                     // to report this at least once a day so they don't go idle.
                     if ((nowElapsed - app.getInteractionEventTime()) > interactionThreshold) {
-                        maybeUpdateUsageStatsLSP(app, nowElapsed);
+                        maybeUpdateUsageStatsLSP(app, oldProcState, newProcState, nowElapsed);
                     }
                 } else {
                     // For foreground services that sit around for a long time but are not
                     // interacted with.
                     if ((nowElapsed - app.getFgInteractionTime()) > interactionThreshold) {
-                        maybeUpdateUsageStatsLSP(app, nowElapsed);
+                        maybeUpdateUsageStatsLSP(app, oldProcState, newProcState, nowElapsed);
                     }
                 }
             }
@@ -20631,8 +20634,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public void onUpdateUidsStarted() {
-            if (mPowerManagerBatchProxy != null) {
-                mPowerManagerBatchProxy.startUidChanges();
+            if (mPowerManagerBatch != null) {
+                mPowerManagerBatch.startUidChanges();
             }
         }
 
@@ -20643,8 +20646,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mInternal.deletePendingTopUid(activeUids.valueAt(i).getUid(), nowElapsed);
             }
 
-            if (mPowerManagerBatchProxy != null) {
-                mPowerManagerBatchProxy.finishUidChanges();
+            if (mPowerManagerBatch != null) {
+                mPowerManagerBatch.finishUidChanges();
             }
 
             // If we have any new uids that became idle this time, we need to make sure
@@ -20727,13 +20730,21 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
+    /**
+     * Updates usage stats for the given process. This is called when the process state changes.
+     *
+     * @param app The process to update usage stats for.
+     * @param oldProcState The previous process state.
+     * @param newProcState The new process state.
+     * @param nowElapsed The current elapsed time.
+     */
     @VisibleForTesting
     @GuardedBy({"this", "mProcLock"})
-    void maybeUpdateUsageStatsLSP(ProcessRecord app, long nowElapsed) {
+    void maybeUpdateUsageStatsLSP(ProcessRecord app, @ActivityManager.ProcessState int oldProcState,
+            @ActivityManager.ProcessState int newProcState, long nowElapsed) {
         if (DEBUG_USAGE_STATS) {
             Slog.d(TAG, "Checking proc [" + Arrays.toString(app.getProcessPackageNames())
-                    + "] state changes: old = " + app.getSetProcState() + ", new = "
-                    + app.getCurProcState());
+                    + "] state changes: old = " + oldProcState + ", new = " + newProcState);
         }
         if (mUsageStatsService == null) {
             return;
@@ -20744,10 +20755,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         // To avoid some abuse patterns, we are going to be careful about what we consider
         // to be an app interaction.  Being the top activity doesn't count while the display
         // is sleeping, nor do short foreground services.
-        if (ActivityManager.isProcStateConsideredInteraction(app.getCurProcState())) {
+        if (ActivityManager.isProcStateConsideredInteraction(newProcState)) {
             isInteraction = true;
             app.setFgInteractionTime(0);
-        } else if (app.getCurProcState() <= PROCESS_STATE_FOREGROUND_SERVICE) {
+        } else if (newProcState <= PROCESS_STATE_FOREGROUND_SERVICE) {
             if (app.getFgInteractionTime() == 0) {
                 app.setFgInteractionTime(nowElapsed);
                 isInteraction = false;
@@ -20758,7 +20769,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 isInteraction = nowElapsed > app.getFgInteractionTime() + interactionTime;
             }
         } else {
-            isInteraction = app.getCurProcState() <= PROCESS_STATE_IMPORTANT_FOREGROUND;
+            isInteraction = newProcState <= PROCESS_STATE_IMPORTANT_FOREGROUND;
             app.setFgInteractionTime(0);
         }
         final long interactionThreshold = fgsInteractionChangeEnabled

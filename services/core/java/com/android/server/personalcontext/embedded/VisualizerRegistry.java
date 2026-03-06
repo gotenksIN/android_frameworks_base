@@ -17,13 +17,13 @@
 package com.android.server.personalcontext.embedded;
 
 import static android.Manifest.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE;
+import static android.service.personalcontext.embedded.InsightSurfaceSessionException.ERROR_FAILED_TO_CREATE_SESSION;
 
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
-import android.os.Bundle;
 import android.os.UserHandle;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
@@ -64,14 +64,6 @@ public class VisualizerRegistry {
     private final Map<ComponentName, VisualizerConnection> mVisualizers = new HashMap<>();
 
     private final PackageMonitor mMonitor = new PackageMonitor() {
-        @Override
-        public void onPackageUnstopped(String packageName, int uid, Bundle extras) {
-            // Apparently mobile-install doesn't trigger the other callbacks below, so we also
-            // listen for "unstopped" packages to catch that case.
-            unregisterVisualizers(packageName);
-            registerVisualizers(packageName);
-        }
-
         @Override
         public void onPackageAdded(String packageName, int uid) {
             registerVisualizers(packageName);
@@ -256,6 +248,8 @@ public class VisualizerRegistry {
             RenderToken renderToken,
             Iterator<VisualizerConnection> visualizers) {
         if (!visualizers.hasNext()) {
+            // Didn't find a visualizer that could produce a visualization.
+            client.onVisualizationError(ERROR_FAILED_TO_CREATE_SESSION);
             return;
         }
 

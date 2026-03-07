@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+/*
+​​ * ​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 package android.telephony;
 
 import static android.net.platform.flags.Flags.FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG;
@@ -11960,6 +11966,33 @@ public class CarrierConfigManager {
     public static final String KEY_DATA_LINGER_TIMER_ALLOWED_DATA_NETWORK_TYPES
             = "data_linger_timer_allowed_data_network_types";
 
+    /**
+     * Controls whether the Narrowband Terrestrial Network (NB‑TN) setting is visible
+     *
+     * <p>If {@code true}, the "Narrowband Terrestrial Network" option is displayed in the UI and
+     * the per‑slot toggle is interactable. Otherwise, the NB‑TN setting is hidden and the feature
+     * cannot be controlled from the UI.
+     *
+     * <p>The default value is {@code false}.
+     *
+     * @hide
+     */
+    public static final String KEY_SHOW_NARROWBAND_TERRESTRIAL_NETWORK_SETTING_BOOL =
+            "show_narrowband_terrestrial_network_setting_bool";
+
+    /**
+     * Controls whether the Narrowband Terrestrial Network (NB‑TN) feature is enabled for a given
+     * subscription.
+     *
+     * <p>If {@code true}, NB‑TN functionality is enabled.
+     *
+     * <p>The default value is {@code false}.
+     *
+     * @hide
+     */
+    public static final String KEY_USE_NARROWBAND_TERRESTRIAL_NETWORK_BOOL =
+            "use_narrowband_terrestrial_network_bool";
+
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
 
@@ -12960,6 +12993,8 @@ public class CarrierConfigManager {
 // QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
         sDefaults.putBoolean(KEY_SHOW_TURBO_DSDA_ICON, false);
 // QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
+        sDefaults.putBoolean(KEY_SHOW_NARROWBAND_TERRESTRIAL_NETWORK_SETTING_BOOL, false);
+        sDefaults.putBoolean(KEY_USE_NARROWBAND_TERRESTRIAL_NETWORK_BOOL, false);
     }
 
     /**

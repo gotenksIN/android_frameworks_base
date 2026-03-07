@@ -6225,9 +6225,7 @@ public final class ActivityRecord extends WindowToken {
             } else {
                 // An activity must be in the {@link PAUSING} state for the system to validate
                 // the move to {@link PAUSED}.
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
                 callServiceTrackeronActivityStatechange(PAUSING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
                 setState(PAUSING, "makeActiveIfNeeded");
                 EventLogTags.writeWmPauseActivity(mUserId, System.identityHashCode(this),
                         shortComponentName, "userLeaving=false", "make-active");

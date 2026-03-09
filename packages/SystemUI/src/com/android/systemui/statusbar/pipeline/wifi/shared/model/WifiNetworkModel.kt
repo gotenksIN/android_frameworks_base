@@ -269,9 +269,7 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
                 if (!level.isValid()) {
                     return Inactive(getInvalidLevelErrorString(level))
                 }
-// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
                 return Active(showExclamation, level, ssid, hotspotDeviceType, wifiStandard)
-// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
             }
 
             private fun Int.isValid(): Boolean {

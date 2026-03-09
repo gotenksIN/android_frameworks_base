@@ -1860,15 +1860,19 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 // QTI_BEGIN: 2022-03-20: Performance: perf: Move ActivityPauseTrigger based on refactored code.
         //Trigger Activity Pause
         if (mActivityTrigger != null) {
+// QTI_END: 2022-03-20: Performance: perf: Move ActivityPauseTrigger based on refactored code.
             mActivityTrigger.activityPauseTrigger(pausing.intent, pausing.info,
                                                   pausing.info.applicationInfo);
+// QTI_BEGIN: 2022-03-20: Performance: perf: Move ActivityPauseTrigger based on refactored code.
         }
 
 // QTI_END: 2022-03-20: Performance: perf: Move ActivityPauseTrigger based on refactored code.
 // QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
         if (mAtmService.getToastWindow() == true) {
             // When we have a toast window, that activity will be translucent.
+// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
             pausing.translucentWindowLaunch = true;
+// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
             mAtmService.resetToastWindow();
         }
 

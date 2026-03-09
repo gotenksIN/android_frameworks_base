@@ -88,8 +88,8 @@ import com.android.settingslib.R;
 import com.android.systemui.dagger.SysUISingleton;
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
 import com.qti.extphone.AuxiliaryRadioIconInfo;
+// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
 import com.qti.extphone.Client;
 import com.qti.extphone.ExtTelephonyManager;
 import com.qti.extphone.IExtPhoneCallback;
@@ -144,9 +144,9 @@ public class FiveGServiceClient {
 // QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
     final SparseArray<CopyOnWriteArrayList<IFiveGStateListener>> mStatesListeners =
             new SparseArray<>();
+// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
     final ArrayList<AuxiliaryListener> mAuxiliaryListeners =
             Lists.newArrayList();
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     private final SparseArray<FiveGServiceState> mCurrentServiceStates = new SparseArray<>();
     private final SparseArray<FiveGServiceState> mLastServiceStates = new SparseArray<>();
@@ -327,6 +327,7 @@ public class FiveGServiceClient {
 // QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     }
 
+// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     public void registerAuxiliaryListener(AuxiliaryListener listener) {
         for (int i = 0; i < mAuxiliaryListeners.size(); i++) {
             if (mAuxiliaryListeners.get(i) == listener) {
@@ -350,7 +351,6 @@ public class FiveGServiceClient {
         mAuxiliaryListeners.remove(listener);
     }
 
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     public void registerListener(int phoneId, IFiveGStateListener listener) {
 // QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
@@ -494,11 +494,13 @@ public class FiveGServiceClient {
 // QTI_END: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
 // QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             initFiveGServiceState();
+// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             try {
                 mExtTelephonyManager.getAuxiliaryRadioIconInfo(mClient);
             } catch (RemoteException e) {
                 Log.d(TAG, "registerAuxiliaryListener: Exception = " + e);
             }
+// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             Log.d(TAG, "Client = " + mClient);
         }
         @Override
@@ -845,7 +847,6 @@ public class FiveGServiceClient {
             updateRadioIcon(state);
             notifyListenersIfNecessary(slotId);
         }
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
         @Override
         public void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {
@@ -866,6 +867,7 @@ public class FiveGServiceClient {
                 }
             }
         }
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     };
 
     public interface IFiveGStateListener {
@@ -876,9 +878,11 @@ public class FiveGServiceClient {
 // QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     }
+// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
     public interface AuxiliaryListener {
         default void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {}
     }
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 }
 // QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information

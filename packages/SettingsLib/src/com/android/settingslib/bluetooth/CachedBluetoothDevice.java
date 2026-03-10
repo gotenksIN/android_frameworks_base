@@ -2785,7 +2785,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mLocalAdapter = bluetoothAdapter;
     }
 
-    private boolean isAndroidAuto() {
+    public boolean isAndroidAuto() {
         try {
             ParcelUuid[] uuids = mDevice.getUuids();
             if (ArrayUtils.contains(uuids, ANDROID_AUTO_UUID)) {

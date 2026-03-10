@@ -1193,7 +1193,7 @@ class BroadcastController {
                             WEAR_REMOTE_INTENT_BLOCKED_IN_BACKGROUND, callingUid)) {
                 final int callerProcState =
                         callerApp != null
-                                ? callerApp.getCurProcState()
+                                ? callerApp.getProcState()
                                 : ActivityManager.PROCESS_STATE_NONEXISTENT;
                 if (ActivityManager.RunningAppProcessInfo.procStateToImportance(callerProcState)
                         > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
@@ -1806,7 +1806,7 @@ class BroadcastController {
             }
         }
         if (app != null && app.getThread() != null && !app.isKilled()) {
-            return app.getCurProcState();
+            return app.getProcState();
         }
         return PROCESS_STATE_NONEXISTENT;
     }

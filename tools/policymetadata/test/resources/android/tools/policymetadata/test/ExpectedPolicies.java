@@ -23,6 +23,7 @@ import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY_WITH_RANGE;
 import static android.app.admin.PolicyIdentifier.SIMPLE_LONG_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_LONG_POLICY_WITH_RANGE;
+import static android.app.admin.PolicyIdentifier.SIMPLE_PACKAGE_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_LIST_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_POLICY;
 import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_ALLOWED;
@@ -305,7 +306,8 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
-            /* emptyStringAllowed= */ false
+            /* emptyStringAllowed= */ false,
+            /* unprintableCharactersAllowed= */ true
         ));
         policies.add(new ListPolicyMetadata<String>(
             /* id= */ SIMPLE_STRING_LIST_POLICY,
@@ -318,9 +320,20 @@ public class Policies {
                 /* requiredPermission= */ null,
                 /* requiredCrossUserPermission= */ null,
                 /* allowedDpcTypes= */ Set.of(),
-                /* emptyStringAllowed= */ true
+                /* emptyStringAllowed= */ true,
+                /* unprintableCharactersAllowed= */ false
             ),
             /* emptyListAllowed= */ false
+        ));
+        policies.add(new PackagePolicyMetadata(
+            /* id= */ SIMPLE_PACKAGE_POLICY,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null,
+            /* allowedDpcTypes= */ Set.of()
         ));
         return policies;
     }

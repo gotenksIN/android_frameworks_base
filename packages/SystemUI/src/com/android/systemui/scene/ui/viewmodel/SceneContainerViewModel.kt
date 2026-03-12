@@ -34,7 +34,6 @@ import com.android.compose.animation.scene.SwipeSourceDetector
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
-import com.android.systemui.Flags
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
@@ -97,6 +96,7 @@ constructor(
     val burnInMovementFactory: BurnInMovementState.Factory,
     val dualShadeEducationalTooltipsViewModelFactory: DualShadeEducationalTooltipsViewModel.Factory,
     val animateQsTilesViewModelFactory: AnimateQsTilesViewModel.Factory,
+    toBouncerTransitionViewModelFactory: ToBouncerTransitionViewModel.Factory,
     sceneTransitionBlurViewModelFactory: SceneTransitionBlurViewModel.Factory,
     private val toastDisplayer: Lazy<SceneContainerToastDisplayer>,
     @Assisted private val motionEventHandlerReceiver: (MotionEventHandler?) -> Unit,
@@ -108,6 +108,7 @@ constructor(
 
     private val hydrator = Hydrator("SceneContainerViewModel.hydrator")
     val blurViewModel: SceneTransitionBlurViewModel = sceneTransitionBlurViewModelFactory.create()
+    val toBouncerTransitionViewModel = toBouncerTransitionViewModelFactory.create()
 
     /** Whether the container is visible. */
     val isVisible: Boolean
@@ -295,17 +296,9 @@ constructor(
             shadeModeInteractor.isDualShade &&
                 isDesktopStatusBarEnabled &&
                 event.action == MotionEvent.ACTION_OUTSIDE &&
-                sceneInteractor.currentOverlays.value.isNotEmpty()
+                sceneInteractor.currentOverlays.value.isNotEmpty() &&
+                sceneInteractor.transitionState.isIdle()
         ) {
-            if (Flags.fixSceneContainerActionOutsideTouch()) {
-                if (currentScene == Scenes.Lockscreen) {
-                    val statusBarHeight = resources.getDimensionPixelSize(R.dimen.status_bar_height)
-                    if (event.y <= statusBarHeight) {
-                        return
-                    }
-                }
-            }
-
             sceneInteractor.currentOverlays.value.forEach {
                 sceneInteractor.hideOverlay(it, "Empty space touch")
             }

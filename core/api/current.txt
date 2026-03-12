@@ -9069,6 +9069,11 @@ package android.app.admin {
     field @NonNull public static final android.os.Parcelable.Creator<android.app.admin.NetworkEvent> CREATOR;
   }
 
+  @FlaggedApi("android.app.admin.flags.policy_streamlining") public final class PackageIdentifier {
+    ctor public PackageIdentifier(@NonNull String);
+    method @NonNull public String getPackageName();
+  }
+
   public final class PackagePolicy implements android.os.Parcelable {
     ctor public PackagePolicy(int);
     ctor public PackagePolicy(int, @NonNull java.util.Set<java.lang.String>);
@@ -57877,8 +57882,6 @@ package android.view.animation {
   public class AnimationUtils {
     ctor public AnimationUtils();
     method public static long currentAnimationTimeMillis();
-    method @FlaggedApi("android.view.flags.expected_presentation_time_read_only") public static long getExpectedPresentationTimeMillis();
-    method @FlaggedApi("android.view.flags.expected_presentation_time_read_only") public static long getExpectedPresentationTimeNanos();
     method public static android.view.animation.Animation loadAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.Interpolator loadInterpolator(android.content.Context, @AnimRes @InterpolatorRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.LayoutAnimationController loadLayoutAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;

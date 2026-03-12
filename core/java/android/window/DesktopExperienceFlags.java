@@ -127,8 +127,6 @@ public enum DesktopExperienceFlags {
         Flags.FLAG_ENABLE_NO_WINDOW_DECORATION_FOR_DESKS),
     ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY(Flags::enablePerDisplayDesktopWallpaperActivity,
             true, Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY),
-    ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS(Flags::enablePresentationForConnectedDisplays, true,
-            Flags.FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS),
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, true,
             Flags.FLAG_ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE),
     ENABLE_REENABLE_APP_HANDLE_COLOR_ANIMATIONS(Flags::reenableAppHandleColorAnimations,
@@ -151,8 +149,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API),
     ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,
             true, Flags.FLAG_ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS),
-    REPOSITORY_BASED_PERSISTENCE(Flags::repositoryBasedPersistence, false,
-            Flags.FLAG_REPOSITORY_BASED_PERSISTENCE),
     SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT(
             Flags::skipDeactivationOfDeskWithNothingInFront, true,
             Flags.FLAG_SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT),

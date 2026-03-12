@@ -153,6 +153,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.DebugUtils;
 import android.util.EventLog;
+import android.util.IndentingPrintWriter;
 import android.util.LongSparseArray;
 import android.util.Pair;
 import android.util.Slog;
@@ -1409,7 +1410,8 @@ public final class ProcessList extends ProcessListInternal
             mPendingMemState = -1;
         }
 
-        public void dumpLine(PrintWriter pw) {
+        /** Dumps the current tracking information of the tracker to the given printer. */
+        public void dumpLine(@NonNull PrintWriter pw) {
             pw.print("best=");
             pw.print(mTotalHighestMem);
             pw.print(" (");
@@ -4694,7 +4696,9 @@ public final class ProcessList extends ProcessListInternal
                     pw.print(r.isPersistent() ? "  *PERS*" : "  *APP*");
                     pw.print(" UID "); pw.print(procs.keyAt(ia));
                     pw.print(" "); pw.println(r);
-                    r.dump(pw, "    ");
+
+                    // TODO: b/492052422 - Use IndentingPrintWriter for the whole dumpProcessesLSP.
+                    r.dump(new IndentingPrintWriter(pw, "  ", "    "));
                     if (r.isPersistent()) {
                         numPers++;
                     }

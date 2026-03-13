@@ -1562,7 +1562,7 @@ public final class ProcessList extends ProcessListInternal
      * {@hide}
      */
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-    public static void setOomAdjExt(int pid, int uid, int amt, int weight) {
+    public static void setOomAdjExt(int pid, int uid, int amt, int weight, boolean forLmkdOnly) {
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         // This indicates that the process is not started yet and so no need to proceed further.
         if (pid <= 0) {
@@ -1581,6 +1581,8 @@ public final class ProcessList extends ProcessListInternal
         buf.putInt(amt);
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         buf.putInt(weight);
+        buf.putInt(0);
+        buf.putInt(forLmkdOnly ? 1 : 0);
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         writeLmkd(buf, null);
         long now = SystemClock.elapsedRealtime();
@@ -1655,7 +1657,7 @@ public final class ProcessList extends ProcessListInternal
         }
 
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-        final int MAX_OOM_ADJ_BATCH_LENGTH = ((4 * 5) * MAX_PROCS_PRIO_PACKET_SIZE) + 4;
+        final int MAX_OOM_ADJ_BATCH_LENGTH = ((4 * 6) * MAX_PROCS_PRIO_PACKET_SIZE) + 4;
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         ByteBuffer buf = ByteBuffer.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
         int total_procs_in_buf = 0;
@@ -1666,6 +1668,7 @@ public final class ProcessList extends ProcessListInternal
             final int amt = apps.get(i).getCurAdj();
             final int uid = apps.get(i).uid;
             final int weight = weights.get(i);
+            final boolean forLmkdOnly = apps.get(i).isZramWrittenBack();
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
@@ -1683,6 +1686,7 @@ public final class ProcessList extends ProcessListInternal
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+            buf.putInt(forLmkdOnly ? 1 : 0);
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);

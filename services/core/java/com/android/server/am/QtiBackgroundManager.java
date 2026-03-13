@@ -1797,6 +1797,8 @@ public class QtiBackgroundManager {
         private static final String SETTINGS_KEEPALIVE_PREFIX = "keepalive_policy_";
         private static final int DEFAULT_PROC_WEIGHT = -1;
         private static final int LOW_PROC_WEIGHT = 0;
+        private static final int MEDIUM_PROC_WEIGHT = 1;
+        private static final int HIGH_PROC_WEIGHT = 2;
 
         public void onPackageInstalled(String packageName) {
             try {
@@ -1837,8 +1839,15 @@ public class QtiBackgroundManager {
             }
 
             try {
-                return Settings.Global.getInt(mContentResolver,
-                            SETTINGS_KEEPALIVE_PREFIX + app.processName);
+                int weight = Settings.Global.getInt(mContentResolver,
+                                    SETTINGS_KEEPALIVE_PREFIX + app.processName);
+                if (weight > HIGH_PROC_WEIGHT) {
+                    return HIGH_PROC_WEIGHT;
+                } else if (weight < LOW_PROC_WEIGHT) {
+                    return LOW_PROC_WEIGHT;
+                }
+
+                return weight;
             } catch (Settings.SettingNotFoundException e) {
                 // If setting doesn't exist, assume it's low priority by default.
                 return LOW_PROC_WEIGHT;
@@ -1879,6 +1888,12 @@ public class QtiBackgroundManager {
                                 try {
                                     String key = SETTINGS_KEEPALIVE_PREFIX + app.packageName;
                                     int weight = Settings.Global.getInt(mContentResolver, key);
+
+                                    if (weight > HIGH_PROC_WEIGHT) {
+                                        weight = HIGH_PROC_WEIGHT;
+                                    } else if (weight < LOW_PROC_WEIGHT) {
+                                        weight = LOW_PROC_WEIGHT;
+                                    }
 
                                     String priorityDesc;
                                     switch (weight) {
@@ -1960,7 +1975,7 @@ public class QtiBackgroundManager {
                 } else {
                     if (mUseDebug) {
                         Slog.d(TAG, String.format(
-                                "%s Package %s is exempt from auto-start (settings)",
+                                "%s Package %s is NOT exempt from auto-start (settings)",
                                 LOG_PREFIX_AUTOSTART, packageName));
                     }
                     return false;

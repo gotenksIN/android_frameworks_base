@@ -461,8 +461,7 @@ class AppHeaderController(
                         appToWebRepository.getAppToWebIntent(taskInfo, isBrowserApp)
                     } else {
                         // Skip request for assist content as it is only used for links, which are
-                        // not
-                        // supported
+                        // not supported
                         null
                     }
                 createHandleMenu(
@@ -548,8 +547,9 @@ class AppHeaderController(
     }
 
     private fun isBrowserApp(): Boolean =
-        taskInfo.baseActivity?.let { isBrowserApp(userContext, it.packageName, userContext.userId) }
-            ?: false
+        taskInfo.baseIntent.component?.let {
+            isBrowserApp(userContext, it.packageName, userContext.userId)
+        } ?: false
 
     /** Creates and shows the manage windows menu. */
     override fun createManageWindowsMenu(snapshotList: ArrayList<Pair<Int, TaskSnapshot>>) {
@@ -704,14 +704,6 @@ class AppHeaderController(
 
     override val occludingElements: List<OccludingElement>
         get() = viewHolder.getOccludingElements()
-
-    /**
-     * Announces that the app window is now being focused for accessibility. This is used after a
-     * window is minimized/closed, and a new app window gains focus.
-     */
-    fun a11yAnnounceFocused() {
-        viewHolder.a11yAnnounceFocused()
-    }
 
     override fun close(wct: WindowContainerTransaction, t: SurfaceControl.Transaction): Boolean {
         loadAppInfoJob?.cancel()

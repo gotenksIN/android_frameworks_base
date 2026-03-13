@@ -412,6 +412,8 @@ policy_metadata {
   documentation: "Test policy 4 "
   type_specific_metadata {
     string_metadata {
+      empty_string_allowed: false
+      unprintable_characters_allowed: true
     }
   }
   allowed_scopes: POLICY_SCOPE_USER
@@ -432,7 +434,26 @@ policy_metadata {
     list_metadata {
       string_metadata {
         empty_string_allowed: true
+        unprintable_characters_allowed: false
       }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_DEVICE_WIDE
+}
+policy_metadata {
+  identifier {
+    field_name: "SIMPLE_PACKAGE_POLICY"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "PackageIdentifier"
+    package_name: "android.app.admin"
+  }
+  documentation: "Test policy 6 "
+  type_specific_metadata {
+    package_metadata {
     }
   }
   allowed_scopes: POLICY_SCOPE_USER

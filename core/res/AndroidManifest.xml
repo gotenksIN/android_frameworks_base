@@ -321,6 +321,7 @@
     <protected-broadcast android:name="android.hardware.usb.action.USB_ACCESSORY_HANDSHAKE" />
     <protected-broadcast android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
     <protected-broadcast android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
+    <protected-broadcast android:name="android.hardware.usb.action.USB_PERMISSION_CHANGED" />
 
     <protected-broadcast android:name="android.intent.action.HEADSET_PLUG" />
     <protected-broadcast android:name="android.media.action.HDMI_AUDIO_PLUG" />
@@ -913,6 +914,7 @@
     <protected-broadcast android:name="android.intent.action.UPDATE_CT_LOGS" />
     <protected-broadcast android:name="android.intent.action.INSTALL_COMPLETE" />
     <protected-broadcast android:name="android.intent.action.PERSONAL_CONTEXT_MODE_CHANGED" />
+    <protected-broadcast android:name="android.os.storage.action.FILE_OPERATION_COMPLETED" />
 
     <!-- Added in 26Q4 -->
     <protected-broadcast android:name="android.app.action.DYNAMIC_BUNDLE_MODIFIED" />

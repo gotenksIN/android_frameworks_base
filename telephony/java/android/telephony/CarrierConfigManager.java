@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
-​​ * ​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- */
-
 package android.telephony;
 
 import static android.net.platform.flags.Flags.FLAG_AVOID_BAD_WIFI_FROM_CARRIER_CONFIG;
@@ -11884,6 +11878,20 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
     public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
 
+    /**
+     * Specifies whether the "Radio Info" (and related) activities should be hidden on user builds.
+     *
+     * <p>If {@code true}, the activities will be hidden on user builds.
+     * If {@code false}, the activities will be visible (default behavior).
+     *
+     * <p>Note: The hidden menu will always be displayed in non-user builds, regardless of this
+     * configuration.
+     *
+     * @hide
+     */
+    public static final String KEY_HIDE_RADIO_INFO_ON_USER_BUILD_BOOL =
+            "hide_radio_info_on_user_build_bool";
+
 // QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
      * Controls whether the turbo DSDA icon is shown on the UI.
@@ -11898,32 +11906,6 @@ public class CarrierConfigManager {
     public static final String KEY_SHOW_TURBO_DSDA_ICON = "show_turbo_dsda_icon";
 
 // QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
-    /**
-     * Controls whether the Narrowband Terrestrial Network (NB‑TN) setting is visible
-     *
-     * <p>If {@code true}, the "Narrowband Terrestrial Network" option is displayed in the UI and
-     * the per‑slot toggle is interactable. Otherwise, the NB‑TN setting is hidden and the feature
-     * cannot be controlled from the UI.
-     *
-     * <p>The default value is {@code false}.
-     *
-     * @hide
-     */
-    public static final String KEY_SHOW_NARROWBAND_TERRESTRIAL_NETWORK_SETTING_BOOL =
-            "show_narrowband_terrestrial_network_setting_bool";
-
-    /**
-     * Controls whether the Narrowband Terrestrial Network (NB‑TN) feature is enabled for a given
-     * subscription.
-     *
-     * <p>If {@code true}, NB‑TN functionality is enabled.
-     *
-     * <p>The default value is {@code false}.
-     *
-     * @hide
-     */
-    public static final String KEY_USE_NARROWBAND_TERRESTRIAL_NETWORK_BOOL =
-            "use_narrowband_terrestrial_network_bool";
 
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
@@ -12920,11 +12902,10 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_SUPPORT_PHONE_NUMBER_SOURCE_TS43_BOOL, false);
         sDefaults.putBoolean(KEY_APN_MATCHED_REQUIRED, true);
         sDefaults.putBoolean(KEY_IS_PRIVATE_NETWORK_BOOL, false);
+        sDefaults.putBoolean(KEY_HIDE_RADIO_INFO_ON_USER_BUILD_BOOL, false);
 // QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
         sDefaults.putBoolean(KEY_SHOW_TURBO_DSDA_ICON, false);
 // QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
-        sDefaults.putBoolean(KEY_SHOW_NARROWBAND_TERRESTRIAL_NETWORK_SETTING_BOOL, false);
-        sDefaults.putBoolean(KEY_USE_NARROWBAND_TERRESTRIAL_NETWORK_BOOL, false);
     }
 
     /**

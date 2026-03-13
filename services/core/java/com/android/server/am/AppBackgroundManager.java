@@ -334,7 +334,7 @@ public class AppBackgroundManager {
         mUseAppKeepaliveManager = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.app_bg_manager.enable_app_keepalive_manager", "true"));
         mUseUIRTSettings = Boolean.valueOf(mPerf.perfGetProp(
-                "ro.vendor.perf.app_bg_manager.enable_ui_rt_settings", "true"));
+                "ro.vendor.perf.app_bg_manager.enable_ui_rt_settings", "false"));
         mUseUIAffinitySettings = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.app_bg_manager.enable_ui_affinity_settings", "true"));
         mUseAggressivePolicy = Boolean.valueOf(mPerf.perfGetProp(

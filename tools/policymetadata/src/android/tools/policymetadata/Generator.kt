@@ -160,6 +160,7 @@ object Generator {
             TypeMetadataCase.LONG_METADATA -> generateLongPolicyMetadata(policy)
             TypeMetadataCase.STRING_METADATA -> generateStringPolicyMetadata(policy)
             TypeMetadataCase.LIST_METADATA -> generateListPolicyMetadata(policy)
+            TypeMetadataCase.PACKAGE_METADATA -> generatePackagePolicyMetadata(policy)
             TypeMetadataCase.TYPEMETADATA_NOT_SET ->
                 throw IllegalArgumentException("Type specific metadata unset")
         }
@@ -354,8 +355,14 @@ object Generator {
 
     private val stringPolicyMetadataType = ClassName.get(METADATA_PACKAGE, "StringPolicyMetadata")
 
-    private fun CodeBlock.Builder.addStringMetadataInformation(emptyStringAllowed: Boolean) =
-        this.add("/* emptyStringAllowed= */ \$L", emptyStringAllowed)
+    private fun CodeBlock.Builder.addStringMetadataInformation(
+        stringMetadata: StringPolicyMetadata
+    ) =
+        this.add("/* emptyStringAllowed= */ \$L,\n", stringMetadata.emptyStringAllowed)
+            .add(
+                "/* unprintableCharactersAllowed= */ \$L",
+                stringMetadata.unprintableCharactersAllowed,
+            )
 
     // Returns a CodeBlock containing `new StringPolicyMetadata(<policy-id>, ....)` .
     private fun generateStringPolicyMetadata(
@@ -368,7 +375,22 @@ object Generator {
             .indent()
             .addPolicyArguments(policy, policyId)
             .add(",\n")
-            .addStringMetadataInformation(stringMetadata.emptyStringAllowed)
+            .addStringMetadataInformation(stringMetadata)
+            .add("\n")
+            .unindent()
+            .add(")")
+            .build()
+
+    private val packagePolicyMetadataType = ClassName.get(METADATA_PACKAGE, "PackagePolicyMetadata")
+
+    private fun generatePackagePolicyMetadata(
+        policy: PolicyMetadata,
+        policyId: CodeBlock = policy.getPolicyIdCodeBlock(),
+    ) =
+        CodeBlock.builder()
+            .add("new \$T(\n", packagePolicyMetadataType)
+            .indent()
+            .addPolicyArguments(policy, policyId)
             .add("\n")
             .unindent()
             .add(")")

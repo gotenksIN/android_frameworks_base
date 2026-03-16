@@ -1634,7 +1634,15 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mServices.onProcessFrozenCancelled();
     }
 
+    /**
+     * Called when the process state is updated.
+     *
+     * @param newProcState The new process state.
+     */
     void onProcStateUpdated(@ActivityManager.ProcessState int newProcState) {
+        if (Flags.encapsulateCurProcState()) {
+            mWindowProcessController.setCurrentProcState(newProcState);
+        }
         mMemoryLimiter.onProcStateUpdated(newProcState);
     }
 

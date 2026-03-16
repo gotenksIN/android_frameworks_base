@@ -71,7 +71,7 @@ import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SYSTEM_INIT;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UID_IDLE;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UNBIND_SERVICE;
-import static android.os.PerfettoTrace.PROC_STATE_CATEGORY;
+import static android.os.PerfettoCategories.PROC_STATE_CATEGORY;
 import static android.os.PerfettoCategories.PROC_STATE_COUNTER_CATEGORY;
 import static android.os.Process.THREAD_GROUP_BACKGROUND;
 import static android.os.Process.THREAD_GROUP_DEFAULT;
@@ -669,8 +669,8 @@ public abstract class OomAdjuster {
             ProcessList.setOomAdj(pid, uid, adj, forLmkdOnly);
         }
 
-        void setOomAdjExt(int pid, int uid, int adj, int weight) {
-            ProcessList.setOomAdjExt(pid, uid, adj, weight);
+        void setOomAdjExt(int pid, int uid, int adj, int weight, boolean forLmkdOnly) {
+            ProcessList.setOomAdjExt(pid, uid, adj, weight, forLmkdOnly);
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         }
 
@@ -2558,7 +2558,9 @@ public abstract class OomAdjuster {
                 if (QtiBackgroundManager.getInstance().useAppKeepaliveManager()) {
                     int weight =
                         QtiBackgroundManager.getInstance().getProcKeepaliveWeight(state);
-                    mInjector.setOomAdjExt(state.getPid(), state.uid, state.getCurAdj(), weight);
+                    boolean forLmkdOnly = state.isZramWrittenBack();
+                    mInjector.setOomAdjExt(
+                            state.getPid(), state.uid, state.getCurAdj(), weight, forLmkdOnly);
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 } else {
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication

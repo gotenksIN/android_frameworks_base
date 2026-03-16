@@ -78,7 +78,14 @@ INP=$ROOT/framework/lockedregioncodeinjection_input.jar
 # Run tool on unit tests.
 $EXE \
     -i $INP -o $OUT/test_output.jar \
-    --config $(dirname $0)/test_config.cfg
+    --targets 'Llockedregioncodeinjection/TestTarget;' \
+    --pre     'lockedregioncodeinjection/TestTarget.boost' \
+    --post    'lockedregioncodeinjection/TestTarget.unboost' \
+    --trace-before-acquire 'lockedregioncodeinjection/TestTarget.traceBeforeAcquire' \
+    --trace-after-acquire 'lockedregioncodeinjection/TestTarget.traceAfterAcquire' \
+    --trace-before-release 'lockedregioncodeinjection/TestTarget.traceBeforeRelease' \
+    --trace-after-release 'lockedregioncodeinjection/TestTarget.traceAfterRelease' \
+    --scoped  'Llockedregioncodeinjection/TestScopedLock;,monitorEnter,monitorExit'
 
 # Run unit tests.
 java -ea -cp $OUT/test_output.jar \

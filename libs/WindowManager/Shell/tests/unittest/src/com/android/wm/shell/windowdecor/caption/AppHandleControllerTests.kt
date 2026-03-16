@@ -191,7 +191,7 @@ class AppHandleControllerTests : ShellTestCase() {
 
         // Assert that handle menu was created with null App-to-Web data since app to web is
         // disabled
-        mockHandleMenuFactory.verifyHandleMenuCreated(appToWebData = { it == null })
+        mockHandleMenuFactory.verifyHandleMenuCreated(appToWebData = null)
     }
 
     private fun createAppHandleController(taskInfo: RunningTaskInfo) =

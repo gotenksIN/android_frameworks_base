@@ -31,7 +31,6 @@ import android.service.personalcontext.embedded.InsightSurfaceVisualizerService;
 import android.service.personalcontext.insight.PublishedContextInsight;
 import android.util.Slog;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -39,7 +38,6 @@ import com.android.internal.content.PackageMonitor;
 
 import com.google.android.collect.Lists;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -209,16 +207,6 @@ public class VisualizerRegistry {
                 createVisualizationForClient(
                         publishedContextInsight, client, renderToken,
                         mVisualizers.values().iterator()));
-    }
-
-    /**
-     * Dump info about connected visualizers.
-     */
-    public void dump(@NonNull PrintWriter fout) {
-        fout.write(" Visualizers:\n");
-        for (Map.Entry<ComponentName, VisualizerConnection> entry : mVisualizers.entrySet()) {
-            entry.getValue().dump(fout);
-        }
     }
 
     private void registerVisualizers(@Nullable String packageName) {

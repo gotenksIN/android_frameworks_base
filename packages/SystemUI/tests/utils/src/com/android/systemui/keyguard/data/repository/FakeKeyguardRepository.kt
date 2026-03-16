@@ -26,7 +26,7 @@ import com.android.systemui.keyguard.shared.model.CameraLaunchSourceModel
 import com.android.systemui.keyguard.shared.model.DismissAction
 import com.android.systemui.keyguard.shared.model.DozeTransitionModel
 import com.android.systemui.keyguard.shared.model.KeyguardDone
-import com.android.systemui.keyguard.shared.model.LockAfterDelayTimerState
+import com.android.systemui.keyguard.shared.model.LockAfterScreenTimeoutTimerState
 import com.android.systemui.keyguard.shared.model.StatusBarState
 import dagger.Binds
 import dagger.Module
@@ -134,8 +134,10 @@ class FakeKeyguardRepository @Inject constructor() : KeyguardRepository {
 
     override val onCameraLaunchDetected = MutableStateFlow(CameraLaunchSourceModel())
 
-    override val lockAfterDelayState =
-        MutableStateFlow<LockAfterDelayTimerState>(LockAfterDelayTimerState.INACTIVE)
+    override val lockAfterScreenTimeoutState =
+        MutableStateFlow<LockAfterScreenTimeoutTimerState>(
+            LockAfterScreenTimeoutTimerState.INACTIVE
+        )
 
     private var _isSignOutButtonOnStatusBarEnabledInConfig: Boolean = false
     override val isSignOutButtonOnStatusBarEnabledInConfig: Boolean

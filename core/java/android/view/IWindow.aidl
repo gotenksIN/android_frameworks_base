@@ -104,6 +104,11 @@ oneway interface IWindow {
     void dispatchDragEvent(in DragEvent event);
 
     /**
+     * Called for non-application windows when the enter animation has completed.
+     */
+    void dispatchWindowShown();
+
+    /**
      * Called when Keyboard Shortcuts are requested for the window.
      */
     void requestAppKeyboardShortcuts(IResultReceiver receiver, int deviceId);

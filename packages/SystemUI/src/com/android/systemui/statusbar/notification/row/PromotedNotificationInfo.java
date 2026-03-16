@@ -22,7 +22,6 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.RemoteException;
-import android.os.UserHandle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.text.SpannableStringBuilder;
@@ -90,21 +89,11 @@ public class PromotedNotificationInfo extends NotificationInfo {
 
         mUiEventLogger = uiEventLogger;
 
-        if (canDemote(sbn)) {
-            bindDemote(sbn, pkg);
-        } else {
-            findViewById(R.id.live_notifications_group).setVisibility(GONE);
-        }
+        bindDemote(sbn, pkg);
 
         // Override the visibility of elements we don't want for the promoted notification
         findViewById(R.id.interruptiveness_settings).setVisibility(GONE);
         findViewById(R.id.turn_off_notifications).setVisibility(GONE);
-    }
-
-    private boolean canDemote(StatusBarNotification sbn) {
-        // RON permission for a package with sharedUserId="android.uid.system" cannot be effectively
-        // taken away (PermissionManager always returns GRANTED).
-        return !UserHandle.isSameApp(sbn.getUid(), android.os.Process.SYSTEM_UID);
     }
 
     protected void bindDemote(StatusBarNotification sbn, String packageName) {

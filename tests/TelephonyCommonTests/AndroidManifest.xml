@@ -18,14 +18,12 @@
           package="com.android.internal.telephony.tests"
           android:debuggable="true">
 
-     <uses-permission android:name="android.permission.WRITE_DEVICE_CONFIG"/>
-
-     <application android:label="TelephonyCommonTests"
+    <application android:label="TelephonyCommonTests"
                  android:debuggable="true">
-          <uses-library android:name="android.test.runner" />
-     </application>
+        <uses-library android:name="android.test.runner" />
+    </application>
 
-     <instrumentation android:name="androidx.test.runner.AndroidJUnitRunner"
+    <instrumentation android:name="androidx.test.runner.AndroidJUnitRunner"
                      android:targetPackage="com.android.internal.telephony.tests"
                      android:label="Telephony common tests"
                      android:debuggable="true"/>

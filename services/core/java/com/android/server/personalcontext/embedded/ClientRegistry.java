@@ -19,9 +19,6 @@ package com.android.server.personalcontext.embedded;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 
-import androidx.annotation.NonNull;
-
-import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,18 +107,6 @@ class ClientRegistry {
             InsightSurfaceClientInfo oldClient, InsightSurfaceClientInfo newClient) {
         synchronized (mClients) {
             mClients.replace(oldClient.getId(), newClient);
-        }
-    }
-
-    /**
-     * Dump info about connected clients.
-     */
-    public void dump(@NonNull PrintWriter fout) {
-        fout.write(" Clients:\n");
-        for (InsightSurfaceClientInfo clientInfo : getClients()) {
-            final UUID clientId = clientInfo.getId();
-            final RenderToken renderToken = mRenderTokensByClientId.get(clientId);
-            fout.write("  Client ID: " + clientId + ", RenderToken: " + renderToken + "\n");
         }
     }
 }

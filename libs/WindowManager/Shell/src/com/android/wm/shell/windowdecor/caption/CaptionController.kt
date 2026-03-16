@@ -530,7 +530,6 @@ abstract class CaptionController<T>(
         APP_HANDLE,
         APP_HEADER,
         APP_PINNED,
-        FULLSCREEN_HEADER,
         NO_CAPTION,
     }
 

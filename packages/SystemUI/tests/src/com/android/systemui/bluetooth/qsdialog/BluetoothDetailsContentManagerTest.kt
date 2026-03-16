@@ -36,6 +36,8 @@ import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.phone.SystemUIDialog
+import com.android.systemui.statusbar.phone.SystemUIDialogManager
 import com.android.systemui.testKosmos
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
@@ -74,6 +76,9 @@ class BluetoothDetailsContentManagerTest : SysuiTestCase() {
     private val uiEventLogger = mock<UiEventLogger>()
 
     private val logger = mock<BluetoothTileDialogLogger>()
+
+    private val sysuiDialogFactory = mock<SystemUIDialog.Factory>()
+    private val dialogManager = mock<SystemUIDialogManager>()
     private val activityStarter = mock<ActivityStarter>()
 
     private val fakeSystemClock = FakeSystemClock()
@@ -111,6 +116,18 @@ class BluetoothDetailsContentManagerTest : SysuiTestCase() {
                     dialogTransitionAnimator,
                     activityStarter,
                 )
+
+            whenever(sysuiDialogFactory.create(any<SystemUIDialog.Delegate>(), any())).thenAnswer {
+                SystemUIDialog(
+                    mContext,
+                    0,
+                    SystemUIDialog.DEFAULT_DISMISS_ON_DEVICE_LOCK,
+                    dialogManager,
+                    fakeBroadcastDispatcher,
+                    dialogTransitionAnimator,
+                    it.getArgument(0),
+                )
+            }
 
             icon = Pair(drawable, DEVICE_NAME)
             deviceItem =

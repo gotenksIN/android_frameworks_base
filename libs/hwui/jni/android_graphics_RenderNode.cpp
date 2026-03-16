@@ -143,41 +143,33 @@ static jboolean android_view_RenderNode_setProjectionReceiver(CRITICAL_JNI_PARAM
 static jboolean android_view_RenderNode_setOutlineRoundRect(CRITICAL_JNI_PARAMS_COMMA jlong renderNodePtr,
         jint left, jint top, jint right, jint bottom, jfloat radius, jfloat alpha) {
     RenderNode* renderNode = reinterpret_cast<RenderNode*>(renderNodePtr);
-    if (renderNode->mutateStagingProperties().mutableOutline().setRoundRect(
-                left, top, right, bottom, radius, alpha)) {
-        renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
-        return true;
-    }
-    return false;
+    renderNode->mutateStagingProperties().mutableOutline().setRoundRect(left, top, right, bottom,
+            radius, alpha);
+    renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
+    return true;
 }
 
 static jboolean android_view_RenderNode_setOutlinePath(CRITICAL_JNI_PARAMS_COMMA jlong renderNodePtr,
         jlong outlinePathPtr, jfloat alpha) {
     RenderNode* renderNode = reinterpret_cast<RenderNode*>(renderNodePtr);
     SkPath* outlinePath = AsSkPath(outlinePathPtr);
-    if (renderNode->mutateStagingProperties().mutableOutline().setPath(outlinePath, alpha)) {
-        renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
-        return true;
-    }
-    return false;
+    renderNode->mutateStagingProperties().mutableOutline().setPath(outlinePath, alpha);
+    renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
+    return true;
 }
 
 static jboolean android_view_RenderNode_setOutlineEmpty(CRITICAL_JNI_PARAMS_COMMA jlong renderNodePtr) {
     RenderNode* renderNode = reinterpret_cast<RenderNode*>(renderNodePtr);
-    if (renderNode->mutateStagingProperties().mutableOutline().setEmpty()) {
-        renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
-        return true;
-    }
-    return false;
+    renderNode->mutateStagingProperties().mutableOutline().setEmpty();
+    renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
+    return true;
 }
 
 static jboolean android_view_RenderNode_setOutlineNone(CRITICAL_JNI_PARAMS_COMMA jlong renderNodePtr) {
     RenderNode* renderNode = reinterpret_cast<RenderNode*>(renderNodePtr);
-    if (renderNode->mutateStagingProperties().mutableOutline().setNone()) {
-        renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
-        return true;
-    }
-    return false;
+    renderNode->mutateStagingProperties().mutableOutline().setNone();
+    renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
+    return true;
 }
 
 static jboolean android_view_RenderNode_clearStretch(CRITICAL_JNI_PARAMS_COMMA jlong renderNodePtr) {

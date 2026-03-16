@@ -53,6 +53,7 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.model.SysUiState
 import com.android.systemui.plugins.ActivityStartOptions
 import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.ShadeController
 import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractor
@@ -703,11 +704,14 @@ constructor(
 
     /** Retrieves the current user handle to start the Activity. */
     private fun getActivityUserHandle(intent: Intent): UserHandle {
-        return if (currentShadeContext.packageName == intent.component?.packageName) {
-            UserHandle(UserHandle.myUserId())
-        } else {
-            UserHandle(selectedUserInteractor.getSelectedUserId())
+        val packages: Array<String> = resources.getStringArray(R.array.system_ui_packages)
+        for (pkg in packages) {
+            val componentName = intent.component ?: break
+            if (pkg == componentName.packageName) {
+                return UserHandle(UserHandle.myUserId())
+            }
         }
+        return UserHandle(selectedUserInteractor.getSelectedUserId())
     }
 
     private fun isKeyguardShowing(): Boolean {

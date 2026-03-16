@@ -68,7 +68,6 @@ import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.compose.assertPointerState
 import com.android.systemui.scene.ui.viewmodel.DualShadeEducationalTooltipsViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
-import com.android.systemui.scene.ui.viewmodel.ToBouncerTransitionViewModel
 import com.android.systemui.shade.ui.composable.LocalStatusIconContext
 import com.android.systemui.shade.ui.composable.rememberStatusIconContext
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
@@ -256,8 +255,6 @@ object SceneWindowRootViewBinder {
                                 bouncerOverlay = bouncerOverlay,
                                 windowInsets = windowInsets,
                                 tintedIconManagerFactory = tintedIconManagerFactory,
-                                toBouncerTransitionViewModel =
-                                    viewModel.toBouncerTransitionViewModel,
                             )
                         )
                     }
@@ -373,7 +370,6 @@ object SceneWindowRootViewBinder {
         bouncerOverlay: Overlay,
         windowInsets: State<WindowInsets?>,
         tintedIconManagerFactory: TintedIconManager.Factory,
-        toBouncerTransitionViewModel: ToBouncerTransitionViewModel,
     ): View {
         return ComposeView(context).apply {
             setContent {
@@ -385,7 +381,6 @@ object SceneWindowRootViewBinder {
                         state = state,
                         bouncerOverlay = bouncerOverlay,
                         modifier = modifier,
-                        toBouncerTransitionViewModel = toBouncerTransitionViewModel,
                     )
                 }
             }

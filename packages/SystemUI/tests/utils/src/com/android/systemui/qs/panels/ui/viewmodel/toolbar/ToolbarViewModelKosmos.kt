@@ -24,6 +24,7 @@ import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.qs.footerActionsInteractor
 import com.android.systemui.qs.panels.ui.viewmodel.textFeedbackContentViewModelFactory
 import com.android.systemui.shade.domain.interactor.shadeInteractor
+import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.user.domain.interactor.fakeHeadlessSystemUserMode
 import com.android.systemui.user.domain.interactor.selectedUserInteractor
 
@@ -35,6 +36,7 @@ val Kosmos.toolbarViewModelFactory by
                     editModeButtonViewModelFactory,
                     textFeedbackContentViewModelFactory,
                     powerMenuViewModelFactory,
+                    shadeModeInteractor,
                     shadeInteractor,
                     footerActionsInteractor,
                     { globalActionsDialogLite },

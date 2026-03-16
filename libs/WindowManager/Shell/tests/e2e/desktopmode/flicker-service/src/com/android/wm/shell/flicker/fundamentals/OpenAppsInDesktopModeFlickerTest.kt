@@ -48,7 +48,6 @@ class OpenAppsInDesktopModeFlickerTest(flicker: FlickerTest) : DesktopModeBaseTe
     @JvmField
     val testSetupRule = Utils.testSetupRule(NavBar.MODE_GESTURAL, flicker.scenario.startRotation)
     val scenario = OpenAppsInDesktopModeScenario()
-    private val fourthApp = scenario.fourthApp
     private val fifthApp = scenario.fifthApp
     private val appInDesktop = scenario.appInDesktop
 
@@ -66,8 +65,7 @@ class OpenAppsInDesktopModeFlickerTest(flicker: FlickerTest) : DesktopModeBaseTe
 
     @Test fun layerBecomesVisible() = appInDesktop.forEach { flicker.layerBecomesVisible(it) }
 
-    @Test
-    fun cascadingEffectAppliedAtEnd() = flicker.cascadingEffectAppliedAtEnd(fifthApp, fourthApp)
+    @Test fun cascadingEffectAppliedAtEnd() = flicker.cascadingEffectAppliedAtEnd(fifthApp)
 
     companion object {
         @Parameterized.Parameters(name = "{0}")

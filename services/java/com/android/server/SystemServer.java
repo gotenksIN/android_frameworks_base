@@ -1043,7 +1043,8 @@ public final class SystemServer implements Dumpable {
         // Start services.
         try {
             t.traceBegin("StartServices");
-            if (SystemProperties.getBoolean("sys.system_server_inherit_rt", false)) {
+            if (android.server.Flags.allowSystemServerInheritRt()
+                    && SystemProperties.getBoolean("sys.system_server_inherit_rt", false)) {
                 Binder.setGlobalInheritRt(true);
             }
             startBootstrapServices(t);

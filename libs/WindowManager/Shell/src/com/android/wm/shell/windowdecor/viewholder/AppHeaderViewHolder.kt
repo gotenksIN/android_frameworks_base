@@ -134,11 +134,9 @@ class AppHeaderViewHolder(
     private val expandMenuErrorImageView: ImageView =
         rootView.requireViewById(R.id.expand_menu_error)
 
-    /** The width of the application name. */
     val appNameTextWidth: Int
         get() = appNameTextView.width
 
-    /** The width of the maximize button view. */
     val maximizeButtonWidth: Int
         get() = maximizeButtonView.width
 
@@ -151,8 +149,7 @@ class AppHeaderViewHolder(
         context.getString(R.string.desktop_mode_talkback_state_minimizing)
     private val a11yAnnounceTextClosing: String =
         context.getString(R.string.desktop_mode_talkback_state_closing)
-    private var a11yAnnounceTextFocused: String? = null
-    private var a11yAnnounceTextNotFocused: String? = null
+    private lateinit var a11yAnnounceTextFocused: String
 
     private lateinit var sizeToggleDirection: SizeToggleDirection
     private lateinit var a11yTextMaximize: String
@@ -449,13 +446,8 @@ class AppHeaderViewHolder(
         )
 
     /** Announces app window name as "focused" via Talkback */
-    private fun updateA11yFocus(isFocused: Boolean) {
-        captionHandle.stateDescription =
-            if (isFocused) {
-                a11yAnnounceTextFocused
-            } else {
-                a11yAnnounceTextNotFocused
-            }
+    fun a11yAnnounceFocused() {
+        captionHandle.stateDescription = a11yAnnounceTextFocused
     }
 
     /** Sets the app's name in the header. */
@@ -479,8 +471,6 @@ class AppHeaderViewHolder(
         a11yTextRestore = context.getString(R.string.restore_button_text, name)
         a11yAnnounceTextFocused =
             context.getString(R.string.desktop_mode_talkback_state_focused, name)
-        a11yAnnounceTextNotFocused =
-            context.getString(R.string.desktop_mode_talkback_state_not_focused, name)
     }
 
     private fun updateMaximizeButtonContentDescription() {
@@ -560,8 +550,6 @@ class AppHeaderViewHolder(
         if (DesktopModeFlags.ENABLE_DESKTOP_APP_HANDLE_ANIMATION.isTrue()) {
             setCaptionVisibility(isCaptionVisible)
         }
-
-        updateA11yFocus(hasGlobalFocus)
 
         // Caption Background
         when (headerStyle.background) {

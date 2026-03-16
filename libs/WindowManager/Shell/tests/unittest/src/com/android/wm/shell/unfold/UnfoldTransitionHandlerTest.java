@@ -118,10 +118,8 @@ public class UnfoldTransitionHandlerTest extends ShellTestCase {
                 .setPhysicalDisplayChanged(true)
                 .setStartAbsBounds(new Rect(0, 0, 100, 100))
                 .setEndAbsBounds(new Rect(0, 0, 200, 200));
-        final List<TransitionRequestInfo.DisplayChange> displayChanges = new ArrayList<>();
-        displayChanges.add(displayChange);
         TransitionRequestInfo requestInfo = new TransitionRequestInfo(TRANSIT_CHANGE,
-                triggerTaskInfo, /* remoteTransition= */ null, displayChanges, 0 /* flags */);
+                triggerTaskInfo, /* remoteTransition= */ null, displayChange, 0 /* flags */);
 
         WindowContainerTransaction result = mUnfoldTransitionHandler.handleRequest(mTransition,
                 requestInfo);
@@ -137,10 +135,8 @@ public class UnfoldTransitionHandlerTest extends ShellTestCase {
                 .setPhysicalDisplayChanged(true)
                 .setStartAbsBounds(new Rect(0, 0, 200, 200))
                 .setEndAbsBounds(new Rect(0, 0, 100, 100));
-        final List<TransitionRequestInfo.DisplayChange> displayChanges = new ArrayList<>();
-        displayChanges.add(displayChange);
         TransitionRequestInfo requestInfo = new TransitionRequestInfo(TRANSIT_CHANGE,
-                triggerTaskInfo, /* remoteTransition= */ null, displayChanges, 0 /* flags */);
+                triggerTaskInfo, /* remoteTransition= */ null, displayChange, 0 /* flags */);
 
         WindowContainerTransaction result = mUnfoldTransitionHandler.handleRequest(mTransition,
                 requestInfo);
@@ -153,10 +149,8 @@ public class UnfoldTransitionHandlerTest extends ShellTestCase {
         ActivityManager.RunningTaskInfo triggerTaskInfo = new ActivityManager.RunningTaskInfo();
         TransitionRequestInfo.DisplayChange displayChange = new TransitionRequestInfo.DisplayChange(
                 Display.DEFAULT_DISPLAY).setPhysicalDisplayChanged(false);
-        final List<TransitionRequestInfo.DisplayChange> displayChanges = new ArrayList<>();
-        displayChanges.add(displayChange);
         TransitionRequestInfo requestInfo = new TransitionRequestInfo(TRANSIT_CHANGE,
-                triggerTaskInfo, /* remoteTransition= */ null, displayChanges, 0 /* flags */);
+                triggerTaskInfo, /* remoteTransition= */ null, displayChange, 0 /* flags */);
 
         WindowContainerTransaction result = mUnfoldTransitionHandler.handleRequest(mTransition,
                 requestInfo);
@@ -404,10 +398,8 @@ public class UnfoldTransitionHandlerTest extends ShellTestCase {
                 .setPhysicalDisplayChanged(true)
                 .setStartAbsBounds(new Rect(0, 0, 100, 100))
                 .setEndAbsBounds(new Rect(0, 0, 200, 200));
-        final List<TransitionRequestInfo.DisplayChange> displayChanges = new ArrayList<>();
-        displayChanges.add(displayChange);
         return new TransitionRequestInfo(TRANSIT_CHANGE,
-                triggerTaskInfo, /* remoteTransition= */ null, displayChanges, 0 /* flags */);
+                triggerTaskInfo, /* remoteTransition= */ null, displayChange, 0 /* flags */);
     }
 
     private TransitionInfo createFoldTransitionInfo() {

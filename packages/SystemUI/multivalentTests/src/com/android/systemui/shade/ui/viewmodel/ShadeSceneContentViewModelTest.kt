@@ -302,7 +302,7 @@ class ShadeSceneContentViewModelTest : SysuiTestCase() {
         fakeConfigurationRepository.onConfigurationChange(configuration)
         val maxTranslation = 10
         fakeConfigurationRepository.setDimensionPixelSize(
-            R.dimen.notification_side_paddings_single,
+            R.dimen.notification_side_paddings,
             maxTranslation,
         )
         return maxTranslation

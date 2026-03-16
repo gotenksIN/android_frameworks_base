@@ -33,10 +33,6 @@ fun LockscreenBehindScrim(
     viewModel: LockscreenBehindScrimViewModel,
     modifier: Modifier = Modifier,
 ) {
-    if (!viewModel.isVisible) {
-        return
-    }
-
     val animatedAlpha: Float by animateFloatAsState(viewModel.alpha)
     Box(modifier.fillMaxSize().graphicsLayer { alpha = animatedAlpha }.background(Color.Black))
 }

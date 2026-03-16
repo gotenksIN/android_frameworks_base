@@ -40,6 +40,8 @@ class MenuViewLayerController implements IAccessibilityFloatingMenu {
     private final WindowManager mWindowManager;
     private final MenuViewLayer mMenuViewLayer;
     private boolean mIsShowing;
+    private final KeyboardRepository mKeyboardRepository;
+    private final PointerDeviceRepository mPointerDeviceRepository;
 
     MenuViewLayerController(
             Context context,
@@ -51,6 +53,8 @@ class MenuViewLayerController implements IAccessibilityFloatingMenu {
             KeyboardRepository keyboardRepository,
             PointerDeviceRepository pointerDeviceRepository, Magnification magnification) {
         mWindowManager = windowManager;
+        mKeyboardRepository = keyboardRepository;
+        mPointerDeviceRepository = pointerDeviceRepository;
 
         MenuViewModel menuViewModel =
                 new MenuViewModel(

@@ -97,7 +97,6 @@ import com.android.systemui.statusbar.policy.IndividualSensorPrivacyController;
 import com.android.systemui.statusbar.policy.IndividualSensorPrivacyControllerImpl;
 import com.android.systemui.statusbar.policy.SensorPrivacyController;
 import com.android.systemui.statusbar.policy.SensorPrivacyControllerImpl;
-import com.android.systemui.statusbar.policy.dagger.SmartRepliesInflationModule;
 import com.android.systemui.toast.ToastModule;
 import com.android.systemui.topwindoweffects.dagger.TopLevelWindowEffectsModule;
 import com.android.systemui.touchpad.tutorial.TouchpadTutorialModule;
@@ -184,7 +183,6 @@ import javax.inject.Provider;
         VolumeModule.class,
         WallpaperModule.class,
         ShortcutHelperModule.class,
-        SmartRepliesInflationModule.class,
         ContextualEducationModule.class,
         ActionCornerModule.class,
         CursorPositionModule.class,

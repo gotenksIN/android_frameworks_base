@@ -23,14 +23,11 @@ import static android.os.UserHandle.USER_CURRENT;
 import android.content.Context;
 import android.hardware.display.DisplayManager.ExternalDisplayConnection;
 import android.provider.Settings;
-import android.util.Log;
 
 import java.util.function.BooleanSupplier;
 
-/** Policy class for managing the setting of mirroring the built-in display. */
+/** Policy class for managing the setting of mirroring the built in display. */
 public class SecondaryDisplayPolicy {
-
-    private static final String TAG = "SecondaryDisplayPolicy";
 
     private final Context mContext;
     private final BooleanSupplier mIsDesktopModeSupportedSupplier;
@@ -49,7 +46,6 @@ public class SecondaryDisplayPolicy {
     public boolean forceEnableMirrorBuiltInDisplaySettingIfNeeded() {
         if (isMirrorBuiltInDisplaySettingDisabled()
                 && shouldForceEnableMirrorBuiltInDisplaySetting()) {
-            Log.d(TAG, "Force enable mirroring");
             // If someone changed the setting to disable mirroring and enable desktop mode, even
             // though it is not supported, let's force the mirroring setting to be enabled.
             enableMirrorBuiltInDisplaySetting();
@@ -70,7 +66,6 @@ public class SecondaryDisplayPolicy {
             @ExternalDisplayConnection int persistedConnectionPreference) {
         if (persistedConnectionPreference == EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_DESKTOP
                 && !mIsDesktopModeSupportedSupplier.getAsBoolean()) {
-            Log.d(TAG, "Desktop mode not supported, resetting connection preference");
             // Desktop mode was previously supported, and the connected display had the
             // connection preference set to DESKTOP.
             // Desktop is no longer supported, therefore resetting the preference to the

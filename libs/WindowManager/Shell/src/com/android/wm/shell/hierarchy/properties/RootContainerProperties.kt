@@ -15,16 +15,12 @@
  */
 package com.android.wm.shell.hierarchy.properties
 
-import android.content.pm.UserInfo
 import android.view.Display.DEFAULT_DISPLAY
 import android.window.TransitionInfo
 import com.android.wm.shell.dagger.hierarchy.WmSyncedProperty
 import com.android.wm.shell.hierarchy.updates.HierarchyChangeFlags
 import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_FOCUS
-import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_IS_FOLDED
-import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_KEYGUARD
-import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_USER
-import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_USER_PROFILES
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_ROOT_EXAMPLE_SHELL_PROPERTY
 import com.android.wm.shell.transition.FocusTransitionObserver
 
 /**
@@ -48,80 +44,8 @@ class FocusState {
         chgs.compareAndSet(perDisplayFocusedTaskId, other.perDisplayFocusedTaskId, CHANGED_FOCUS)
     }
 
-    override fun toString(): String {
-        return "FOCUS display=$globallyFocusedDisplayId task=$globallyFocusedTaskId"
-    }
-}
-
-/**
- * Tracks the current user & profiles.
- */
-class UserState {
-    var currentUserId = 0
-    var currentUserProfiles = mutableListOf<UserInfo>()
-
-    fun copyFrom(other: UserState) {
-        currentUserId = other.currentUserId
-        currentUserProfiles.clear()
-        currentUserProfiles.addAll(other.currentUserProfiles)
-    }
-
-    fun diff(other: UserState, chgs: HierarchyChangeFlags) {
-        chgs.compareAndSet(currentUserId, other.currentUserId, CHANGED_USER)
-        chgs.compareAndSet(currentUserProfiles, other.currentUserProfiles, CHANGED_USER_PROFILES)
-    }
-
-    override fun toString(): String {
-        val profileUsers = currentUserProfiles
-            .map { it.id }
-            .joinToString(prefix = "[", postfix = "]")
-        return "USER curUserId=$currentUserId profiles=$profileUsers"
-    }
-}
-
-/**
- * Tracks the device state.
- */
-class DeviceState {
-    var keyguardState = KeyguardState.Unlocked
-    var isFolded = false
-
-    // This is just a setting that's usually used on demand, so we don't need to propagate changes
-    // of this setting to the modes for now
-    var onFoldSetting = OnFoldSetting.Sleep
-
-    fun copyFrom(other: DeviceState) {
-        keyguardState = other.keyguardState
-        isFolded = other.isFolded
-    }
-
-    fun diff(other: DeviceState, chgs: HierarchyChangeFlags) {
-        chgs.compareAndSet(keyguardState, other.keyguardState, CHANGED_KEYGUARD)
-        chgs.compareAndSet(isFolded, other.isFolded, CHANGED_IS_FOLDED)
-    }
-
-    override fun toString(): String {
-        val keyguard =
-            if (keyguardState != KeyguardState.Unlocked) "keyguard=${keyguardState.name}" else ""
-        val isFolded = if (isFolded) "isFolded" else ""
-        val stateStr = listOf(keyguard, isFolded)
-            .filter { it.isNotEmpty() }
-            .joinToString()
-        return if (stateStr.isNotEmpty()) "DEVICE $stateStr" else ""
-    }
-
-    // The current state of the keyguard
-    enum class KeyguardState {
-        Unlocked,
-        Locked,
-        Occluded,
-    }
-
-    // The current setting for what to do when a foldable device is folded
-    enum class OnFoldSetting {
-        StayAwake,
-        SelectiveStayAwake,
-        Sleep,
+    fun propsToString(): String {
+        return "focusedDisplay=$globallyFocusedDisplayId focusedTask=$globallyFocusedTaskId"
     }
 }
 
@@ -134,11 +58,8 @@ class RootContainerProperties : ContainerProperties() {
     @WmSyncedProperty
     val focusState = FocusState()
 
-    // The current user info
-    val userState = UserState()
-
-    // The current device info
-    val deviceState = DeviceState()
+    // An example of a tracked shell state that modes can listen for
+    var exampleTrackedShellOnlyState = false
 
     private val focusTransitionObserver = FocusTransitionObserver()
 
@@ -156,8 +77,7 @@ class RootContainerProperties : ContainerProperties() {
     override fun copyFrom(other: ContainerProperties) {
         val otherRoot = other as RootContainerProperties
         focusState.copyFrom(otherRoot.focusState)
-        userState.copyFrom(otherRoot.userState)
-        deviceState.copyFrom(otherRoot.deviceState)
+        exampleTrackedShellOnlyState = otherRoot.exampleTrackedShellOnlyState
         super.copyFrom(other)
     }
 
@@ -173,14 +93,15 @@ class RootContainerProperties : ContainerProperties() {
         super.diff(other, chgs)
         val otherRoot = other as RootContainerProperties
         focusState.diff(otherRoot.focusState, chgs)
-        userState.diff(otherRoot.userState, chgs)
-        deviceState.diff(otherRoot.deviceState, chgs)
+        chgs.compareAndSet(
+            exampleTrackedShellOnlyState, otherRoot.exampleTrackedShellOnlyState,
+            CHANGED_ROOT_EXAMPLE_SHELL_PROPERTY
+        )
     }
 
     /** @see ContainerProperties.propsToString */
     override fun propsToString(): String {
-        return super.propsToString() + " | " +
-                listOf(userState, focusState, deviceState).joinToString(separator = " ")
+        return focusState.propsToString() + " example=$exampleTrackedShellOnlyState " + super.propsToString()
     }
 
     /** @see ContainerProperties.getTypeName */

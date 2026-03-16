@@ -18,7 +18,6 @@ package com.android.settingslib.fuelgauge
 
 import android.content.Context
 import android.provider.Settings
-import android.util.Log
 import java.time.Duration
 import java.time.Instant
 
@@ -31,10 +30,6 @@ class Estimate(
     val averageDischargeTime: Long
 ) {
     companion object {
-        private val TAG = "Estimate"
-        private val DURATION_ONE_MINUTE = Duration.ofMinutes(1)
-        private val DURATION_TWO_SECONDS = Duration.ofSeconds(2)
-
         /**
          * Returns the cached estimate if it is available and fresh. Will return null if estimate is
          * unavailable or older than 2 minutes.
@@ -49,7 +44,7 @@ class Estimate(
             val resolver = context.contentResolver
             val lastUpdateTime = getLastCacheUpdateTime(context)
             return if (Duration.between(lastUpdateTime,
-                            Instant.now()) > DURATION_ONE_MINUTE) {
+                            Instant.now()) > Duration.ofMinutes(1)) {
                 null
             } else Estimate(
                     Settings.Global.getLong(resolver,
@@ -73,20 +68,6 @@ class Estimate(
         fun storeCachedEstimate(context: Context, estimate: Estimate) {
             // store the estimate and update the timestamp
             val resolver = context.contentResolver
-            val isBasedOnUsageOldValue =
-                    Settings.Global.getInt(
-                            resolver,
-                            Settings.Global.TIME_REMAINING_ESTIMATE_BASED_ON_USAGE,
-                            0) == 1
-            // update the cache if isBasedOnUsage update forcibly
-            if (isBasedOnUsageOldValue == estimate.isBasedOnUsage
-                      && Duration.between(getLastCacheUpdateTime(context),
-                            Instant.now()) < DURATION_TWO_SECONDS) {
-                Log.d(TAG, "storeCachedEstimate: skip!")
-                return;
-            }
-            Log.d(TAG, "storeCachedEstimate")
-
             Settings.Global.putLong(resolver, Settings.Global.TIME_REMAINING_ESTIMATE_MILLIS,
                     estimate.estimateMillis)
             Settings.Global.putInt(resolver, Settings.Global.TIME_REMAINING_ESTIMATE_BASED_ON_USAGE,

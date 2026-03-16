@@ -181,7 +181,6 @@ jboolean NativeSensorService::sendRuntimeSensorEvent(JNIEnv* env, jint handle, j
 
     int valuesLength = env->GetArrayLength(values);
     jfloat* sensorValues = env->GetFloatArrayElements(values, nullptr);
-    status_t err = OK;
 
     switch (type) {
         case SENSOR_TYPE_ACCELEROMETER:
@@ -192,12 +191,11 @@ jboolean NativeSensorService::sendRuntimeSensorEvent(JNIEnv* env, jint handle, j
         case SENSOR_TYPE_LINEAR_ACCELERATION: {
             if (valuesLength != 3) {
                 ALOGD("Dropping sendRuntimeSensorEvent, wrong number of values.");
-                err = BAD_VALUE;
-            } else {
-                event.acceleration.x = sensorValues[0];
-                event.acceleration.y = sensorValues[1];
-                event.acceleration.z = sensorValues[2];
+                return false;
             }
+            event.acceleration.x = sensorValues[0];
+            event.acceleration.y = sensorValues[1];
+            event.acceleration.z = sensorValues[2];
             break;
         }
         case SENSOR_TYPE_DEVICE_ORIENTATION:
@@ -220,26 +218,21 @@ jboolean NativeSensorService::sendRuntimeSensorEvent(JNIEnv* env, jint handle, j
         case SENSOR_TYPE_LOW_LATENCY_OFFBODY_DETECT: {
             if (valuesLength != 1) {
                 ALOGD("Dropping sendRuntimeSensorEvent, wrong number of values.");
-                err = BAD_VALUE;
-            } else {
-                event.data[0] = sensorValues[0];
+                return false;
             }
+            event.data[0] = sensorValues[0];
             break;
         }
         default: {
             if (valuesLength > 16) {
                 ALOGD("Dropping sendRuntimeSensorEvent, number of values exceeds the maximum.");
-                err = BAD_VALUE;
-            } else {
-                memcpy(event.data, sensorValues, valuesLength * sizeof(float));
+                return false;
             }
+            memcpy(event.data, sensorValues, valuesLength * sizeof(float));
         }
     }
 
-    if (err == OK) {
-        err = mService->sendRuntimeSensorEvent(event);
-    }
-    env->ReleaseFloatArrayElements(values, sensorValues, JNI_ABORT);
+    status_t err = mService->sendRuntimeSensorEvent(event);
     return err == OK;
 }
 
@@ -272,7 +265,6 @@ jboolean NativeSensorService::sendRuntimeSensorAdditionalInfo(JNIEnv* env, jint 
         if (valuesLength > 0) {
             jfloat* sensorValues = env->GetFloatArrayElements(values, nullptr);
             memcpy(event.additional_info.data_float, sensorValues, valuesLength * sizeof(float));
-            env->ReleaseFloatArrayElements(values, sensorValues, JNI_ABORT);
         }
     }
 

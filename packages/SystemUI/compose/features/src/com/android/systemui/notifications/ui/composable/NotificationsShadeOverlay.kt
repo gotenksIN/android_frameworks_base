@@ -97,8 +97,7 @@ constructor(
 
     @Composable
     override fun ContentScope.Content(modifier: Modifier) {
-        val notificationStackPadding =
-            dimensionResource(id = R.dimen.notification_side_paddings_single)
+        val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings)
 
         val viewModel =
             rememberViewModel("NotificationsShadeOverlay-viewModel") {

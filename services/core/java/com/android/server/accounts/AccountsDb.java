@@ -134,6 +134,10 @@ class AccountsDb implements AutoCloseable {
 
     static final String CE_DATABASE_NAME = "accounts_ce.db";
     static final String DE_DATABASE_NAME = "accounts_de.db";
+    private static final String CE_DB_PREFIX = "ceDb.";
+    private static final String CE_TABLE_ACCOUNTS = CE_DB_PREFIX + TABLE_ACCOUNTS;
+    private static final String CE_TABLE_AUTHTOKENS = CE_DB_PREFIX + TABLE_AUTHTOKENS;
+    private static final String CE_TABLE_EXTRAS = CE_DB_PREFIX + TABLE_EXTRAS;
 
     static final int MAX_DEBUG_DB_SIZE = 64;
 
@@ -271,8 +275,10 @@ class AccountsDb implements AutoCloseable {
 
         @Override
         public void onConfigure(SQLiteDatabase db) {
-            db.enableWriteAheadLogging();
-            db.execSQL("PRAGMA synchronous = NORMAL");
+            if (Flags.detachDeCe()) {
+                db.enableWriteAheadLogging();
+                db.execSQL("PRAGMA synchronous = NORMAL");
+            }
         }
 
         @Override
@@ -328,8 +334,9 @@ class AccountsDb implements AutoCloseable {
 
     List<Pair<Account, String>> invalidateAuthToken(String accountType, String authToken) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
-        final String authtokensTable = TABLE_AUTHTOKENS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
+        final String authtokensTable =
+                Flags.detachDeCe() ? TABLE_AUTHTOKENS : CE_TABLE_AUTHTOKENS;
         String[] selectionArgs = {authToken, accountType};
         String sql = "DELETE FROM " + authtokensTable
                 + " WHERE " + AUTHTOKENS_AUTHTOKEN + " = ?"
@@ -355,7 +362,7 @@ class AccountsDb implements AutoCloseable {
 
     Map<String, String> findAuthTokensByAccount(Account account) {
         final SQLiteDatabase db = getReadableCeDb();
-        final String authtokensTable = TABLE_AUTHTOKENS;
+        final String authtokensTable = Flags.detachDeCe() ? TABLE_AUTHTOKENS : CE_TABLE_AUTHTOKENS;
         HashMap<String, String> authTokensForAccount = new HashMap<>();
         Cursor cursor = db.query(authtokensTable,
                 COLUMNS_AUTHTOKENS_TYPE_AND_AUTHTOKEN,
@@ -376,7 +383,7 @@ class AccountsDb implements AutoCloseable {
 
     long insertAuthToken(long accountId, String authTokenType, String authToken) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String authtokensTable = TABLE_AUTHTOKENS;
+        final String authtokensTable = Flags.detachDeCe() ? TABLE_AUTHTOKENS : CE_TABLE_AUTHTOKENS;
         ContentValues values = new ContentValues();
         values.put(AUTHTOKENS_ACCOUNTS_ID, accountId);
         values.put(AUTHTOKENS_TYPE, authTokenType);
@@ -386,7 +393,7 @@ class AccountsDb implements AutoCloseable {
 
     long insertOrReplaceAuthToken(long accountId, String authTokenType, String authToken) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String authtokensTable = TABLE_AUTHTOKENS;
+        final String authtokensTable = Flags.detachDeCe() ? TABLE_AUTHTOKENS : CE_TABLE_AUTHTOKENS;
         ContentValues values = new ContentValues();
         values.put(AUTHTOKENS_ACCOUNTS_ID, accountId);
         values.put(AUTHTOKENS_TYPE, authTokenType);
@@ -397,7 +404,7 @@ class AccountsDb implements AutoCloseable {
 
     int updateCeAccountPassword(long accountId, String password) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         final ContentValues values = new ContentValues();
         values.put(ACCOUNTS_PASSWORD, password);
         return db.update(
@@ -407,7 +414,7 @@ class AccountsDb implements AutoCloseable {
 
     boolean renameCeAccount(long accountId, String newName) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         final ContentValues values = new ContentValues();
         values.put(ACCOUNTS_NAME, newName);
         final String[] argsAccountId = {String.valueOf(accountId)};
@@ -417,14 +424,14 @@ class AccountsDb implements AutoCloseable {
 
     boolean deleteAuthTokensByAccountId(long accountId) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String authtokensTable = TABLE_AUTHTOKENS;
+        final String authtokensTable = Flags.detachDeCe() ? TABLE_AUTHTOKENS : CE_TABLE_AUTHTOKENS;
         return db.delete(authtokensTable, AUTHTOKENS_ACCOUNTS_ID + "=?",
                 new String[] {String.valueOf(accountId)}) > 0;
     }
 
     long findExtrasIdByAccountId(long accountId, String key) {
         final SQLiteDatabase db = getReadableCeDb();
-        final String extrasTable = TABLE_EXTRAS;
+        final String extrasTable = Flags.detachDeCe() ? TABLE_EXTRAS : CE_TABLE_EXTRAS;
         Cursor cursor = db.query(
                 extrasTable, new String[]{EXTRAS_ID},
                 EXTRAS_ACCOUNTS_ID + "=" + accountId + " AND " + EXTRAS_KEY + "=?",
@@ -441,7 +448,7 @@ class AccountsDb implements AutoCloseable {
 
     long insertExtra(long accountId, String key, String value) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String extrasTable = TABLE_EXTRAS;
+        final String extrasTable = Flags.detachDeCe() ? TABLE_EXTRAS : CE_TABLE_EXTRAS;
         ContentValues values = new ContentValues();
         values.put(EXTRAS_KEY, key);
         values.put(EXTRAS_ACCOUNTS_ID, accountId);
@@ -451,7 +458,7 @@ class AccountsDb implements AutoCloseable {
 
     long insertOrReplaceExtra(long accountId, String key, String value) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String extrasTable = TABLE_EXTRAS;
+        final String extrasTable = Flags.detachDeCe() ? TABLE_EXTRAS : CE_TABLE_EXTRAS;
         ContentValues values = new ContentValues();
         values.put(EXTRAS_KEY, key);
         values.put(EXTRAS_ACCOUNTS_ID, accountId);
@@ -462,7 +469,7 @@ class AccountsDb implements AutoCloseable {
 
     Map<String, String> findUserExtrasForAccount(Account account) {
         final SQLiteDatabase db = getReadableCeDb();
-        final String extrasTable = TABLE_EXTRAS;
+        final String extrasTable = Flags.detachDeCe() ? TABLE_EXTRAS : CE_TABLE_EXTRAS;
         Map<String, String> userExtrasForAccount = new HashMap<>();
         String[] selectionArgs = {account.name, account.type};
         try (Cursor cursor = db.query(extrasTable,
@@ -481,7 +488,7 @@ class AccountsDb implements AutoCloseable {
 
     long findCeAccountId(Account account) {
         final SQLiteDatabase db = getReadableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         String[] columns = { ACCOUNTS_ID };
         String selection = "name=? AND type=?";
         String[] selectionArgs = {account.name, account.type};
@@ -496,7 +503,7 @@ class AccountsDb implements AutoCloseable {
 
     String findAccountPasswordByNameAndType(String name, String type) {
         final SQLiteDatabase db = getReadableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         String selection = ACCOUNTS_NAME + "=? AND " + ACCOUNTS_TYPE + "=?";
         String[] selectionArgs = {name, type};
         String[] columns = {ACCOUNTS_PASSWORD};
@@ -511,7 +518,7 @@ class AccountsDb implements AutoCloseable {
 
     long insertCeAccount(Account account, String password) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         ContentValues values = new ContentValues();
         values.put(ACCOUNTS_NAME, account.name);
         values.put(ACCOUNTS_TYPE, account.type);
@@ -711,8 +718,10 @@ class AccountsDb implements AutoCloseable {
 
         @Override
         public void onConfigure(SQLiteDatabase db) {
-            db.enableWriteAheadLogging();
-            db.execSQL("PRAGMA synchronous = NORMAL");
+            if (Flags.detachDeCe()) {
+                db.enableWriteAheadLogging();
+                db.execSQL("PRAGMA synchronous = NORMAL");
+            }
         }
     }
 
@@ -1281,18 +1290,41 @@ class AccountsDb implements AutoCloseable {
     }
 
     List<Account> findCeAccountsNotInDe() {
-        if (!mDeDatabase.mCeAttached) {
-            return Collections.emptyList();
+        if (Flags.detachDeCe()) {
+            if (!mDeDatabase.mCeAttached) {
+                return Collections.emptyList();
+            }
+            Map<Long, Account> ceAccounts = findCeAccountsAsMap();
+            Map<Long, Account> deAccounts = findDeAccountsAsMap();
+            ceAccounts.keySet().removeAll(deAccounts.keySet());
+            return new ArrayList<>(ceAccounts.values());
+        } else {
+            SQLiteDatabase db = mDeDatabase.getReadableDatabaseUserIsUnlocked();
+            // Select accounts from CE that do not exist in DE
+            Cursor cursor = db.rawQuery(
+                    "SELECT " + ACCOUNTS_NAME + "," + ACCOUNTS_TYPE
+                            + " FROM " + CE_TABLE_ACCOUNTS
+                            + " WHERE NOT EXISTS "
+                            + " (SELECT " + ACCOUNTS_ID + " FROM " + TABLE_ACCOUNTS
+                            + " WHERE " + ACCOUNTS_ID + "=" + CE_TABLE_ACCOUNTS + "." + ACCOUNTS_ID
+                            + " )", null);
+            try {
+                List<Account> accounts = new ArrayList<>(cursor.getCount());
+                while (cursor.moveToNext()) {
+                    String accountName = cursor.getString(0);
+                    String accountType = cursor.getString(1);
+                    accounts.add(new Account(accountName, accountType));
+                }
+                return accounts;
+            } finally {
+                cursor.close();
+            }
         }
-        Map<Long, Account> ceAccounts = findCeAccountsAsMap();
-        Map<Long, Account> deAccounts = findDeAccountsAsMap();
-        ceAccounts.keySet().removeAll(deAccounts.keySet());
-        return new ArrayList<>(ceAccounts.values());
     }
 
     private Map<Long, Account> findCeAccountsAsMap() {
         final SQLiteDatabase db = getReadableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         LinkedHashMap<Long, Account> map = new LinkedHashMap<>();
         String[] columns = {ACCOUNTS_ID, ACCOUNTS_TYPE, ACCOUNTS_NAME};
         try (Cursor cursor = db.query(accountsTable, columns,
@@ -1311,7 +1343,7 @@ class AccountsDb implements AutoCloseable {
 
     boolean deleteCeAccount(long accountId) {
         final SQLiteDatabase db = getWritableCeDb();
-        final String accountsTable = TABLE_ACCOUNTS;
+        final String accountsTable = Flags.detachDeCe() ? TABLE_ACCOUNTS : CE_TABLE_ACCOUNTS;
         return db.delete(accountsTable, ACCOUNTS_ID + "=" + accountId, null) > 0;
     }
 
@@ -1348,19 +1380,32 @@ class AccountsDb implements AutoCloseable {
         if (!mDeDatabase.mCeAttached) {
             throw new SQLiteException("CE database is not attached");
         }
-        return mCeDatabase.getReadableDatabase();
+        if (Flags.detachDeCe()) {
+            return mCeDatabase.getReadableDatabase();
+        }
+        return mDeDatabase.getReadableDatabaseUserIsUnlocked();
     }
 
     private SQLiteDatabase getWritableCeDb() {
         if (!mDeDatabase.mCeAttached) {
             throw new SQLiteException("CE database is not attached");
         }
-        return mCeDatabase.getWritableDatabase();
+        if (Flags.detachDeCe()) {
+            return mCeDatabase.getWritableDatabase();
+        }
+        return mDeDatabase.getWritableDatabaseUserIsUnlocked();
     }
 
     void attachCeDatabase(File ceDbFile) {
-        mCeDatabase = CeDatabaseHelper.create(mContext, mPreNDatabaseFile, ceDbFile);
-        mDeDatabase.mCeAttached = true;
+        if (Flags.detachDeCe()) {
+            mCeDatabase = CeDatabaseHelper.create(mContext, mPreNDatabaseFile, ceDbFile);
+            mDeDatabase.mCeAttached = true;
+        } else {
+            CeDatabaseHelper.create(mContext, mPreNDatabaseFile, ceDbFile);
+            SQLiteDatabase db = mDeDatabase.getWritableDatabase();
+            db.execSQL("ATTACH DATABASE '" +  ceDbFile.getPath()+ "' AS ceDb");
+            mDeDatabase.mCeAttached = true;
+        }
     }
 
     /*

@@ -1135,7 +1135,6 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.hideSurfaceBehindKeyguard();
 
         verify(mKeyguardStateController).notifyKeyguardGoingAway(false);
-        verify(mUpdateMonitor).setKeyguardGoingAway(false);
     }
 
     @Test

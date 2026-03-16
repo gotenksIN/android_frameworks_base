@@ -367,20 +367,12 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
         final int displayId = waitAndGetDisplayId();
         if (displayId != INVALID_DISPLAY) {
             final ComponentName componentName = activityInfo.getComponentName();
-            final ComponentName topComponentName;
-            final int currentWindowFlags;
-            synchronized (mGenericWindowPolicyControllerLock) {
-                topComponentName = mWindowFlagsTracker.getTopComponentName();
-                if (Objects.equals(componentName, topComponentName)) {
-                    currentWindowFlags = mWindowFlagsTracker.getCurrentWindowFlags();
-                    mWindowFlagsTracker.setWindowFlagsForComponentName(componentName, windowFlags);
-                } else {
-                    currentWindowFlags = FLAG_NONE;
-                }
-            }
+            final ComponentName topComponentName = mWindowFlagsTracker.getTopComponentName();
             if (Objects.equals(componentName, topComponentName)) {
+                final int currentWindowFlags = mWindowFlagsTracker.getCurrentWindowFlags();
                 detectSecureWindowStatusChange(windowFlags, currentWindowFlags, componentName,
                         activityInfo.applicationInfo.uid, displayId);
+                mWindowFlagsTracker.setWindowFlagsForComponentName(componentName, windowFlags);
             }
         }
 
@@ -398,7 +390,6 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
         return true;
     }
 
-    // TODO(b/487544125): Support multiple top activity changes for desktop mode.
     @Override
     public void onTopActivityChanged(ComponentName topActivity, int uid, @UserIdInt int userId) {
         final int displayId = waitAndGetDisplayId();
@@ -413,14 +404,10 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
         mHandler.post(() ->
                 mActivityListener.onTopActivityChanged(displayId, topActivity, userId));
 
-        final int windowFlagsForComponentName;
-        final int currentWindowFlags;
-        synchronized (mGenericWindowPolicyControllerLock) {
-            windowFlagsForComponentName =
-                    mWindowFlagsTracker.getWindowFlagsForComponentName(topActivity);
-            currentWindowFlags = mWindowFlagsTracker.getCurrentWindowFlags();
-            mWindowFlagsTracker.setTopComponentName(topActivity);
-        }
+        final int windowFlagsForComponentName =
+                mWindowFlagsTracker.getWindowFlagsForComponentName(topActivity);
+        final int currentWindowFlags = mWindowFlagsTracker.getCurrentWindowFlags();
+        mWindowFlagsTracker.setTopComponentName(topActivity);
         detectSecureWindowStatusChange(windowFlagsForComponentName, currentWindowFlags,
                 topActivity, uid, displayId);
     }
@@ -509,8 +496,6 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
         // The callback is fired only when window flags have changed, to let the VirtualDevice owner
         // know that the secure/insecure state of the content on the virtual display has changed.
         // Post callback on the main thread, so it doesn't block activity launching.
-        // TODO(b/487544125): Support multiple secure surfaces shown or hidden in succession in
-        // desktop mode.
         if (isSecureContent(newWindowFlags) && !isSecureContent(previousWindowFlags)) {
             mHandler.post(
                     () -> mActivityListener.onSecureWindowShown(displayId, componentName, uid));
@@ -579,7 +564,6 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
             }
         }
 
-        @GuardedBy("mLock")
         private int getWindowFlagsForComponentNameLocked(@NonNull ComponentName componentName) {
             return mComponentNameToWindowFlagsMap.getOrDefault(componentName, FLAG_NONE);
         }

@@ -36,7 +36,6 @@ import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import com.android.internal.infra.AndroidFuture
-import com.android.server.appfunctions.dynamic.MultiUserDynamicAppFunctionRegistry
 import com.google.common.truth.Truth.assertThat
 import com.google.common.util.concurrent.MoreExecutors
 import kotlin.coroutines.resume

@@ -1320,8 +1320,8 @@ public final class ViewRootImpl implements ViewParent,
             }
         };
 
-    private HardwareRenderer.CornerRadiiCallback mHardwareRendererCornerRadiiCallback =
-            new HardwareRenderer.CornerRadiiCallback() {
+    private BLASTBufferQueue.CornerRadiiCallback mCornerRadiiCallback =
+            new BLASTBufferQueue.CornerRadiiCallback() {
                 @Override
                 public void onCornerRadiiChanged(float[] cornerRadii) {
                     if (!setClientDrawnCornerRadii()) {
@@ -2144,14 +2144,6 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
-  private void updateRendererSurfaceControlAndBbq(SurfaceControl sc, BLASTBufferQueue bq) {
-      if (mAttachInfo.mThreadedRenderer == null) { return; }
-      mAttachInfo.mThreadedRenderer.setSurfaceControl(sc, bq);
-      mAttachInfo.mThreadedRenderer.setCornerRadiiCallback(mHardwareRendererCornerRadiiCallback);
-      mAttachInfo.mThreadedRenderer.setWaitForBufferReleaseCallback(
-              mChoreographer::onWaitForBufferRelease);
-  }
-
     @UnsupportedAppUsage
     private void enableHardwareAcceleration(WindowManager.LayoutParams attrs) {
         mAttachInfo.mHardwareAccelerated = false;
@@ -2200,7 +2192,7 @@ public final class ViewRootImpl implements ViewParent,
                 if (mPerfHintSessionDisabled) {
                     renderer.setHintSessionEnabled(false);
                 }
-                updateRendererSurfaceControlAndBbq(mSurfaceControl, mBlastBufferQueue);
+                renderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
                 updateColorModeIfNeeded(attrs.getColorMode(), attrs.getDesiredHdrHeadroom());
                 mHdrRenderState.forceUpdateHdrSdrRatio();
                 updateForceDarkMode();
@@ -3070,12 +3062,12 @@ public final class ViewRootImpl implements ViewParent,
         // queuing buffers on multiple apply tokens causing out of order buffer submissions. We
         // fix this by setting the same apply token on all BBQs created by this VRI.
         mBlastBufferQueue.setApplyToken(mBbqApplyToken);
-        mBlastBufferQueue.update(mSurfaceControl, mSurfaceSize.x, mSurfaceSize.y,
+        mBlastBufferQueue.update(mSurfaceControl,  mSurfaceSize.x, mSurfaceSize.y,
                 mWindowAttributes.format);
         mBlastBufferQueue.setTransactionHangCallback(sTransactionHangCallback);
-
+        mBlastBufferQueue.setWaitForBufferReleaseCallback(mChoreographer::onWaitForBufferRelease);
+        mBlastBufferQueue.setCornerRadiiCallback(mCornerRadiiCallback);
         Surface blastSurface;
-
         blastSurface = mBlastBufferQueue.createSurfaceWithHandle();
         // Only call transferFrom if the surface has changed to prevent inc the generation ID and
         // causing EGL resources to be recreated.
@@ -3148,7 +3140,9 @@ public final class ViewRootImpl implements ViewParent,
             mBlastBufferQueue = null;
         }
 
-        updateRendererSurfaceControlAndBbq(null, null);
+        if (mAttachInfo.mThreadedRenderer != null) {
+            mAttachInfo.mThreadedRenderer.setSurfaceControl(null, null);
+        }
 
         // Also reset the VRR relevant values.
         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_DEFAULT;
@@ -7225,6 +7219,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final int MSG_INVALIDATE_WORLD = 22;
     private static final int MSG_WINDOW_MOVED = 23;
     private static final int MSG_SYNTHESIZE_INPUT_EVENT = 24;
+    private static final int MSG_DISPATCH_WINDOW_SHOWN = 25;
     private static final int MSG_REQUEST_KEYBOARD_SHORTCUTS = 26;
     private static final int MSG_POINTER_CAPTURE_CHANGED = 28;
     private static final int MSG_INSETS_CONTROL_CHANGED = 29;
@@ -7292,6 +7287,8 @@ public final class ViewRootImpl implements ViewParent,
                     return "MSG_WINDOW_MOVED";
                 case MSG_SYNTHESIZE_INPUT_EVENT:
                     return "MSG_SYNTHESIZE_INPUT_EVENT";
+                case MSG_DISPATCH_WINDOW_SHOWN:
+                    return "MSG_DISPATCH_WINDOW_SHOWN";
                 case MSG_POINTER_CAPTURE_CHANGED:
                     return "MSG_POINTER_CAPTURE_CHANGED";
                 case MSG_INSETS_CONTROL_CHANGED:
@@ -7537,6 +7534,9 @@ public final class ViewRootImpl implements ViewParent,
                     if (mView != null) {
                         invalidateWorld(mView);
                     }
+                } break;
+                case MSG_DISPATCH_WINDOW_SHOWN: {
+                    handleDispatchWindowShown();
                 } break;
                 case MSG_REQUEST_KEYBOARD_SHORTCUTS: {
                     final IResultReceiver receiver = (IResultReceiver) msg.obj;
@@ -9835,6 +9835,10 @@ public final class ViewRootImpl implements ViewParent,
         mAttachInfo.mForceReportNewAttributes = true;
     }
 
+    public void handleDispatchWindowShown() {
+        mAttachInfo.mTreeObserver.dispatchOnWindowShown();
+    }
+
     public void handleRequestKeyboardShortcuts(IResultReceiver receiver, int deviceId) {
         Bundle data = new Bundle();
         ArrayList<KeyboardShortcutGroup> list = new ArrayList<>();
@@ -10320,7 +10324,7 @@ public final class ViewRootImpl implements ViewParent,
         if (mSurfaceControl.isValid()) {
             updateRenderTargetIfNeeded();
             if (mAttachInfo.mThreadedRenderer != null) {
-                updateRendererSurfaceControlAndBbq(mSurfaceControl, mBlastBufferQueue);
+                mAttachInfo.mThreadedRenderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
             }
             mHdrRenderState.forceUpdateHdrSdrRatio();
             if (transformHintChanged) {
@@ -11719,6 +11723,10 @@ public final class ViewRootImpl implements ViewParent,
         mHandler.sendMessage(msg);
     }
 
+    public void dispatchWindowShown() {
+        mHandler.sendEmptyMessage(MSG_DISPATCH_WINDOW_SHOWN);
+    }
+
     public void dispatchCloseSystemDialogs(String reason) {
         Message msg = Message.obtain();
         msg.what = MSG_CLOSE_SYSTEM_DIALOGS;
@@ -12782,6 +12790,14 @@ public final class ViewRootImpl implements ViewParent,
             final ViewRootImpl viewAncestor = mViewAncestor.get();
             if (viewAncestor != null) {
                 viewAncestor.dispatchDragEvent(event);
+            }
+        }
+
+        @Override
+        public void dispatchWindowShown() {
+            final ViewRootImpl viewAncestor = mViewAncestor.get();
+            if (viewAncestor != null) {
+                viewAncestor.dispatchWindowShown();
             }
         }
 

@@ -17,6 +17,8 @@
 package com.android.systemui.statusbar.policy
 
 import android.app.ActivityOptions
+import android.app.Flags.enableActionAttribution
+import android.app.Flags.notificationAnimatedActionContentDescription
 import android.app.Notification
 import android.app.Notification.Action.SEMANTIC_ACTION_MARK_CONVERSATION_AS_PRIORITY
 import android.app.PendingIntent
@@ -34,6 +36,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.service.notification.StatusBarNotification
+import android.text.Annotation
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
@@ -42,6 +48,7 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import android.widget.Button
+import androidx.appcompat.content.res.AppCompatResources
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
 import com.android.systemui.shared.system.ActivityManagerWrapper
@@ -377,7 +384,11 @@ interface SmartActionInflater {
 private const val ICON_TASK_TIMEOUT_MS = 500L
 private val iconTaskThreadPool = ThreadPoolExecutor(0, 25, 1, TimeUnit.MINUTES, SynchronousQueue())
 
-fun loadIconDrawableWithTimeout(icon: Icon, packageContext: Context, targetSize: Int): Drawable? {
+private fun loadIconDrawableWithTimeout(
+    icon: Icon,
+    packageContext: Context,
+    targetSize: Int,
+): Drawable? {
     if (icon.type != Icon.TYPE_URI && icon.type != Icon.TYPE_URI_ADAPTIVE_BITMAP) {
         return icon.loadDrawable(packageContext)
     }
@@ -419,10 +430,10 @@ fun loadIconDrawableWithTimeout(icon: Icon, packageContext: Context, targetSize:
     return result
 }
 
-open class SmartActionInflaterImpl
+/* internal */ class SmartActionInflaterImpl
 @Inject
 constructor(
-    protected val constants: SmartReplyConstants,
+    private val constants: SmartReplyConstants,
     private val activityStarter: ActivityStarter,
     private val smartReplyController: SmartReplyController,
     private val headsUpManager: HeadsUpManager,
@@ -437,42 +448,73 @@ constructor(
         delayOnClickListener: Boolean,
         packageContext: Context,
     ): Button {
-        val button =
-            LayoutInflater.from(parent.context)
-                .inflate(R.layout.notification_2025_smart_action_button, parent, false) as Button
-
-        button.apply {
-            text = action.title
-
-            // We received the Icon from the application - so use the Context of the application
-            // to reference icon resources.
-            val iconSize =
-                context.resources.getDimensionPixelSize(
-                    R.dimen.notification_2025_smart_action_button_icon_size
-                )
-            val iconDrawable =
-                loadIconDrawableWithTimeout(action.getIcon(), packageContext, iconSize)
-                    ?: GradientDrawable()
-            iconDrawable.setBounds(0, 0, iconSize, iconSize)
-            // Add the action icon to the Smart Action button.
-            setCompoundDrawablesRelative(iconDrawable, null, null, null)
-
-            val onClickListener =
-                View.OnClickListener {
-                    onSmartActionClick(entry, smartActions, actionIndex, action)
+        val isAnimatedAction =
+            smartActions.fromAssistant &&
+                action.extras.getBoolean(Notification.Action.EXTRA_IS_ANIMATED, false)
+        val layoutRes =
+            if (isAnimatedAction) {
+                R.layout.animated_action_button
+            } else {
+                R.layout.notification_2025_smart_action_button
+            }
+        return (LayoutInflater.from(parent.context).inflate(layoutRes, parent, false) as Button)
+            .apply {
+                if (enableActionAttribution() && isAnimatedAction) {
+                    val fullTextWithAttribution = formatChoiceWithAttribution(context, action.title)
+                    text = fullTextWithAttribution
+                } else {
+                    text = action.title
                 }
-            setOnClickListener(
-                if (delayOnClickListener)
-                    DelayedOnClickListener(onClickListener, constants.onClickInitDelay)
-                else onClickListener
-            )
-            // Mark this as an Action button
-            (layoutParams as SmartReplyView.LayoutParams).mButtonType = SmartButtonType.ACTION
-        }
-        return button
+                if (
+                    notificationAnimatedActionContentDescription() &&
+                        isAnimatedAction &&
+                        action.extras.containsKey(Notification.Action.EXTRA_CONTENT_DESCRIPTION)
+                ) {
+                    contentDescription =
+                        action.extras.getString(Notification.Action.EXTRA_CONTENT_DESCRIPTION)
+                }
+
+                // We received the Icon from the application - so use the Context of the application
+                // to
+                // reference icon resources.
+                val newIconSize =
+                    if (isAnimatedAction) {
+                        context.resources.getDimensionPixelSize(
+                            R.dimen.animated_action_button_icon_size
+                        )
+                    } else {
+                        context.resources.getDimensionPixelSize(
+                            R.dimen.notification_2025_smart_action_button_icon_size
+                        )
+                    }
+                val iconDrawable =
+                    loadIconDrawableWithTimeout(action.getIcon(), packageContext, newIconSize)
+                        ?: GradientDrawable()
+                iconDrawable.setBounds(0, 0, newIconSize, newIconSize)
+                // Add the action icon to the Smart Action button.
+                setCompoundDrawablesRelative(iconDrawable, null, null, null)
+
+                val onClickListener =
+                    View.OnClickListener {
+                        onSmartActionClick(entry, smartActions, actionIndex, action)
+                    }
+                setOnClickListener(
+                    if (delayOnClickListener)
+                        DelayedOnClickListener(onClickListener, constants.onClickInitDelay)
+                    else onClickListener
+                )
+                if (isAnimatedAction) {
+                    (layoutParams as SmartReplyView.LayoutParams).mButtonType =
+                        SmartButtonType.ANIMATED_ACTION
+                } else {
+                    // Mark this as an Action button
+                    (layoutParams as SmartReplyView.LayoutParams).mButtonType =
+                        SmartButtonType.ACTION
+                }
+            }
     }
 
-    fun onSmartActionClick(
+    private fun onSmartActionClick(
         entry: NotificationEntry,
         smartActions: SmartActions,
         actionIndex: Int,
@@ -516,10 +558,10 @@ interface SmartReplyInflater {
     ): Button
 }
 
-open class SmartReplyInflaterImpl
+class SmartReplyInflaterImpl
 @Inject
 constructor(
-    protected val constants: SmartReplyConstants,
+    private val constants: SmartReplyConstants,
     private val keyguardDismissUtil: KeyguardDismissUtil,
     private val remoteInputManager: NotificationRemoteInputManager,
     private val smartReplyController: SmartReplyController,
@@ -534,41 +576,88 @@ constructor(
         choice: CharSequence,
         delayOnClickListener: Boolean,
     ): Button {
-        val button =
-            LayoutInflater.from(parent.context)
-                .inflate(R.layout.notification_2025_smart_reply_button, parent, false) as Button
+        val enableAnimatedReply = smartReplies.fromAssistant && isAnimatedReply(choice)
+        val layoutRes =
+            if (enableAnimatedReply) {
+                R.layout.animated_action_button
+            } else {
+                R.layout.notification_2025_smart_reply_button
+            }
 
-        button.apply {
-            text = choice
-
-            val onClickListener =
-                View.OnClickListener {
-                    onSmartReplyClick(entry, smartReplies, replyIndex, parent, this, choice)
-                }
-            setOnClickListener(
-                if (delayOnClickListener)
-                    DelayedOnClickListener(onClickListener, constants.onClickInitDelay)
-                else onClickListener
-            )
-            accessibilityDelegate =
-                object : View.AccessibilityDelegate() {
-                    override fun onInitializeAccessibilityNodeInfo(
-                        host: View,
-                        info: AccessibilityNodeInfo,
-                    ) {
-                        super.onInitializeAccessibilityNodeInfo(host, info)
-                        val label =
-                            parent.resources.getString(R.string.accessibility_send_smart_reply)
-                        val action = AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, label)
-                        info.addAction(action)
+        return (LayoutInflater.from(parent.context).inflate(layoutRes, parent, false) as Button)
+            .apply {
+                // choiceToDeliver does not contain Annotation with extra data
+                val choiceToDeliver: CharSequence
+                if (enableAnimatedReply) {
+                    choiceToDeliver = choice.toString()
+                    // If the choice is animated reply, format the text by concatenating
+                    // attributionText with different color to choice text
+                    val fullTextWithAttribution = formatChoiceWithAttribution(context, choice)
+                    text = fullTextWithAttribution
+                    if (notificationAnimatedActionContentDescription()) {
+                        val animatedReplyContentDescription =
+                            getAnimatedReplyContentDescription(choice)
+                        if (animatedReplyContentDescription != null) {
+                            contentDescription = animatedReplyContentDescription
+                        }
                     }
+                    // Add the icon to the Animated Reply button
+                    val animatedReplyIconSize =
+                        context.resources.getDimensionPixelSize(
+                            R.dimen.animated_action_button_icon_size
+                        )
+                    val iconDrawable =
+                        AppCompatResources.getDrawable(context, R.drawable.ic_content_paste_spark)
+                    if (iconDrawable != null) {
+                        iconDrawable.setBounds(0, 0, animatedReplyIconSize, animatedReplyIconSize)
+                        setCompoundDrawablesRelative(iconDrawable, null, null, null)
+                    }
+                } else {
+                    choiceToDeliver = choice
+                    text = choice
                 }
-            (layoutParams as SmartReplyView.LayoutParams).mButtonType = SmartButtonType.REPLY
-        }
-        return button
+
+                val onClickListener =
+                    View.OnClickListener {
+                        onSmartReplyClick(
+                            entry,
+                            smartReplies,
+                            replyIndex,
+                            parent,
+                            this,
+                            choiceToDeliver,
+                        )
+                    }
+                setOnClickListener(
+                    if (delayOnClickListener)
+                        DelayedOnClickListener(onClickListener, constants.onClickInitDelay)
+                    else onClickListener
+                )
+                accessibilityDelegate =
+                    object : View.AccessibilityDelegate() {
+                        override fun onInitializeAccessibilityNodeInfo(
+                            host: View,
+                            info: AccessibilityNodeInfo,
+                        ) {
+                            super.onInitializeAccessibilityNodeInfo(host, info)
+                            val label =
+                                parent.resources.getString(R.string.accessibility_send_smart_reply)
+                            val action =
+                                AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, label)
+                            info.addAction(action)
+                        }
+                    }
+                if (enableAnimatedReply) {
+                    (layoutParams as SmartReplyView.LayoutParams).mButtonType =
+                        SmartButtonType.ANIMATED_REPLY
+                } else {
+                    (layoutParams as SmartReplyView.LayoutParams).mButtonType =
+                        SmartButtonType.REPLY
+                }
+            }
     }
 
-    fun onSmartReplyClick(
+    private fun onSmartReplyClick(
         entry: NotificationEntry,
         smartReplies: SmartReplies,
         replyIndex: Int,
@@ -621,7 +710,7 @@ constructor(
             false // do not defer
         }
 
-    internal fun createRemoteInputIntent(smartReplies: SmartReplies, choice: CharSequence): Intent {
+    private fun createRemoteInputIntent(smartReplies: SmartReplies, choice: CharSequence): Intent {
         val results = Bundle()
         results.putString(smartReplies.remoteInput.resultKey, choice.toString())
         val intent = Intent().addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
@@ -629,12 +718,38 @@ constructor(
         RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_CHOICE)
         return intent
     }
+
+    // Check if the choice is animated reply
+    private fun isAnimatedReply(choice: CharSequence): Boolean {
+        if (choice is Spanned) {
+            val annotations = choice.getSpans(0, choice.length, Annotation::class.java)
+            for (annotation in annotations) {
+                if (annotation.key == "isAnimatedReply" && annotation.value == "1") {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    // Get content description if it's animated reply.
+    private fun getAnimatedReplyContentDescription(choice: CharSequence): String? {
+        if (choice is Spanned) {
+            val annotations = choice.getSpans(0, choice.length, Annotation::class.java)
+            for (annotation in annotations) {
+                if (annotation.key == "contentDescription") {
+                    return annotation.value
+                }
+            }
+        }
+        return null
+    }
 }
 
 /**
  * An OnClickListener wrapper that blocks the underlying OnClickListener for a given amount of time.
  */
-class DelayedOnClickListener(
+private class DelayedOnClickListener(
     private val mActualListener: View.OnClickListener,
     private val mInitDelayMs: Long,
 ) : View.OnClickListener {
@@ -670,3 +785,31 @@ private fun ActivityStarter.startPendingIntentDismissingKeyguard(
     associatedView: View?,
     runnable: () -> Unit,
 ) = startPendingIntentDismissingKeyguard(intent, runnable::invoke, associatedView)
+
+// Format the text by concatenating attributionText with attribution text color to choice text
+private fun formatChoiceWithAttribution(context: Context, choice: CharSequence): CharSequence {
+    val colorInt = context.getColor(R.color.animated_action_button_attribution_color)
+    if (choice is Spanned) {
+        val annotations = choice.getSpans(0, choice.length, Annotation::class.java)
+        for (annotation in annotations) {
+            if (annotation.key == "attributionText") {
+                // Extract the attribution text
+                val extraText = annotation.value
+                // Concatenate choice text and attribution text
+                val spannableWithColor = SpannableStringBuilder(choice)
+                spannableWithColor.append(" $extraText")
+                // Apply color to attribution text
+                spannableWithColor.setSpan(
+                    ForegroundColorSpan(colorInt),
+                    choice.length,
+                    spannableWithColor.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                return spannableWithColor
+            }
+        }
+    }
+
+    // Return the original if no attributionText found
+    return choice.toString()
+}

@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <SkBitmap.h>
 #include <SkImage.h>
 #include <SkSurface.h>
 #include <binder/Binder.h>
@@ -28,7 +27,6 @@ class GrDirectContext;
 
 namespace android {
 class GraphicBuffer;
-class RenderCommandBuffer;
 }
 
 namespace android {
@@ -91,10 +89,11 @@ public:
 
     OoprLayerResult createLayerSurface(uint32_t width, uint32_t height, GrDirectContext* context);
     void registerBuffer(const sp<GraphicBuffer>& buffer, const sk_sp<SkImage>& image);
-    void registerBitmap(const SkBitmap& bitmap, const sk_sp<SkImage>& image);
+    void registerBitmap(const SkBitmap& bitmap, const sk_sp<SkImage>& image,
+                        const sp<GraphicBuffer>& buffer);
     void deregisterBuffer(const sk_sp<SkImage>& image);
 
-    void sendPendingBitmapRegistrations(RenderCommandBuffer* cmds);
+    void registerPendingBitmaps();
 
 private:
     OoprClient();
@@ -103,20 +102,6 @@ private:
     bool mEnableOOPR = false;
     sp<BBinder> mToken;
     std::unique_ptr<IPCClientResourceCache> mCache;
-
-    struct Registration {
-        sp<GraphicBuffer> buffer;
-        sk_sp<SkImage> image;
-        SkBitmap bitmap;
-    };
-
-    struct Deregistration {
-        uint64_t imageId;
-        uint64_t bufferId = 0;
-    };
-
-    std::vector<Registration> mRegistrations;
-    std::vector<Deregistration> mDeregistrations;
 };
 
 #endif

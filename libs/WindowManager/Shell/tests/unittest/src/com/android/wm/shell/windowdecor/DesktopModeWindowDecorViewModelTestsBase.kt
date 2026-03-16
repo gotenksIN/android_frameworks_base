@@ -221,6 +221,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
         spyContext.setMockPackageManager(packageManager)
         snapController = SnapController()
         doNothing().`when`(spyContext).startActivity(any())
+        doNothing().`when`(mockWindowDecoration).a11yAnnounceNewFocusedWindow()
         shellInit = ShellInit(testShellExecutor)
         windowDecorByTaskIdSpy.clear()
         spyContext.addMockSystemService(InputManager::class.java, mockInputManager)

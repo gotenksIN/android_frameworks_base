@@ -30,7 +30,6 @@ import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
 import android.view.ViewStub
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -48,7 +47,6 @@ import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieCompositionFactory
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.theme.PlatformTheme
-import com.android.systemui.Flags
 import com.android.systemui.biometrics.BiometricAuthIconAssets
 import com.android.systemui.biometrics.Utils.ellipsize
 import com.android.systemui.biometrics.shared.model.BiometricModalities
@@ -124,8 +122,6 @@ object BiometricViewBinder {
 
         val iconView = view.requireViewById<LottieAnimationView>(R.id.biometric_icon)
         val indicatorMessageView = view.requireViewById<TextView>(R.id.indicator)
-
-        val closeButton = view.requireViewById<ImageButton>(R.id.close_button)
 
         // Negative-side (left) buttons
         val negativeButton = view.requireViewById<Button>(R.id.button_negative)
@@ -226,7 +222,6 @@ object BiometricViewBinder {
             )
 
             // set button listeners
-            closeButton.setOnClickListener { legacyCallback.onUserCanceled() }
             cancelButton.setOnClickListener { legacyCallback.onUserCanceled() }
             credentialFallbackButton.setOnClickListener {
                 viewModel.onSwitchToCredential()
@@ -289,29 +284,25 @@ object BiometricViewBinder {
             }
 
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                if (!Flags.largeScreenBp()) {
-                    // handle background clicks
-                    launch {
-                        combine(viewModel.isAuthenticated, viewModel.size) {
-                                (authenticated, _),
-                                size ->
-                                when {
-                                    authenticated -> false
-                                    size == PromptSize.SMALL -> false
-                                    size == PromptSize.LARGE -> false
-                                    else -> true
+                // handle background clicks
+                launch {
+                    combine(viewModel.isAuthenticated, viewModel.size) { (authenticated, _), size ->
+                            when {
+                                authenticated -> false
+                                size == PromptSize.SMALL -> false
+                                size == PromptSize.LARGE -> false
+                                else -> true
+                            }
+                        }
+                        .collect { dismissOnClick ->
+                            backgroundView.setOnClickListener {
+                                if (dismissOnClick) {
+                                    legacyCallback.onUserCanceled()
+                                } else {
+                                    Log.w(TAG, "Ignoring background click")
                                 }
                             }
-                            .collect { dismissOnClick ->
-                                backgroundView.setOnClickListener {
-                                    if (dismissOnClick) {
-                                        legacyCallback.onUserCanceled()
-                                    } else {
-                                        Log.w(TAG, "Ignoring background click")
-                                    }
-                                }
-                            }
-                    }
+                        }
                 }
 
                 launch {

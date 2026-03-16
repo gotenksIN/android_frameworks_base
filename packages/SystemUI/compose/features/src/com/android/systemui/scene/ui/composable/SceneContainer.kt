@@ -156,18 +156,11 @@ private fun InternalSceneContainer(
 
     val resources = LocalResources.current
     val sceneTransitions =
-        remember(
-            hapticFeedback,
-            shadeExpansionMotion,
-            animateQsTilesViewModel,
-            resources,
-            viewModel.toBouncerTransitionViewModel,
-        ) {
+        remember(hapticFeedback, shadeExpansionMotion, animateQsTilesViewModel, resources) {
             transitionsBuilder.build(
                 shadeExpansionMotion,
                 viewModel.hapticsViewModel.getRevealHaptics(hapticFeedback),
                 animateQsTilesViewModel,
-                viewModel.toBouncerTransitionViewModel,
                 resources,
             )
         }

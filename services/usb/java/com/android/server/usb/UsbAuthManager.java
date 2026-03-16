@@ -75,7 +75,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.List;
 
 public class UsbAuthManager implements IBinder.DeathRecipient {
     private static final String TAG = "UsbAuthManager";
@@ -380,18 +379,6 @@ public class UsbAuthManager implements IBinder.DeathRecipient {
             mContext.registerReceiver(
                     mDismissNotificationReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         }
-
-        // We may have missed some Ask and AllowPersist callbacks during boot. Take care of them
-        // here after the system is further along in boot.
-        List<UsbAuthDeviceInfo> allowPersistDevices = getDevicesAwaitingPersistedAuthorization();
-        for (UsbAuthDeviceInfo device : allowPersistDevices) {
-            mAuthEventsListener.onDeviceCheckPersistedAuthorization(device);
-        }
-
-        List<UsbAuthDeviceInfo> askDevices = getDevicesAwaitingAuthorization();
-        for (UsbAuthDeviceInfo device : askDevices) {
-            mAuthEventsListener.onDeviceAskForAuthorization(device);
-        }
     }
 
     private IUsbAuthManager getService() {
@@ -454,34 +441,6 @@ public class UsbAuthManager implements IBinder.DeathRecipient {
         } catch (IllegalArgumentException e) {
             Slog.e(TAG, "Failed to set authorization: ", e);
         }
-    }
-
-    private List<UsbAuthDeviceInfo> getDevicesAwaitingAuthorization() {
-        try {
-            IUsbAuthManager service = getService();
-            if (service != null) {
-                return service.getDevicesAwaitingAuthorization();
-            }
-        } catch (RemoteException e) {
-            Slog.e(TAG, "Failed to get devices awaiting authorization", e);
-            binderDied();
-        }
-
-        return List.of();
-    }
-
-    private List<UsbAuthDeviceInfo> getDevicesAwaitingPersistedAuthorization() {
-        try {
-            IUsbAuthManager service = getService();
-            if (service != null) {
-                return service.getDevicesAwaitingPersistedAuthorization();
-            }
-        } catch (RemoteException e) {
-            Slog.e(TAG, "Failed to get devices awaiting persisted authorization", e);
-            binderDied();
-        }
-
-        return List.of();
     }
 
     public void onUpdateScreenLockedState(boolean locked) {

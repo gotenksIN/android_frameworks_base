@@ -34,7 +34,6 @@ import com.android.window.flags.Flags
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
-import com.android.wm.shell.desktopmode.DesktopScrimController
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.data.DesktopRepository
@@ -73,7 +72,6 @@ class ResizeTaskPositionerTest : ShellTestCase() {
     private val mockDesktopRepository = mock<DesktopRepository>()
     private val mockDragEventListener = mock<DragPositioningCallbackUtility.DragEventListener>()
     private val mockInteractionJankMonitor = mock<InteractionJankMonitor>()
-    private val mockDesktopScrimController = mock<DesktopScrimController>()
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var taskPositioner: ResizeTaskPositioner
@@ -99,8 +97,6 @@ class ResizeTaskPositionerTest : ShellTestCase() {
         whenever(mockDesktopRepository.hasBoundsBeforeSnapOrMaximize(any())).thenReturn(true)
         whenever(mockDesktopRepository.getBoundsBeforeSnapOrMaximize(TASK_ID))
             .thenReturn(mock<Rect>())
-        whenever(mockDesktopTasksController.getDesktopScrimController())
-            .thenReturn(mockDesktopScrimController)
 
         taskPositioner =
             ResizeTaskPositioner(
@@ -139,12 +135,13 @@ class ResizeTaskPositionerTest : ShellTestCase() {
 
         taskPositioner.onDragPositioningMove(0, 200f, 200f)
         verify(mockTaskResizer).onResizeUpdate(any(), eq(200f), eq(200f))
-        verify(mockDesktopScrimController).updateDesktopScrimOnResize(any(), any(), any())
+        verify(mockDesktopTasksController).updateTaskbarRoundingOnTaskResize(any(), any(), any())
 
         // Second move, expecting no taskbar rounding update.
-        clearInvocations(mockDesktopScrimController)
+        clearInvocations(mockDesktopTasksController)
         taskPositioner.onDragPositioningMove(0, 210f, 210f)
-        verify(mockDesktopScrimController, never()).updateDesktopScrimOnResize(any(), any(), any())
+        verify(mockDesktopTasksController, never())
+            .updateTaskbarRoundingOnTaskResize(any(), any(), any())
 
         // End
         taskPositioner.onDragPositioningEnd(0, 50f, 50f)
@@ -215,12 +212,13 @@ class ResizeTaskPositionerTest : ShellTestCase() {
         // First Move
         taskPositioner.onDragPositioningMove(1, 200f, 200f)
         verify(mockTaskMover).onMoveUpdate(any(), eq(1), eq(200f), eq(200f))
-        verify(mockDesktopScrimController).updateDesktopScrimOnResize(any(), any(), any())
+        verify(mockDesktopTasksController).updateTaskbarRoundingOnTaskResize(any(), any(), any())
 
         // Second move, expecting no taskbar rounding update.
-        clearInvocations(mockDesktopScrimController)
+        clearInvocations(mockDesktopTasksController)
         taskPositioner.onDragPositioningMove(1, 210f, 210f)
-        verify(mockDesktopScrimController, never()).updateDesktopScrimOnResize(any(), any(), any())
+        verify(mockDesktopTasksController, never())
+            .updateTaskbarRoundingOnTaskResize(any(), any(), any())
 
         // End
         taskPositioner.onDragPositioningEnd(2, 50f, 50f)

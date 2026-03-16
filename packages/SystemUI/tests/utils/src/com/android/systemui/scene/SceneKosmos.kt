@@ -32,7 +32,6 @@ import com.android.systemui.scene.ui.viewmodel.SceneContainerToastDisplayer
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneTransitionBlurViewModel
 import com.android.systemui.scene.ui.viewmodel.dualShadeEducationalTooltipsViewModelFactory
-import com.android.systemui.scene.ui.viewmodel.toBouncerTransitionViewModelFactory
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.domain.interactor.remoteInputInteractor
@@ -154,7 +153,6 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 animateQsTilesViewModelFactory = animateQsTilesViewModelFactory,
                 sceneTransitionBlurViewModelFactory = sceneTransitionBlurViewModelFactory,
                 toastDisplayer = { sceneContainerToastDisplayer },
-                toBouncerTransitionViewModelFactory = toBouncerTransitionViewModelFactory,
                 burnInMovementFactory =
                     object : BurnInMovementState.Factory {
                         override fun create() = BurnInMovementState(aodBurnInViewModel)

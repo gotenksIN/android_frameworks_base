@@ -55,7 +55,6 @@ class OpenAppFromAllAppsUsingKeyboardFlickerTest(flicker: FlickerTest) :
     val testSetupRule = Utils.testSetupRule(NavBar.MODE_GESTURAL, flicker.scenario.startRotation)
     val scenario = OpenAppFromAllAppsUsingKeyboardScenario()
 
-    private val testApp = scenario.testApp
     private val calculatorApp = scenario.calculatorApp
 
     override val transition: FlickerBuilder.() -> Unit
@@ -73,8 +72,7 @@ class OpenAppFromAllAppsUsingKeyboardFlickerTest(flicker: FlickerTest) :
 
     @Test fun layerBecomesVisible() = flicker.layerBecomesVisible(calculatorApp)
 
-    @Test
-    fun cascadingEffectAppliedAtEnd() = flicker.cascadingEffectAppliedAtEnd(calculatorApp, testApp)
+    @Test fun cascadingEffectAppliedAtEnd() = flicker.cascadingEffectAppliedAtEnd(calculatorApp)
 
     companion object {
         @Parameterized.Parameters(name = "{0}")

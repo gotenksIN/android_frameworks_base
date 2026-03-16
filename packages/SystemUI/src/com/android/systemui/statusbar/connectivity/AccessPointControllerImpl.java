@@ -132,7 +132,7 @@ public class AccessPointControllerImpl implements AccessPointController,
         }
 
         if (mWifiPickerTracker != null) {
-            mWifiPickerTracker.close();
+            mWifiPickerTracker.onStop();
         }
         Context context = mContext.createContextAsUser(UserHandle.of(newUserId), /* flags= */ 0);
         mWifiPickerTracker = mWifiPickerTrackerFactory.create(context, mLifecycle, this, TAG);

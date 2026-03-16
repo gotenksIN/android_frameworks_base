@@ -21,8 +21,6 @@ import static com.android.internal.accessibility.AccessibilityShortcutController
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.InsetDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -145,15 +143,7 @@ public class AccessibilityTargetAdapter extends Adapter<ViewHolder> {
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         final AccessibilityTarget target = mTargets.get(position);
-        Drawable icon = target.getIcon();
-        if (target instanceof MoreOptionsTarget) {
-            final int iconSize = icon.getIntrinsicWidth();
-            if (mIconWidthHeight > iconSize && iconSize > 0) {
-                final int inset = (mIconWidthHeight - iconSize) / 2;
-                icon = new InsetDrawable(icon, inset);
-            }
-        }
-        holder.mIconView.setBackground(icon);
+        holder.mIconView.setBackground(target.getIcon());
         holder.mRightBadgeView.setBackground(null);
         holder.mLeftBadgeView.setBackground(null);
         holder.updateIconSize(mIconWidthHeight);
@@ -192,9 +182,8 @@ public class AccessibilityTargetAdapter extends Adapter<ViewHolder> {
                 clickHint, /* command= */ null);
 
         if (com.android.settingslib.flags.Flags.hearingDeviceSetConnectionStatusReport()) {
-            final String targetId = target.getId();
-            if (targetId != null && ACCESSIBILITY_HEARING_AIDS_COMPONENT_NAME.equals(
-                    ComponentName.unflattenFromString(targetId))) {
+            if (ACCESSIBILITY_HEARING_AIDS_COMPONENT_NAME.equals(
+                    ComponentName.unflattenFromString(target.getId()))) {
                 updateHearingDeviceStatusDrawable(holder, mHearingDeviceStatus);
             }
         }

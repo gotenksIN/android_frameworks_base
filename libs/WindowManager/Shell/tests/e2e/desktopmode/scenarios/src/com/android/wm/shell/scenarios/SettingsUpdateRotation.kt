@@ -17,7 +17,6 @@
 package com.android.wm.shell.scenarios
 
 import android.platform.uiautomatorhelpers.DeviceHelpers.waitForObj
-import android.view.Display.INVALID_DISPLAY
 import androidx.test.uiautomator.By
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertNotNull
@@ -31,6 +30,7 @@ abstract class SettingsUpdateRotation : SettingsConnectedDisplayTestBase() {
 
     @Test
     fun updateRotation() {
+        val displayId = connectedDisplayRule.addedDisplays.first()
         val rotationPreference = getRotationPreference()
         rotationPreference.click()
 
@@ -44,17 +44,16 @@ abstract class SettingsUpdateRotation : SettingsConnectedDisplayTestBase() {
             rotationPreference.findObject(By.text(ROTATION_90_TEXT)),
             "Rotation value did not update to 90°",
         )
-        assertThat(displayManager.getDisplay(addedDisplayId).rotation).isEqualTo(ROTATION_90_VAL)
+        assertThat(displayManager.getDisplay(displayId).rotation).isEqualTo(ROTATION_90_VAL)
     }
 
     @After
     fun teardown() {
-        if (addedDisplayId == INVALID_DISPLAY) {
+        if (connectedDisplayRule.addedDisplays.isEmpty()) {
             return
         }
-        instrumentation.uiAutomation.executeShellCommand(
-            "wm user-rotation -d $addedDisplayId lock 0"
-        )
+        val displayId = connectedDisplayRule.addedDisplays.first()
+        instrumentation.uiAutomation.executeShellCommand("wm user-rotation -d $displayId lock 0")
     }
 
     private fun getRotationPreference() =

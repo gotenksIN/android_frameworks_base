@@ -32,13 +32,6 @@ import org.junit.After
 import org.junit.Ignore
 import org.junit.Test
 
-/**
- * This test focuses on entering split screen from fullscreen state via app handle. Test focusing on
- * entering split screen from desktop via app handle is covered by
- * ExitDesktopToSplitScreenWithAppHeaderMenu
- *
- * @see ExitDesktopToSplitScreenWithAppHeaderMenu
- */
 @Ignore("Test Base Class")
 abstract class EnterSplitScreenWithAppHandleMenu(val rotation: Rotation = Rotation.ROTATION_0) :
     TestScenarioBase(rotation) {
@@ -47,15 +40,14 @@ abstract class EnterSplitScreenWithAppHandleMenu(val rotation: Rotation = Rotati
     private val wmHelper = WindowManagerStateHelper(instrumentation)
     private val device = UiDevice.getInstance(instrumentation)
     private val keyEventHelper = KeyEventHelper(InstrumentationRegistry.getInstrumentation())
+    private val simpleAppHelper = SimpleAppHelper(instrumentation)
     val calculatorApp = CalculatorAppHelper(instrumentation)
-    val testApp = DesktopModeAppHelper(SimpleAppHelper(instrumentation))
+    val testApp = DesktopModeAppHelper(simpleAppHelper)
 
     @Test
     open fun enterSplitScreenFromAppHandle() {
-        testApp.launchViaIntent(wmHelper)
-        // Split-screen from desktop mode is covered by another test case, this test case focus
-        // on entering from fullscreen on both desktop-first and touch-first
-        testApp.exitDesktopModeToFullScreenIfNeeded(wmHelper, device)
+        // Launch app in order to enter split screen
+        simpleAppHelper.launchViaIntent(wmHelper)
         testApp.enterSplitScreenFromAppHandleMenu(wmHelper, device)
         // Open allApps via keyboard shortcut
         keyEventHelper.press(KEYCODE_META_RIGHT)

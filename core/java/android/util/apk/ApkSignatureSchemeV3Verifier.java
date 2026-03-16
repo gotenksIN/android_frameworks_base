@@ -31,7 +31,6 @@ import static android.util.apk.ApkSigningBlockUtils.readLengthPrefixedByteArray;
 import static android.util.apk.ApkSigningBlockUtils.verifyProofOfRotationStruct;
 
 import android.os.Build;
-import android.os.SystemClock;
 import android.util.ArrayMap;
 import android.util.Pair;
 import android.util.apk.ApkSignatureVerifierMetrics.VerificationResult;
@@ -218,7 +217,6 @@ public class ApkSignatureSchemeV3Verifier {
      */
     private VerifiedSigner verify(SignatureInfo signatureInfo, int blockId)
             throws SecurityException, IOException, PlatformNotSupportedException {
-        long verificationStartTimeMs = SystemClock.uptimeMillis();
         mBlockId = blockId;
         List<VerifiedSigner> verifiedSigners = new ArrayList<>();
         CertificateFactory certFactory;
@@ -311,11 +309,6 @@ public class ApkSignatureSchemeV3Verifier {
             throw new SecurityException("No content digests found");
         }
 
-        // Collect the signature block verification duration before the APK's integrity is verified
-        // since this should be the distinguishing factor between the signature algorithms and
-        // single / hybrid configs; the APK integrity verification will be similar regardless of the
-        // signature scheme / algorithm since it requires calculating the digest of the APK content.
-        long verificationDurationMs = SystemClock.uptimeMillis() - verificationStartTimeMs;
         if (mVerifyIntegrity) {
             try {
                 ApkSigningBlockUtils.verifyIntegrity(result.contentDigests, mApk, signatureInfo);
@@ -337,11 +330,9 @@ public class ApkSignatureSchemeV3Verifier {
 
         result.verityRootHash = verityRootHash;
         result.blockId = blockId;
-        // Only log metrics when the integrity is verified since this step is generally performed on
-        // an install / update.
-        if (mVerifyIntegrity) {
+        if (blockId == APK_SIGNATURE_SCHEME_V32_BLOCK_ID) {
             logSignatureVerificationSuccess(blockId, result.minSdkVersion, result.maxSdkVersion,
-                    result.algorithmId, verificationDurationMs);
+                    result.algorithmId);
         }
         return result;
     }

@@ -36,6 +36,8 @@ import android.view.InputApplicationHandle;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.SurfaceControl;
+import android.view.WindowManager;
+import android.view.WindowManagerPolicyConstants;
 
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.util.function.pooled.PooledLambda;
@@ -260,6 +262,14 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
         return mService.mPolicy.interceptUnhandledKey(event, focusedToken);
     }
 
+    /** Callback to get pointer layer. */
+    @Override
+    public int getPointerLayer() {
+        return mService.mPolicy.getWindowLayerFromTypeLw(WindowManager.LayoutParams.TYPE_POINTER)
+                * WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER
+                + WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
+    }
+
     /** Callback to get pointer display id. */
     @Override
     public int getPointerDisplayId() {
@@ -322,7 +332,7 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
                         + " - DisplayContent not found.");
                 return null;
             }
-            return dc.getPointerOverlayLayer();
+            return dc.getOverlayLayer();
         }
     }
 

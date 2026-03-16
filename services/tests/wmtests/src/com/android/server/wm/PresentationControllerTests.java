@@ -32,6 +32,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_PRIVATE_PRESENTATION;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
+import static com.android.window.flags.Flags.FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 import static com.android.window.flags.Flags.FLAG_ENABLE_PRESENTATION_STOPS_TOP_TASK_BUGFIX;
 
 import static org.junit.Assert.assertEquals;
@@ -44,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import android.annotation.NonNull;
 import android.os.Binder;
 import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.view.DisplayInfo;
@@ -76,7 +78,10 @@ public class PresentationControllerTests extends WindowTestsBase {
         mPlayer = registerTestTransitionPlayer();
     }
 
-    @EnableFlags(FLAG_ENABLE_PRESENTATION_STOPS_TOP_TASK_BUGFIX)
+    @EnableFlags({
+            FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS,
+            FLAG_ENABLE_PRESENTATION_STOPS_TOP_TASK_BUGFIX
+    })
     @Test
     public void testPresentationShowAndHide() {
         final DisplayContent dc = createPresentationDisplay();
@@ -114,6 +119,28 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertTrue(activity.isVisible());
     }
 
+    @DisableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
+    @Test
+    public void testPresentationShowAndHide_flagDisabled() {
+        final DisplayContent dc = createPresentationDisplay();
+        final ActivityRecord activity = createActivityRecord(createTask(dc));
+        assertTrue(activity.isVisible());
+        // Finish WAKE transition (adding task to empty display wakes it up)
+        mPlayer.flush();
+
+        final WindowState window = addPresentationWindow(100000, dc.mDisplayId);
+        assertFalse(window.mTransitionController.isCollecting());
+        assertTrue(activity.isVisibleRequested());
+        assertTrue(activity.isVisible());
+
+        window.removeIfPossible();
+        assertFalse(window.mTransitionController.isCollecting());
+        assertTrue(activity.isVisibleRequested());
+        assertTrue(activity.isVisible());
+        assertFalse(window.isAttached());
+    }
+
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPresentationCannotCoverFocusedHostTask() {
         forceAllowPresentationsOnDefaultDisplay();
@@ -143,6 +170,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertFalse(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPresentationCannotCoverUnfocusedHostTask() {
         int uid = Binder.getCallingUid();
@@ -170,6 +198,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertAddPresentationWindowFails(uid, presentationDisplay.mDisplayId);
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPresentationCanLaunchWithUnfocusedHostTaskOnDifferentDisplay() {
         // This test verifies that a presentation can be launched on a display when its host task
@@ -203,6 +232,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertTrue(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPresentationCannotLaunchOnAllDisplays() {
         forceAllowPresentationsOnDefaultDisplay();
@@ -225,6 +255,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertAddPresentationWindowFails(uid + 1, presentationDisplay.mDisplayId);
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testInvisiblePresentationIsNotAllowed() {
         final int uid = Binder.getCallingUid();
@@ -251,6 +282,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertFalse(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testInvisiblePrivatePresentationIsAllowed() {
         final int uid = Binder.getCallingUid();
@@ -276,6 +308,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertTrue(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPresentationCannotLaunchOnInternalDisplayWithoutHostHavingGlobalFocus() {
         forceAllowPresentationsOnDefaultDisplay();
@@ -308,6 +341,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertTrue(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testReparentingActivityToSameDisplayClosesPresentation() {
         final int uid = Binder.getCallingUid();
@@ -333,6 +367,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertFalse(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPrivatePresentationDoesNotHaveHostTask() {
         final int uid = Binder.getCallingUid();
@@ -359,6 +394,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertTrue(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testPrivatePresentationCanCoverHostTask() {
         // This test verifies that a private presentation can be shown on the same display as its
@@ -380,6 +416,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertTrue(window.isVisible());
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testNewPresentationCannotShowOnPresentingDesk() {
         forceAllowPresentationsOnDefaultDisplay();
@@ -406,6 +443,7 @@ public class PresentationControllerTests extends WindowTestsBase {
         assertAddPresentationWindowFails(uid, DEFAULT_DISPLAY);
     }
 
+    @EnableFlags(FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testDisallowPresentationOnNonPresentationDisplay() {
         assumeTrue(!mDefaultDisplay.mDisplay.isPublicPresentation());

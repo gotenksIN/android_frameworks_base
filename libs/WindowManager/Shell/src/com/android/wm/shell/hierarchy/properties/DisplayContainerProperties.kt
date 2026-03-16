@@ -57,19 +57,15 @@ class DisplayInsetsState(private val props: DisplayContainerProperties) {
         chgs.compareAndSet(insetsState, other.insetsState, CHANGED_INSETS)
     }
 
-    override fun toString(): String {
+    fun propsToString(): String {
         val interestingSources = mutableListOf<String>()
-        for (i in 0..<insetsState.sourceSize()) {
+        for (i in 0..< insetsState.sourceSize()) {
             val src = insetsState.sourceAt(i)
             if (insetsTypeToStr.containsKey(src.type)) {
                 interestingSources.add("${insetsTypeToStr[src.type]}=${src.frame.toShortString()}")
             }
         }
-        return "INSETS " + interestingSources.joinToString(
-            separator = ", ",
-            prefix = "{",
-            postfix = "}"
-        )
+        return "insets={" + interestingSources.joinToString(separator = ", ") + "}"
     }
 
     companion object {
@@ -161,7 +157,7 @@ class DisplayContainerProperties(
 
     /** @see ContainerProperties.propsToString */
     override fun propsToString(): String {
-        return "#$displayId | " + super.propsToString() + " | $insetsState"
+        return "#$displayId " + insetsState.propsToString() + " " + super.propsToString()
     }
 
     /** @see ContainerProperties.getTypeName */

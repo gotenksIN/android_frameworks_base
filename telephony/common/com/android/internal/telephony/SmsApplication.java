@@ -47,8 +47,6 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.util.SparseArray;
 
-import com.android.internal.telephony.flags.Flags;
-
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -90,8 +88,6 @@ public final class SmsApplication {
     private static SmsPackageMonitor sSmsPackageMonitor = null;
 
     private static SmsRoleListener sSmsRoleListener = null;
-
-    private static MessagingReadRestrictionAllowlistMonitor sAllowlistMonitor = null;
 
     public static class SmsApplicationData {
         /**
@@ -914,11 +910,6 @@ public final class SmsApplication {
         sSmsPackageMonitor = new SmsPackageMonitor(context);
         sSmsPackageMonitor.register(context, context.getMainLooper(), UserHandle.ALL);
         sSmsRoleListener = new SmsRoleListener(context);
-        if (Flags.secureAccessToRestrictedRcsMessages()) {
-            sAllowlistMonitor =
-                    new MessagingReadRestrictionAllowlistMonitor(context);
-            sAllowlistMonitor.initialize();
-        }
     }
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)

@@ -886,23 +886,10 @@ public class GnssLocationProvider extends AbstractLocationProvider implements
      * power management use cases on automotive devices.
      */
     public void setAutomotiveGnssSuspended(boolean suspended) {
-        if (DEBUG) {
-            Log.d(TAG, "setAutomotiveGnssSuspended: " + suspended);
-        }
-        boolean isExitingSuspend;
         synchronized (mLock) {
-            isExitingSuspend = mAutomotiveSuspend && !suspended;
             mAutomotiveSuspend = suspended;
         }
-        mHandler.post(() -> {
-            updateEnabled();
-            if (Flags.gnssRestartLocationRequestOnResume()) {
-                // When exiting suspended mode, if GPS is enabled, restart the location request.
-                if (isExitingSuspend && isGpsEnabled()) {
-                    restartLocationRequest();
-                }
-            }
-        });
+        mHandler.post(this::updateEnabled);
     }
 
     /**

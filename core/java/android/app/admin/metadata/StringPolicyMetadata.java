@@ -28,7 +28,6 @@ import java.util.Set;
  */
 public class StringPolicyMetadata extends PolicyMetadata<String> {
     private final boolean mEmptyStringAllowed;
-    private final boolean mUnprintableCharactersAllowed;
 
     public StringPolicyMetadata(
             @NonNull PolicyIdentifier<String> id,
@@ -37,8 +36,7 @@ public class StringPolicyMetadata extends PolicyMetadata<String> {
             @Nullable String requiredPermission,
             @Nullable String requiredCrossUserPermission,
             @NonNull Set<Integer> allowedDpcTypes,
-            boolean emptyStringAllowed,
-            boolean unprintableCharactersAllowed) {
+            boolean emptyStringAllowed) {
         this(
                 id,
                 allowedScopes,
@@ -47,8 +45,7 @@ public class StringPolicyMetadata extends PolicyMetadata<String> {
                 requiredCrossUserPermission,
                 allowedDpcTypes,
                 null,
-                emptyStringAllowed,
-                unprintableCharactersAllowed);
+                emptyStringAllowed);
     }
 
     public StringPolicyMetadata(
@@ -59,8 +56,7 @@ public class StringPolicyMetadata extends PolicyMetadata<String> {
             @Nullable String requiredCrossUserPermission,
             @NonNull Set<Integer> allowedDpcTypes,
             @Nullable ResolutionMechanismMetadata<String> resolutionMechanism,
-            boolean emptyStringAllowed,
-            boolean unprintableCharactersAllowed) {
+            boolean emptyStringAllowed) {
         super(
                 id,
                 allowedScopes,
@@ -71,14 +67,9 @@ public class StringPolicyMetadata extends PolicyMetadata<String> {
                 resolutionMechanism);
 
         mEmptyStringAllowed = emptyStringAllowed;
-        mUnprintableCharactersAllowed = unprintableCharactersAllowed;
     }
 
     public boolean isEmptyStringAllowed() {
         return mEmptyStringAllowed;
-    }
-
-    public boolean isUnprintableCharactersAllowed() {
-        return mUnprintableCharactersAllowed;
     }
 }

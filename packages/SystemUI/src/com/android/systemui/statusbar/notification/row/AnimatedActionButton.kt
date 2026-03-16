@@ -31,12 +31,11 @@ class AnimatedActionButton
 @JvmOverloads
 constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) :
     Button(context, attrs, defStyleAttr) {
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        (background as? AnimatableActionBackground)?.let { animatable ->
-            val interactionJankMonitor = InteractionJankMonitor.getInstance()
-            animatable.animate(
+    init {
+        val interactionJankMonitor = InteractionJankMonitor.getInstance()
+        background =
+            AnimatedActionBackgroundDrawable(
+                context = context,
                 onAnimationStarted = {
                     interactionJankMonitor.begin(this, Cuj.CUJ_NOTIFICATIONS_ANIMATED_ACTION)
                 },
@@ -47,6 +46,10 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                     interactionJankMonitor.cancel(Cuj.CUJ_NOTIFICATIONS_ANIMATED_ACTION)
                 },
             )
-        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        (background as AnimatedActionBackgroundDrawable).animate()
     }
 }

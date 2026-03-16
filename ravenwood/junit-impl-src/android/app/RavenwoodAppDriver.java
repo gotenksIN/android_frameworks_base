@@ -194,7 +194,7 @@ public final class RavenwoodAppDriver {
         var mockSettings = RavenwoodProxyHelper.newProxy(
                 IContentProvider.class,
                 IContentProvider.descriptor,
-                mSettingsProvider);
+                mSettingsProvider, false);
         synchronized (mProviders) {
             mProviders.put(Settings.AUTHORITY, mockSettings);
         }

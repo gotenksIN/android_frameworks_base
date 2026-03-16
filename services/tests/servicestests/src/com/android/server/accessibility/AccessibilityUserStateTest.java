@@ -428,37 +428,37 @@ public class AccessibilityUserStateTest {
 
     @Test
     @EnableFlags(android.security.Flags.FLAG_EXTEND_AAPM_TO_A11Y_SERVICES)
-    public void isAccessibilityFeaturePermittedLocked_apmOff_returnTrue() {
+    public void isShortcutTargetPermittedLocked_apmOff_returnTrue() {
         List<AccessibilityServiceInfo> installedServices = new ArrayList<>(
                 mUserState.getInstalledServices());
         installedServices.add(mMockServiceInfo);
         mUserState.buildInstalledServicesMapLocked(installedServices);
         mUserState.setPermittedAccessibilityServicesLocked(null);
 
-        boolean isFeaturePermitted = mUserState.isAccessibilityFeaturePermittedLocked(
+        boolean isShortcutTargetPermitted = mUserState.isShortcutTargetPermittedLocked(
                 COMPONENT_NAME.flattenToString());
 
-        assertThat(isFeaturePermitted).isTrue();
+        assertThat(isShortcutTargetPermitted).isTrue();
     }
 
     @Test
     @EnableFlags(android.security.Flags.FLAG_EXTEND_AAPM_TO_A11Y_SERVICES)
-    public void isAccessibilityFeaturePermittedLocked_apmOn_returnFalse() {
+    public void isShortcutTargetPermittedLocked_apmOn_returnFalse() {
         List<AccessibilityServiceInfo> installedServices = new ArrayList<>(
                 mUserState.getInstalledServices());
         installedServices.add(mMockServiceInfo);
         mUserState.buildInstalledServicesMapLocked(installedServices);
         mUserState.setPermittedAccessibilityServicesLocked(new HashSet<>());
 
-        boolean isFeaturePermitted = mUserState.isAccessibilityFeaturePermittedLocked(
+        boolean isShortcutTargetPermitted = mUserState.isShortcutTargetPermittedLocked(
                 COMPONENT_NAME.flattenToString());
 
-        assertThat(isFeaturePermitted).isFalse();
+        assertThat(isShortcutTargetPermitted).isFalse();
     }
 
     @Test
     @EnableFlags(android.security.Flags.FLAG_EXTEND_AAPM_TO_A11Y_SERVICES)
-    public void isAccessibilityFeaturePermittedLocked_apmOn_permittedService_returnTrue() {
+    public void isShortcutTargetPermittedLocked_apmOn_permittedService_returnTrue() {
         // Setup: Add an installed service to the user state.
         List<AccessibilityServiceInfo> installedServices = new ArrayList<>(
                 mUserState.getInstalledServices());
@@ -470,20 +470,20 @@ public class AccessibilityUserStateTest {
         mUserState.setPermittedAccessibilityServicesLocked(permitted);
 
         // Action: Check if the service is permitted as a shortcut target.
-        boolean isFeaturePermitted = mUserState.isAccessibilityFeaturePermittedLocked(
+        boolean isShortcutTargetPermitted = mUserState.isShortcutTargetPermittedLocked(
                 COMPONENT_NAME.flattenToString());
 
         // Assertion: Should be true.
-        assertThat(isFeaturePermitted).isTrue();
+        assertThat(isShortcutTargetPermitted).isTrue();
     }
 
     @Test
-    public void isAccessibilityFeaturePermittedLocked_builtInFeature_returnsTrue() {
+    public void isShortcutTargetPermittedLocked_builtInFeature_returnsTrue() {
         // Block everything
         mUserState.setPermittedAccessibilityServicesLocked(new HashSet<>());
 
         // Magnification controller is a built-in feature and should be permitted
-        assertThat(mUserState.isAccessibilityFeaturePermittedLocked(MAGNIFICATION_CONTROLLER_NAME))
+        assertThat(mUserState.isShortcutTargetPermittedLocked(MAGNIFICATION_CONTROLLER_NAME))
                 .isTrue();
     }
 
@@ -498,7 +498,7 @@ public class AccessibilityUserStateTest {
     }
 
     @Test
-    public void isAccessibilityFeaturePermittedLocked_spoofedFrameworkFeature_returnFalse() {
+    public void isShortcutTargetPermittedLocked_spoofedFrameworkFeature_returnFalse() {
         ComponentName spoofedComponent =
                 AccessibilityShortcutController.COLOR_INVERSION_COMPONENT_NAME;
         AccessibilityServiceInfo spoofedServiceInfo = mock(AccessibilityServiceInfo.class);
@@ -508,8 +508,8 @@ public class AccessibilityUserStateTest {
         installedServices.add(spoofedServiceInfo);
         mUserState.buildInstalledServicesMapLocked(installedServices);
 
-        assertThat(mUserState.isAccessibilityFeaturePermittedLocked(
-                spoofedComponent.flattenToString())).isFalse();
+        assertThat(mUserState.isShortcutTargetPermittedLocked(spoofedComponent.flattenToString()))
+                .isFalse();
     }
 
     @Test

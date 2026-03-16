@@ -460,9 +460,6 @@ public final class VirtualDeviceManager {
         if (mService == null) {
             return false;
         }
-        if (!Flags.computerControlAccess()) {
-            return false;
-        }
         try {
             return mService.isComputerControlAvailable(mContext.getAttributionSource());
         } catch (RemoteException e) {

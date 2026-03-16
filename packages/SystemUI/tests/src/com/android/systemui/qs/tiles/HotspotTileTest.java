@@ -18,14 +18,10 @@ package com.android.systemui.qs.tiles;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.os.Handler;
-import android.os.UserManager;
 import android.service.quicksettings.Tile;
 import android.testing.TestableLooper;
 
@@ -53,8 +49,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoSession;
 import org.mockito.junit.MockitoJUnit;
@@ -75,14 +69,6 @@ public class HotspotTileTest extends SysuiTestCase {
     private DataSaverController mDataSaverController;
     @Mock
     private QsEventLogger mUiEventLogger;
-    @Mock
-    private UserManager mUserManager;
-    @Mock
-    private ActivityStarter mActivityStarter;
-    @Captor
-    private ArgumentCaptor<Runnable> mRunnableCaptor;
-
-    private static final int USER_ID = 10;
 
     private TestableLooper mTestableLooper;
     private HotspotTile mTile;
@@ -93,7 +79,6 @@ public class HotspotTileTest extends SysuiTestCase {
         mTestableLooper = TestableLooper.get(this);
         when(mHost.getContext()).thenReturn(mContext);
         when(mHost.getUserContext()).thenReturn(mContext);
-        when(mHost.getUserId()).thenReturn(USER_ID);
         when(mDataSaverController.isDataSaverEnabled()).thenReturn(false);
 
         mTile = new HotspotTile(
@@ -104,11 +89,10 @@ public class HotspotTileTest extends SysuiTestCase {
                 new FalsingManagerFake(),
                 mock(MetricsLogger.class),
                 mock(StatusBarStateController.class),
-                mActivityStarter,
+                mock(ActivityStarter.class),
                 mock(QSLogger.class),
                 mHotspotController,
-                mDataSaverController,
-                mUserManager
+                mDataSaverController
         );
 
         mTile.initialize();
@@ -187,30 +171,7 @@ public class HotspotTileTest extends SysuiTestCase {
                 .isEqualTo(createExpectedIcon(R.drawable.qs_hotspot_icon_on));
     }
 
-    @Test
-    public void handleClick_userLocked_showsKeyguard() {
-        mTile.getState().value = false;
-        when(mUserManager.isUserUnlockingOrUnlocked(USER_ID)).thenReturn(false);
-
-        mTile.handleClick(null);
-        verify(mActivityStarter).postQSRunnableDismissingKeyguard(mRunnableCaptor.capture());
-        verify(mHotspotController, never()).setHotspotEnabled(any(Boolean.class));
-
-        mRunnableCaptor.getValue().run();
-        verify(mHotspotController).setHotspotEnabled(true);
-    }
-
     private QSTile.Icon createExpectedIcon(int resId) {
         return new QSTileImpl.DrawableIconWithRes(mContext.getDrawable(resId), resId);
-    }
-
-    @Test
-    public void handleClick_userUnlocked_enablesHotspotDirectly() {
-        mTile.getState().value = false;
-        when(mUserManager.isUserUnlockingOrUnlocked(USER_ID)).thenReturn(true);
-
-        mTile.handleClick(null);
-        verify(mActivityStarter, never()).postQSRunnableDismissingKeyguard(any());
-        verify(mHotspotController).setHotspotEnabled(true);
     }
 }

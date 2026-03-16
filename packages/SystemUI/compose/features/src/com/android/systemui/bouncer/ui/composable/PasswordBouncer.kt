@@ -73,6 +73,7 @@ import kotlinx.coroutines.awaitCancellation
 @Composable
 internal fun ContentScope.PasswordBouncer(
     viewModel: PasswordBouncerViewModel,
+    alphaOnEntry: () -> Float,
     modifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -97,7 +98,7 @@ internal fun ContentScope.PasswordBouncer(
 
     val color = MaterialTheme.colorScheme.onSurfaceVariant
 
-    DisableSoftKeyboardWhenNotVisible() {
+    DisableSoftKeyboardWhenNotVisible(alphaOnEntry = alphaOnEntry) {
         SelectedUserAwareInputConnection(selectedUserId) {
             SelectedUserAwareLocalContext(selectedUserId) {
                 OutlinedSecureTextField(
@@ -250,11 +251,15 @@ private fun RequestFocus(focusRequester: FocusRequester, viewModel: PasswordBoun
 
 /** Disables the visibility of the IME when the bouncer is not visible. */
 @Composable
-fun ContentScope.DisableSoftKeyboardWhenNotVisible(content: @Composable () -> Unit) {
-    val shouldImeBeVisible by remember {
-        derivedStateOf { shouldImeBeVisible(layoutState.transitionState) }
+fun ContentScope.DisableSoftKeyboardWhenNotVisible(
+    alphaOnEntry: () -> Float,
+    content: @Composable () -> Unit,
+) {
+    val contentVisible by remember {
+        derivedStateOf { contentVisible(alphaOnEntry, layoutState.currentTransition) }
     }
-    DisableSoftKeyboard(!shouldImeBeVisible) { content() }
+
+    DisableSoftKeyboard(!contentVisible) { content() }
 }
 
 /** Disables the visibility of the IME without affecting the text field focus. */
@@ -273,24 +278,20 @@ fun DisableSoftKeyboard(disabled: Boolean, content: @Composable () -> Unit) {
     }
 }
 
-/** Determines when IME should become visible based on the transition state. */
-private fun shouldImeBeVisible(transitionState: TransitionState): Boolean {
-    if (transitionState.isIdle(Overlays.Bouncer)) return true
-
-    val transition = transitionState as? TransitionState.Transition
-    val progressThresholdForShowingIME = 0.75
-    if (transition?.isTransitioning(to = Overlays.Bouncer) == true) {
-        return when {
-            // Flings/swipes to open the bouncer, wait until transition is idle to show IME.
-            transitionState.isInitiatedByUserInput -> false
-
-            // programmatic transitions
-            else -> transitionState.progress >= progressThresholdForShowingIME
-        }
+/**
+ * Calculates whether the content of the bouncer is visible based on the alpha value from the entry
+ * animation and the current transition state.
+ */
+private fun contentVisible(
+    alphaOnEntry: () -> Float,
+    currentTransition: TransitionState.Transition?,
+): Boolean {
+    if (currentTransition == null || currentTransition.isTransitioning(to = Overlays.Bouncer)) {
+        return alphaOnEntry() > 0.5
     }
 
-    if (transition?.isTransitioning(from = Overlays.Bouncer) == true) {
-        return transitionState.progress < progressThresholdForShowingIME
+    if (currentTransition.isTransitioning(from = Overlays.Bouncer)) {
+        return currentTransition.progress <= 0.5
     }
 
     return false

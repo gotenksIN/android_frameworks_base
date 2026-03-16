@@ -278,8 +278,6 @@
   <java-symbol type="id" name="profile_tabhost" />
   <java-symbol type="id" name="tabs" />
   <java-symbol type="id" name="tabcontent" />
-  <java-symbol type="id" name="outer_container" />
-  <java-symbol type="id" name="inner_container" />
 
   <java-symbol type="attr" name="actionModeShareDrawable" />
   <java-symbol type="attr" name="alertDialogCenterButtons" />
@@ -6581,9 +6579,6 @@
   <!-- Whether user information setup is enabled in SuW. -->
   <java-symbol type="bool" name="config_enableUserInfoSetupInSuw" />
 
-  <!-- Whether inset focus rings are enabled in SuW. -->
-  <java-symbol type="bool" name="config_enableInsetFocusRingsInSuw" />
-
   <!-- Whether to keep the task on back pressed. -->
   <java-symbol type="bool" name="config_alwaysMoveTaskToBackOnBackPressed" />
 
@@ -6613,10 +6608,6 @@
   <java-symbol type="array" name="config_allowlistPersonalContextInsightPublishing" />
   <!-- Packages allowed to receive context insights -->
   <java-symbol type="array" name="config_allowlistPersonalContextInsightReceiving" />
-
-  <!-- PersonalContext TextClassifier configuration -->
-  <java-symbol type="integer" name="config_textClassifierPersonalContextTimeoutMillis" />
-  <java-symbol type="integer" name="config_textClassifierPersonalContextMergeStrategy" />
 
   <!-- TV Watchdog configuration -->
   <java-symbol type="integer" name="config_tvWatchdogUidIoUsageSummaryTopCount" />

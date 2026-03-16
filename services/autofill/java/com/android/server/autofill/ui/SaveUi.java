@@ -778,10 +778,6 @@ final class SaveUi {
                 : R.string.autofill_save_title_with_3types;
     }
 
-    PendingUi getPendingUi() {
-        return mPendingUi;
-    }
-
     void dump(PrintWriter pw, String prefix) {
         pw.print(prefix); pw.print("title: "); pw.println(mTitle);
         pw.print(prefix); pw.print("subtitle: "); pw.println(mSubTitle);

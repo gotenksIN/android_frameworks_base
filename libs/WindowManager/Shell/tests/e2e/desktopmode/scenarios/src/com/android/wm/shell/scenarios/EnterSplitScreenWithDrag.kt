@@ -41,14 +41,14 @@ abstract class EnterSplitScreenWithDrag(val rotation: Rotation = Rotation.ROTATI
     private val wmHelper = WindowManagerStateHelper(instrumentation)
     private val device = UiDevice.getInstance(instrumentation)
     private val keyEventHelper = KeyEventHelper(InstrumentationRegistry.getInstrumentation())
+    private val simpleAppHelper = SimpleAppHelper(instrumentation)
     val calculatorApp = CalculatorAppHelper(instrumentation)
-    val testApp = DesktopModeAppHelper(SimpleAppHelper(instrumentation))
+    val testApp = DesktopModeAppHelper(simpleAppHelper)
 
     @Before
     fun setup() {
-        testApp.launchViaIntent(wmHelper)
-        // Split-screen with drag CUJ should start from full-screen apps
-        testApp.exitDesktopModeToFullScreenIfNeeded(wmHelper, device)
+        // Launch app in order to enter split screen
+        simpleAppHelper.launchViaIntent(wmHelper)
     }
 
     @Test

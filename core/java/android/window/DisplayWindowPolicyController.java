@@ -94,8 +94,7 @@ public abstract class DisplayWindowPolicyController {
     public final boolean isWindowingModeSupported(
             @WindowConfiguration.WindowingMode int windowingMode) {
         synchronized (mSupportedWindowingModes) {
-            return mSupportedWindowingModes.contains(windowingMode)
-                    || mSupportedWindowingModes.isEmpty();
+            return mSupportedWindowingModes.contains(windowingMode);
         }
     }
 

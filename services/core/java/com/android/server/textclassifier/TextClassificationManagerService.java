@@ -200,8 +200,7 @@ public final class TextClassificationManagerService extends ITextClassifierServi
         mPmInternal = LocalServices.getService(PackageManagerInternal.class);
         mSessionCache = new SessionCache(mLock);
         mPackageMonitor = new MyPackageMonitor();
-        mPersonalContextBridge = new PersonalContextBridgeImpl(
-                new PersonalContextBridge.Config(mContext));
+        mPersonalContextBridge = new PersonalContextBridgeImpl();
     }
 
     private void startListenSettings() {

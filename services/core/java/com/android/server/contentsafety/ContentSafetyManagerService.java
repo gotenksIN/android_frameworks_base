@@ -857,18 +857,14 @@ public class ContentSafetyManagerService extends SystemService {
 
                         @Override
                         public void onDisconnected(@NonNull IContentSafetySettingsService service) {
-                            if (mRemoteContentSafetyService != null) {
-                                mRemoteContentSafetyService.run(
-                                        IContentSafetyService::notifySettingsServiceDisconnected);
-                            }
+                            mRemoteContentSafetyService.run(
+                                    IContentSafetyService::notifySettingsServiceDisconnected);
                         }
 
                         @Override
                         public void onBinderDied() {
-                            if (mRemoteContentSafetyService != null) {
-                                mRemoteContentSafetyService.run(
-                                        IContentSafetyService::notifySettingsServiceDisconnected);
-                            }
+                            mRemoteContentSafetyService.run(
+                                    IContentSafetyService::notifySettingsServiceDisconnected);
                         }
                     });
 
@@ -885,18 +881,14 @@ public class ContentSafetyManagerService extends SystemService {
                     @Override
                     public void onDisconnected(
                             @NonNull IContentSafetySandboxedService service) {
-                        if (mRemoteContentSafetyService != null) {
-                            mRemoteContentSafetyService.run(
-                                    IContentSafetyService::notifySandboxedServiceDisconnected);
-                        }
+                        mRemoteContentSafetyService.run(
+                                IContentSafetyService::notifySandboxedServiceDisconnected);
                     }
 
                     @Override
                     public void onBinderDied() {
-                        if (mRemoteContentSafetyService != null) {
-                            mRemoteContentSafetyService.run(
-                                    IContentSafetyService::notifySandboxedServiceDisconnected);
-                        }
+                        mRemoteContentSafetyService.run(
+                                IContentSafetyService::notifySandboxedServiceDisconnected);
                     }
                 });
         }

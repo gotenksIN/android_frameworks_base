@@ -23,6 +23,7 @@ import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
 import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.app.AppOpsManager
+import android.app.IWallpaperManager
 import android.app.KeyguardManager
 import android.app.PendingIntent
 import android.app.TaskInfo
@@ -50,6 +51,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.RemoteException
+import android.os.ServiceManager
+import android.os.SystemProperties
 import android.os.Trace
 import android.os.UserHandle
 import android.os.UserManager
@@ -313,14 +316,13 @@ class DesktopTasksController(
         }
     private val latencyTracker: LatencyTracker
 
-    // TODO(b/489936769): Isolate relevant logic from DesktopTasksController to decouple
-    //  DesktopScrimController.
-    private val desktopScrimController =
-        DesktopScrimController(desktopRemoteListener, this, shellController)
-
     private val mOnAnimationFinishedCallback = { releaseVisualIndicator() }
+
+    private val wallpaperService: IWallpaperManager =
+        IWallpaperManager.Stub.asInterface(ServiceManager.getService(Context.WALLPAPER_SERVICE))
     private lateinit var mPipScheduler: PipScheduler
 
+    private val wallpaperDimAmount: Float
     private val dragToDesktopStateListener =
         object : DragToDesktopStateListener {
             override fun onCommitToDesktopAnimationStart() {
@@ -401,6 +403,8 @@ class DesktopTasksController(
         if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             desktopRepositoryInitializer.deskRootHelper = desksController
         }
+        wallpaperDimAmount =
+            SystemProperties.getInt("persist.wm.debug.wallpaper_dim_amount", 100).toFloat() / 100
     }
 
     private fun onInit() {
@@ -1885,7 +1889,7 @@ class DesktopTasksController(
             }
 
         repository.addClosingTask(displayId = displayId, deskId = deskId, taskId = taskId)
-        desktopScrimController.updateDesktopScrimIfNeeded(displayId, userId, taskId)
+        updateTaskBarAndWallpaperDimIfNeeded(displayId, userId, taskId)
 
         val immersiveRunnable =
             desktopImmersiveController
@@ -2034,7 +2038,7 @@ class DesktopTasksController(
             exitResult.asExit()?.runOnTransitionStart?.invoke(transition)
             desktopExitRunnable?.invoke(transition)
         }
-        desktopScrimController.updateDesktopScrimIfNeeded(displayId, userId, taskId)
+        updateTaskBarAndWallpaperDimIfNeeded(displayId, userId, taskId)
     }
 
     /**
@@ -3173,7 +3177,30 @@ class DesktopTasksController(
         logD("willMaximize = %b", willMaximize)
         logD("shouldRestoreToSnap = %b", shouldRestoreToSnap)
 
-        desktopScrimController.handleToggleTaskSize(willMaximize, taskInfo, shouldRestoreToSnap)
+        val shouldApplyTaskbarCornerRoundingAndWallpaperDimEffect =
+            if (Flags.fixWallpaperDimIssues26q2()) {
+                // The maximized / restored task will not be tiled. So just check if it will be
+                // maximized, or any other task is already maximized or double-tiled.
+                willMaximize ||
+                    isAnyTaskMaximizedOrDoubleTiled(
+                        taskInfo.displayId,
+                        taskInfo.userId,
+                        excludeTaskId = taskInfo.taskId,
+                    )
+            } else {
+                willMaximize ||
+                    shouldRestoreToSnap ||
+                    isAnyTaskMaximizedOrSnapped(
+                        displayId = taskInfo.displayId,
+                        userId = taskInfo.userId,
+                        excludeTaskId = taskInfo.taskId,
+                    )
+            }
+
+        updateTaskBarAndWallpaperDim(
+            taskInfo.displayId,
+            shouldApplyTaskbarCornerRoundingAndWallpaperDimEffect,
+        )
         val wct = WindowContainerTransaction().setBounds(taskInfo.token, destinationBounds)
         interaction.uiEvent?.let { uiEvent -> desktopModeUiEventLogger.log(taskInfo, uiEvent) }
         desktopModeEventLogger.logTaskResizingEnded(
@@ -3231,7 +3258,7 @@ class DesktopTasksController(
         )
     }
 
-    fun isMaximizedToStableBoundsEdges(displayId: Int, taskBounds: Rect): Boolean {
+    private fun isMaximizedToStableBoundsEdges(displayId: Int, taskBounds: Rect): Boolean {
         val displayLayout = displayController.getDisplayLayout(displayId) ?: return false
         val stableBounds = Rect().also { displayLayout.getStableBounds(it) }
         return isTaskBoundsEqual(taskBounds, stableBounds)
@@ -3242,7 +3269,36 @@ class DesktopTasksController(
         getSnapBounds(displayId, SnapPosition.LEFT) == taskBounds ||
             getSnapBounds(displayId, SnapPosition.RIGHT) == taskBounds
 
-    fun doesTaskMaximizedOrSnapped(displayId: Int, taskBounds: Rect): Boolean {
+    /**
+     * Update the rounding state of the taskbar on the given display, based on the task with ID
+     * [taskId] having bounds [newBounds].
+     */
+    fun updateTaskbarRoundingOnTaskResize(displayId: Int, taskId: Int, newBounds: Rect) {
+        val shouldApplyEffect =
+            if (Flags.fixWallpaperDimIssues26q2()) {
+                // The resized task will not be tiled. So just check if it will be maximized, or any
+                // other task is already maximized or double-tiled.
+                isMaximizedToStableBoundsEdges(displayId, newBounds) ||
+                    isAnyTaskMaximizedOrDoubleTiled(
+                        displayId,
+                        shellController.currentUserId,
+                        excludeTaskId = taskId,
+                    )
+            } else {
+                val otherTasksRequireTaskbarRounding =
+                    isAnyTaskMaximizedOrSnapped(
+                        displayId,
+                        shellController.currentUserId,
+                        excludeTaskId = taskId,
+                    )
+                val resizedTaskRequiresTaskbarRounding =
+                    doesTaskMaximizedOrSnapped(displayId, newBounds)
+                otherTasksRequireTaskbarRounding || resizedTaskRequiresTaskbarRounding
+            }
+        updateTaskBarAndWallpaperDim(displayId, shouldApplyEffect)
+    }
+
+    private fun doesTaskMaximizedOrSnapped(displayId: Int, taskBounds: Rect): Boolean {
         val isSnappedToHalfScreen = isTaskSnappedToHalfScreen(displayId, taskBounds)
         val isMaximizedToBothEdges = isMaximizedToStableBoundsEdges(displayId, taskBounds)
         logD("isTaskSnappedToHalfScreen(taskInfo) = %b", isSnappedToHalfScreen)
@@ -3250,6 +3306,7 @@ class DesktopTasksController(
         return isSnappedToHalfScreen || isMaximizedToBothEdges
     }
 
+    @VisibleForTesting
     fun isAnyTaskMaximizedOrSnapped(
         displayId: Int,
         userId: Int,
@@ -3296,7 +3353,7 @@ class DesktopTasksController(
             }
     }
 
-    fun isAnyTaskTiledAndVisible(
+    private fun isAnyTaskTiledAndVisible(
         displayId: Int,
         userId: Int,
         position: SnapPosition,
@@ -3318,6 +3375,7 @@ class DesktopTasksController(
             !repository.isMinimizedTaskInDesk(taskId, deskId)
     }
 
+    @VisibleForTesting
     fun isAnyTaskMaximizedOrDoubleTiled(
         displayId: Int,
         userId: Int,
@@ -3374,8 +3432,45 @@ class DesktopTasksController(
             repository.saveBoundsBeforeSnapOrMaximize(taskInfo.taskId, previousBounds)
         }
 
-        val isTiled = snapController.snapToHalfScreen(taskInfo, currentDragBounds, position)
-        desktopScrimController.handleOnSnapped(isTiled, taskInfo, position)
+        if (Flags.fixWallpaperDimIssues26q2()) {
+            snapController.snapToHalfScreen(taskInfo, currentDragBounds, position)
+            // snapController.snapToHalfScreen() returns false when the task's bounds are not
+            // updated, even if the task is newly tiled. On the other hand, tiled tasks have
+            // already been updated at this point. So, instead of checking the return value,
+            // directly check if any task is tiled on `position` to see if the task has been
+            // newly tiled and thus the wallpaper dimming effect might need to be updated.
+            if (isAnyTaskTiledAndVisible(taskInfo.displayId, taskInfo.userId, position)) {
+                val oppositePosition =
+                    when (position) {
+                        SnapPosition.LEFT -> SnapPosition.RIGHT
+                        SnapPosition.RIGHT -> SnapPosition.LEFT
+                    }
+                val isDoubleTiled =
+                    isAnyTaskTiledAndVisible(
+                        taskInfo.displayId,
+                        taskInfo.userId,
+                        oppositePosition,
+                        excludeTaskId = taskInfo.taskId,
+                    )
+                if (isDoubleTiled) {
+                    updateTaskBarAndWallpaperDim(taskInfo.displayId, true)
+                } else {
+                    // We might need to update the effects when either:
+                    // 1. The task has been snapped from the maximized state.
+                    // 2. The task has been snapped from the opposite position.
+                    updateTaskBarAndWallpaperDimIfNeeded(
+                        taskInfo.displayId,
+                        taskInfo.userId,
+                        excludeTaskId = taskInfo.taskId,
+                    )
+                }
+            }
+        } else {
+            val isTiled = snapController.snapToHalfScreen(taskInfo, currentDragBounds, position)
+            if (isTiled) {
+                updateTaskBarAndWallpaperDim(taskInfo.displayId, true)
+            }
+        }
     }
 
     /**
@@ -3568,7 +3663,7 @@ class DesktopTasksController(
                 }
             }
 
-        desktopScrimController.updateDesktopScrimIfNeeded(displayId, userId)
+        updateTaskBarAndWallpaperDimIfNeeded(displayId, userId)
     }
 
     private fun moveHomeTaskToTop(displayId: Int, wct: WindowContainerTransaction) {
@@ -3787,7 +3882,10 @@ class DesktopTasksController(
                 shouldEndUpAtHome,
             )
         }
-        desktopScrimController.handleExitCleanUp(displayId, shouldEndUpAtHome, exitReason)
+        if (shouldEndUpAtHome && exitReason == ExitReason.RETURN_HOME_OR_OVERVIEW) {
+            // We are going back to home, remove any effects for the maximized/snapped tasks.
+            updateTaskBarAndWallpaperDim(displayId, shouldApplyEffect = false)
+        }
         val shouldHandleWallpaperAndHome =
             (!skipWallpaperAndHomeOrdering ||
                 !DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) &&
@@ -4556,12 +4654,11 @@ class DesktopTasksController(
             }
         }
 
-        val shouldActivateDesk =
-            !isTargetDeskActive
-            // It's possible that we don't need to activate the desk even though it's not
-            // active now, for example, when the task requests repositining within an inactive
-            // desk.
-            && bringTaskToFront
+        val shouldActivateDesk = !isTargetDeskActive
+                // It's possible that we don't need to activate the desk even though it's not
+                // active now, for example, when the task requests repositining within an inactive
+                // desk.
+                && bringTaskToFront
         if (shouldActivateDesk) {
             val runOnTransitStart =
                 addDeskActivationChanges(
@@ -4978,7 +5075,7 @@ class DesktopTasksController(
             snapController.removeTaskIfTiled(task.displayId, task.taskId)
         }
 
-        desktopScrimController.updateDesktopScrimIfNeeded(task.displayId, task.userId, task.taskId)
+        updateTaskBarAndWallpaperDimIfNeeded(task.displayId, task.userId, task.taskId)
         return if (wct.isEmpty) null else wct
     }
 
@@ -5553,7 +5650,7 @@ class DesktopTasksController(
             userId = userId,
         )
         desksOrganizer.activateDesk(wct, deskId)
-        desktopScrimController.updateDesktopScrimIfNeeded(displayId, userId)
+        updateTaskBarAndWallpaperDimIfNeeded(displayId, userId)
         val expandedTasksOrderedFrontToBack =
             repository.getExpandedTasksIdsInDeskOrdered(deskId = deskId)
         // If we're adding a new Task we might need to minimize an old one
@@ -6310,10 +6407,6 @@ class DesktopTasksController(
             .updateIndicatorType(displayId, PointF(inputX, taskTop))
     }
 
-    fun getDesktopScrimController(): DesktopScrimController {
-        return desktopScrimController
-    }
-
     @VisibleForTesting
     fun getOrCreateVisualIndicator(
         taskInfo: RunningTaskInfo,
@@ -6563,10 +6656,7 @@ class DesktopTasksController(
         // operation method (e.g., [toggleDesktopTaskSize]) accordingly.
         if (taskInfo.displayId != motionEvent.displayId) {
             // The window has moved to a new display, both of the display needs to be updated
-            desktopScrimController.updateDesktopScrimIfNeeded(
-                motionEvent.displayId,
-                taskInfo.userId,
-            )
+            updateTaskBarAndWallpaperDimIfNeeded(motionEvent.displayId, taskInfo.userId)
         }
         return needDragIndicatorCleanup
     }
@@ -6961,6 +7051,29 @@ class DesktopTasksController(
             userRepositories.current.getDeskDisplayStateForRemote().any {
                 it.displayId == displayId && it.activeDeskId != INVALID_DISPLAY
             }
+
+    private fun updateTaskBarAndWallpaperDimIfNeeded(
+        displayId: Int,
+        userId: Int,
+        excludeTaskId: Int? = null,
+    ) {
+        val shouldApplyEffect =
+            if (Flags.fixWallpaperDimIssues26q2()) {
+                isAnyTaskMaximizedOrDoubleTiled(displayId, userId, excludeTaskId)
+            } else {
+                isAnyTaskMaximizedOrSnapped(displayId, userId, excludeTaskId)
+            }
+        updateTaskBarAndWallpaperDim(displayId, shouldApplyEffect)
+    }
+
+    private fun updateTaskBarAndWallpaperDim(displayId: Int, shouldApplyEffect: Boolean) {
+        desktopRemoteListener.onTaskbarCornerRoundingUpdate(shouldApplyEffect, displayId)
+        wallpaperService.setWallpaperDimAmount(
+            if (shouldApplyEffect) wallpaperDimAmount else 0f,
+            displayId,
+            true, /* temporary */
+        )
+    }
 
     /** The interface for calls from outside the host process. */
     @BinderThread

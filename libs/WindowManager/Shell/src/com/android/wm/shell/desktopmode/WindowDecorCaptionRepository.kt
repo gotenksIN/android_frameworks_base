@@ -76,13 +76,6 @@ sealed class CaptionState {
         override val isFocused: Boolean,
     ) : CaptionState()
 
-    data class FullscreenHeader(
-        val runningTaskInfo: RunningTaskInfo,
-        val isHeaderMenuExpanded: Boolean,
-        val globalAppChipBounds: Rect,
-        override val isFocused: Boolean,
-    ) : CaptionState()
-
     data class NoCaption(val taskId: Int = INVALID_TASK_ID) : CaptionState() {
         override val isFocused = false
     }
@@ -92,7 +85,6 @@ sealed class CaptionState {
         when (this) {
             is AppHandle -> runningTaskInfo
             is AppHeader -> runningTaskInfo
-            is FullscreenHeader -> runningTaskInfo
             is NoCaption -> null
         }
 

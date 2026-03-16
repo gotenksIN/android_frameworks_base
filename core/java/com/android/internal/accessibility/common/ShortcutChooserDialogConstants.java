@@ -21,10 +21,7 @@ package com.android.internal.accessibility.common;
  * framework and system ui.
  */
 public class ShortcutChooserDialogConstants {
-
-    /** The intent action to launch the shortcut chooser dialog. */
-    public static final String LAUNCH_SHORTCUT_CHOOSER_DIALOG_ACTION =
-            "com.android.systemui.action.LAUNCH_ACCESSIBILITY_SHORTCUT_CHOOSER_DIALOG";
+    private ShortcutChooserDialogConstants() {}
 
     /**
      * Used as the name of the extra data when we put the value of the shortcut type among
@@ -36,6 +33,4 @@ public class ShortcutChooserDialogConstants {
      * Used as the name of the extra data when we put the value of the display id into an intent.
      */
     public static final String DISPLAY_ID = "DISPLAY_ID";
-
-    private ShortcutChooserDialogConstants() {}
 }

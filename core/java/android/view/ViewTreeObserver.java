@@ -62,6 +62,7 @@ public final class ViewTreeObserver {
     @UnsupportedAppUsage
     private CopyOnWriteArray<OnScrollChangedListener> mOnScrollChangedListeners;
     private CopyOnWriteArray<OnPreDrawListener> mOnPreDrawListeners;
+    private CopyOnWriteArray<OnWindowShownListener> mOnWindowShownListeners;
     private CopyOnWriteArray<Consumer<List<Rect>>> mGestureExclusionListeners;
 
     // These listeners cannot be mutated during dispatch
@@ -71,6 +72,10 @@ public final class ViewTreeObserver {
 
     // These listeners are one-shot
     private ArrayList<Runnable> mOnFrameCommitListeners;
+
+    /** Remains false until #dispatchOnWindowShown() is called. If a listener registers after
+     * that the listener will be immediately called. */
+    private boolean mWindowShown;
 
     // The reason that the last call to dispatchOnPreDraw() returned true to cancel and redraw
     private StringBuilder mLastDispatchOnPreDrawCanceledReason;
@@ -213,6 +218,18 @@ public final class ViewTreeObserver {
         public void onScrollChanged();
     }
 
+    /**
+     * Interface definition for a callback noting when a system window has been displayed.
+     * This is only used for non-Activity windows. Activity windows can use
+     * Activity.onEnterAnimationComplete() to get the same signal.
+     * @hide
+     */
+    public interface OnWindowShownListener {
+        /**
+         * Callback method to be invoked when a non-activity window is fully shown.
+         */
+        void onWindowShown();
+    }
 
     /**
      * Parameters used with OnComputeInternalInsetsListener.
@@ -461,6 +478,14 @@ public final class ViewTreeObserver {
             }
         }
 
+        if (observer.mOnWindowShownListeners != null) {
+            if (mOnWindowShownListeners != null) {
+                mOnWindowShownListeners.addAll(observer.mOnWindowShownListeners);
+            } else {
+                mOnWindowShownListeners = observer.mOnWindowShownListeners;
+            }
+        }
+
         if (observer.mGestureExclusionListeners != null) {
             if (mGestureExclusionListeners != null) {
                 mGestureExclusionListeners.addAll(observer.mGestureExclusionListeners);
@@ -700,6 +725,44 @@ public final class ViewTreeObserver {
         mOnPreDrawListeners.remove(victim);
     }
 
+    /**
+     * Register a callback to be invoked when the view tree window has been shown
+     *
+     * @param listener The callback to add
+     *
+     * @throws IllegalStateException If {@link #isAlive()} returns false
+     * @hide
+     */
+    public void addOnWindowShownListener(OnWindowShownListener listener) {
+        checkIsAlive();
+
+        if (mOnWindowShownListeners == null) {
+            mOnWindowShownListeners = new CopyOnWriteArray<OnWindowShownListener>();
+        }
+
+        mOnWindowShownListeners.add(listener);
+        if (mWindowShown) {
+            listener.onWindowShown();
+        }
+    }
+
+    /**
+     * Remove a previously installed window shown callback
+     *
+     * @param victim The callback to remove
+     *
+     * @throws IllegalStateException If {@link #isAlive()} returns false
+     *
+     * @see #addOnWindowShownListener(OnWindowShownListener)
+     * @hide
+     */
+    public void removeOnWindowShownListener(OnWindowShownListener victim) {
+        checkIsAlive();
+        if (mOnWindowShownListeners == null) {
+            return;
+        }
+        mOnWindowShownListeners.remove(victim);
+    }
 
     /**
      * <p>Register a callback to be invoked when the view tree is about to be drawn.</p>
@@ -1143,6 +1206,26 @@ public final class ViewTreeObserver {
         return null;
     }
 
+    /**
+     * Notifies registered listeners that the window is now shown
+     * @hide
+     */
+    @SuppressWarnings("unchecked")
+    public final void dispatchOnWindowShown() {
+        mWindowShown = true;
+        final CopyOnWriteArray<OnWindowShownListener> listeners = mOnWindowShownListeners;
+        if (listeners != null && listeners.size() > 0) {
+            CopyOnWriteArray.Access<OnWindowShownListener> access = listeners.start();
+            try {
+                int count = access.size();
+                for (int i = 0; i < count; i++) {
+                    access.get(i).onWindowShown();
+                }
+            } finally {
+                listeners.end();
+            }
+        }
+    }
 
     /**
      * Notifies registered listeners that the drawing pass is about to start.

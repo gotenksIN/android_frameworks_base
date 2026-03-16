@@ -52,8 +52,7 @@ import com.android.settingslib.utils.applications.AppUtils
 /** Transform Catalyst Graph result to Framework GET METADATA result */
 fun transformCatalystGetMetadataResponse(
     context: Context,
-    graph: PreferenceGraphProto,
-    maxParametrizedCount: Int = 10
+    graph: PreferenceGraphProto
 ): MetadataResult {
     val graph = PreferenceGraphCompressor.expand(graph)
     val preferences = mutableSetOf<PreferenceWithScreen>()
@@ -80,7 +79,7 @@ fun transformCatalystGetMetadataResponse(
         for (groupOrPref in screen.root.preferencesList) {
             traverseGroupOrPref(screenKey, groupOrPref)
         }
-        for (parameterizedScreen in screen.parameterizedScreensList.take(maxParametrizedCount)) {
+        for (parameterizedScreen in screen.parameterizedScreensList) {
             val args = parameterizedScreen.args.toBundle()
             // TODO: support parameterized screen with non empty arguments
             if (!args.isEmpty) continue

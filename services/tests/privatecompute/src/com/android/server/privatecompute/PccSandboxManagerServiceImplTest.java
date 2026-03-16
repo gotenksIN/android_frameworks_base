@@ -56,6 +56,8 @@ import androidx.test.runner.AndroidJUnit4;
 import com.android.server.LocalServices;
 import com.android.server.privatecompute.PccSandboxManagerServiceImpl.Injector;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -64,9 +66,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /** Unit tests for {@link PccSandboxManagerServiceImpl}. */
 @RunWith(AndroidJUnit4.class)
@@ -365,7 +364,6 @@ public class PccSandboxManagerServiceImplTest {
                     "android.permission.BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE";
         }
 
-        when(mPackageManager.resolveServiceAsUser(any(), anyInt(), anyInt())).thenReturn(
-                resolveInfo);
+        when(mPackageManager.resolveService(any(), anyInt())).thenReturn(resolveInfo);
     }
 }

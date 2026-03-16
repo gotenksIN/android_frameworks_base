@@ -16,10 +16,8 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
-import android.content.applicationContext
 import com.android.systemui.brightness.domain.interactor.brightnessMirrorShowingInteractor
 import com.android.systemui.common.ui.configurationState
-import com.android.systemui.common.ui.domain.interactor.configurationInteractor
 import com.android.systemui.dump.dumpManager
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.kosmos.Kosmos
@@ -47,7 +45,5 @@ val Kosmos.notificationScrollViewModel by Fixture {
         headsUpNotificationInteractor = headsUpNotificationInteractor,
         sceneInteractor = sceneInteractor,
         keyguardInteractor = { keyguardInteractor },
-        configurationInteractor = configurationInteractor,
-        context = applicationContext,
     )
 }

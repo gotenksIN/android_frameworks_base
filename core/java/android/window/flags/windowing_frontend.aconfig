@@ -74,13 +74,6 @@ flag {
 }
 
 flag {
-    name: "synced_display_mode_updates"
-    namespace: "windowing_frontend"
-    description: "Synchronized multi-display mode updates"
-    bug: "448471638"
-}
-
-flag {
   name: "avoid_intermediate_destroying_state"
   namespace: "windowing_frontend"
   description: "Prevent intermediate destroying state from affecting visibility"
@@ -106,16 +99,6 @@ flag {
   description: "Deprecate ActivityOptions#makeTaskLaunchBehind"
   bug: "473967290"
   is_exported: true
-}
-
-flag {
-  name: "lite_task_description_changed"
-  namespace: "windowing_frontend"
-  description: "Optimize TaskDescription change events dispatching"
-  bug: "489914754"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -368,6 +351,16 @@ flag {
     namespace: "windowing_frontend"
     description: "Virtual display owners can create system application overlays"
     bug: "432521645"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "displayinfo_state_deferrable"
+    namespace: "windowing_frontend"
+    description: "Display state should be a deferrable WM property"
+    bug: "423701190"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -19,13 +19,10 @@ package com.android.systemui.scene.ui.composable.transitions
 import com.android.compose.animation.scene.SceneTransitionsBuilder
 import com.android.compose.animation.scene.TransitionKey
 import com.android.systemui.scene.shared.model.Overlays
-import com.android.systemui.scene.ui.viewmodel.ToBouncerTransitionViewModel
 
 /** Bouncer transitions that are common to both `SceneContainer` and `BouncerSceneContainer`. */
-fun SceneTransitionsBuilder.sharedBouncerTransitions(
-    toBouncerTransitionViewModel: ToBouncerTransitionViewModel
-) {
-    to(Overlays.Bouncer) { toBouncerTransition(viewModel = toBouncerTransitionViewModel) }
+fun SceneTransitionsBuilder.sharedBouncerTransitions() {
+    to(Overlays.Bouncer) { toBouncerTransition() }
     from(Overlays.Bouncer) { fromBouncerTransition() }
     from(Overlays.Bouncer, key = TransitionKey.PredictiveBack, preview = { fromBouncerPreview() }) {
         fromBouncerTransition()

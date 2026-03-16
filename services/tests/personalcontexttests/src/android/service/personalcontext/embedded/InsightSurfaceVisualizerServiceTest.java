@@ -16,12 +16,9 @@
 
 package android.service.personalcontext.embedded;
 
-import static android.view.View.MeasureSpec.makeMeasureSpec;
-
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,17 +37,15 @@ import android.service.personalcontext.testutil.FakeExecutor;
 import android.view.Display;
 import android.view.SurfaceControlViewHost;
 import android.view.View;
-import android.view.ViewTreeObserver;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
-import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -64,9 +59,8 @@ public class InsightSurfaceVisualizerServiceTest {
     @Mock private IVisualizationResult mResult;
     @Mock private Context mContext;
     @Mock private Display mDisplay;
-    @Mock private InsightSurfaceVisualizerService.RootView mRootView;
+    @Mock private FrameLayout mRootView;
     @Mock private SurfaceControlViewHost mSurfaceControlViewHost;
-    @Mock ViewTreeObserver mViewTreeObserver;
 
     @Mock private IOpCallback mOpCallback;
     private final PublishedContextInsightWrapper mInsight =
@@ -95,10 +89,7 @@ public class InsightSurfaceVisualizerServiceTest {
                 }
 
                 @Override
-                public InsightSurfaceVisualizerService.RootView createRootView(
-                        Context context,
-                        InsightSurfaceClientInfo clientInfo,
-                        SurfaceControlViewHost host) {
+                public FrameLayout createRootView(Context context) {
                     return mRootView;
                 }
             };
@@ -154,7 +145,6 @@ public class InsightSurfaceVisualizerServiceTest {
         MockitoAnnotations.openMocks(this);
         when(mClientInfo.getId()).thenReturn(UUID.randomUUID());
         when(mSurfaceControlViewHost.getView()).thenReturn(mRootView);
-        when(mRootView.getViewTreeObserver()).thenReturn(mViewTreeObserver);
     }
 
 
@@ -247,16 +237,6 @@ public class InsightSurfaceVisualizerServiceTest {
         visualizer.createVisualizationForClient(
                 mInsight, mClientInfo, mRenderToken, mResult, mOpCallback);
         mFakeExecutor.runAll();
-
-        final ArgumentCaptor<ViewTreeObserver.OnPreDrawListener>
-                onPreDrawListenerArgumentCaptor =
-                ArgumentCaptor.forClass(ViewTreeObserver.OnPreDrawListener.class);
-        verify(mViewTreeObserver).addOnPreDrawListener(
-                onPreDrawListenerArgumentCaptor.capture());
-        final ViewTreeObserver.OnPreDrawListener listener =
-                onPreDrawListenerArgumentCaptor.getValue();
-        listener.onPreDraw();
-
         verify(mClientInfo).onSurfaceCreated(any(), any());
     }
 
@@ -326,25 +306,6 @@ public class InsightSurfaceVisualizerServiceTest {
         // Since the visualizer was created with a View to create, it will call the callback
         // with "true" to indicate that View creation succeeded.
         verify(mResult).onResult(true);
-    }
-
-    @Test
-    public void testOnSizeChanged_whenViewSizeChanges() {
-        final InsightSurfaceVisualizerService.RootView rootView =
-                new InsightSurfaceVisualizerService.RootView(
-                        ApplicationProvider.getApplicationContext(),
-                        mClientInfo,
-                        mSurfaceControlViewHost);
-        when(mClientInfo.getMeasureSpecWidth()).thenReturn(
-                makeMeasureSpec(100, View.MeasureSpec.EXACTLY));
-        when(mClientInfo.getMeasureSpecHeight()).thenReturn(
-                makeMeasureSpec(100, View.MeasureSpec.EXACTLY));
-
-        final View childView = new View(ApplicationProvider.getApplicationContext());
-        rootView.setContentView(childView);
-        rootView.executeOnRequestLayoutAction();
-
-        verify(mClientInfo).onSizeChanged(anyInt(), anyInt());
     }
 
     private TestInsightSurfaceVisualizerService createVisualizer() {

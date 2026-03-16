@@ -138,6 +138,7 @@ import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_FIRST_TIME;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
+import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 
 import static com.android.internal.policy.TransitionAnimation.MAX_ANIMATION_DURATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
@@ -1160,23 +1161,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         getPendingTransaction().setTrustedOverlay(mSurfaceControl, isWindowTrustedOverlay());
         getPendingTransaction().setSecure(mSurfaceControl, isSecureLocked());
         // All apps should be considered as occluding when computing TrustedPresentation Thresholds.
-        getPendingTransaction().setCanOccludePresentation(mSurfaceControl,
-                canOccludePresentation());
-    }
-
-
-    // Indicate whether this window will be considered occluding when computing occlusion
-    // for other windows. See {@link WindowState#isWindowTrustedOverlay()}
-    private boolean canOccludePresentation() {
-        if (mSession.mCanAddInternalSystemWindow) {
-            return false;
-        }
-
-        if (mAttrs.type == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY) {
-            return false;
-        }
-
-        return true;
+        final boolean canOccludePresentation = !mSession.mCanAddInternalSystemWindow;
+        getPendingTransaction().setCanOccludePresentation(mSurfaceControl, canOccludePresentation);
     }
 
     @Override
@@ -2501,7 +2487,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
             // Only a presentation window needs a transition because its visibility affets the
             // lifecycle of apps below (b/390481865).
-            if (isPresentation()) {
+            if (ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS.isTrue() && isPresentation()) {
                 final ActionChain chain =
                         mWmService.mAtmService.mChainTracker.startTransit("removeWin");
                 final boolean wasTransitionOnDisplay = chain.isCollectingOnDisplay(displayContent);
@@ -4960,6 +4946,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mWinAnimator.mEnteringAnimation) {
             mWinAnimator.mEnteringAnimation = false;
             mWmService.requestTraversal();
+            // System windows don't have an activity and an app token as a result, but need a way
+            // to be informed about their entrance animation end.
+            if (mActivityRecord == null) {
+                try {
+                    mClient.dispatchWindowShown();
+                } catch (RemoteException e) {
+                }
+            }
         }
 
         if (isAnimating()) {

@@ -163,11 +163,9 @@ public final class AutomatedPackagesRepository {
     public boolean validateAutomatedAppLaunchWarningIntent(@NonNull Intent intent) {
         String packageName = intent.getStringExtra(Intent.EXTRA_PACKAGE_NAME);
         int userId = intent.getIntExtra(Intent.EXTRA_USER_ID, UserHandle.USER_NULL);
-        synchronized (mLock) {
-            for (int i = 0; i < mDevicePackages.size(); ++i) {
-                if (mDevicePackages.valueAt(i).get(userId, EMPTY_SET).contains(packageName)) {
-                    return true;
-                }
+        for (int i = 0; i < mDevicePackages.size(); ++i) {
+            if (mDevicePackages.valueAt(i).get(userId, EMPTY_SET).contains(packageName)) {
+                return true;
             }
         }
         return false;
@@ -181,7 +179,6 @@ public final class AutomatedPackagesRepository {
         }
     }
 
-    @GuardedBy("mLock")
     private void updateLocked(int deviceId, String deviceOwnerPackageName,
             ArraySet<Pair<Integer, String>> uidPackagePairs) {
         if (uidPackagePairs.isEmpty()) {

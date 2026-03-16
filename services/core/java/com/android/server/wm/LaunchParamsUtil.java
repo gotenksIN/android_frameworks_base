@@ -36,8 +36,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.window.WindowContainerToken;
 
-import com.android.window.flags.Flags;
-
 import java.util.function.Consumer;
 
 /**
@@ -353,17 +351,16 @@ class LaunchParamsUtil {
         }
 
         if (taskDisplayArea == null && source != null) {
-            if (!Flags.prioritizeVisibleTaskDisplayOverSource() || task == null
-                    || !task.isVisibleRequested()) {
-                final TaskDisplayArea sourceDisplayArea = source.getDisplayArea();
-                logger.accept("display-area-from-source=" + sourceDisplayArea);
-                taskDisplayArea = sourceDisplayArea;
-            }
+            final TaskDisplayArea sourceDisplayArea = source.getDisplayArea();
+            logger.accept("display-area-from-source=" + sourceDisplayArea);
+            taskDisplayArea = sourceDisplayArea;
         }
 
-        if (taskDisplayArea == null && task != null) {
-            logger.accept("display-from-task=" + task.getDisplayId());
-            taskDisplayArea = task.getDisplayArea();
+        final Task rootTask = (taskDisplayArea == null && task != null)
+                ? task.getRootTask() : null;
+        if (rootTask != null) {
+            logger.accept("display-from-task=" + rootTask.getDisplayId());
+            taskDisplayArea = rootTask.getDisplayArea();
         }
 
         if (taskDisplayArea == null && options != null) {

@@ -65,7 +65,6 @@ import android.util.Slog;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.infra.AndroidFuture;
-import com.android.server.appfunctions.dynamic.MultiUserDynamicAppFunctionRegistry;
 
 import java.util.ArrayList;
 import java.util.Collections;

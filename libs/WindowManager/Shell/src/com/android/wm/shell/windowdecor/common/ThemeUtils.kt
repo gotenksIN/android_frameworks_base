@@ -26,8 +26,6 @@ import android.graphics.Color
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import com.android.wm.shell.dagger.WMSingleton
-import javax.inject.Inject
 
 /** The theme of a window decoration. */
 enum class Theme {
@@ -57,10 +55,7 @@ const val OPACITY_60 = 153
 const val OPACITY_65 = 166
 
 /** Utility class for determining themes based on system settings and app's [RunningTaskInfo]. */
-class DecorThemeUtil
-// TODO b/346528003: make this constructor private to use Factory instead.
-@Deprecated("Use DecorThemeUtil.Factory instead.")
-constructor(private val context: Context) {
+class DecorThemeUtil(private val context: Context) {
     private val lightColors = dynamicLightColorScheme(context)
     private val darkColors = dynamicDarkColorScheme(context)
 
@@ -107,11 +102,4 @@ constructor(private val context: Context) {
 
     fun getColorScheme(isDarkMode: Boolean): ColorScheme =
         if (isDarkMode) darkColors else lightColors
-
-    @WMSingleton
-    class Factory @Inject constructor() {
-        fun create(context: Context): DecorThemeUtil {
-            return DecorThemeUtil(context)
-        }
-    }
 }

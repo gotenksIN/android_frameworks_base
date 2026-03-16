@@ -64,10 +64,6 @@ class AppHandleNotifier(
                     is CaptionState.AppHandle -> {
                         addHandle(captionState.appHandleIdentifier)
                     }
-
-                    is CaptionState.FullscreenHeader -> {
-                        removeHandle(captionState.runningTaskInfo.taskId)
-                    }
                 }
             }
         }

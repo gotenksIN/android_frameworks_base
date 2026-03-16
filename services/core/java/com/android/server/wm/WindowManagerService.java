@@ -52,7 +52,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.WindowManage
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.WINDOW_FRAMES_VALID;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.Parcelable.PARCELABLE_WRITE_RETURN_VALUE;
-import static android.os.PerfettoCategories.BIG_LOCKS_CATEGORY;
+import static android.os.PerfettoTrace.BIG_LOCKS_V3;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.Process.myPid;
 import static android.os.Process.myUid;
@@ -115,6 +115,7 @@ import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_MISSING_WINDOW;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_NOT_VISIBLE_ON_SCREEN;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
+import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 import static android.window.ScreenCapture.ScreenCaptureParams.CAPTURE_MODE_REQUIRE_OPTIMIZED;
 import static android.window.ScreenCapture.ScreenCaptureParams.PROTECTED_CONTENT_POLICY_THROW_EXCEPTION;
 import static android.window.ScreenCapture.ScreenCaptureParams.SECURE_CONTENT_POLICY_THROW_EXCEPTION;
@@ -347,6 +348,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.SystemServerLock;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.annotations.VisibleForTesting.Visibility;
+import com.android.internal.dev.perfetto.sdk.PerfettoTrace;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.os.TransferPipe;
 import com.android.internal.policy.IKeyguardDismissCallback;
@@ -1211,29 +1213,21 @@ public class WindowManagerService extends IWindowManager.Stub
      * Emits a trace event indicating the start of an attempt to acquire the main WMS lock.
      */
     public static void traceBeforeWmsLock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.instant(BIG_LOCKS_CATEGORY,
-                    "wms_lock_acquire").emit();
-        }
+        PerfettoTrace.instant(BIG_LOCKS_V3, "wms_lock_acquire").emit();
     }
 
     /**
      * Emits a trace event indicating that the main WMS lock has been acquired and is now held.
      */
     public static void traceAfterWmsLock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.begin(BIG_LOCKS_CATEGORY,
-                    "wms_lock_held").emit();
-        }
+        PerfettoTrace.begin(BIG_LOCKS_V3, "wms_lock_held").emit();
     }
 
     /**
      * Emits a trace event indicating the end of the critical section protected by the WMS lock.
      */
     public static void traceAfterWmsUnlock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.end(BIG_LOCKS_CATEGORY).emit();
-        }
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     SystemPerformanceHinter mSystemPerformanceHinter;
@@ -1998,7 +1992,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
             // A presentation window needs a transition because its visibility affects the lifecycle
             // apps below (b/390481865).
-            final boolean isPresentationWindow = win.isPresentation();
+            final boolean isPresentationWindow =
+                    ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS.isTrue() && win.isPresentation();
             // WindowContainer#assignLayers() is blocked for the majority of window containers if
             // a transition is playing. If there are multiple children in the display area for
             // screenshot windows, we could miss the chance to set correct z-orders on layers
@@ -7782,13 +7777,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mH.post(() -> {
             synchronized (mGlobalLock) {
                 mAtmService.deferWindowLayout();
-                if (Flags.syncedDisplayModeUpdates()) {
-                    mRoot.forAllDisplays(dc -> dc.getDisplayPolicy().updateCurrentUserResources());
-                    mRoot.mDisplayUpdater.updateDisplays(() -> mRoot.forAllDisplays(
-                            dc -> dc.getDisplayPolicy().onResourcesUpdated()));
-                } else {
-                    mRoot.forAllDisplays(dc -> dc.getDisplayPolicy().onOverlayChanged());
-                }
+                mRoot.forAllDisplays(dc -> dc.getDisplayPolicy().onOverlayChanged());
                 mAtmService.continueWindowLayout();
             }
         });
@@ -9855,15 +9844,12 @@ public class WindowManagerService extends IWindowManager.Stub
         // apps to go behind home. See b/117376413
         if (task.isActivityTypeHome()) {
             // Only ignore root home task if the requested focus home Task is in the same
-            // TaskDisplayArea or RootDisplayArea as the current focus window.
-            final WindowState curFocusedWindow = getFocusedWindow();
-            if (curFocusedWindow != null) {
-                final DisplayArea commonParent = curFocusedWindow.isActivityWindow()
-                        ? curFocusedWindow.getDisplayArea()
-                        : curFocusedWindow.getRootDisplayArea();
-                if (commonParent != null && task.isDescendantOf(commonParent)) {
-                    return;
-                }
+            // TaskDisplayArea as the current focus Task.
+            TaskDisplayArea homeTda = task.getDisplayArea();
+            WindowState curFocusedWindow = getFocusedWindow();
+            if (curFocusedWindow != null && homeTda != null
+                    && curFocusedWindow.isDescendantOf(homeTda)) {
+                return;
             }
         }
 

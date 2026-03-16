@@ -43,9 +43,6 @@ import libcore.util.EmptyArray;
 public abstract class KeyProperties {
     private KeyProperties() {}
 
-    // Defined in RFC 8410.
-    private static final String ED25519_OID = "1.3.101.112";
-
     /**
      * @hide
      */
@@ -283,8 +280,7 @@ public abstract class KeyProperties {
         public static int toKeymasterAsymmetricKeyAlgorithm(
                 @NonNull @KeyAlgorithmEnum String algorithm) {
             if (KEY_ALGORITHM_EC.equalsIgnoreCase(algorithm)
-                    || KEY_ALGORITHM_XDH.equalsIgnoreCase(algorithm)
-                    || ED25519_OID.equalsIgnoreCase(algorithm)) {
+                    || KEY_ALGORITHM_XDH.equalsIgnoreCase(algorithm)) {
                 return KeymasterDefs.KM_ALGORITHM_EC;
             } else if (KEY_ALGORITHM_RSA.equalsIgnoreCase(algorithm)) {
                 return KeymasterDefs.KM_ALGORITHM_RSA;

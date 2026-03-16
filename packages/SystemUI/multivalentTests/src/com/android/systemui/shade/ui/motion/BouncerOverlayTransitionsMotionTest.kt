@@ -82,7 +82,6 @@ import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
 import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
-import com.android.systemui.scene.ui.viewmodel.toBouncerTransitionViewModel
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.phone.KeyguardStatusBarViewController
@@ -117,7 +116,6 @@ import platform.test.screenshot.Displays.Phone
 @LargeTest
 @RunWithLooper
 @EnableSceneContainer
-@Ignore("b/481758025")
 class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val deviceSpec = DeviceEmulationSpec(Phone)
@@ -274,7 +272,6 @@ class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
                     BouncerSceneContainer(
                         state = bouncerSceneContainerState,
                         bouncerOverlay = bouncerOverlay,
-                        toBouncerTransitionViewModel = kosmos.toBouncerTransitionViewModel,
                     )
                     SceneContainer(
                         viewModel = vm,

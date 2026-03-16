@@ -65,7 +65,6 @@ import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.display.brightness.BrightnessUtils;
 import com.android.server.display.feature.DisplayManagerFlags;
-import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.utils.DebugTransactionDetails;
 
 import java.io.PrintWriter;
@@ -93,6 +92,7 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
     private static final AtomicInteger sNextUniqueIndex = new AtomicInteger(0);
 
     private final ArrayMap<IBinder, VirtualDisplayDevice> mVirtualDisplayDevices = new ArrayMap<>();
+
     // When a virtual display is created, the mapping (appToken -> ownerUid) is stored here. That
     // way, when the display is released later, we can retrieve the ownerUid and decrement
     // the number of virtual displays that exist for that ownerUid. We can't use
@@ -365,7 +365,6 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
         private final float mDimBrightness;
         private float mCurrentBrightness;
         private final IBrightnessListener mBrightnessListener;
-        private final boolean mHasUniqueId;
 
         public VirtualDisplayDevice(IBinder displayToken, IBinder appToken,
                 int ownerUid, String ownerPackageName, Surface surface, int flags,
@@ -405,7 +404,6 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
             mPendingChanges |= PENDING_SURFACE_CHANGE;
             mDisplayIdToMirror = virtualDisplayConfig.getDisplayIdToMirror();
             mIsWindowManagerMirroring = virtualDisplayConfig.isWindowManagerMirroringEnabled();
-            mHasUniqueId = virtualDisplayConfig.getUniqueId() != null;
         }
 
         @Override
@@ -488,7 +486,7 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
 
         @Override
         public boolean hasStableUniqueId() {
-            return Flags.virtualDisplaysSupportDesktopMode() && mHasUniqueId;
+            return false;
         }
 
         @Override

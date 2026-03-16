@@ -67,7 +67,6 @@ import android.os.IBinder;
 import android.os.LocaleList;
 import android.os.Looper;
 import android.os.Parcel;
-import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
@@ -120,10 +119,9 @@ public class VirtualDeviceManagerService extends SystemService {
 
     private static final String VIRTUAL_DEVICE_NATIVE_SERVICE = "virtualdevice_native";
 
-    static final String DEVICE_PROFILE_UNKNOWN = "DEVICE_PROFILE_UNKNOWN";
-    static final String DEVICE_PROFILE_SYSTEM = "DEVICE_PROFILE_SYSTEM";
-    static final String DEVICE_PROFILE_SHELL = "DEVICE_PROFILE_SHELL";
-    static final String DEVICE_PROFILE_COMPUTER_CONTROL = "DEVICE_PROFILE_COMPUTER_CONTROL";
+    private static final String DEVICE_PROFILE_UNKNOWN = "DEVICE_PROFILE_UNKNOWN";
+    private static final String DEVICE_PROFILE_SYSTEM = "DEVICE_PROFILE_SYSTEM";
+    private static final String DEVICE_PROFILE_COMPUTER_CONTROL = "DEVICE_PROFILE_COMPUTER_CONTROL";
 
     private static final List<String> VIRTUAL_DEVICE_COMPANION_DEVICE_PROFILES = Arrays.asList(
             AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION,
@@ -481,16 +479,10 @@ public class VirtualDeviceManagerService extends SystemService {
         }
     }
 
-    VirtualDeviceImpl getVirtualDeviceForId(int deviceId) {
+    private VirtualDeviceImpl getVirtualDeviceForId(int deviceId) {
         synchronized (mVirtualDeviceManagerLock) {
             return mVirtualDevices.get(deviceId);
         }
-    }
-
-    IVirtualDevice createShellVirtualDevice(
-            IBinder token, AttributionSource attributionSource, VirtualDeviceParams params) {
-        return mImpl.createLocalVirtualDevice(
-                token, attributionSource, params, DEVICE_PROFILE_SHELL);
     }
 
     @Nullable
@@ -870,16 +862,6 @@ public class VirtualDeviceManagerService extends SystemService {
                 Slog.e(TAG, "Error during IPC", e);
                 throw ExceptionUtils.propagate(e, RemoteException.class);
             }
-        }
-
-        @Override
-        public int handleShellCommand(@NonNull ParcelFileDescriptor in,
-                @NonNull ParcelFileDescriptor out,
-                @NonNull ParcelFileDescriptor err,
-                @NonNull String[] args) {
-            return new VirtualDeviceShellCommand(VirtualDeviceManagerService.this)
-                    .exec(this, in.getFileDescriptor(), out.getFileDescriptor(),
-                            err.getFileDescriptor(), args);
         }
 
         @Override

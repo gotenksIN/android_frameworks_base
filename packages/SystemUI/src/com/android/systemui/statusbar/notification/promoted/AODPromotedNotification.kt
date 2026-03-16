@@ -117,8 +117,7 @@ fun AODPromotedNotification(
     }
 
     key(content.identity, notificationView.getTag(viewInflationIdentity)) {
-        // TODO(b/488459485): make sidePaddings response to shadeMode
-        val sidePaddings = dimensionResource(systemuiR.dimen.notification_side_paddings_single)
+        val sidePaddings = dimensionResource(systemuiR.dimen.notification_side_paddings)
         val sidePaddingValues = PaddingValues(horizontal = sidePaddings, vertical = 0.dp)
         AODPromotedNotificationView(
             notificationViewFactory = { notificationView },

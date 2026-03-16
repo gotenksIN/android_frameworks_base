@@ -38,6 +38,8 @@ import androidx.annotation.MainThread;
 import com.android.compose.animation.scene.OverlayKey;
 import com.android.compose.animation.scene.SceneKey;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.keyguard.KeyguardUpdateMonitor;
+import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.settingslib.bluetooth.HearingAidDeviceManager;
 import com.android.systemui.Flags;
 import com.android.systemui.accessibility.AccessibilityButtonModeObserver;
@@ -78,6 +80,7 @@ public class AccessibilityFloatingMenuController implements
 
     private final AccessibilityButtonModeObserver mAccessibilityButtonModeObserver;
     private final AccessibilityButtonTargetsObserver mAccessibilityButtonTargetsObserver;
+    private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     private final SceneInteractor mSceneInteractor;
     private final KeyguardTransitionInteractor mKeyguardInteractor;
     private final UserTracker mUserTracker;
@@ -99,12 +102,34 @@ public class AccessibilityFloatingMenuController implements
     private final HeadlessSystemUserMode mHeadlessSystemUserMode;
     private int mBtnMode;
     private String mBtnTargets;
+    private boolean mIsKeyguardVisible;
     private boolean mIsBouncerVisible;
     private KeyguardState mKeyguardState = KeyguardState.GONE;
     private SceneKey mSceneKey = Scenes.Gone;
     private boolean mIsUserInInitialization;
     @VisibleForTesting
     Handler mHandler;
+
+    @VisibleForTesting
+    final KeyguardUpdateMonitorCallback mKeyguardCallback = new KeyguardUpdateMonitorCallback() {
+
+        @Override
+        public void onUserUnlocked() {
+            handleFloatingMenuVisibility();
+        }
+
+        @Override
+        public void onKeyguardVisibilityChanged(boolean visible) {
+            mIsKeyguardVisible = visible;
+            handleFloatingMenuVisibility();
+        }
+
+        @Override
+        public void onUserSwitching(int userId) {
+            destroyFloatingMenu();
+            mIsUserInInitialization = true;
+        }
+    };
 
     @VisibleForTesting
     final UserInitializationCompleteCallback mUserInitializationCompleteCallback =
@@ -143,6 +168,7 @@ public class AccessibilityFloatingMenuController implements
             AccessibilityButtonTargetsObserver accessibilityButtonTargetsObserver,
             AccessibilityButtonModeObserver accessibilityButtonModeObserver,
             @Nullable HearingAidDeviceManager hearingAidDeviceManager,
+            KeyguardUpdateMonitor keyguardUpdateMonitor,
             SecureSettings secureSettings,
             DisplayTracker displayTracker,
             NavigationModeController navigationModeController,
@@ -162,6 +188,7 @@ public class AccessibilityFloatingMenuController implements
         mAccessibilityButtonTargetsObserver = accessibilityButtonTargetsObserver;
         mAccessibilityButtonModeObserver = accessibilityButtonModeObserver;
         mHearingAidDeviceManager = hearingAidDeviceManager;
+        mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mSecureSettings = secureSettings;
         mDisplayTracker = displayTracker;
         mNavigationModeController = navigationModeController;
@@ -174,6 +201,8 @@ public class AccessibilityFloatingMenuController implements
         mPointerDeviceRepository = pointerDeviceRepository;
         mHeadlessSystemUserMode = headlessSystemUserMode;
         mMagnification = magnification;
+
+        mIsKeyguardVisible = false;
     }
 
     /**
@@ -209,18 +238,22 @@ public class AccessibilityFloatingMenuController implements
     private void registerContentObservers() {
         mAccessibilityButtonModeObserver.addListener(this);
         mAccessibilityButtonTargetsObserver.addListener(this);
-        if (mCoroutineScope != null) {
-            if (Flags.sceneContainer()) {
-                collectFlow(mCoroutineScope,
-                        mSceneInteractor.getCurrentScene(), mSceneConsumer);
-                collectFlow(mCoroutineScope,
-                        mSceneInteractor.getCurrentOverlays(), mOverlayConsumer);
-            } else {
-                collectFlow(mCoroutineScope,
-                        mKeyguardInteractor.getCurrentKeyguardState(), mKeyguardStateConsumer);
+        if (Flags.keyguardInteractorForFloatingButton()) {
+            if (mCoroutineScope != null) {
+                if (Flags.sceneContainer()) {
+                    collectFlow(mCoroutineScope,
+                            mSceneInteractor.getCurrentScene(), mSceneConsumer);
+                    collectFlow(mCoroutineScope,
+                            mSceneInteractor.getCurrentOverlays(), mOverlayConsumer);
+                } else {
+                    collectFlow(mCoroutineScope,
+                            mKeyguardInteractor.getCurrentKeyguardState(), mKeyguardStateConsumer);
+                }
             }
+            mUserTracker.addCallback(mUserTrackerCallback, new HandlerExecutor(mHandler));
+        } else {
+            mKeyguardUpdateMonitor.registerCallback(mKeyguardCallback);
         }
-        mUserTracker.addCallback(mUserTrackerCallback, new HandlerExecutor(mHandler));
         mAccessibilityManager.registerUserInitializationCompleteCallback(
                 mUserInitializationCompleteCallback);
     }
@@ -239,6 +272,11 @@ public class AccessibilityFloatingMenuController implements
     private boolean hasValidScene() {
         if (mIsUserInInitialization) {
             return false; // Not allowed during user initialization.
+        }
+
+        // Legacy path
+        if (!Flags.keyguardInteractorForFloatingButton()) {
+            return !mIsKeyguardVisible;
         }
 
         // Evaluate based on scene

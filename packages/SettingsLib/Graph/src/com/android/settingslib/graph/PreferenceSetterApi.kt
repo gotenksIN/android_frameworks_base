@@ -181,9 +181,7 @@ class PreferenceSetterApiHandler(
             val value = request.value
             try {
                 if (value.hasBooleanValue()) {
-                    if (metadata.valueType != Boolean::class.javaObjectType &&
-                        metadata.valueType != Boolean::class.javaPrimitiveType
-                    ) {
+                    if (metadata.valueType != Boolean::class.javaObjectType) {
                         return PreferenceSetterResult.INVALID_REQUEST
                     }
                     val booleanValue = value.booleanValue
@@ -210,9 +208,7 @@ class PreferenceSetterApiHandler(
                     storage.setFloat(key, floatValue)
                     return PreferenceSetterResult.OK
                 } else if (value.hasStringValue()) {
-                    if (metadata.valueType != String::class.javaObjectType &&
-                        metadata.valueType != String::class.javaPrimitiveType
-                    ){
+                    if (metadata.valueType != String::class.javaObjectType) {
                         return PreferenceSetterResult.INVALID_REQUEST
                     }
                     val stringValue = value.stringValue

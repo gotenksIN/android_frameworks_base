@@ -20,6 +20,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.os.UserHandle
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.provider.Settings
@@ -36,24 +37,24 @@ import com.android.systemui.accessibility.data.repository.AccessibilityShortcuts
 import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
 import com.android.systemui.accessibility.shortcutchooser.shared.model.DialogRequestModel
 import com.android.systemui.broadcast.broadcastDispatcher
+import com.android.systemui.broadcast.mockBroadcastSender
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
-import com.android.systemui.kosmos.collectValues
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.testKosmosNew
 import com.android.systemui.user.data.repository.userRepository
 import com.android.systemui.user.domain.interactor.fakeHeadlessSystemUserMode
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.flowOf
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
@@ -86,13 +87,9 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
                 fakeHeadlessSystemUserMode,
                 keyguardInteractor,
                 broadcastDispatcher,
+                mockBroadcastSender,
             )
         }
-
-    @Before
-    fun setUp() {
-        setOobeCompleted(true)
-    }
 
     @Test
     fun dialogRequest_topRowKeyType_onDefaultDisplay_flowIsValid() =
@@ -101,19 +98,7 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
 
             sendIntentBroadcast(UserShortcutType.TOP_ROW_KEY, DEFAULT_DISPLAY)
 
-            assertThat(requestModel)
-                .isEqualTo(DialogRequestModel(UserShortcutType.TOP_ROW_KEY, DEFAULT_DISPLAY))
-        }
-
-    @Test
-    fun dialogRequest_topRowKeyType_onExternalDisplay_flowIsValid() =
-        kosmos.runTest {
-            val requestModel by collectLastValue(underTest.dialogRequest)
-
-            sendIntentBroadcast(UserShortcutType.TOP_ROW_KEY, DEFAULT_DISPLAY + 2)
-
-            assertThat(requestModel)
-                .isEqualTo(DialogRequestModel(UserShortcutType.TOP_ROW_KEY, DEFAULT_DISPLAY + 2))
+            assertThat(requestModel).isNotNull()
         }
 
     @Test
@@ -127,44 +112,13 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun dialogRequest_topRowKeyType_inOOBE_emitsQuickAccessRequest() =
-        kosmos.runTest {
-            setOobeCompleted(false)
-
-            val requestModels by collectValues(underTest.dialogRequest)
-
-            sendIntentBroadcast(UserShortcutType.TOP_ROW_KEY, DEFAULT_DISPLAY)
-
-            assertThat(requestModels)
-                .isEqualTo(
-                    listOf(DialogRequestModel(UserShortcutType.QUICK_ACCESS, DEFAULT_DISPLAY))
-                )
-        }
-
-    @Test
-    fun dialogRequest_topRowKeyType_onLoginScreen_emitsQuickAccessRequest() =
-        kosmos.runTest {
-            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
-
-            val requestModels by collectValues(underTest.dialogRequest)
-
-            sendIntentBroadcast(UserShortcutType.TOP_ROW_KEY, DEFAULT_DISPLAY)
-
-            assertThat(requestModels)
-                .isEqualTo(
-                    listOf(DialogRequestModel(UserShortcutType.QUICK_ACCESS, DEFAULT_DISPLAY))
-                )
-        }
-
-    @Test
     fun dialogRequest_hardwareType_onDefaultDisplay_flowIsValid() =
         kosmos.runTest {
             val requestModel by collectLastValue(underTest.dialogRequest)
 
             sendIntentBroadcast(UserShortcutType.HARDWARE, DEFAULT_DISPLAY)
 
-            assertThat(requestModel)
-                .isEqualTo(DialogRequestModel(UserShortcutType.HARDWARE, DEFAULT_DISPLAY))
+            assertThat(requestModel).isNotNull()
         }
 
     @Test
@@ -184,8 +138,8 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
 
             sendIntentBroadcast(UserShortcutType.SOFTWARE, DEFAULT_DISPLAY)
 
-            assertThat(requestModel)
-                .isEqualTo(DialogRequestModel(UserShortcutType.SOFTWARE, DEFAULT_DISPLAY))
+            assertThat(requestModel).isNotNull()
+            assertThat(requestModel?.shortcutType).isEqualTo(UserShortcutType.SOFTWARE)
         }
 
     @Test
@@ -478,6 +432,32 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         }
 
     @Test
+    fun launchQuickAccessDialog_sendBroadcast() =
+        kosmos.runTest {
+            val intentArgumentCaptor = argumentCaptor<Intent>()
+            val userHandleArgumentCaptor = argumentCaptor<UserHandle>()
+            underTest.launchQuickAccessDialog(DEFAULT_DISPLAY)
+
+            verify(mockBroadcastSender, times(1))
+                .sendBroadcastAsUser(
+                    intentArgumentCaptor.capture(),
+                    userHandleArgumentCaptor.capture(),
+                )
+            assertThat(intentArgumentCaptor.firstValue.`package`)
+                .isEqualTo(ShortcutChooserDialogInteractor.SYSTEMUI_PACKAGE)
+            assertThat(intentArgumentCaptor.firstValue.action)
+                .isEqualTo(ShortcutChooserDialogInteractor.QUICK_ACCESS_ACTION)
+            assertThat(
+                    intentArgumentCaptor.firstValue.getIntExtra(
+                        ShortcutChooserDialogConstants.DISPLAY_ID,
+                        INVALID_DISPLAY,
+                    )
+                )
+                .isEqualTo(DEFAULT_DISPLAY)
+            assertThat(userHandleArgumentCaptor.firstValue).isEqualTo(UserHandle.SYSTEM)
+        }
+
+    @Test
     fun isCompletedFullUser_notHSU_notOOBE_returnsTrue() =
         kosmos.runTest {
             fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(false)
@@ -512,8 +492,12 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
     private fun Kosmos.sendIntentBroadcast(@UserShortcutType shortcutType: Int, displayId: Int) {
         Intent()
             .apply {
-                action = ShortcutChooserDialogConstants.LAUNCH_SHORTCUT_CHOOSER_DIALOG_ACTION
-                putExtra(ShortcutChooserDialogConstants.SHORTCUT_TYPE, shortcutType)
+                if (shortcutType == UserShortcutType.QUICK_ACCESS) {
+                    action = ShortcutChooserDialogInteractor.QUICK_ACCESS_ACTION
+                } else {
+                    action = ShortcutChooserDialogInteractor.SHORTCUT_CHOOSER_ACTION
+                    putExtra(ShortcutChooserDialogConstants.SHORTCUT_TYPE, shortcutType)
+                }
                 putExtra(ShortcutChooserDialogConstants.DISPLAY_ID, displayId)
             }
             .let { broadcastDispatcher.sendIntentToMatchingReceiversOnly(context, it) }

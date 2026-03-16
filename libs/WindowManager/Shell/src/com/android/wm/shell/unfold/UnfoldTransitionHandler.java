@@ -315,25 +315,16 @@ public class UnfoldTransitionHandler implements TransitionHandler, UnfoldListene
         if (!ValueAnimator.areAnimatorsEnabled()) return false;
 
         return (request.getType() == TRANSIT_CHANGE
-                && getDefaultDisplayChange(request.getDisplayChanges())
+                && getDefaultDisplayChange(request.getDisplayChange())
                 == DefaultDisplayChange.DEFAULT_DISPLAY_UNFOLD);
     }
 
     @DefaultDisplayChange
     private int getDefaultDisplayChange(
-            @Nullable List<TransitionRequestInfo.DisplayChange> displayChanges) {
-        if (displayChanges == null) return DefaultDisplayChange.DEFAULT_DISPLAY_NO_CHANGE;
+            @Nullable TransitionRequestInfo.DisplayChange displayChange) {
+        if (displayChange == null) return DefaultDisplayChange.DEFAULT_DISPLAY_NO_CHANGE;
 
-        TransitionRequestInfo.DisplayChange displayChange = null;
-        for (int i = 0; i < displayChanges.size(); i++) {
-            TransitionRequestInfo.DisplayChange change = displayChanges.get(i);
-            if (change.getDisplayId() == DEFAULT_DISPLAY) {
-                displayChange = change;
-                break;
-            }
-        }
-
-        if (displayChange == null) {
+        if (displayChange.getDisplayId() != DEFAULT_DISPLAY) {
             return DefaultDisplayChange.DEFAULT_DISPLAY_NO_CHANGE;
         }
 

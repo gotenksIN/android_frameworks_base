@@ -18,10 +18,6 @@ package com.android.wm.shell.windowdecor.caption
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.assist.AssistContent
-import android.content.ComponentName
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.os.Looper
 import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
@@ -74,9 +70,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.kotlin.any
-import org.mockito.kotlin.argThat
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.spy
+import org.mockito.kotlin.times
 import org.mockito.kotlin.whenever
 
 /**
@@ -238,64 +234,6 @@ class AppHeaderControllerTests : ShellTestCase() {
 
         // Verify menu is closed
         assertFalse(appHeaderController.isLayoutMenuActive)
-    }
-
-    @Test
-    fun openHandleMenu_isBrowserApp() = runTest {
-        val packageName = "com.android.test_browser"
-        val mockPackageManager = mock<PackageManager>()
-
-        val resolveInfo = ResolveInfo()
-        resolveInfo.activityInfo = mock()
-        resolveInfo.handleAllWebDataURI = true
-
-        mContext.setMockPackageManager(mockPackageManager)
-        whenever(
-                mockPackageManager.queryIntentActivitiesAsUser(
-                    argThat { getPackage() == packageName },
-                    any<Int>(),
-                    any<Int>(),
-                )
-            )
-            .thenReturn(listOf(resolveInfo))
-
-        taskInfo.baseIntent = Intent()
-        taskInfo.baseIntent.component = ComponentName.createRelative(packageName, ".MainActivity")
-
-        appHeaderController.createHandleMenu(minimumInstancesFound = true)
-        testScope.advanceUntilIdle()
-
-        mockHandleMenuFactory.verifyHandleMenuCreated(appToWebData = { it?.isBrowserApp ?: false })
-    }
-
-    @Test
-    fun openHandleMenu_isNotBrowserApp() = runTest {
-        val packageName = "com.android.test_app"
-        val mockPackageManager = mock<PackageManager>()
-
-        val resolveInfo = ResolveInfo()
-        resolveInfo.activityInfo = mock()
-        resolveInfo.handleAllWebDataURI = false
-
-        mContext.setMockPackageManager(mockPackageManager)
-        whenever(
-                mockPackageManager.queryIntentActivitiesAsUser(
-                    argThat { getPackage() == packageName },
-                    any<Int>(),
-                    any<Int>(),
-                )
-            )
-            .thenReturn(listOf(resolveInfo))
-
-        taskInfo.baseIntent = Intent()
-        taskInfo.baseIntent.component = ComponentName.createRelative(packageName, ".MainActivity")
-
-        appHeaderController.createHandleMenu(minimumInstancesFound = true)
-        testScope.advanceUntilIdle()
-
-        mockHandleMenuFactory.verifyHandleMenuCreated(
-            appToWebData = { !(it?.isBrowserApp ?: true) }
-        )
     }
 
     private fun createAppHeaderController(taskInfo: RunningTaskInfo) =

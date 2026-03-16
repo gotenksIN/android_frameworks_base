@@ -3176,7 +3176,7 @@ public class MockingOomAdjusterTests {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, false);
         mProcessStateController.setPendingFinishAttach(app, true);
-        MockUtils.setHasForegroundActivities(app, false);
+        app.setHasForegroundActivities(false);
 
         mProcessStateController.setAttachingProcessStatesLSP(app);
         updateOomAdj(app);
@@ -3192,7 +3192,7 @@ public class MockingOomAdjusterTests {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, false);
         mProcessStateController.setPendingFinishAttach(app, true);
-        MockUtils.setHasForegroundActivities(app, true);
+        app.setHasForegroundActivities(true);
         setTopProcess(app);
 
         mProcessStateController.setAttachingProcessStatesLSP(app);
@@ -4496,7 +4496,7 @@ public class MockingOomAdjusterTests {
         // will be prioritized as top app.
         ProcessRecord host = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
-        MockUtils.setCurrentSchedulingGroup(host, SCHED_GROUP_DEFAULT);
+        host.setCurrentSchedulingGroup(SCHED_GROUP_DEFAULT);
         ProcessRecord client = makeDefaultProcessRecord(MOCKAPP2_PID, MOCKAPP2_UID,
                 MOCKAPP2_PROCESSNAME, MOCKAPP2_PACKAGENAME, false);
         mProcessStateController.setMaxAdj(client, SYSTEM_ADJ);
@@ -5103,15 +5103,15 @@ public class MockingOomAdjusterTests {
             MockUtils.setSetRawAdj(state, mSetRawAdj);
             MockUtils.setCurAdj(state, mCurAdj);
             MockUtils.setSetAdj(state, mSetAdj);
-            MockUtils.setCurrentSchedulingGroup(state, mCurSchedGroup);
-            MockUtils.setSetSchedGroup(state, mSetSchedGroup);
+            state.setCurrentSchedulingGroup(mCurSchedGroup);
+            state.setSetSchedGroup(mSetSchedGroup);
             MockUtils.setCurProcState(state, mCurProcState);
             MockUtils.setReportedProcState(state, mRepProcState);
             MockUtils.setCurRawProcState(state, mCurRawProcState);
             MockUtils.setSetProcState(state, mSetProcState);
             MockUtils.setServiceB(state, mServiceb);
             MockUtils.setRepForegroundActivities(state, mRepForegroundActivities);
-            MockUtils.setHasForegroundActivities(state, mHasForegroundActivities);
+            state.setHasForegroundActivities(mHasForegroundActivities);
             MockUtils.setSystemNoUi(state, mSystemNoUi);
             MockUtils.setHasShownUi(state, mHasShownUi);
             mProcessStateController.setHasTopUi(state, mHasTopUi);

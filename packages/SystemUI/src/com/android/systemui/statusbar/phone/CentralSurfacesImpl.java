@@ -2765,9 +2765,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
      * Logic is duplicated in {@link ActivityStarterImpl}. Please add it there too.
      */
     private UserHandle getActivityUserHandle(Intent intent) {
-        if (intent.getComponent() != null
-                && mContext.getPackageName().equals(intent.getComponent().getPackageName())) {
-            return new UserHandle(UserHandle.myUserId());
+        String[] packages = mContext.getResources().getStringArray(R.array.system_ui_packages);
+        for (String pkg : packages) {
+            if (intent.getComponent() == null) break;
+            if (pkg.equals(intent.getComponent().getPackageName())) {
+                return new UserHandle(UserHandle.myUserId());
+            }
         }
         return mUserTracker.getUserHandle();
     }

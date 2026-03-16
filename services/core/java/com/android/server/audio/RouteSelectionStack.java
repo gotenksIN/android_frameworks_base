@@ -16,9 +16,9 @@
 
 package com.android.server.audio;
 
-import static com.android.server.audio.AudioService.anonymizeBluetoothAddress;
 import static com.android.server.utils.EventLogger.Event.ALOGI;
 import static com.android.server.utils.EventLogger.Event.ALOGW;
+import static com.android.server.audio.AudioService.anonymizeBluetoothAddress;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -76,19 +76,6 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
         mLogger.enqueueAndSlog("addClient: " + client + " -> " + getStackStateString(), ALOGI);
     }
 
-    public synchronized boolean updateClient(
-            IBinder token, Optional<AudioDeviceAttributes> device) {
-        for (var client : mClients) {
-            if (client.getToken().equals(token)) {
-                client.setDevice(device);
-                mLogger.enqueueAndSlog(
-                        "updateClient: " + token + " -> " + getStackStateString(), ALOGI);
-                return true;
-            }
-        }
-        return false;
-    }
-
     public synchronized RouteClient removeClient(IBinder token) {
         RouteClient client = null;
         // really Java..
@@ -111,29 +98,23 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
     }
 
     /**
-     * Returns the device corresponding to the communication client with the highest priority:
-     * In all cases, if the client is disabled, it is still the owning client, but this method will
-     * return empty.
+     * Returns the communication client with the highest priority:
      * - 1) the client which is currently also controlling the audio mode
-     * - 2) the top active client in the stack if there is no audio mode owner
-     * - 3) empty otherwise
-     * @return the audio device which should drive the APM strategy
+     * - 2) the top client in the stack if there is no audio mode owner
+     * - 3) null otherwise
+     *   TODO: evaluate call-sites excluding returning the winning device
+     * @return CommunicationRouteClient the client driving the communication use case routing.
      */
-    public synchronized Optional<AudioDeviceAttributes> selectedDevice() {
-        return topClient().flatMap(x -> x.getDevice());
-    }
-
     public synchronized Optional<RouteClient> topClient() {
-        Optional<RouteClient> lastActive = Optional.empty();
         for (var client : mClients) {
-            if (client.getToken().equals(mModeOwnerToken)) {
-                return Optional.of(client).filter(x -> !x.isDisabled());
-            }
-            if (client.isActive()) {
-                lastActive = Optional.of(client);
+            // TODO: migrate to isActive
+            if (!client.isDisabled() && client.getToken().equals(mModeOwnerToken)) {
+                return Optional.of(client);
             }
         }
-        return mModeOwnerToken != null ? Optional.empty() : lastActive.filter(x -> !x.isDisabled());
+        return Optional.ofNullable(
+                mModeOwnerToken == null && !mClients.isEmpty() && mClients.getLast().isActive() ?
+                    mClients.getLast() : null);
     }
 
     /**
@@ -169,13 +150,13 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
         mLogger.enqueueAndSlog("applyDeviceRestrictions " + getStackStateString(), ALOGI);
     }
 
-    public synchronized Optional<RouteClient> getClientForToken(IBinder token) {
+    public RouteClient getClientForToken(IBinder token) {
         for (var client : mClients) {
-            if (client.getToken().equals(token)) {
-                return Optional.of(client);
+            if (client.getToken() == token) {
+                return client;
             }
         }
-        return Optional.empty();
+        return null;
     }
 
     // TODO: All identification should be binder-mediated, either via static tokens generated in
@@ -194,16 +175,11 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
     public synchronized boolean updateActiveForUid(int uid, boolean active) {
         boolean updated = false;
         for (var client : mClients) {
-            if (client.getUid() != uid) {
-                continue;
+            if (client.getUid() != uid) continue;
+            if (client.isActive() != active) {
+                client.setStreamActive(active);
+                updated = true;
             }
-            boolean wasActive = client.isActive();
-            client.setStreamActive(active);
-            updated = client.isActive() != wasActive;
-        }
-        if (updated) {
-            mLogger.enqueueAndSlog(
-                    "updateActiveForUid " + uid + active + getStackStateString(), ALOGI);
         }
         return updated;
     }
@@ -216,17 +192,19 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
     // TODO: layer inversion
     @Override
     public void binderDied(IBinder who) {
-        mDeathCb.accept(getClientForToken(who).orElse(null));
+        mDeathCb.accept(getClientForToken(who));
     }
 
-    public synchronized void dump(PrintWriter pw, String prefix) {
-        pw.println(prefix + "RouteSelectionStack:");
-        pw.println(prefix + "  Mode owner token: " + mModeOwnerToken);
-        pw.println(prefix + "  Clients (top of stack first):");
-        for (int i = mClients.size() - 1; i >= 0; i--) {
-            RouteClient client = mClients.get(i);
-            String ownerSuffix = client.getToken() == mModeOwnerToken ? " (mode owner)" : "";
-            pw.println(prefix + "    " + client + ownerSuffix);
+    public void dump(PrintWriter pw, String prefix) {
+        synchronized (this) {
+            pw.println(prefix + "RouteSelectionStack:");
+            pw.println(prefix + "  Mode owner token: " + mModeOwnerToken);
+            pw.println(prefix + "  Clients (top of stack first):");
+            for (int i = mClients.size() - 1; i >= 0; i--) {
+                RouteClient client = mClients.get(i);
+                String ownerSuffix = client.getToken() == mModeOwnerToken ? " (mode owner)" : "";
+                pw.println(prefix + "    " + client + ownerSuffix);
+            }
         }
     }
 
@@ -252,6 +230,7 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
 
         RouteClient(IBinder cb, @NonNull AttributionSource attributionSource,
                 AudioDeviceAttributes device, boolean isPrivileged) {
+
             mToken = cb;
             mAttributionSource = attributionSource;
             mDevice = Optional.ofNullable(device);
@@ -282,7 +261,7 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
         }
 
         public boolean isActive() {
-            return mIsPrivileged || mStreamActive;
+            return !mDisabled && (mIsPrivileged || mStreamActive);
         }
 
         public boolean isDisabled() {
@@ -306,17 +285,18 @@ public class RouteSelectionStack implements IBinder.DeathRecipient {
             return "[RouteClient: " + mAttributionSource.getUid() + "("
                     + mAttributionSource.getPackageName() + ")"
                     + " mDevice: " + mDevice + " mIsPrivileged: " + mIsPrivileged
-                    + " mStreamActive: " + mStreamActive + " mDisabled: " + mDisabled + "]";
+                    + " mStreamActive: " + mStreamActive
+                    + " mDisabled: " + mDisabled + "]";
         }
 
         public String toShortString() {
             var abbrevDev = mDevice.map(x -> AudioSystem.getDeviceName(x.getType()))
-                                    .map(x -> clampedSubstr(x, 0, 3))
-                                    .orElse(null);
+                                   .map(x -> clampedSubstr(x, 0, 3))
+                                   .orElse(null);
             return String.valueOf(getUid()) + "("
                     + abbrevPackage(getAttributionSource().getPackageName()) + ")"
-                    + "|" + abbrevDev + "_" + anonymizeBluetoothAddress(mDevice.orElse(null))
-                    + "|" + (isActive() ? "a" : "i") + "|" + (isDisabled() ? "d" : "e");
+                    + ":" + abbrevDev + "_" + anonymizeBluetoothAddress(mDevice.orElse(null))
+                    + ":" + (isActive() ? "a" : "") + ":" + (isDisabled() ? "d" : "");
         }
     }
 

@@ -416,9 +416,6 @@ public final class Display {
      *
      * @hide
      */
-    @TestApi
-    @FlaggedApi(com.android.server.display.feature.flags.Flags
-            .FLAG_VIRTUAL_DISPLAYS_SUPPORT_DESKTOP_MODE)
     public static final int FLAG_ALLOWS_CONTENT_MODE_SWITCH = 1 << 15;
 
     /**

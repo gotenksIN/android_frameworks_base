@@ -22,7 +22,6 @@ import com.android.compose.animation.scene.reveal.ContainerRevealHaptics
 import com.android.compose.animation.scene.transitions
 import com.android.mechanics.behavior.VerticalExpandContainerSpec
 import com.android.systemui.qs.panels.ui.viewmodel.AnimateQsTilesViewModel
-import com.android.systemui.scene.ui.viewmodel.ToBouncerTransitionViewModel
 
 /**
  * Builder of the comprehensive definition of all transitions between scenes and overlays in the
@@ -35,7 +34,6 @@ interface SceneContainerTransitionsBuilder {
         shadeExpansionMotion: VerticalExpandContainerSpec,
         revealHaptics: ContainerRevealHaptics,
         animateQsTilesViewModel: AnimateQsTilesViewModel,
-        toBouncerTransitionViewModel: ToBouncerTransitionViewModel,
         resources: Resources,
     ): SceneTransitions
 }
@@ -51,7 +49,6 @@ class ConstantSceneContainerTransitionsBuilder(
         shadeExpansionMotion: VerticalExpandContainerSpec,
         revealHaptics: ContainerRevealHaptics,
         animateQsTilesViewModel: AnimateQsTilesViewModel,
-        toBouncerTransitionViewModel: ToBouncerTransitionViewModel,
         resources: Resources,
     ): SceneTransitions = transitions
 }

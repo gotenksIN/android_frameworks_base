@@ -2210,17 +2210,15 @@ public class DisplayPolicy {
     void onOverlayChanged() {
         updateCurrentUserResources();
         // Update the latest display size, cutout.
-        mDisplayContent.requestDisplayUpdate(this::onResourcesUpdated);
-    }
-
-    void onResourcesUpdated() {
-        onConfigurationChanged();
-        if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
-            StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
-            if (statusBar != null) statusBar.onConfigurationChanged();
-        } else {
-            mSystemGestures.onConfigurationChanged();
-        }
+        mDisplayContent.requestDisplayUpdate(() -> {
+            onConfigurationChanged();
+            if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+                StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
+                if (statusBar != null) statusBar.onConfigurationChanged();
+            } else {
+                mSystemGestures.onConfigurationChanged();
+            }
+        });
     }
 
     /**
@@ -2258,7 +2256,7 @@ public class DisplayPolicy {
      * Updates the current user's resources to pick up any changes for the current user (including
      * overlay paths)
      */
-    void updateCurrentUserResources() {
+    private void updateCurrentUserResources() {
         final int userId = mService.mAmInternal.getCurrentUserId();
         final Context uiContext = getSystemUiContext();
 

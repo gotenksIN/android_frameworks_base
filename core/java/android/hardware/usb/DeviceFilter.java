@@ -23,10 +23,10 @@ import android.service.usb.UsbDeviceFilterProto;
 import android.util.Slog;
 
 import com.android.internal.util.dump.DualDumpOutputStream;
-import com.android.modules.utils.TypedXmlSerializer;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlSerializer;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -44,17 +44,6 @@ public class DeviceFilter {
 
     // Name of tag used for serialization and deserialization.
     public static final String XML_ROOT_NAME = "usb-device";
-
-    // Tags used for serialization and deserialization.
-    private static final String VENDOR_ID_ATTR = "vendor-id";
-    private static final String PRODUCT_ID_ATTR = "product-id";
-    private static final String CLASS_ATTR = "class";
-    private static final String SUBCLASS_ATTR = "subclass";
-    private static final String PROTOCOL_ATTR = "protocol";
-    private static final String MANUFACTURER_NAME_ATTR = "manufacturer-name";
-    private static final String PRODUCT_NAME_ATTR = "product-name";
-    private static final String SERIAL_NAME_ATTR = "serial-number";
-    private static final String INTERFACE_NAME_ATTR = "interface-name";
 
     // USB Vendor ID (or -1 for unspecified)
     public final int mVendorId;
@@ -113,13 +102,6 @@ public class DeviceFilter {
         mInterfaceName = filter.mInterfaceName;
     }
 
-    /**
-     * Construct self from XML.
-     *
-     * @param parser Xml parser with the current tag matching {@link #XML_ROOT_NAME}
-     *
-     * @return {@link DeviceFilter}
-     */
     public static DeviceFilter read(XmlPullParser parser)
             throws XmlPullParserException, IOException {
         int vendorId = -1;
@@ -136,13 +118,13 @@ public class DeviceFilter {
             String name = parser.getAttributeName(i);
             String value = parser.getAttributeValue(i);
             // Attribute values are ints or strings
-            if (MANUFACTURER_NAME_ATTR.equals(name)) {
+            if ("manufacturer-name".equals(name)) {
                 manufacturerName = value;
-            } else if (PRODUCT_NAME_ATTR.equals(name)) {
+            } else if ("product-name".equals(name)) {
                 productName = value;
-            } else if (SERIAL_NAME_ATTR.equals(name)) {
+            } else if ("serial-number".equals(name)) {
                 serialNumber = value;
-            }  else if (INTERFACE_NAME_ATTR.equals(name)) {
+            }  else if ("interface-name".equals(name)) {
                 interfaceName = value;
             } else {
                 int intValue;
@@ -159,15 +141,15 @@ public class DeviceFilter {
                     Slog.e(TAG, "invalid number for field " + name, e);
                     continue;
                 }
-                if (VENDOR_ID_ATTR.equals(name)) {
+                if ("vendor-id".equals(name)) {
                     vendorId = intValue;
-                } else if (PRODUCT_ID_ATTR.equals(name)) {
+                } else if ("product-id".equals(name)) {
                     productId = intValue;
-                } else if (CLASS_ATTR.equals(name)) {
+                } else if ("class".equals(name)) {
                     deviceClass = intValue;
-                } else if (SUBCLASS_ATTR.equals(name)) {
+                } else if ("subclass".equals(name)) {
                     deviceSubclass = intValue;
-                } else if (PROTOCOL_ATTR.equals(name)) {
+                } else if ("protocol".equals(name)) {
                     deviceProtocol = intValue;
                 }
             }
@@ -177,39 +159,34 @@ public class DeviceFilter {
                 manufacturerName, productName, serialNumber, interfaceName);
     }
 
-    /**
-     * Write self to XML with the tag {@link #XML_ROOT_NAME}.
-     *
-     * @param serializer Xml serializer
-     */
-    public void write(@NonNull TypedXmlSerializer serializer) throws IOException {
+    public void write(XmlSerializer serializer) throws IOException {
         serializer.startTag(null, XML_ROOT_NAME);
         if (mVendorId != -1) {
-            serializer.attributeInt(null, VENDOR_ID_ATTR, mVendorId);
+            serializer.attribute(null, "vendor-id", Integer.toString(mVendorId));
         }
         if (mProductId != -1) {
-            serializer.attributeInt(null, PRODUCT_ID_ATTR, mProductId);
+            serializer.attribute(null, "product-id", Integer.toString(mProductId));
         }
         if (mClass != -1) {
-            serializer.attributeInt(null, CLASS_ATTR, mClass);
+            serializer.attribute(null, "class", Integer.toString(mClass));
         }
         if (mSubclass != -1) {
-            serializer.attributeInt(null, SUBCLASS_ATTR, mSubclass);
+            serializer.attribute(null, "subclass", Integer.toString(mSubclass));
         }
         if (mProtocol != -1) {
-            serializer.attributeInt(null, PROTOCOL_ATTR, mProtocol);
+            serializer.attribute(null, "protocol", Integer.toString(mProtocol));
         }
         if (mManufacturerName != null) {
-            serializer.attribute(null, MANUFACTURER_NAME_ATTR, mManufacturerName);
+            serializer.attribute(null, "manufacturer-name", mManufacturerName);
         }
         if (mProductName != null) {
-            serializer.attribute(null, PRODUCT_NAME_ATTR, mProductName);
+            serializer.attribute(null, "product-name", mProductName);
         }
         if (mSerialNumber != null) {
-            serializer.attribute(null, SERIAL_NAME_ATTR, mSerialNumber);
+            serializer.attribute(null, "serial-number", mSerialNumber);
         }
         if (mInterfaceName != null) {
-            serializer.attribute(null, INTERFACE_NAME_ATTR, mInterfaceName);
+            serializer.attribute(null, "interface-name", mInterfaceName);
         }
         serializer.endTag(null, XML_ROOT_NAME);
     }

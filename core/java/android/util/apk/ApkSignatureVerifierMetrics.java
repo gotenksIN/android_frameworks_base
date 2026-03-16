@@ -74,8 +74,7 @@ public class ApkSignatureVerifierMetrics {
             VerificationResult.VERIFICATION_V32_MISSING_CLASSICAL_INSTALLED_DATA,
             VerificationResult.VERIFICATION_V32_MISSING_CLASSICAL_ROLLBACK,
             VerificationResult.VERIFICATION_V32_MISSING_CLASSICAL,
-            VerificationResult.VERIFICATION_V32_MAX_ATTR_WITHOUT_MIN_ATTR,
-            VerificationResult.VERIFICATION_V32_UPDATE_SIGNATURE_MISMATCH
+            VerificationResult.VERIFICATION_V32_MAX_ATTR_WITHOUT_MIN_ATTR
     })
     public @interface VerificationResult {
         int VERIFICATION_SUCCESS = ApkSigVerifyProtoEnums.VERIFICATION_SUCCESS;
@@ -141,8 +140,6 @@ public class ApkSignatureVerifierMetrics {
                 ApkSigVerifyProtoEnums.VERIFICATION_V32_MISSING_CLASSICAL;
         int VERIFICATION_V32_MAX_ATTR_WITHOUT_MIN_ATTR =
                 ApkSigVerifyProtoEnums.VERIFICATION_V32_MAX_ATTR_WITHOUT_MIN_ATTR;
-        int VERIFICATION_V32_UPDATE_SIGNATURE_MISMATCH =
-                ApkSigVerifyProtoEnums.VERIFICATION_V32_UPDATE_SIGNATURE_MISMATCH;
     }
 
     /**
@@ -152,14 +149,12 @@ public class ApkSignatureVerifierMetrics {
      * @param blockMinSdkVersion the minimum SDK version targeted by the block
      * @param blockMaxSdkVersion the maximum SDK version targeted by the block
      * @param sigAlgorithmId     the signature algorithm ID used to sign the block
-     * @param verificationDurationMillis the time in ms to complete the verification of the
-     *                                   signature block
      */
     public static void logSignatureVerificationSuccess(int blockId, int blockMinSdkVersion,
-            int blockMaxSdkVersion, int sigAlgorithmId, long verificationDurationMillis) {
+            int blockMaxSdkVersion, int sigAlgorithmId) {
         logApkSignatureVerificationReported(blockId, blockMinSdkVersion, blockMaxSdkVersion,
-                sigAlgorithmId, false, false, ApkSigVerifyProtoEnums.VERIFICATION_SUCCESS,
-                verificationDurationMillis);
+                sigAlgorithmId, false,
+                false, ApkSigVerifyProtoEnums.VERIFICATION_SUCCESS);
     }
 
     /**
@@ -173,7 +168,7 @@ public class ApkSignatureVerifierMetrics {
      */
     public static void logSignatureVerificationBlockFailure(int blockId,
             @VerificationResult int verificationResult) {
-        logApkSignatureVerificationReported(blockId, 0, 0, 0, false, false, verificationResult, 0);
+        logApkSignatureVerificationReported(blockId, 0, 0, 0, false, false, verificationResult);
     }
 
     /**
@@ -195,7 +190,7 @@ public class ApkSignatureVerifierMetrics {
             int blockMaxSdkVersion, int sigAlgorithmId,
             @VerificationResult int verificationResult) {
         logApkSignatureVerificationReported(blockId, blockMinSdkVersion, blockMaxSdkVersion,
-                sigAlgorithmId, false, false, verificationResult, 0);
+                sigAlgorithmId, false, false, verificationResult);
     }
 
     /**
@@ -218,7 +213,7 @@ public class ApkSignatureVerifierMetrics {
         }
         int blockId = getBlockIdFromSchemeVersion(majorSchemeVersion, minorSchemeVersion);
         logApkSignatureVerificationReported(blockId, 0, 0, 0, isRollback, isRotation,
-                VerificationResult.VERIFICATION_SUCCESS, 0);
+                VerificationResult.VERIFICATION_SUCCESS);
     }
 
     /**
@@ -242,7 +237,7 @@ public class ApkSignatureVerifierMetrics {
             @VerificationResult int verificationResult) {
         int blockId = getBlockIdFromSchemeVersion(majorSchemeVersion, minorSchemeVersion);
         logApkSignatureVerificationReported(blockId, 0, 0, 0, false, false,
-                verificationResult, 0);
+                verificationResult);
     }
 
     /**
@@ -275,21 +270,19 @@ public class ApkSignatureVerifierMetrics {
      *                           be determined
      * @param blockMaxSdkVersion the maximum SDK version targeted by the block, or 0 if it could not
      *                           be determined
-     * @param sigAlgorithmId     the signature algorithm ID used by the signer for this block, or 0
+     * @param sigAlgorithmId     the signature algorithm ID used by th signer for this block, or 0
      *                           if it could not be determined
      * @param isRollback         whether the current event reflects a rollback of the APK's signing
      *                           key
      * @param isRotation         whether the current event reflects a rotation of the APK's signing
      *                           key
      * @param verificationResult the {@link VerificationResult} expressing the result of the event
-     * @param verificationDurationMillis the time in ms to complete the verification of the
-     *                                   signature block
      */
     private static void logApkSignatureVerificationReported(int blockId, int blockMinSdkVersion,
             int blockMaxSdkVersion, int sigAlgorithmId, boolean isRollback, boolean isRotation,
-            @VerificationResult int verificationResult, long verificationDurationMillis) {
+            @VerificationResult int verificationResult) {
         FrameworkStatsLog.write(FrameworkStatsLog.APK_SIGNATURE_VERIFICATION_REPORTED,
                 blockId, blockMinSdkVersion, blockMaxSdkVersion, sigAlgorithmId, isRollback,
-                isRotation, verificationResult, (int) verificationDurationMillis);
+                isRotation, verificationResult);
     }
 }

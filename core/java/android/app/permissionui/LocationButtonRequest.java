@@ -395,12 +395,8 @@ public final class LocationButtonRequest implements Parcelable {
         /**
          * Creates a new Builder with the required initial properties.
          *
-         * <p>The provided {@code width} must be at least 48dp. The provided {@code height} must be
-         * between 48dp and 136dp (inclusive). Values outside these ranges will be clamped by the
-         * system during session creation and resizing.
-         *
-         * @param width The total width of the button in pixels.
-         * @param height The total height of the button in pixels.
+         * @param width The total width of the button in pixels. Must be at least 48dp.
+         * @param height The total height of the button in pixels. Must be between 48dp and 136dp.
          * @param configuration The {@link Configuration} of the context hosting the button.
          */
         public Builder(int width, int height, @NonNull Configuration configuration) {
@@ -409,12 +405,7 @@ public final class LocationButtonRequest implements Parcelable {
             mConfiguration = Objects.requireNonNull(configuration);
         }
 
-        /**
-         * Sets the left padding of the button.
-         *
-         * <p>The padding must be between 0 and 8dp (inclusive). Values outside this range will be
-         * clamped. If not explicitly set, it defaults to 0.
-         */
+        /** Sets the left padding of the button. */
         @NonNull
         public Builder setPaddingLeft(int paddingLeft) {
             mPaddingLeft = paddingLeft;
@@ -422,12 +413,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the top padding of the button.
-         *
-         * <p>The padding must be between 0 and 8dp (inclusive). Values outside this range will be
-         * clamped. If not explicitly set, it defaults to 0.
-         */
+        /** Sets the top padding of the button. */
         @NonNull
         public Builder setPaddingTop(int paddingTop) {
             mPaddingTop = paddingTop;
@@ -435,12 +421,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the right padding of the button.
-         *
-         * <p>The padding must be between 0 and 8dp (inclusive). Values outside this range will be
-         * clamped. If not explicitly set, it defaults to 0.
-         */
+        /** Sets the right padding of the button. */
         @NonNull
         public Builder setPaddingRight(int paddingRight) {
             mPaddingRight = paddingRight;
@@ -448,12 +429,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the bottom padding of the button.
-         *
-         * <p>The padding must be between 0 and 8dp (inclusive). Values outside this range will be
-         * clamped. If not explicitly set, it defaults to 0.
-         */
+        /** Sets the bottom padding of the button. */
         @NonNull
         public Builder setPaddingBottom(int paddingBottom) {
             mPaddingBottom = paddingBottom;
@@ -461,12 +437,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the background color of the button.
-         *
-         * <p>The system will ensure the background color is fully opaque by overriding its
-         * alpha channel to 255. If not explicitly set, it defaults to a system default color.
-         */
+        /** Sets the background color of the button. */
         @NonNull
         public Builder setBackgroundColor(@ColorInt int backgroundColor) {
             mBackgroundColor = backgroundColor;
@@ -474,11 +445,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the stroke color of the button.
-         *
-         * <p>If not explicitly set, the stroke color will default to the button's background color.
-         */
+        /** Sets the stroke color of the button. */
         @NonNull
         public Builder setStrokeColor(@ColorInt int strokeColor) {
             mStrokeColor = strokeColor;
@@ -486,12 +453,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the stroke width of the button.
-         *
-         * <p>The stroke width must be between 0 and 3dp (inclusive). Values outside this range will
-         * be clamped. If not explicitly set, it defaults to 0.
-         */
+        /** Sets the stroke width of the button. */
         @NonNull
         public Builder setStrokeWidth(int strokeWidth) {
             mStrokeWidth = strokeWidth;
@@ -499,11 +461,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the corner radius of the button.
-         *
-         * <p>The corner radius must be non-negative. Negative values will be clamped to 0.
-         */
+        /** Sets the corner radius of the button. */
         @NonNull
         public Builder setCornerRadius(float cornerRadius) {
             mCornerRadius = cornerRadius;
@@ -511,11 +469,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the corner radius of the button when pressed.
-         *
-         * <p>The corner radius must be non-negative. Negative values will be clamped to 0.
-         */
+        /** Sets the corner radius of the button when pressed. */
         @NonNull
         public Builder setPressedCornerRadius(float cornerRadius) {
             mPressedCornerRadius = cornerRadius;
@@ -523,13 +477,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the icon tint color.
-         *
-         * <p>The system will automatically adjust the provided color if necessary to ensure it
-         * meets a minimum contrast ratio of 4.5:1 against the button's background color. If not
-         * explicitly set, it defaults to a system default color.
-         */
+        /** Sets the icon tint color. */
         @NonNull
         public Builder setIconTint(@ColorInt int iconTint) {
             mIconTint = iconTint;
@@ -537,13 +485,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the text type of the button.
-         *
-         * <p>Unsupported text types will be treated as
-         * {@link LocationButtonSession#TEXT_TYPE_NONE}. If not explicitly set, it defaults
-         * to {@link LocationButtonSession#TEXT_TYPE_NONE}.
-         */
+        /** Sets the text type of the button. */
         @NonNull
         public Builder setTextType(@LocationButtonSession.TextType int textType) {
             mTextType = textType;
@@ -551,13 +493,7 @@ public final class LocationButtonRequest implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the text color of the button.
-         *
-         * <p>The system will automatically adjust the provided color if necessary to ensure it
-         * meets a minimum contrast ratio of 4.5:1 against the button's background color. If not
-         * explicitly set, it defaults to a system default color.
-         */
+        /** Sets the text color of the button. */
         @NonNull
         public Builder setTextColor(@ColorInt int textColor) {
             mTextColor = textColor;

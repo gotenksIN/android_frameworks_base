@@ -77,7 +77,6 @@ import com.android.compose.animation.scene.transitions
 import com.android.compose.gesture.effect.OffsetOverscrollEffect
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.gesture.gesturesDisabled
-import com.android.compose.lifecycle.DisposableEffectWithLifecycle
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.animateContentSizeNoClip
 import com.android.compose.modifiers.height
@@ -290,7 +289,7 @@ private fun ContentScope.SingleShade(
         layoutState.isTransitioningBetween(Scenes.Gone, Scenes.Shade) ||
             layoutState.isTransitioningBetween(Scenes.Lockscreen, Scenes.Shade)
     val mediaInRow = viewModel.showMediaInRow
-    val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings_single)
+    val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings)
 
     val systemBarsPadding = WindowInsets.systemBars.asPaddingValues()
     val navBarHeight = { systemBarsPadding.calculateBottomPadding() }
@@ -416,7 +415,7 @@ private fun ContentScope.SingleShade(
                     mediaInRow = mediaInRow,
                 )
             },
-            scrollableScrim = { onContentHeightChanged, isScrimAtRest ->
+            scrollableScrim = { onContentHeightChanged ->
                 NestedScrollingNotificationPanel(
                     tag = "$tag.Single",
                     shadeSession = shadeSession,
@@ -436,7 +435,6 @@ private fun ContentScope.SingleShade(
                         viewModel::onEmptySpaceClicked.takeIf { viewModel.isEmptySpaceClickable },
                     modifier = Modifier.padding(horizontal = shadeHorizontalPadding),
                     onStackHeightChanged = onContentHeightChanged,
-                    allowSwipeToExpandChildren = isScrimAtRest,
                 )
             },
             cutoutInsetsProvider = {
@@ -507,7 +505,7 @@ private fun ContentScope.SplitShade(
             viewModel.qsContainerViewModelFactory.create(supportsBrightnessMirroring = true)
         }
 
-    val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings_split)
+    val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings)
     val navBarBottomHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     val brightnessMirrorShowing = qsContainerViewModel.brightnessSliderViewModel.showMirror
@@ -577,16 +575,6 @@ private fun ContentScope.SplitShade(
                             )
 
                         val coroutineScope = rememberCoroutineScope()
-
-                        DisposableEffectWithLifecycle(
-                            key1 = qsContainerViewModel,
-                            key2 = sceneState,
-                        ) {
-                            onDispose {
-                                qsContainerViewModel.editModeViewModel.stopEditing()
-                                sceneState.snapTo(QS)
-                            }
-                        }
 
                         LaunchedEffect(sceneState, qsContainerViewModel.isEditing, coroutineScope) {
                             if (qsContainerViewModel.isEditing) {

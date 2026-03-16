@@ -2023,7 +2023,9 @@ public class AccountManagerService
                     if (accounts.accountsDb.insertDeAccount(account, accountId) < 0) {
                         Log.w(TAG, "insertAccountIntoDatabase: " + account.toSafeString()
                                 + ", skipping the DB insert failed");
-                        accounts.accountsDb.deleteCeAccount(accountId);
+                        if (Flags.detachDeCe()) {
+                            accounts.accountsDb.deleteCeAccount(accountId);
+                        }
                         return false;
                     }
                     if (extras != null) {
@@ -2034,7 +2036,9 @@ public class AccountManagerService
                                         + account.toSafeString()
                                         + ", skipping since insertExtra failed for key "
                                         + key);
+                                if (Flags.detachDeCe()) {
                                     accounts.accountsDb.deleteCeAccount(accountId);
+                                }
                                 return false;
                             } else {
                                 AccountManager.invalidateLocalAccountUserDataCaches();

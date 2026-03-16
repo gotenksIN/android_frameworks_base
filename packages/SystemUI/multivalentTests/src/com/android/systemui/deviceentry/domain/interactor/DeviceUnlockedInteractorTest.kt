@@ -41,7 +41,7 @@ import com.android.systemui.keyguard.domain.interactor.biometricUnlockInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardEnabledInteractor
 import com.android.systemui.keyguard.shared.model.AuthenticationFlags
 import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
-import com.android.systemui.keyguard.shared.model.LockAfterDelayTimerState
+import com.android.systemui.keyguard.shared.model.LockAfterScreenTimeoutTimerState
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
@@ -280,13 +280,13 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
             kosmos.powerInteractor.setAsleepForTest(
                 sleepReason = PowerManager.GO_TO_SLEEP_REASON_TIMEOUT
             )
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.RUNNING
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.RUNNING
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
 
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.ELAPSED
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.ELAPSED
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isFalse()
         }
@@ -308,14 +308,14 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
             kosmos.powerInteractor.setAsleepForTest(
                 sleepReason = PowerManager.GO_TO_SLEEP_REASON_TIMEOUT
             )
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.RUNNING
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.RUNNING
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
 
             kosmos.powerInteractor.setAwakeForTest()
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.INACTIVE
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.INACTIVE
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
         }
@@ -336,21 +336,21 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
             kosmos.powerInteractor.setAsleepForTest(
                 sleepReason = PowerManager.GO_TO_SLEEP_REASON_TIMEOUT
             )
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.RUNNING
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.RUNNING
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
 
             // Lock timer elapses - device locks
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.ELAPSED
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.ELAPSED
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isFalse()
 
             // Device wakes up after lock timer has elapsed - device still locked
             kosmos.powerInteractor.setAwakeForTest()
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.INACTIVE
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.INACTIVE
             runCurrent()
             assertThat(deviceUnlockStatus?.isUnlocked).isFalse()
         }
@@ -654,13 +654,13 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
             startDreaming()
             assertThat(isUnlocked).isTrue()
 
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.RUNNING
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.RUNNING
             runCurrent()
             assertThat(isUnlocked).isTrue()
 
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.ELAPSED
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.ELAPSED
             runCurrent()
             assertThat(isUnlocked).isFalse()
         }
@@ -674,16 +674,16 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
             startDreaming()
             assertThat(isUnlocked).isTrue()
 
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.RUNNING
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.RUNNING
             runCurrent()
             assertThat(isUnlocked).isTrue()
 
             stopDreaming()
             assertThat(isUnlocked).isTrue()
 
-            kosmos.fakeKeyguardRepository.lockAfterDelayState.value =
-                LockAfterDelayTimerState.INACTIVE
+            kosmos.fakeKeyguardRepository.lockAfterScreenTimeoutState.value =
+                LockAfterScreenTimeoutTimerState.INACTIVE
             runCurrent()
             assertThat(isUnlocked).isTrue()
         }

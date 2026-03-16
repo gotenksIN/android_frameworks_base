@@ -403,12 +403,6 @@
       ]
     },
     {
-      "name": "FunctionalTestsDesktopMode-launchbounds-RememberedBoundsTest",
-      "keywords": [
-        "desktop"
-      ]
-    },
-    {
       "name": "FunctionalTestsDesktopMode-maximize-MaximizeAppWindowTest",
       "keywords": [
         "desktop"

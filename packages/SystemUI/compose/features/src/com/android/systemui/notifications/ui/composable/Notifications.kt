@@ -47,13 +47,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,7 +115,6 @@ import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.session.ui.composable.sessionCoroutineScope
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ui.ShadeColors
-import com.android.systemui.statusbar.notification.shared.NsslTouchDispatchFix
 import com.android.systemui.statusbar.notification.stack.shared.model.AccessibilityScrollEvent
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimRounding
@@ -321,7 +320,6 @@ fun ContentScope.NestedScrollingNotificationPanel(
     isActivated: Boolean = true,
     onEmptySpaceClick: (() -> Unit)? = null,
     onStackHeightChanged: (Int) -> Unit = {},
-    allowSwipeToExpandChildren: () -> Boolean = { contentScrollState.value == 0 },
 ) {
     /**
      * Space available for the notification stack on the screen. These bounds don't scroll off the
@@ -510,7 +508,9 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         )
                     )
                 }
-                .onUnplaced { viewModel.onScrimBoundsChanged(null) }
+                .onUnplaced {
+                    viewModel.onScrimBoundsChanged(null)
+                }
                 .thenIf(onEmptySpaceClick != null) {
                     Modifier.clickable(
                         interactionSource = interactionSource,
@@ -567,19 +567,6 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         derivedStateOf { contentScrollState.maxValue > 0 }
                     }
 
-                    var layoutCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
-
-                    val swipeToExpandDraggable: SwipeToExpandNotificationDraggable =
-                        remember(stackScrollView, allowSwipeToExpandChildren) {
-                            SwipeToExpandNotificationDraggable(
-                                callback = stackScrollView.getExpandHelperCallback(),
-                                layoutCoordinatesProvider = { layoutCoordinates },
-                                allowStartGesture = allowSwipeToExpandChildren,
-                                velocityThresholdPx = with(density) { 125.dp.toPx() }, // px/sec
-                                distanceThresholdPx = with(density) { 56.dp.toPx() },
-                            )
-                        }
-
                     // NotificationPanel content
                     Box {
                         Column(
@@ -598,28 +585,16 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                             "$tag.NestedScroll.container onPlaced bounds=$rawBounds"
                                         }
                                         viewModel.setStackBounds(rawBounds)
-                                        layoutCoordinates = it
                                     }
                                     .onUnplaced {
                                         debugLog(viewModel) {
                                             "$tag.NestedScroll.container onUnplaced"
                                         }
                                         viewModel.resetStackBounds()
-                                        layoutCoordinates = null
                                     }
                                     .debugBackground(viewModel, DEBUG_BOX_COLOR)
-                                    .disableSwipesWhenScrolling() // prevents scene changes
-                                    .then(
-                                        if (NsslTouchDispatchFix.isEnabled) {
-                                            Modifier.swipeToExpandNotification(
-                                                draggable = swipeToExpandDraggable
-                                            )
-                                        } else {
-                                            Modifier.nestedScroll(
-                                                swipeToExpandNotificationScrollConnection
-                                            )
-                                        }
-                                    )
+                                    .disableSwipesWhenScrolling()
+                                    .nestedScroll(swipeToExpandNotificationScrollConnection)
                                     .nestedScroll(
                                         connection = object : NestedScrollConnection {},
                                         dispatcher = nestedScrollDispatcher,

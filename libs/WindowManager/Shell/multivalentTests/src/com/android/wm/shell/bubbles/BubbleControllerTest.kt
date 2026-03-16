@@ -63,6 +63,7 @@ import com.android.wm.shell.Flags
 import com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
 import com.android.wm.shell.Flags.FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE
+import com.android.wm.shell.Flags.FLAG_SEND_BUBBLE_ROOT_TASK_ID_TO_LAUNCHER
 import com.android.wm.shell.Flags.FLAG_UPDATE_BUBBLE_BOUNDS_DURING_ROTATION
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -1178,7 +1179,7 @@ class BubbleControllerTest {
         assertThat(bubbleStateListener.lastUpdate).isNotNull()
     }
 
-    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
+    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR, FLAG_SEND_BUBBLE_ROOT_TASK_ID_TO_LAUNCHER)
     @Test
     fun sendInitialBubbleBarState_containsBubbleRootTaskId() {
         assumeTrue(BubbleFlagHelper.enableCreateAnyBubble())

@@ -162,9 +162,7 @@ class FakeSceneDataSource(initialSceneKey: SceneKey, val testScope: TestScope) :
             )
     }
 
-    override fun startTransitionImmediately(transition: TransitionState.Transition) {
-        transitionState = transition
-    }
+    override fun startTransitionImmediately(transition: TransitionState.Transition) = Unit
 
     /**
      * Pauses scene and overlay changes.

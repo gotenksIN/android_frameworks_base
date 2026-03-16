@@ -20,11 +20,8 @@ import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
 
-import org.objectweb.asm.Type;
-
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -72,14 +69,6 @@ public class RavenwoodExperimentalApiChecker {
             this(frame.getDeclaringClass(), frame.getMethodName(), frame.getDescriptor());
         }
 
-        MethodInfo(Method method) {
-            this(method.getDeclaringClass(), method.getName(), Type.getMethodDescriptor(method));
-        }
-
-        public String toShortString() {
-            return clazz.getName() + "#" + name;
-        }
-
         @Override
         public String toString() {
             return clazz.getName() + "#" + name + desc;
@@ -103,9 +92,6 @@ public class RavenwoodExperimentalApiChecker {
     }
 
     private static void maybeLogExperimentalApiCall(@NonNull MethodInfo mi) {
-        synchronized (sLock) {
-            sStats.computeIfAbsent(mi, k -> new IntRef()).i += 1;
-        }
         var enable = sLogExperimentalApiCall;
         if (enable < 0) {
             enable = RavenwoodEnvironment.getInstance().getIntEnvVar("RAVENWOOD_LOG_EXP_API", 0);
@@ -127,6 +113,9 @@ public class RavenwoodExperimentalApiChecker {
      */
     public static boolean onExperimentalApiCalled(Class<?> clazz, String method, String desc) {
         var mi = new MethodInfo(clazz, method, desc);
+        synchronized (sLock) {
+            sStats.computeIfAbsent(mi, k -> new IntRef()).i += 1;
+        }
         maybeLogExperimentalApiCall(mi);
         // Even when experimental APIs are disabled, we don't want to throw from <clinit>.
         // because that'd make the class unloadable. Instead, we return false to skip the rest of
@@ -134,7 +123,7 @@ public class RavenwoodExperimentalApiChecker {
         if ("<clinit>".equals(method)) {
             return isExperimentalApiEnabled();
         }
-        onExperimentalApiCalledInner(mi);
+        onExperimentalApiCalledInner(2);
         return true;
     }
 
@@ -149,23 +138,16 @@ public class RavenwoodExperimentalApiChecker {
         var walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
         var frame = walker.walk(s -> s.skip(skipStackTraces).findFirst().get());
         var mi = new MethodInfo(frame);
+        synchronized (sLock) {
+            sStats.computeIfAbsent(mi, k -> new IntRef()).i += 1;
+        }
         maybeLogExperimentalApiCall(mi);
-        onExperimentalApiCalledInner(mi);
+        onExperimentalApiCalledInner(skipStackTraces + 1);
     }
 
-    /**
-     * Check if experimental APIs are enabled, and if not, throws
-     * {@link RavenwoodUnsupportedApiException}.
-     */
-    public static void onExperimentalApiCalled(Method method) {
-        var mi = new MethodInfo(method);
-        maybeLogExperimentalApiCall(mi);
-        onExperimentalApiCalledInner(mi);
-    }
-
-    private static void onExperimentalApiCalledInner(MethodInfo mi) {
+    private static void onExperimentalApiCalledInner(int skipStackTraces) {
         if (!isExperimentalApiEnabled()) {
-            throw new RavenwoodUnsupportedApiException().setReason(mi.toShortString());
+            throw new RavenwoodUnsupportedApiException().skipStackTracesForReason(skipStackTraces);
         }
     }
 

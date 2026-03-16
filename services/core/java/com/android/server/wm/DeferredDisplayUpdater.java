@@ -45,6 +45,7 @@ import com.android.internal.display.BrightnessSynchronizer;
 import com.android.internal.protolog.ProtoLog;
 import com.android.server.wm.Transition.ReadyCondition;
 import com.android.server.wm.utils.DisplayInfoOverrides.DisplayInfoFieldsUpdater;
+import com.android.window.flags.Flags;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -73,7 +74,9 @@ class DeferredDisplayUpdater {
         out.uniqueId = override.uniqueId;
         out.address = override.address;
         out.canHostTasks = override.canHostTasks;
-        out.state = override.state;
+        if (Flags.displayinfoStateDeferrable()) {
+            out.state = override.state;
+        }
 
         // Also apply WM-override fields, since they might produce differences in window hierarchy
         WM_OVERRIDE_FIELDS.setFields(out, override);
@@ -282,7 +285,8 @@ class DeferredDisplayUpdater {
 
                 if (physicalDisplayUpdated) {
                     onDisplayUpdated(transition, fromRotation, startBounds);
-                } else if (!transition.mParticipants.isEmpty()) {
+                } else if (!transition.mParticipants.isEmpty()
+                        || !Flags.displayinfoStateDeferrable()) {
                     final TransitionRequestInfo.DisplayChange displayChange =
                             getCurrentDisplayChange(fromRotation, startBounds);
                     // If the display has become unable to host tasks, identify a potential
@@ -292,12 +296,8 @@ class DeferredDisplayUpdater {
                         displayChange.setDisconnectReparentDisplay(reparentDisplay);
                         transition.addDisconnectReparentDisplay(reparentDisplay);
                     }
-
-                    final List<TransitionRequestInfo.DisplayChange> displayChanges =
-                            new ArrayList<>();
-                    displayChanges.add(displayChange);
                     mDisplayContent.mTransitionController.requestStartTransition(transition,
-                            /* startTask= */ null, /* remoteTransition= */ null, displayChanges);
+                            /* startTask= */ null, /* remoteTransition= */ null, displayChange);
                     if (willStopHostingTasks) {
                         mDisplayContent.mTransitionController.mStateValidators.add(() -> {
                             mDisplayContent.updateContentMode();
@@ -382,10 +382,8 @@ class DeferredDisplayUpdater {
         displayChange.setPhysicalDisplayChanged(true);
 
         transition.addTransactionPresentedListener(() -> continueScreenUnblocking(transition));
-        final List<TransitionRequestInfo.DisplayChange> displayChanges = new ArrayList<>();
-        displayChanges.add(displayChange);
         mDisplayContent.mTransitionController.requestStartTransition(transition,
-                /* startTask= */ null, /* remoteTransition= */ null, displayChanges);
+                /* startTask= */ null, /* remoteTransition= */ null, displayChange);
 
         if (mPendingKeyguardDrawing && ensureWallpaperDrawnOnDisplaySwitch()) {
             // Keyguard hasn't reported that it has drawn yet, defer readiness until it draws
@@ -580,6 +578,7 @@ class DeferredDisplayUpdater {
                 || first.minimalPostProcessingSupported != second.minimalPostProcessingSupported
                 || first.appVsyncOffsetNanos != second.appVsyncOffsetNanos
                 || first.presentationDeadlineNanos != second.presentationDeadlineNanos
+                || (!Flags.displayinfoStateDeferrable() && first.state != second.state)
                 || first.committedState != second.committedState
                 || first.ownerUid != second.ownerUid
                 || !Objects.equals(first.ownerPackageName, second.ownerPackageName)
@@ -611,7 +610,7 @@ class DeferredDisplayUpdater {
                 || first.logicalHeight != second.logicalHeight
                 || first.physicalXDpi != second.physicalXDpi
                 || first.physicalYDpi != second.physicalYDpi
-                || first.state != second.state
+                || (Flags.displayinfoStateDeferrable() && first.state != second.state)
                 || first.rotation != second.rotation
                 || !Objects.equals(first.displayCutout, second.displayCutout)
                 || first.logicalDensityDpi != second.logicalDensityDpi

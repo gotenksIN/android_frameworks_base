@@ -69,7 +69,6 @@ fun CredentialPinPad(
                                 onPointerDown = {}, // Hook up haptics here if needed
                                 scaling = { 1f },
                                 isAnimationEnabled = true,
-                                backgroundColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             )
                         }
                     }
@@ -92,7 +91,6 @@ fun CredentialPinPad(
                         scaling = { 1f },
                         elementId = "delete_button",
                         onPointerDown = {},
-                        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
                     )
 
                     DigitButton(
@@ -102,7 +100,6 @@ fun CredentialPinPad(
                         onPointerDown = {},
                         scaling = { 1f },
                         isAnimationEnabled = true,
-                        backgroundColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
 
                     ActionButton(
@@ -118,7 +115,6 @@ fun CredentialPinPad(
                         scaling = { 1f },
                         elementId = "key_enter",
                         onPointerDown = {},
-                        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
                     )
                 }
             }
@@ -173,7 +169,10 @@ fun PinDisplay(pinText: String, isError: Boolean = false, modifier: Modifier = M
             Box(
                 modifier =
                     Modifier.size(16.dp)
-                        .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape)
+                        .background(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            shape = CircleShape,
+                        )
             )
         }
     }

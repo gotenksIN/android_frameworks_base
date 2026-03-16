@@ -59,7 +59,8 @@ class LongProcessor(processingEnv: ProcessingEnvironment) :
             )
         }
 
-        val longMetadataBuilder = TypeSpecificPolicyMetadata.LongPolicyMetadata.newBuilder()
+        val longMetadataBuilder =
+            TypeSpecificPolicyMetadata.LongPolicyMetadata.newBuilder()
         if (longDefinition.minValue != Long.MIN_VALUE) {
             longMetadataBuilder.setMinValue(longDefinition.minValue)
         }
@@ -68,7 +69,9 @@ class LongProcessor(processingEnv: ProcessingEnvironment) :
         }
 
         val typeSpecificMetadata =
-            TypeSpecificPolicyMetadata.newBuilder().setLongMetadata(longMetadataBuilder).build()
+            TypeSpecificPolicyMetadata.newBuilder()
+                .setLongMetadata(longMetadataBuilder)
+                .build()
 
         return Pair(typeSpecificMetadata, longDefinition.base)
     }

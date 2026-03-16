@@ -23,10 +23,10 @@ import android.annotation.RequiresNoPermission;
 import android.app.AppOpsManager;
 import android.chre.flags.Flags;
 import android.content.Context;
-import android.hardware.contexthub.DataFlowId;
-import android.hardware.contexthub.DataFlowInfo;
 import android.hardware.contexthub.DataFlowSinkContext;
 import android.hardware.contexthub.DataFlowSinkRegistrationParams;
+import android.hardware.contexthub.DataFlowId;
+import android.hardware.contexthub.DataFlowInfo;
 import android.hardware.contexthub.EndpointInfo;
 import android.hardware.contexthub.ErrorCode;
 import android.hardware.contexthub.HubEndpointInfo;
@@ -67,6 +67,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -857,7 +858,8 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
     /* package */ void onDataFlowOffloadEndpointUnregistered(
             DataFlowId dataFlowId, HubEndpointInfo endpoint) {
         invokeCallback(
-                (consumer) -> consumer.onDataFlowOffloadEndpointUnregistered(dataFlowId, endpoint));
+                (consumer) ->
+                        consumer.onDataFlowOffloadEndpointUnregistered(dataFlowId, endpoint));
     }
 
     /* package */ boolean hasSessionId(int sessionId) {
@@ -869,7 +871,7 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
     /**
      * Handle the case where the underlying Context Hub HAL has died.
      *
-     * <p>This will close all open sessions with the HUB_RESET reason.
+     * This will close all open sessions with the HUB_RESET reason.
      */
     /* package */ void onHalDeath() {
         synchronized (mOpenSessionLock) {

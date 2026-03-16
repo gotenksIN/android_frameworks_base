@@ -43,7 +43,6 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito
 import com.android.modules.utils.testing.ExtendedMockitoRule
 import com.android.server.LocalServices
 import com.android.server.appfunctions.allowlist.AppFunctionAllowlistReader
-import com.android.server.appfunctions.dynamic.MultiUserDynamicAppFunctionRegistry
 import com.android.server.appinteraction.AppInteractionService
 import com.android.server.uri.UriGrantsManagerInternal
 import com.android.server.wm.ActivityTaskManagerInternal

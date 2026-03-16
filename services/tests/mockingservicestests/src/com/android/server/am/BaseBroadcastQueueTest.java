@@ -118,7 +118,6 @@ public abstract class BaseBroadcastQueueTest {
             .spyStatic(FrameworkStatsLog.class)
             .spyStatic(ProcessList.class)
             .spyStatic(SystemServiceRegistry.class)
-            .spyStatic(BroadcastSkipPolicy.class)
             .mockStatic(AppGlobals.class)
             .build();
 
@@ -245,7 +244,7 @@ public abstract class BaseBroadcastQueueTest {
         final BroadcastSkipPolicy skipPolicy = spy(new BroadcastSkipPolicy(mAms));
         doReturn(null).when(skipPolicy).shouldSkipAtEnqueueMessage(any(), any());
         doReturn(null).when(skipPolicy).shouldSkipMessage(any(), any());
-        doReturn(false).when(() -> BroadcastSkipPolicy.disallowBackgroundStart(any()));
+        doReturn(false).when(skipPolicy).disallowBackgroundStart(any());
         return skipPolicy;
     }
 

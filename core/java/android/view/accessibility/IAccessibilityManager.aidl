@@ -169,10 +169,10 @@ interface IAccessibilityManager {
     boolean startFlashNotificationEvent(String opPkg, int reason, String reasonPkg);
 
     @RequiresNoPermission
-    boolean isAccessibilityServiceTargetAllowed(in AccessibilityServiceInfo info, int userId);
+    boolean isAccessibilityTargetAllowed(String packageName, int uid, int userId);
 
     @RequiresNoPermission
-    boolean sendRestrictedDialogIntent(in AccessibilityServiceInfo info, int userId);
+    boolean sendRestrictedDialogIntent(String packageName, int uid, int userId);
 
     @EnforcePermission("MANAGE_ACCESSIBILITY")
     boolean isAccessibilityServiceWarningRequired(in AccessibilityServiceInfo info);

@@ -148,7 +148,7 @@ abstract class RequestSession<T, U, V> implements CredentialManagerUi.Credential
         mRequestSessionMetric.collectInitialPhaseMetricInfo(timestampStarted,
                 mCallingUid, ApiName.getMetricCodeFromRequestInfo(mRequestType));
         setCancellationListener();
-        if (shouldBindClientToDeath) {
+        if (shouldBindClientToDeath && Flags.clearSessionEnabled()) {
             if (mClientCallback != null && mClientCallback instanceof IInterface) {
                 setUpClientCallbackListener(((IInterface) mClientCallback).asBinder());
             }

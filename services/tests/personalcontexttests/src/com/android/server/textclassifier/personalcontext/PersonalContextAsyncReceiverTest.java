@@ -68,8 +68,7 @@ public class PersonalContextAsyncReceiverTest {
                         any(Runnable.class), eq(TEST_TIMEOUT_MILLIS), eq(TimeUnit.MILLISECONDS)))
                 .thenAnswer(invocation -> mScheduledFuture);
 
-        mRetriever =
-                new PersonalContextAsyncReceiver(mScheduledExecutorService, TEST_TIMEOUT_MILLIS);
+        mRetriever = new PersonalContextAsyncReceiver(mScheduledExecutorService);
     }
 
     @Test
@@ -77,27 +76,31 @@ public class PersonalContextAsyncReceiverTest {
         mRetriever.put(TEST_SESSION_ID, TEST_CLASSIFICATION);
 
         mRetriever.getAsync(
-                TEST_SESSION_ID, result -> assertThat(result).isEqualTo(TEST_CLASSIFICATION));
+                TEST_SESSION_ID,
+                TEST_TIMEOUT_MILLIS,
+                result -> assertThat(result).isEqualTo(TEST_CLASSIFICATION));
     }
 
     @Test
     public void testGetAsync_beforePut_returnsAfter() {
         mRetriever.getAsync(
-                TEST_SESSION_ID, result -> assertThat(result).isEqualTo(TEST_CLASSIFICATION));
+                TEST_SESSION_ID,
+                TEST_TIMEOUT_MILLIS,
+                result -> assertThat(result).isEqualTo(TEST_CLASSIFICATION));
 
         mRetriever.put(TEST_SESSION_ID, TEST_CLASSIFICATION);
     }
 
     @Test
     public void testGetAsync_withoutPut_timesOut() throws Exception {
-        mRetriever.getAsync(TEST_SESSION_ID, expectTimeoutRetriever());
+        mRetriever.getAsync(TEST_SESSION_ID, TEST_TIMEOUT_MILLIS, expectTimeoutRetriever());
 
         getTimeoutTask().run();
     }
 
     @Test
     public void testGetAsync_afterTimeout_returnsNothing() throws Exception {
-        mRetriever.getAsync(TEST_SESSION_ID, expectTimeoutRetriever());
+        mRetriever.getAsync(TEST_SESSION_ID, TEST_TIMEOUT_MILLIS, expectTimeoutRetriever());
         getTimeoutTask().run();
 
         mRetriever.put(TEST_SESSION_ID, TEST_CLASSIFICATION);
@@ -106,10 +109,11 @@ public class PersonalContextAsyncReceiverTest {
     @Test
     public void testGetAsync_withGetAsyncAlreadyCalled_returnsNothing() {
         mRetriever.put(TEST_SESSION_ID, TEST_CLASSIFICATION);
-        mRetriever.getAsync(TEST_SESSION_ID, result -> {});
+        mRetriever.getAsync(TEST_SESSION_ID, TEST_TIMEOUT_MILLIS, result -> {});
 
         mRetriever.getAsync(
                 TEST_SESSION_ID,
+                TEST_TIMEOUT_MILLIS,
                 new OutcomeReceiver<>() {
                     @Override
                     public void onResult(TextClassification result) {
@@ -131,7 +135,7 @@ public class PersonalContextAsyncReceiverTest {
             mRetriever.put(TEST_SESSION_ID + i, TEST_CLASSIFICATION);
         }
 
-        mRetriever.getAsync(TEST_SESSION_ID, expectTimeoutRetriever());
+        mRetriever.getAsync(TEST_SESSION_ID, TEST_TIMEOUT_MILLIS, expectTimeoutRetriever());
     }
 
     private Runnable getTimeoutTask() {

@@ -326,17 +326,13 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
         ResolveInfo resolvedService = null;
         String targetPackage = null;
 
-        int userId = UserHandle.getUserId(callingUid);
-
         for (String pkg : packages) {
             intent.setPackage(pkg);
-            ResolveInfo ri = pm.resolveServiceAsUser(intent, 0, userId);
+            ResolveInfo ri = pm.resolveService(intent, 0);
             if (ri != null && ri.serviceInfo != null) {
-                if (pkg.equals(ri.serviceInfo.packageName)) {
-                    resolvedService = ri;
-                    targetPackage = pkg;
-                    break;
-                }
+                resolvedService = ri;
+                targetPackage = pkg;
+                break;
             }
         }
 

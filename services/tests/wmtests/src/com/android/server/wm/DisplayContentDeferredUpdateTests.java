@@ -62,8 +62,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 
-import java.util.List;
-
 /**
  * Tests for the {@link DisplayContent} class when FLAG_DEFER_DISPLAY_UPDATES is enabled.
  *
@@ -141,15 +139,13 @@ public class DisplayContentDeferredUpdateTests extends WindowTestsBase {
         onUpdated = () -> mDisplayContent.mTransitionController.collect(mDisplayContent);
         mDisplayContent.requestDisplayUpdate(onUpdated);
         assertThat(mDisplayContent.mTransitionController.isCollecting(mDisplayContent)).isTrue();
-        final ArgumentCaptor<List<TransitionRequestInfo.DisplayChange>> displayChangesCaptor =
-                ArgumentCaptor.forClass(List.class);
+        final ArgumentCaptor<TransitionRequestInfo.DisplayChange> displayChangeCaptor =
+                ArgumentCaptor.forClass(TransitionRequestInfo.DisplayChange.class);
         verify(mDisplayContent.mTransitionController).requestStartTransition(
-                any(), any(), any(), displayChangesCaptor.capture());
-        final List<TransitionRequestInfo.DisplayChange> displayChanges = displayChangesCaptor
-                .getValue();
-        assertThat(displayChanges).hasSize(1);
-        assertThat(displayChanges.get(0).getStartAbsBounds()).isEqualTo(displayBounds);
-        assertThat(displayChanges.get(0).getEndAbsBounds()).isEqualTo(displayBounds);
+                any(), any(), any(), displayChangeCaptor.capture());
+        final TransitionRequestInfo.DisplayChange displayChange = displayChangeCaptor.getValue();
+        assertThat(displayChange.getStartAbsBounds()).isEqualTo(displayBounds);
+        assertThat(displayChange.getEndAbsBounds()).isEqualTo(displayBounds);
     }
 
     @Test

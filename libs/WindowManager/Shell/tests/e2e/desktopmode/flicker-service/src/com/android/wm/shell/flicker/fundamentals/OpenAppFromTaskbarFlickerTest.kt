@@ -47,7 +47,6 @@ class OpenAppFromTaskbarFlickerTest(flicker: FlickerTest) : DesktopModeBaseTest(
     @JvmField
     val testSetupRule = Utils.testSetupRule(NavBar.MODE_GESTURAL, flicker.scenario.startRotation)
     val scenario = OpenAppFromTaskbarScenario()
-    private val prevApp = scenario.testApp
     private val openedApp = scenario.browserApp
 
     override val transition: FlickerBuilder.() -> Unit
@@ -64,8 +63,7 @@ class OpenAppFromTaskbarFlickerTest(flicker: FlickerTest) : DesktopModeBaseTest(
 
     @Test fun layerBecomesVisible() = flicker.layerBecomesVisible(openedApp)
 
-    @Test
-    fun cascadingEffectAppliedAtEnd() = flicker.cascadingEffectAppliedAtEnd(openedApp, prevApp)
+    @Test fun cascadingEffectAppliedAtEnd() = flicker.cascadingEffectAppliedAtEnd(openedApp)
 
     companion object {
         @Parameterized.Parameters(name = "{0}")

@@ -551,9 +551,7 @@ public final class DisplayManager {
      * @see #createVirtualDisplay
      * @hide
      */
-    @FlaggedApi(com.android.server
-            .display.feature.flags.Flags.FLAG_VIRTUAL_DISPLAYS_SUPPORT_DESKTOP_MODE)
-    @SystemApi
+    @FlaggedApi(com.android.server.display.feature.flags.Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
     public static final int VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH = 1 << 17;
 
     /** @hide */

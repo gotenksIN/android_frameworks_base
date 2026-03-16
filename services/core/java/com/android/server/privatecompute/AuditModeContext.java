@@ -16,8 +16,6 @@
 
 package com.android.server.privatecompute;
 
-import static android.os.UserHandle.USER_SYSTEM;
-
 import android.os.Binder;
 import android.os.SystemClock;
 import com.android.internal.annotations.GuardedBy;
@@ -208,6 +206,7 @@ class AuditModeContext {
                 return;
             }
             if (!mAuditLogInMemoryBuffer.add(data)) {
+
                 try {
                     // Can't be added to this file, write it to disk and create a new one.
                     mDiskWriterExecutor.execute(mAuditLogInMemoryBuffer::writeToFile);

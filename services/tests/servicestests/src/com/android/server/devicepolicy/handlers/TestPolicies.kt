@@ -112,7 +112,6 @@ object StringPolicy {
             /*allowedDpcTypes=*/ setOf(),
             /*resolutionMechanism=*/ ResolutionMechanismMetadata.MostRestrictive<String>(),
             /*emptyStringAllowed=*/ false,
-            /*unprintableCharactersAllowed=*/ false,
         )
     val anyTransportValue: PolicyValueTransport = PolicyValueTransport.stringField("a string value")
 
@@ -133,7 +132,6 @@ fun StringPolicyMetadata.copy(
     requiredCrossUserPermission: String? = null,
     allowedDpcTypes: Set<Int>? = null,
     emptyStringAllowed: Boolean? = null,
-    unprintableCharactersAllowed: Boolean? = null,
 ) =
     StringPolicyMetadata(
         id ?: this.id,
@@ -144,7 +142,6 @@ fun StringPolicyMetadata.copy(
         allowedDpcTypes ?: this.allowedDpcTypes,
         this.resolutionMechanism,
         emptyStringAllowed ?: this.isEmptyStringAllowed,
-        unprintableCharactersAllowed ?: this.isUnprintableCharactersAllowed,
     )
 
 object ListOfStringPolicy {
@@ -161,7 +158,6 @@ object ListOfStringPolicy {
                 /*requiredCrossUserPermission=*/ "testCrossUserPermission",
                 /* allowedDpcTypes= */ setOf(),
                 /* emptyStringAllowed= */ false,
-                /* unprintableCharactersAllowed= */ false,
             ),
             /* emptyListAllowed= */ false,
         )
@@ -185,7 +181,6 @@ fun ListPolicyMetadata<String>.copy(
     requiredCrossUserPermission: String? = null,
     allowedDpcTypes: Set<Int>? = null,
     emptyStringAllowed: Boolean? = null,
-    unprintableCharactersAllowed: Boolean? = null,
     emptyListAllowed: Boolean? = null,
 ) =
     ListPolicyMetadata(
@@ -201,8 +196,6 @@ fun ListPolicyMetadata<String>.copy(
             /* allowedDpcTypes= */ allowedDpcTypes ?: this.elementMetadata.allowedDpcTypes,
             /* emptyStringAllowed= */ emptyStringAllowed
                 ?: (this.elementMetadata as StringPolicyMetadata).isEmptyStringAllowed,
-            /* unprintableCharactersAllowed= */ unprintableCharactersAllowed
-                ?: (this.elementMetadata as StringPolicyMetadata).isUnprintableCharactersAllowed,
         ),
         /* emptyListAllowed= */ emptyListAllowed ?: this.isEmptyListAllowed,
     )

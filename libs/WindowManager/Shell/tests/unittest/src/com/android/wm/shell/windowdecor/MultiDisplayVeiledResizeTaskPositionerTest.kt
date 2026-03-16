@@ -44,7 +44,6 @@ import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController
 import com.android.wm.shell.common.MultiDisplayTestUtil.TestDisplay
-import com.android.wm.shell.desktopmode.DesktopScrimController
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.data.DesktopRepository
@@ -106,7 +105,6 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
     private val mockDesktopUserRepositories = mock<DesktopUserRepositories>()
     private val mockDesktopRepository = mock<DesktopRepository>()
     private val mockResizeBinder = mock<IBinder>()
-    private val mockDesktopScrimController = mock<DesktopScrimController>()
     private lateinit var resources: TestableResources
     private lateinit var spyDisplayLayout0: DisplayLayout
     private lateinit var spyDisplayLayout1: DisplayLayout
@@ -171,8 +169,6 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
         whenever(mockDisplay.displayId).thenAnswer { DISPLAY_ID_0 }
         whenever(mockDesktopUserRepositories.getProfile(anyInt())).thenReturn(mockDesktopRepository)
         whenever(mockTransitions.startTransition(any(), any(), any())).thenReturn(mockResizeBinder)
-        whenever(mockDesktopTasksController.getDesktopScrimController())
-            .thenReturn(mockDesktopScrimController)
 
         taskPositioner =
             MultiDisplayVeiledResizeTaskPositioner(
@@ -839,8 +835,8 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
             moveBounds.bottom.toFloat(),
         )
 
-        verify(mockDesktopScrimController)
-            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, moveBounds)
+        verify(mockDesktopTasksController)
+            .updateTaskbarRoundingOnTaskResize(DISPLAY_ID_0, TASK_ID, moveBounds)
     }
 
     @Test
@@ -868,10 +864,10 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
             secondMoveBounds.bottom.toFloat() + 100,
         )
 
-        verify(mockDesktopScrimController)
-            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, firstmoveBounds)
-        verify(mockDesktopScrimController, never())
-            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
+        verify(mockDesktopTasksController)
+            .updateTaskbarRoundingOnTaskResize(DISPLAY_ID_0, TASK_ID, firstmoveBounds)
+        verify(mockDesktopTasksController, never())
+            .updateTaskbarRoundingOnTaskResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
     }
 
     @Test

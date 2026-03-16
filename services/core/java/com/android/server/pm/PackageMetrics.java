@@ -36,7 +36,6 @@ import android.content.pm.DataLoaderType;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.content.pm.SigningDetails;
 import android.content.pm.parsing.ApkLiteParseUtils;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -283,13 +282,6 @@ public final class PackageMetrics {
                 }
             }
         }
-        boolean isPqcSigned = false;
-        if (android.security.Flags.apkPqcHybridSigning()) {
-            SigningDetails signingDetails = mInstallRequest.getSigningDetails();
-            if (signingDetails != null) {
-                isPqcSigned = signingDetails.isPqcSigned();
-            }
-        }
 
 
         FrameworkStatsLog.write(FrameworkStatsLog.PACKAGE_INSTALLATION_SESSION_REPORTED,
@@ -322,8 +314,7 @@ public final class PackageMetrics {
                 mInstallRequest
                         .isDependencyInstallerEnabled() /* is_install_dependencies_enabled */,
                 mInstallRequest.getMissingSharedLibraryCount() /* missing_dependencies_count */,
-                mInstallRequest.getAppImportance() /* app_importance */,
-                isPqcSigned /* is_pqc_signed */
+                mInstallRequest.getAppImportance() /* app_importance */
         );
     }
 
@@ -447,14 +438,6 @@ public final class PackageMetrics {
     }
 
     public static void onVerificationFailed(VerifyingSession verifyingSession) {
-        boolean isPqcSigned = false;
-        if (android.security.Flags.apkPqcHybridSigning()) {
-            SigningDetails signingDetails = verifyingSession.getSigningDetails();
-            if (signingDetails != null) {
-                isPqcSigned = signingDetails.isPqcSigned();
-            }
-        }
-
         FrameworkStatsLog.write(FrameworkStatsLog.PACKAGE_INSTALLATION_SESSION_REPORTED,
                 verifyingSession.getSessionId() /* session_id */,
                 null /* package_name */,
@@ -484,8 +467,7 @@ public final class PackageMetrics {
                 verifyingSession.isStaged() /* is_staged */,
                 false /* is_install_dependencies_enabled */,
                 0 /* missing_dependencies_count */,
-                0 /* app_importance */,
-                isPqcSigned /* is_pqc_signed */
+                0 /* app_importance */
         );
     }
 
@@ -530,8 +512,7 @@ public final class PackageMetrics {
                 params.isStaged /* is_staged */,
                 true /* is_install_dependencies_enabled */,
                 missingDependenciesCount /* missing_dependencies_count */,
-                0 /* app_importance */,
-                false /* is_pqc_signed */
+                0 /* app_importance */
         );
     }
 

@@ -21,15 +21,16 @@ import android.app.activityManagerInterface
 import android.content.packageManager
 import android.content.testableContext
 import android.permission.PermissionManager
+import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.backgroundScope
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.notifications.content.icon.appIconProvider
 import com.android.systemui.plugins.activityStarter
 import com.android.systemui.shade.data.repository.privacyChipRepository
-import com.android.systemui.statusbar.dagger.PerDisplayStatusBarModule
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModePerDisplayRepository
 import com.android.systemui.statusbar.policy.FakeIndividualSensorPrivacyController
+import com.android.systemui.statusbar.quickactions.av.AvControlsChipModule
 import com.android.systemui.statusbar.quickactions.av.shared.model.AvControlsChipModel
 import com.android.systemui.statusbar.quickactions.av.shared.model.SensorActivityModel
 import com.android.systemui.user.domain.interactor.selectedUserInteractor
@@ -38,12 +39,15 @@ import org.mockito.Mockito.mock
 
 val Kosmos.avControlsChipInteractor: AvControlsChipInteractor by
     Kosmos.Fixture {
-        PerDisplayStatusBarModule.avControlsChipInteractor(
-            scope = backgroundScope,
-            factory = AvControlsChipInteractorImpl.Factory { _, _ -> avControlsChipInteractorImpl },
-            avControlsChipNotSupported = { noOpAvControlsChipInteractor },
-            statusBarModeRepo = fakeStatusBarModePerDisplayRepository,
-        )
+        AvControlsChipModule()
+            .provideAvControlsChipInteractor(
+                backgroundScope = backgroundScope,
+                avControlsChipSupportedFactory = {
+                    AvControlsChipInteractorImpl.Factory { _, _ -> avControlsChipInteractorImpl }
+                },
+                avControlsChipNotSupported = { noOpAvControlsChipInteractor },
+                displaySubcomponentRepo = displaySubcomponentPerDisplayRepository,
+            )
     }
 
 val Kosmos.sensorPrivacyController: FakeIndividualSensorPrivacyController by

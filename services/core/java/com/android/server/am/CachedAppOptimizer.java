@@ -45,7 +45,7 @@ import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UID_IDLE;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UNBIND_SERVICE;
 import static android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND;
-import static android.os.PerfettoCategories.FREEZER_CATEGORY;
+import static android.os.PerfettoTrace.FREEZER_V3;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.FREEZER_EVENT;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidFreezerEvent.FROZEN_DUR_MS;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidFreezerEvent.UID;
@@ -2800,7 +2800,7 @@ public class CachedAppOptimizer {
                 frozen = opt.isFrozen();
 
                 if (frozen && android.os.Flags.perfettoSdkTracingV3()) {
-                    PerfettoTrace.instant(FREEZER_CATEGORY, "freeze")
+                    PerfettoTrace.instant(FREEZER_V3, "freeze")
                             .beginProto()
                             .beginNested(FREEZER_EVENT)
                             .addField(UID, proc.uid)
@@ -2869,7 +2869,7 @@ public class CachedAppOptimizer {
             app.onProcessUnfrozen();
 
             if (android.os.Flags.perfettoSdkTracingV3()) {
-                PerfettoTrace.instant(FREEZER_CATEGORY, "unfreeze")
+                PerfettoTrace.instant(FREEZER_V3, "unfreeze")
                         .beginProto()
                         .beginNested(FREEZER_EVENT)
                         .addField(UID, app.uid)

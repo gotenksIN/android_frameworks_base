@@ -98,8 +98,8 @@ import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_HIGH;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_NORMAL;
 import static android.os.IServiceManager.DUMP_FLAG_PROTO;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
-import static android.os.PerfettoCategories.BIG_LOCKS_CATEGORY;
-import static android.os.PerfettoCategories.PROC_LIFECYCLE_CATEGORY;
+import static android.os.PerfettoTrace.BIG_LOCKS_V3;
+import static android.os.PerfettoTrace.PROC_STATE_CATEGORY;
 import static android.os.PowerExemptionManager.REASON_ACTIVITY_VISIBILITY_GRACE_PERIOD;
 import static android.os.PowerExemptionManager.REASON_BACKGROUND_ACTIVITY_PERMISSION;
 import static android.os.PowerExemptionManager.REASON_BOOT_COMPLETED;
@@ -362,6 +362,7 @@ import android.content.pm.ProviderInfoList;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.SharedLibraryInfo;
+import android.content.pm.Signature;
 import android.content.pm.SignedPackage;
 import android.content.pm.SigningDetails;
 import android.content.pm.SystemFeaturesCache;
@@ -481,6 +482,7 @@ import com.android.internal.app.procstats.ProcessStats;
 import com.android.internal.app.ActivityTrigger;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.internal.content.InstallLocationUtils;
+import com.android.internal.dev.perfetto.sdk.PerfettoTrace;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
 import com.android.internal.os.ApplicationSharedMemory;
@@ -953,58 +955,42 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Emits a trace event indicating the start of an attempt to acquire the main AMS lock.
      */
     public static void traceBeforeAmsLock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.instant(BIG_LOCKS_CATEGORY,
-                    "ams_lock_acquire").emit();
-        }
+        PerfettoTrace.instant(BIG_LOCKS_V3, "ams_lock_acquire").emit();
     }
 
     /**
      * Emits a trace event indicating that the main AMS lock has been acquired and is now held.
      */
     public static void traceAfterAmsLock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.begin(BIG_LOCKS_CATEGORY,
-                    "ams_lock_held").emit();
-        }
+        PerfettoTrace.begin(BIG_LOCKS_V3, "ams_lock_held").emit();
     }
 
     /**
      * Emits a trace event indicating the end of the critical section protected by the AMS lock.
      */
     public static void traceAfterAmsUnlock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.end(BIG_LOCKS_CATEGORY).emit();
-        }
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     /**
      * Emits a trace event indicating the start of an attempt to acquire the process lock.
      */
     public static void traceBeforeProcLock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.instant(BIG_LOCKS_CATEGORY,
-                    "proc_lock_acquire").emit();
-        }
+        PerfettoTrace.instant(BIG_LOCKS_V3, "proc_lock_acquire").emit();
     }
 
     /**
      * Emits a trace event indicating that the process lock has been acquired and is now held.
      */
     public static void traceAfterProcLock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.begin(BIG_LOCKS_CATEGORY,
-                    "proc_lock_held").emit();
-        }
+        PerfettoTrace.begin(BIG_LOCKS_V3, "proc_lock_held").emit();
     }
 
     /**
      * Emits a trace event indicating the end of the critical section protected by the process lock.
      */
     public static void traceAfterProcUnlock() {
-        if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace.end(BIG_LOCKS_CATEGORY).emit();
-        }
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     static void boostPriorityForProcLockedSection() {
@@ -3081,12 +3067,6 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Checks if {@code policyOwnerPkg} has an {@code <allow-component-access>} policy, and if so,
      * verifies that {@code candidatePkg} is explicitly allowed. Returns true if no policy is
      * specified for {@code policyOwnerPkg}.
-     *
-     * <p>If a policy rule specifies a package name but NO certificate digest:
-     * <ul>
-     * <li>If the target is a <b>preinstalled package</b>, association with it is allowed.</li>
-     * <li>If the target is a <b>non-preinstalled package</b>, association with it is denied.</li>
-     * </ul>
      */
     private boolean isComponentAccessAllowedByPolicyLocked(
             String policyOwnerPkg, int policyOwnerUid, String candidatePkg, int candidateUid) {
@@ -3117,11 +3097,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         final List<String> expectedDigests = new ArrayList<>();
         final List<SignedPackage> rules = policy.getAllowlistedSignedPackages();
         final int rulesSize = rules.size();
-        boolean packageFoundInPolicy = false;
         for (int i = 0; i < rulesSize; i++) {
             SignedPackage rule = rules.get(i);
             if (rule.getPackageName().equals(candidatePkg)) {
-                packageFoundInPolicy = true;
                 if (rule.hasCertificateDigest()) {
                     if (candidateInfo
                             .getSigningDetails()
@@ -3131,60 +3109,46 @@ public class ActivityManagerService extends IActivityManager.Stub
                     expectedDigests.add(
                             HexDump.toHexString(rule.getCertificateDigest()).toUpperCase());
                 } else {
-                    // For non system apps ensure a signature is present
-                    final ApplicationInfo appInfo = packageManagerInternal.getApplicationInfo(
-                            candidatePkg, /*flags*/0, Process.SYSTEM_UID, UserHandle.USER_SYSTEM);
-                    final boolean isSystem = (appInfo != null)
-                            && (appInfo.flags & (ApplicationInfo.FLAG_SYSTEM
-                            | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
-                    if (isSystem) {
-                        return true;
-                    }
+                    return true;
                 }
             }
         }
 
         logAssociationDenialLocked(policyOwnerPkg, candidatePkg, candidateUid,
-                packageFoundInPolicy, expectedDigests, candidateInfo.getSigningDetails());
+                expectedDigests, candidateInfo.getSigningDetails());
         return false;
     }
 
-    private void logAssociationDenialLocked(
-            String owner, String target, int targetUid, boolean isPackageInPolicy,
+    private void logAssociationDenialLocked(String owner, String target, int targetUid,
             List<String> expectedDigests, SigningDetails details) {
-        final String baseMsg =
-                "Access denied: " + owner + " blocks " + target + " (uid " + targetUid + "): ";
-        if (!isPackageInPolicy) {
-            Slog.w(TAG, baseMsg + "Package not listed in policy");
+        if (expectedDigests.isEmpty()) {
+            Slog.w(TAG, "Access denied: " + owner + " blocks " + target
+                    + " (uid " + targetUid + "): package not listed in policy");
             return;
         }
 
-        if (expectedDigests == null || expectedDigests.isEmpty()) {
-            Slog.w(TAG, baseMsg + "A certDigest must be specified for non-preinstalled packages.");
-            return;
-        }
-
-        final List<String> actualDigests = new ArrayList<>();
-        if (details != null && details.getSignatures() != null) {
-            for (int i = 0; i < details.getSignatures().length; i++) {
-                byte[] digest =
-                        PackageUtils.computeSha256DigestBytes(
-                                details.getSignatures()[i].toByteArray());
-                if (digest != null) {
-                    actualDigests.add(HexDump.toHexString(digest).toUpperCase());
+        List<String> actualDigests = new ArrayList<>();
+        if (details != null) {
+            final Signature[] signatures = details.getSignatures();
+            if (signatures != null) {
+                for (int i = 0; i < signatures.length; i++) {
+                    final Signature sig = signatures[i];
+                    byte[] digest = PackageUtils.computeSha256DigestBytes(sig.toByteArray());
+                    if (digest != null) {
+                        actualDigests.add(HexDump.toHexString(digest).toUpperCase());
+                    }
                 }
             }
         }
 
-        final String actualOutput = actualDigests.isEmpty() ? "unknown" : actualDigests.toString();
-        Slog.w(
-                TAG,
-                baseMsg
-                        + "Certificate digest did not match. Expected one of: "
-                        + expectedDigests
-                        + ". Package on device has: "
-                        + actualOutput);
+        final String actualOutput =
+                actualDigests.isEmpty() ? "unknown" : actualDigests.toString();
+
+        Slog.w(TAG, "Access denied: " + owner + " has a policy for " + target
+                + " but the certificate digest did not match. Expected one of: "
+                + expectedDigests + ". Package on device has: " + actualOutput);
     }
+
 
     /**
      * Checks if the association is allowed by the App's own Manifest policy (the {@code
@@ -4092,8 +4056,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (app.getPid() == pid && (appThread = app.getThread()) != null
                 && appThread.asBinder() == thread.asBinder()) {
             if (android.os.Flags.perfettoSdkTracingV3()) {
-                com.android.internal.dev.perfetto.sdk.PerfettoTrace
-                        .instant(PROC_LIFECYCLE_CATEGORY, "binder_died")
+                PerfettoTrace.instant(PROC_STATE_CATEGORY, "binder_died")
                         .beginProto()
                         .beginNested(BINDER_DIED_EVENT)
                         .addField(AndroidBinderDiedEvent.UID, app.info.uid)
@@ -5311,8 +5274,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         EventLogTags.writeAmProcBound(app.userId, pid, app.processName);
         if (android.os.Flags.perfettoSdkTracingV3()) {
-            com.android.internal.dev.perfetto.sdk.PerfettoTrace
-                    .instant(PROC_LIFECYCLE_CATEGORY, "process_bound")
+            PerfettoTrace.instant(PROC_STATE_CATEGORY, "process_bound")
                     .beginProto()
                     .beginNested(PROCESS_START_EVENT)
                     .addField(UID, app.info.uid)
@@ -5726,8 +5688,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             final long startDelay = SystemClock.uptimeMillis() - app.getStartUptime();
 
             if (android.os.Flags.perfettoSdkTracingV3()) {
-                com.android.internal.dev.perfetto.sdk.PerfettoTrace
-                        .instant(PROC_LIFECYCLE_CATEGORY, "process_start")
+                PerfettoTrace.instant(PROC_STATE_CATEGORY, "process_start")
                         .beginProto()
                         .beginNested(PROCESS_START_EVENT)
                         .addField(UID, app.info.uid)

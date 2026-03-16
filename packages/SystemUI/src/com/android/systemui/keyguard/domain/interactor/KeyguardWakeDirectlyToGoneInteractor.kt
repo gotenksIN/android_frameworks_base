@@ -30,11 +30,12 @@ import com.android.systemui.keyguard.shared.model.BiometricUnlockMode
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
 import com.android.systemui.keyguard.shared.model.KeyguardState.Companion.deviceIsAsleepInState
 import com.android.systemui.keyguard.shared.model.KeyguardState.Companion.deviceIsAwakeInState
-import com.android.systemui.keyguard.shared.model.LockAfterDelayTimerState
+import com.android.systemui.keyguard.shared.model.LockAfterScreenTimeoutTimerState
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.scene.shared.model.Scenes.Gone
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.settings.SecureSettings
@@ -158,8 +159,9 @@ constructor(
 
     private fun listenForLockAfterScreenTimeoutState() {
         scope.launch {
-            repository.lockAfterDelayState.collect { state ->
-                if (state == LockAfterDelayTimerState.RUNNING) {
+            repository.lockAfterScreenTimeoutState.collect { state ->
+                // If we're sleeping from GONE,
+                if (state == LockAfterScreenTimeoutTimerState.RUNNING && currentScene() == Gone) {
                     // Let the repository know that we can return to GONE until we notify
                     // it otherwise.
                     Log.d(
@@ -167,7 +169,7 @@ constructor(
                         "can ignore auth and return to gone - lock timeout timer not elapsed",
                     )
                     repository.setCanIgnoreAuthAndReturnToGone(true)
-                } else if (state == LockAfterDelayTimerState.ELAPSED) {
+                } else if (state == LockAfterScreenTimeoutTimerState.ELAPSED) {
                     Log.d(
                         TAG,
                         "can not ignore auth and return to gone - lock timeout timer elapsed",

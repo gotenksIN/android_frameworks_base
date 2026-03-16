@@ -29,7 +29,6 @@ android_ravenwood_test {
     srcs: [
         "test/**/*.java",
         "test/**/*.kt",
-        "test/**/*.aidl",
     ],
     data: [
         "data/**/*",

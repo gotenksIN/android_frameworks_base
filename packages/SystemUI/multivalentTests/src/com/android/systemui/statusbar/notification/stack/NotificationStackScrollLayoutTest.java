@@ -2354,27 +2354,19 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         Configuration configuration = new Configuration();
         configuration.orientation = Configuration.ORIENTATION_LANDSCAPE;
         mTestableResources.overrideConfiguration(configuration);
-        final int mMinimumPaddings = px(R.dimen.notification_side_paddings_single);
-        mStackScroller.setBaseSidePadding(mMinimumPaddings);
+        final int mMinimumPaddings = px(R.dimen.notification_side_paddings);
 
-        // WHEN: alignToInnerQqsTiles is true
-        mStackScroller.setAlignToInnerQqsTiles(true);
+        // WHEN: useLargeSidePaddings is true
+        mStackScroller.setUseLargeSidePaddings(true);
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are greater than minimum
         assertThat(mStackScroller.getSidePaddings()).isGreaterThan(mMinimumPaddings);
 
-        // WHEN: alignToInnerQqsTiles is false
-        mStackScroller.setAlignToInnerQqsTiles(false);
+        // WHEN: useLargeSidePaddings is false
+        mStackScroller.setUseLargeSidePaddings(false);
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are equal to minimum
         assertThat(mStackScroller.getSidePaddings()).isEqualTo(mMinimumPaddings);
-
-        // WHEN: baseSidePadding is custom
-        int customPadding = 123;
-        mStackScroller.setBaseSidePadding(customPadding);
-        mStackScroller.updateSidePadding(1000);
-        // THEN: side paddings are equal to custom
-        assertThat(mStackScroller.getSidePaddings()).isEqualTo(customPadding);
     }
 
     @Test
@@ -2384,7 +2376,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         Configuration configuration = new Configuration();
         configuration.orientation = Configuration.ORIENTATION_LANDSCAPE;
         mTestableResources.overrideConfiguration(configuration);
-        final int mMinimumPaddings = px(R.dimen.notification_side_paddings_single);
+        final int mMinimumPaddings = px(R.dimen.notification_side_paddings);
 
         // WHEN: split shade is disabled
         mStackScroller.setSplitShade(false);

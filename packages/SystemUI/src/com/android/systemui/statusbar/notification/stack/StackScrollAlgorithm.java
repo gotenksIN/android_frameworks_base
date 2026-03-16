@@ -123,9 +123,7 @@ public class StackScrollAlgorithm {
                 R.dimen.bundle_expanded_divider_height);
         mGroupingDisabledSectionGapHeight = res.getDimensionPixelSize(
                 R.dimen.grouping_disabled_section_gap_height);
-        // TODO(b/488459485): make sidePaddings response to shadeMode if needed
-        mNotificationScrimPadding =
-                res.getDimensionPixelSize(R.dimen.notification_side_paddings_single);
+        mNotificationScrimPadding = res.getDimensionPixelSize(R.dimen.notification_side_paddings);
         mMarginBottom = res.getDimensionPixelSize(R.dimen.notification_panel_margin_bottom);
         mQuickQsOffsetHeight = SystemBarUtils.getQuickQsOffsetHeight(context);
         mSmallCornerRadius = res.getDimension(R.dimen.notification_corner_radius_small);

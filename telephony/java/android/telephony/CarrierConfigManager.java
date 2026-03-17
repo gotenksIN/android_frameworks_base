@@ -11907,6 +11907,18 @@ public class CarrierConfigManager {
 
 // QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
 
+    /**
+     * A list of network types that support a linger timer to delay the teardown of a data network.
+     *
+     * While the default value is null, configuring a linger timer is recommended for LTE
+     * and LTE CA.
+     *
+     * @see TelephonyManager NETWORK_TYPE_*
+     * @hide
+     */
+    public static final String KEY_DATA_LINGER_TIMER_ALLOWED_DATA_NETWORK_TYPES
+            = "data_linger_timer_allowed_data_network_types";
+
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
 

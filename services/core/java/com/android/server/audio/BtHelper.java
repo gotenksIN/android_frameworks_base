@@ -1107,15 +1107,20 @@ public class BtHelper {
             return new AudioDeviceAttributes(AudioSystem.DEVICE_OUT_BLUETOOTH_SCO, "");
         }
         String address = btDevice.getAddress();
-// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        String name = getName(btDevice);
-// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
+        String dummyAddress = "00:00:00:00:00:00";
+        String name = "";
+        if (!address.equals(dummyAddress)) {
+            name = getName(btDevice);
+        }
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             address = "";
         }
-// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        BluetoothClass btClass = btDevice.getBluetoothClass();
-// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
+        BluetoothClass btClass = dummyAddress.equals(address) ? null :
+                                 btDevice.getBluetoothClass();
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         int nativeType = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO;
         if (btClass != null) {
             switch (btClass.getDeviceClass()) {
@@ -1202,28 +1207,60 @@ public class BtHelper {
         if (Objects.equals(btDevice, previousActiveDevice)) {
             return;
         }
-// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        if (!handleBtScoActiveDeviceChange(previousActiveDevice, false, deviceSwitch)) {
-            Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
-                        + getAnonymizedAddress(previousActiveDevice));
-// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        }
-// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        // mBluetoothHeadsetDevice must correspond to previous device until now and new device from
-        // now on for SCO activation/deactivation requests made by
-        // AudioDeviceBroker.onUpdateCommunicationRouteClient() to succeed.
-// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        mBluetoothHeadsetDevice = btDevice;
-// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        if (!handleBtScoActiveDeviceChange(btDevice, true, false /*deviceSwitch*/)) {
-            Log.e(TAG, "onSetBtScoActiveDevice() failed to add new device "
-                        + getAnonymizedAddress(btDevice));
-            // set mBluetoothHeadsetDevice to null when failing to add new devicei
-            mBluetoothHeadsetDevice = null;
-        }
-// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
-        if (mBluetoothHeadsetDevice == null) {
-            resetBluetoothSco();
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
+        boolean mVoipLeaWarEnabled =
+                SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
+
+        if (!mVoipLeaWarEnabled) {
+            if (!handleBtScoActiveDeviceChange(previousActiveDevice, false, deviceSwitch)) {
+                Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
+                            + getAnonymizedAddress(previousActiveDevice));
+            }
+            // mBluetoothHeadsetDevice must correspond to previous device until now and new device from
+            // now on for SCO activation/deactivation requests made by
+            // AudioDeviceBroker.onUpdateCommunicationRouteClient() to succeed.
+            mBluetoothHeadsetDevice = btDevice;
+            if (!handleBtScoActiveDeviceChange(btDevice, true, false /*deviceSwitch*/)) {
+                Log.e(TAG, "onSetBtScoActiveDevice() failed to add new device "
+                            + getAnonymizedAddress(btDevice));
+                // set mBluetoothHeadsetDevice to null when failing to add new devicei
+                mBluetoothHeadsetDevice = null;
+            }
+            if (mBluetoothHeadsetDevice == null) {
+                resetBluetoothSco();
+            }
+        } else {
+            String DummyAddress = "00:00:00:00:00:00";
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null) {
+                Log.i(TAG, "adapter is null, returning from setBtScoActiveDevice");
+                return;
+            }
+            mBluetoothHeadsetDummyDevice = adapter.getRemoteDevice(DummyAddress);
+            if (mBluetoothHeadsetDevice == null && btDevice != null) {
+                //SCO device entry is added to mConnectedDevices hash map only when active
+                //device connects for the first time.
+                if (!handleBtScoActiveDeviceChange(mBluetoothHeadsetDummyDevice, true, false /*deviceSwitch*/)) {
+                    Log.e(TAG, "onSetBtScoActiveDevice() failed to add new device " + btDevice);
+                    // set mBluetoothHeadsetDevice to null when failing to add new device
+                    btDevice = null;
+                }
+            }
+            if (mBluetoothHeadsetDevice != null && btDevice == null) {
+                //SCO device entry is removed from mConnectedDevices hash map only when active
+                //device is disconnected.
+                if (!handleBtScoActiveDeviceChange(mBluetoothHeadsetDummyDevice, false, false /*deviceSwitch*/)) {
+                    Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
+                            + previousActiveDevice);
+                }
+            }
+            mBluetoothHeadsetDevice = btDevice;
+            if (mBluetoothHeadsetDevice == null) {
+                mBluetoothHeadsetDummyDevice = null;
+                Log.i(TAG, "In setBtScoActiveDevice(), calling resetBluetoothSco()");
+                resetBluetoothSco();
+            }
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         }
     }
 

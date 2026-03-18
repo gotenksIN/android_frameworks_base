@@ -26,6 +26,7 @@ import com.android.systemui.common.domain.interactor.SysUIStateDisplaysInteracto
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.model.StateChange;
+import com.android.systemui.shared.Flags;
 import com.android.systemui.shared.system.QuickStepContract;
 
 import java.io.PrintWriter;
@@ -46,6 +47,9 @@ import javax.inject.Inject;
 public class SystemUIDialogManager implements Dumpable {
     private static final StateChange SYSUI_STATE_DIALOG_SHOWING_FLAG = new StateChange().setFlag(
             QuickStepContract.SYSUI_STATE_DIALOG_SHOWING, /* state= */ true);
+    private static final StateChange SYSUI_STATE_DIALOG_STASH_TASKBAR_FLAG =
+            new StateChange().setFlag(QuickStepContract.SYSUI_STATE_DIALOG_STASH_TASKBAR,
+                    /* state= */ true);
 
     private final KeyguardViewController mKeyguardViewController;
     private final SysUIStateDisplaysInteractor mSysUIStateDisplaysInteractor;
@@ -118,6 +122,23 @@ public class SystemUIDialogManager implements Dumpable {
                 .collect(Collectors.toSet());
         mSysUIStateDisplaysInteractor.setFlagsExclusivelyToDisplays(displaysWithDialog,
                 SYSUI_STATE_DIALOG_SHOWING_FLAG);
+
+        if (Flags.selectiveDialogTaskbarStash()) {
+            Set<Integer> displaysWithStashingDialog = mDialogsShowing.stream()
+                    .filter(d -> {
+                        if (d instanceof SystemUIDialog systemDialog) {
+                            return systemDialog.shouldStashTaskbar();
+                        }
+                        // All legacy dialogs are considered "stashing" by default to maintain
+                        // existing behavior.
+                        return true;
+                    })
+                    .map(d -> d.getContext().getDisplayId())
+                    .collect(Collectors.toSet());
+
+            mSysUIStateDisplaysInteractor.setFlagsExclusivelyToDisplays(displaysWithStashingDialog,
+                    SYSUI_STATE_DIALOG_STASH_TASKBAR_FLAG);
+        }
     }
 
     private void updateDialogListeners() {

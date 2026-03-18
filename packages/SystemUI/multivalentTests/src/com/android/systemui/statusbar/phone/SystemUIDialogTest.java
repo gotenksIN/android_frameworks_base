@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.phone;
 
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_STASH_TASKBAR;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
 import static com.android.systemui.statusbar.phone.SystemUIDialog.DEFAULT_DISMISS_ON_DEVICE_LOCK;
 import static com.android.systemui.statusbar.phone.SystemUIDialog.DEFAULT_THEME;
@@ -37,6 +38,8 @@ import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.platform.test.ravenwood.RavenwoodRule;
@@ -54,6 +57,7 @@ import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.display.data.repository.FakeDisplayRepository;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.model.SysUiState;
+import com.android.systemui.shared.Flags;
 import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor;
 
 import org.junit.After;
@@ -250,6 +254,7 @@ public class SystemUIDialogTest extends SysuiTestCase {
 
     /** Regression test for b/386871258 */
     @Test
+    @EnableFlags(Flags.FLAG_SELECTIVE_DIALOG_TASKBAR_STASH)
     public void sysuiStateUpdated() {
         SystemUIDialog dialog1 =
                 createDialogWithDelegate(mContext, mDelegate, /* shouldAcsDismissDialog */ true,
@@ -258,19 +263,57 @@ public class SystemUIDialogTest extends SysuiTestCase {
                 createDialogWithDelegate(mContext, mDelegate, /* shouldAcsDismissDialog */ true,
                         mBlurInteractor);
 
+        when(mDelegate.shouldStashTaskbar(ArgumentMatchers.any())).thenReturn(true);
+
         dialog1.show();
         assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isTrue();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isTrue();
 
         dialog2.show();
         assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isTrue();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isTrue();
 
         dialog2.dismiss();
         // explicitly call onWindowFocusChanged to simulate dialog 1 regaining focus
         dialog1.onWindowFocusChanged(/* hasFocus= */ true);
         assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isTrue();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isTrue();
 
         dialog1.dismiss();
         assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isFalse();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isFalse();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SELECTIVE_DIALOG_TASKBAR_STASH)
+    public void sysuiStateUpdated_noStash() {
+        SystemUIDialog dialog =
+                createDialogWithDelegate(mContext, mDelegate, /* shouldAcsDismissDialog */ true,
+                        mBlurInteractor);
+
+        when(mDelegate.shouldStashTaskbar(ArgumentMatchers.any())).thenReturn(false);
+
+        dialog.show();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isTrue();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isFalse();
+
+        dialog.dismiss();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isFalse();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isFalse();
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_SELECTIVE_DIALOG_TASKBAR_STASH)
+    public void sysuiStateUpdated_flagDisabled() {
+        SystemUIDialog dialog =
+                createDialogWithDelegate(mContext, mDelegate, /* shouldAcsDismissDialog */ true,
+                        mBlurInteractor);
+
+        dialog.show();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_SHOWING) != 0).isTrue();
+        assertThat((mSysUiState.getFlags() & SYSUI_STATE_DIALOG_STASH_TASKBAR) != 0).isFalse();
+
+        dialog.dismiss();
     }
 
     @Test

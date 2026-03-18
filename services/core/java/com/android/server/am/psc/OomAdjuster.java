@@ -1451,7 +1451,17 @@ public abstract class OomAdjuster {
                 mProcessList.getLruProcessesLOSP();
         final int numLru = lruList.size();
 
-        final boolean doKillExcessiveProcesses = shouldKillExcessiveProcesses(now);
+        final boolean doKillExcessiveProcesses;
+        final String enableVendorKillConfig =
+                mPerf.perfGetProp("ro.vendor.am.force_kill_excessive_processes", "true");
+        if (enableVendorKillConfig.equals("true")) {
+            // Vendor explicitly wants to control this
+            doKillExcessiveProcesses = Boolean.parseBoolean(enableVendorKillConfig);
+        } else {
+            // Default AOSP / framework behavior
+            doKillExcessiveProcesses = shouldKillExcessiveProcesses(now);
+        }
+
         if (!doKillExcessiveProcesses) {
             if (mNextNoKillDebugMessageTime < now) {
                 Slog.d(TAG, "Not killing cached processes"); // STOPSHIP Remove it b/222365734

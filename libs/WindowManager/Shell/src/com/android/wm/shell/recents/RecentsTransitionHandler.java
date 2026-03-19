@@ -91,6 +91,7 @@ import com.android.wm.shell.shared.pip.PipFlags;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.HomeTransitionObserver;
 import com.android.wm.shell.transition.Transitions;
+import com.android.window.flags.Flags;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -306,8 +307,16 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             // Ignore if there is no running recents transition
             return null;
         }
-        final RecentsController controller = mControllers.get(mControllers.size() - 1);
-        controller.handleMidTransitionRequest(request);
+        if (Flags.syncedDisplayModeUpdates()) {
+            // Notify all active controllers about an incoming transition request
+            for (int i = 0; i < mControllers.size(); i++) {
+                final RecentsController controller = mControllers.get(i);
+                controller.handleMidTransitionRequest(request);
+            }
+        } else {
+            final RecentsController controller = mControllers.get(mControllers.size() - 1);
+            controller.handleMidTransitionRequest(request);
+        }
         return null;
     }
 
@@ -1064,11 +1073,16 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
          * Updates this controller when a new transition is requested mid-recents transition.
          */
         void handleMidTransitionRequest(TransitionRequestInfo request) {
-            // TODO: b/448471638 - support multiple display changes
             if (request.getType() == TRANSIT_CHANGE && request.getDisplayChanges() != null
                             && !request.getDisplayChanges().isEmpty()) {
-                final TransitionRequestInfo.DisplayChange dispChange = request.getDisplayChanges()
-                        .getFirst();
+                TransitionRequestInfo.DisplayChange dispChange;
+                if (Flags.syncedDisplayModeUpdates()) {
+                    dispChange = request.getDisplayChangeForDisplay(mDisplayId);
+                    if (dispChange == null) return;
+                } else {
+                    dispChange = request.getDisplayChanges().getFirst();
+                }
+
                 if (dispChange.getStartRotation() != dispChange.getEndRotation()) {
                     ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                             "[%d] RecentsController.prepareForMerge: "

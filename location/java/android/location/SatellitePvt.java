@@ -16,12 +16,13 @@
 
 package android.location;
 
+import android.annotation.FlaggedApi;
 import android.annotation.FloatRange;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.annotation.SystemApi;
+import android.location.flags.Flags;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -48,9 +49,8 @@ import java.lang.annotation.RetentionPolicy;
  * <p>If {@link GnssMeasurement#getReceivedSvTimeNanos()} is not fully decoded,
  * {@link GnssMeasurement#getSatellitePvt()} could still be reported and
  * {@link GnssMeasurement#getReceivedSvTimeUncertaintyNanos()} would be used to provide confidence.
- * @hide
  */
-@SystemApi
+@FlaggedApi(Flags.FLAG_ENABLE_PUBLIC_SATELLITE_PVT_API)
 public final class SatellitePvt implements Parcelable {
     /**
      * Bit mask for {@link #mFlags} indicating valid satellite position, velocity and clock info
@@ -723,7 +723,7 @@ public final class SatellitePvt implements Parcelable {
          * @return builder object
          */
         @NonNull
-        public Builder setPositionEcef(@NonNull PositionEcef positionEcef) {
+        public Builder setPositionEcef(@Nullable PositionEcef positionEcef) {
             mPositionEcef = positionEcef;
             updateFlags();
             return this;
@@ -736,7 +736,7 @@ public final class SatellitePvt implements Parcelable {
          * @return builder object
          */
         @NonNull
-        public Builder setVelocityEcef(@NonNull VelocityEcef velocityEcef) {
+        public Builder setVelocityEcef(@Nullable VelocityEcef velocityEcef) {
             mVelocityEcef = velocityEcef;
             updateFlags();
             return this;
@@ -749,7 +749,7 @@ public final class SatellitePvt implements Parcelable {
          * @return builder object
          */
         @NonNull
-        public Builder setClockInfo(@NonNull ClockInfo clockInfo) {
+        public Builder setClockInfo(@Nullable ClockInfo clockInfo) {
             mClockInfo = clockInfo;
             updateFlags();
             return this;

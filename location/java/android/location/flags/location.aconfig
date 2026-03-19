@@ -246,3 +246,11 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "enable_public_satellite_pvt_api"
+    namespace: "location"
+    description: "Make SatPvt API from SystemApi to public API."
+    bug: "493351958"
+    is_exported: true
+}

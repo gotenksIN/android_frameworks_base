@@ -124,6 +124,14 @@ flag {
 
 flag {
     namespace: "windowing_sdk"
+    name: "virtual_gamepad_developer_opt_out"
+    is_exported: true
+    description: "Whether the WindowManager.PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE property is public."
+    bug: "458739902"
+}
+
+flag {
+    namespace: "windowing_sdk"
     name: "device_engagement_mode"
     description: "Track and report device engagement modes, indicating the device's current interaction capabilities (e.g. audio-only)."
     bug: "423990404"
@@ -183,6 +191,17 @@ flag {
     }
 }
 
+
+flag {
+    namespace: "windowing_sdk"
+    name: "fix_multi_window_task_focus_change"
+    description: "Avoid changing focus to a lower z-ordering multi-window task"
+    bug: "479335798"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
 flag {
     namespace: "windowing_sdk"
     name: "idempotent_wct_resolution"
@@ -198,6 +217,16 @@ flag {
     name: "quick_bubble_switch"
     description: "Fix the animation when doing quick bubble switch"
     bug: "488433153"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "partial_translucent_activity_embedding"
+    description: "Make the bottom most partial translucent ae pair opaque"
+    bug: "491678669"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

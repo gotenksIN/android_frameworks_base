@@ -1091,6 +1091,7 @@ public class AudioService extends IAudioService.Stub
             AudioSystem.DEVICE_OUT_AUX_LINE));
     // Devices for which the volume is always max, no volume panel
     Set<Integer> mFullVolumeDevices = new HashSet<>(Arrays.asList(
+            AudioSystem.DEVICE_OUT_SPDIF,
             AudioSystem.DEVICE_OUT_HDMI_ARC,
             AudioSystem.DEVICE_OUT_HDMI_EARC
     ));
@@ -8146,16 +8147,20 @@ public class AudioService extends IAudioService.Stub
     }
 
     /** @see AudioManager#getAvailableCommunicationDevices(int) */
-    public int[] getAvailableCommunicationDeviceIds() {
-        List<AudioDeviceInfo> commDevices = AudioDeviceBroker.getAvailableCommunicationDevices();
-        return commDevices.stream().mapToInt(AudioDeviceInfo::getId).toArray();
+    public List<AudioDeviceAttributes> getAvailableCommunicationDevices() {
+        List<AudioDeviceInfo> devices = AudioDeviceBroker.getAvailableCommunicationDevices();
+        List<AudioDeviceAttributes> adas = new ArrayList<AudioDeviceAttributes>();
+        for (AudioDeviceInfo device : devices) {
+            adas.add(new AudioDeviceAttributes(device));
+        }
+        return adas;
     }
 
     /**
      * @see AudioManager#setCommunicationDevice(int)
      * @see AudioManager#clearCommunicationDevice()
      */
-    public boolean setCommunicationDevice(IBinder cb, int portId,
+    public boolean setCommunicationDevice(IBinder cb, AudioDeviceAttributes ada,
             @NonNull AttributionSource attributionSource) {
         if (attributionSource == null) {
             return false;
@@ -8164,10 +8169,10 @@ public class AudioService extends IAudioService.Stub
         final int pid = attributionSource.getPid();
 
         AudioDeviceInfo device = null;
-        if (portId != 0) {
-            device = AudioManager.getDeviceForPortId(portId, AudioManager.GET_DEVICES_OUTPUTS);
+        if (ada != null) {
+            device = AudioManager.getDeviceInfoFromTypeAndAddress(ada.getType(), ada.getAddress());
             if (device == null) {
-                Log.w(TAG, "setCommunicationDevice: invalid portID " + portId);
+                Log.w(TAG, "setCommunicationDevice: invalid device " + ada);
                 return false;
             }
             if (!AudioDeviceBroker.isValidCommunicationDevice(device)) {
@@ -8219,16 +8224,11 @@ public class AudioService extends IAudioService.Stub
     }
 
     /** @see AudioManager#getCommunicationDevice() */
-    public int getCommunicationDevice() {
-        int deviceId = 0;
-        final long ident = Binder.clearCallingIdentity();
-        try {
+    public AudioDeviceAttributes getCommunicationDevice() {
+        try (SafeCloseable ignored = ClearCallingIdentityContext.create()) {
             AudioDeviceInfo device = mDeviceBroker.getCommunicationDevice();
-            deviceId = device != null ? device.getId() : 0;
-        } finally {
-            Binder.restoreCallingIdentity(ident);
+            return device != null ? new AudioDeviceAttributes(device) : null;
         }
-        return deviceId;
     }
 
     /** @see AudioManager#addOnCommunicationDeviceChangedListener(

@@ -307,6 +307,7 @@ java_library_static {
       "//packages/modules/AdServices/adservices/tests/unittest/service-core/adid",
       "//packages/modules/AdServices/shared/device-side/tests",
       "//frameworks/base/services/tests/servicestests/src/com/android/server/signalcollector",
+      "//cts/tests/app/ServiceTest",
     ],
     lint: {
         baseline_filename: "lint-baseline.xml",

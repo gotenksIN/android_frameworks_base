@@ -1341,26 +1341,6 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
             264301586L; // buganizer id
 
     /**
-     * Includes the packages the override is applied to in the camera compatibility treatment in
-     * free-form windowing mode for fixed-orientation apps.
-     *
-     * <p>In free-form windowing mode, the compatibility treatment emulates running on a portrait
-     * device by letterboxing the app window and changing the camera characteristics to what apps
-     * commonly expect in a portrait device: 90 and 270 degree sensor rotation for back and front
-     * cameras, respectively, and setting display rotation to 0.
-     *
-     * <p>Use this flag to enable the compatibility treatment for apps in which camera doesn't work
-     * well in freeform windowing.
-     *
-     * @hide
-     */
-    @ChangeId
-    @Overridable
-    @Disabled
-    public static final long OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT =
-            314961188L;
-
-    /**
      * Excludes the packages the override is applied to from the camera compatibility treatment for
      * fixed-orientation apps, which simulates running on a portrait device, in the orientation
      * requested by the app.
@@ -1656,6 +1636,20 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     private static final long CHECK_MIN_WIDTH_HEIGHT_FOR_MULTI_WINDOW = 197654537L;
 
     /**
+     * This change will enable synchronizing the system insets animation (e.g. showing IME) with
+     * the app content, if applicable. This means that the insets are applied per frame and the
+     * app needs to redraw. In case
+     * {@link android.view.WindowManager.LayoutParams#SOFT_INPUT_ADJUST_PAN} was set, this will
+     * synchronize the scrolling with the IME animation.
+     *
+     * @hide
+     */
+    @ChangeId
+    @Disabled
+    @Overridable
+    public static final long ENABLE_SYNCHRONIZED_INSETS_ANIMATION = 463899193L;
+
+    /**
      * The activity is targeting a SDK version that should receive the changed behavior of
      * configuration insets decouple.
      *
@@ -1774,6 +1768,8 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     @ChangeId
     @Overridable
     @Disabled
+    @FlaggedApi(Flags.FLAG_VIRTUAL_GAMEPAD_DEVELOPER_OPT_OUT)
+    @TestApi
     public static final long OVERRIDE_ENABLE_VIRTUAL_GAMEPAD = 447093535L;
 
     /**

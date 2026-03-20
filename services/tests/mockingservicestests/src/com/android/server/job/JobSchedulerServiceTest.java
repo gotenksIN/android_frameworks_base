@@ -18,6 +18,26 @@ package com.android.server.job;
 
 import static android.app.job.Flags.FLAG_HANDLE_ABANDONED_JOBS;
 import static android.app.usage.UsageStatsManager.REASON_MAIN_TIMEOUT;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.BACK_OFF_POLICY_TYPE;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.DEADLINE_MS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.DELAY_MS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.EFFECTIVE_PRIORITY;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.INTERNAL_STOP_REASON;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.JOB_ID;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.JOB_START_LATENCY_MS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.JOB_STATE_FLAGS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.NUM_PREVIOUS_ATTEMPTS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.NUM_RESCHEDULES_DUE_TO_ABANDONMENT;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.NUM_UNCOMPLETED_WORK_ITEMS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.PERIODIC_JOB_FLEX_INTERVAL_MS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.PERIODIC_JOB_INTERVAL_MS;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.PROC_STATE;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.PROXY_UID;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.PUBLIC_STOP_REASON;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.REQUESTED_PRIORITY;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.SOURCE_UID;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.STANDBY_BUCKET;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidJobSchedulerJob.STATE;
 import static android.text.format.DateUtils.DAY_IN_MILLIS;
 import static android.text.format.DateUtils.HOUR_IN_MILLIS;
 import static android.text.format.DateUtils.MINUTE_IN_MILLIS;
@@ -36,26 +56,7 @@ import static com.android.server.job.JobSchedulerService.ACTIVE_INDEX;
 import static com.android.server.job.JobSchedulerService.RARE_INDEX;
 import static com.android.server.job.JobSchedulerService.sElapsedRealtimeClock;
 import static com.android.server.job.JobSchedulerService.sUptimeMillisClock;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_BACK_OFF_POLICY_TYPE;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_DEADLINE_MS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_DELAY_MS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_EFFECTIVE_PRIORITY;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_INTERNAL_STOP_REASON;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_JOB_ID;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_JOB_START_LATENCY_MS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_JOB_STATE_FLAGS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_NUM_PREVIOUS_ATTEMPTS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_NUM_RESCHEDULES_DUE_TO_ABANDONMENT;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_NUM_UNCOMPLETED_WORK_ITEMS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_PERIODIC_JOB_FLEX_INTERVAL_MS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_PERIODIC_JOB_INTERVAL_MS;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_PROC_STATE;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_PROXY_UID;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_PUBLIC_STOP_REASON;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_REQUESTED_PRIORITY;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_SOURCE_UID;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_STANDBY_BUCKET;
-import static com.android.server.job.controllers.JobStatus.PERFETTO_TRACE_FIELD_STATE;
+import static com.android.server.job.JobStore.TOTAL_JOB_WORK_ITEM_SIZE_LIMIT;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -107,7 +108,9 @@ import android.os.BatteryManager;
 import android.os.BatteryManagerInternal;
 import android.os.BatteryManagerInternal.ChargingPolicyChangeListener;
 import android.os.Looper;
+import android.os.Parcel;
 import android.os.ParcelDuration;
+import android.os.PersistableBundle;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -153,6 +156,7 @@ import org.mockito.quality.Strictness;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Map;
 
 public class JobSchedulerServiceTest {
@@ -2875,18 +2879,14 @@ public class JobSchedulerServiceTest {
         }
 
         // Try to schedule one more, it should fail.
-        try {
-            final JobInfo extraJob =
-                    createJobInfo(TEST_MAX_PROXIED_JOBS_PER_APP)
-                            .setMinimumLatency(3600_000).build();
-            mService.scheduleAsPackage(
-                    extraJob, null, Process.SYSTEM_UID, sourcePackage,
-                    sourceUserId, TEST_NAMESPACE, "");
-            fail("Scheduling proxied job beyond limit should have failed");
-        } catch (IllegalStateException e) {
-            // Expected
-            assertTrue(e.getMessage().contains("Too many proxied sync jobs"));
-        }
+        final JobInfo extraJob =
+                createJobInfo(TEST_MAX_PROXIED_JOBS_PER_APP)
+                        .setMinimumLatency(3600_000).build();
+        assertEquals("Scheduling proxied job beyond limit should have failed",
+                JobScheduler.RESULT_FAILURE,
+                mService.scheduleAsPackage(
+                        extraJob, null, Process.SYSTEM_UID, sourcePackage,
+                        sourceUserId, TEST_NAMESPACE, ""));
     }
 
     @Test
@@ -2927,68 +2927,68 @@ public class JobSchedulerServiceTest {
         mService.scheduleAsPackage(job, null, TEST_UID, null, 0, "JSSTest", "");
 
         verify(mMockPerfettoTracer).startEvent(eq(jobStatus.getBatteryName()));
-        verify(mMockPerfettoTracer).addField(eq((long) PERFETTO_TRACE_FIELD_JOB_ID), eq(loggingId));
+        verify(mMockPerfettoTracer).addField(eq((long) JOB_ID), eq(loggingId));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_SOURCE_UID), eq((long) TEST_UID));
-        verify(mMockPerfettoTracer).addField(eq((long) PERFETTO_TRACE_FIELD_PROXY_UID), eq(-1L));
+                .addField(eq((long) SOURCE_UID), eq((long) TEST_UID));
+        verify(mMockPerfettoTracer).addField(eq((long) PROXY_UID), eq(-1L));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_STATE),
+                        eq((long) STATE),
                         eq((long) FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED__STATE__SCHEDULED));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_STANDBY_BUCKET),
+                        eq((long) STANDBY_BUCKET),
                         eq((long) JobSchedulerService.EXEMPTED_INDEX));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_REQUESTED_PRIORITY),
+                        eq((long) REQUESTED_PRIORITY),
                         eq((long) JobInfo.PRIORITY_DEFAULT));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_EFFECTIVE_PRIORITY),
+                        eq((long) EFFECTIVE_PRIORITY),
                         eq((long) JobInfo.PRIORITY_DEFAULT));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_NUM_PREVIOUS_ATTEMPTS), eq(0L));
+                .addField(eq((long) NUM_PREVIOUS_ATTEMPTS), eq(0L));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_DEADLINE_MS),
+                        eq((long) DEADLINE_MS),
                         eq(job.getMaxExecutionDelayMillis()));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_DELAY_MS), eq(job.getMinLatencyMillis()));
+                .addField(eq((long) DELAY_MS), eq(job.getMinLatencyMillis()));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_JOB_START_LATENCY_MS), eq(0L));
+                .addField(eq((long) JOB_START_LATENCY_MS), eq(0L));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_NUM_UNCOMPLETED_WORK_ITEMS), eq(0L));
+                .addField(eq((long) NUM_UNCOMPLETED_WORK_ITEMS), eq(0L));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_PROC_STATE),
+                        eq((long) PROC_STATE),
                         eq((long) ActivityManager.processStateAmToProto(
                                         ActivityManager.PROCESS_STATE_TOP)));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_PERIODIC_JOB_INTERVAL_MS),
+                        eq((long) PERIODIC_JOB_INTERVAL_MS),
                         eq(HOUR_IN_MILLIS));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_PERIODIC_JOB_FLEX_INTERVAL_MS),
+                        eq((long) PERIODIC_JOB_FLEX_INTERVAL_MS),
                         eq(10L * MINUTE_IN_MILLIS));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_NUM_RESCHEDULES_DUE_TO_ABANDONMENT), eq(0L));
+                        eq((long) NUM_RESCHEDULES_DUE_TO_ABANDONMENT), eq(0L));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_BACK_OFF_POLICY_TYPE),
+                        eq((long) BACK_OFF_POLICY_TYPE),
                         eq((long) JobInfo.BACKOFF_POLICY_EXPONENTIAL + 1));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_INTERNAL_STOP_REASON),
+                        eq((long) INTERNAL_STOP_REASON),
                         eq((long) JobProtoEnums.INTERNAL_STOP_REASON_UNKNOWN));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_PUBLIC_STOP_REASON),
+                        eq((long) PUBLIC_STOP_REASON),
                         eq((long) JobProtoEnums.STOP_REASON_UNDEFINED));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_JOB_STATE_FLAGS), eq(expectedFlags));
+                .addField(eq((long) JOB_STATE_FLAGS), eq(expectedFlags));
         verify(mMockPerfettoTracer).emit();
     }
 
@@ -3023,31 +3023,31 @@ public class JobSchedulerServiceTest {
         // Then Perfetto tracing should be called for cancellation.
         verify(mMockPerfettoTracer).startEvent(eq(jobStatus.getBatteryName()));
         // Verify cancelled event.
-        verify(mMockPerfettoTracer).addField(eq((long) PERFETTO_TRACE_FIELD_JOB_ID), eq(loggingId));
+        verify(mMockPerfettoTracer).addField(eq((long) JOB_ID), eq(loggingId));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_SOURCE_UID), eq((long) TEST_UID));
+                .addField(eq((long) SOURCE_UID), eq((long) TEST_UID));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_STATE),
+                        eq((long) STATE),
                         eq((long) FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED__STATE__CANCELLED));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_STANDBY_BUCKET),
+                        eq((long) STANDBY_BUCKET),
                         eq((long) JobSchedulerService.EXEMPTED_INDEX));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_PROC_STATE),
+                        eq((long) PROC_STATE),
                         eq((long) ActivityManager.processStateAmToProto(
                                         ActivityManager.PROCESS_STATE_TOP)));
         verify(mMockPerfettoTracer)
                 .addField(
-                        eq((long) PERFETTO_TRACE_FIELD_INTERNAL_STOP_REASON),
+                        eq((long) INTERNAL_STOP_REASON),
                         eq((long) internalStopReason));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_PUBLIC_STOP_REASON),
+                .addField(eq((long) PUBLIC_STOP_REASON),
                             eq((long) stopReason));
         verify(mMockPerfettoTracer)
-                .addField(eq((long) PERFETTO_TRACE_FIELD_JOB_STATE_FLAGS), eq(expectedFlags));
+                .addField(eq((long) JOB_STATE_FLAGS), eq(expectedFlags));
         verify(mMockPerfettoTracer).emit();
     }
 
@@ -3144,4 +3144,70 @@ public class JobSchedulerServiceTest {
         }
     }
 
+    @Test
+    @EnableFlags(com.android.server.job.Flags.FLAG_LIMIT_PER_UID_CUMULATIVE_WORKITEM_SIZE)
+    public void testTotalJobWorkItemSizeLimit_scheduleJobWorkItems() {
+        final int divisor = 5;
+        final int largeStringSize = TOTAL_JOB_WORK_ITEM_SIZE_LIMIT / divisor;
+
+        final JobInfo job = createJobInfo().setPersisted(false).build();
+        // Create a JobWorkItem with a really long string.
+        final PersistableBundle extras = new PersistableBundle();
+        extras.putString("really_long_string", largeString(largeStringSize));
+        final JobWorkItem item = new JobWorkItem.Builder()
+                .setExtras(extras)
+                .build();
+        // Simulate a transaction by parcelling and unparcelling the JobWorkItem
+        Parcel p = Parcel.obtain();
+        item.writeToParcel(p, 0);
+        p.setDataPosition(0);
+        final JobWorkItem transactedItem = JobWorkItem.CREATOR.createFromParcel(p);
+        try {
+            // Strings can be encoded down to 8 bits per character, guarantee hitting the total
+            // size limit be scheduling N + 1 Jobs with JobWorkItems of size >= limit / N.
+            for (int i = 0; i < divisor + 1; ++i) {
+                mService.scheduleAsPackage(job, transactedItem, TEST_UID,
+                        job.getService().getPackageName(),
+                        0, "JSSTest", "");
+            }
+            fail("Excessive JobWorkItem scheduling should have triggered an "
+                    + "IllegalStateException.");
+        } catch (IllegalStateException ise) {
+            // Success
+        }
+    }
+
+    @Test
+    @EnableFlags(com.android.server.job.Flags.FLAG_LIMIT_PER_UID_CUMULATIVE_WORKITEM_SIZE)
+    public void testTotalJobWorkItemSizeLimit_multipleApps() {
+        final int divisor = 5;
+        final int largeStringSize = TOTAL_JOB_WORK_ITEM_SIZE_LIMIT / divisor;
+
+        final JobInfo job = createJobInfo().setPersisted(false).build();
+        // Create a JobWorkItem with a really long string.
+        final PersistableBundle extras = new PersistableBundle();
+        extras.putString("really_long_string", largeString(largeStringSize));
+        final JobWorkItem item = new JobWorkItem.Builder()
+                .setExtras(extras)
+                .build();
+        // Simulate a transaction by parcelling and unparcelling the JobWorkItem
+        Parcel p = Parcel.obtain();
+        item.writeToParcel(p, 0);
+        p.setDataPosition(0);
+        final JobWorkItem transactedItem = JobWorkItem.CREATOR.createFromParcel(p);
+
+        // Schedule several large JobWorkItems from different apps. None should hit the size limit.
+        for (int i = 0; i < divisor + 1; ++i) {
+            assertEquals(JobScheduler.RESULT_SUCCESS,
+                    mService.scheduleAsPackage(job, transactedItem, TEST_UID + i,
+                            job.getService().getPackageName(),
+                            0, "JSSTest", ""));
+        }
+    }
+
+    String largeString(int length) {
+        char[] manyChars = new char[length];
+        Arrays.fill(manyChars, 'A');
+        return new String(manyChars);
+    }
 }

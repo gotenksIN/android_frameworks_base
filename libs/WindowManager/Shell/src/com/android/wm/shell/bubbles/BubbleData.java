@@ -1131,9 +1131,6 @@ public class BubbleData {
     public void onLocusVisibilityChanged(int taskId, LocusId locusId, boolean visible) {
         if (locusId == null) return;
 
-        BubbleLog.d("BubbleData.onLocusVisibilityChanged() locusId=%s visible=%b taskId=%d",
-                locusId.getId(), visible, taskId);
-
         Bubble matchingBubble = getBubbleInStackWithLocusId(locusId);
         // Don't add the locus if it's from a bubble'd activity, we only suppress for non-bubbled.
         if (visible && (matchingBubble == null || matchingBubble.getTaskId() != taskId)) {
@@ -1151,12 +1148,18 @@ public class BubbleData {
         boolean isAlreadySuppressed = mSuppressedBubbles.get(locusId) != null;
         if (visible && !isAlreadySuppressed && matchingBubble.isSuppressable()
                 && taskId != matchingBubble.getTaskId()) {
+            BubbleLog.d("BubbleData.onLocusVisibilityChanged() locusId=%s visible=%b taskId=%d "
+                            + "suppressingBubble=%s",
+                    locusId.getId(), visible, taskId, matchingBubble);
             mSuppressedBubbles.put(locusId, matchingBubble);
             doSuppress(matchingBubble);
             dispatchPendingChanges();
         } else if (!visible) {
             Bubble unsuppressedBubble = mSuppressedBubbles.remove(locusId);
             if (unsuppressedBubble != null) {
+                BubbleLog.d("BubbleData.onLocusVisibilityChanged() locusId=%s visible=%b taskId=%d "
+                                + "unsuppressingBubble=%s",
+                        locusId.getId(), visible, taskId, unsuppressedBubble);
                 doUnsuppress(unsuppressedBubble);
             }
             dispatchPendingChanges();
@@ -1377,6 +1380,18 @@ public class BubbleData {
             b = getSuppressedBubbleWithKey(key);
         }
         return b;
+    }
+
+    /** Whether there is a bubble with the given task id. */
+    public boolean hasAnyBubbleWithTaskId(int taskId) {
+        Predicate<Bubble> taskIdPredicate = b -> b.getTaskId() == taskId;
+        if (getBubbleWithPredicate(mBubbles, taskIdPredicate) != null) {
+            return true;
+        }
+        if (getBubbleWithPredicate(mOverflowBubbles, taskIdPredicate) != null) {
+            return true;
+        }
+        return getBubbleWithPredicate(mSuppressedBubbles.values(), taskIdPredicate) != null;
     }
 
     /** @return the bubble in the stack that matches the provided taskId. */

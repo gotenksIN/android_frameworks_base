@@ -18,15 +18,11 @@ package com.android.server.companion.virtual.computercontrol;
 
 import static android.Manifest.permission.ACCESS_COMPUTER_CONTROL;
 
-import static com.android.server.companion.virtual.computercontrol.ComputerControlAllowlistController.COMPUTER_CONTROL_NAMESPACE;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlAllowlistController.COMPUTER_CONTROL_AUTOMATABLE_APP_ALLOWLIST_KEY;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlAllowlistController.COMPUTER_CONTROL_AUTOMATABLE_APP_DENYLIST_KEY;
+import static com.android.server.companion.virtual.computercontrol.ComputerControlAllowlistController.COMPUTER_CONTROL_NAMESPACE;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlAllowlistController.COMPUTER_CONTROL_SESSION_OWNER_ALLOWLIST_KEY;
 
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -35,9 +31,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import android.annotation.NonNull;
 import android.app.KeyguardManager;
+import android.app.role.RoleManager;
+import android.companion.virtual.VirtualDeviceManager;
+import android.companion.virtualdevice.flags.Flags;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -47,12 +52,19 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.content.pm.SigningInfo;
 import android.content.res.Resources;
+import android.net.Uri;
 import android.os.Process;
 import android.os.SystemClock;
+import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.DeviceConfig;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.PackageUtils;
+import android.util.SparseArray;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -66,8 +78,10 @@ import junitparams.Parameters;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -76,7 +90,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 @Presubmit
 @RunWith(JUnitParamsRunner.class)
@@ -84,8 +100,10 @@ public class ComputerControlAllowlistControllerTest {
 
     private static final long TIMEOUT_MILLIS = 1000L;
     private static final Random RANDOM = new Random();
+    private static final String AGENT_PACKAGE = "com.normal.agent";
     private static final String SUPER_AGENT_PACKAGE = "com.super.agent";
     private static final String PERMISSION_CONTROLLER_PACKAGE = "permission.controller.package";
+    private static final UserHandle USER_HANDLE = new UserHandle(0);
 
     @Mock
     private PackageManager mPackageManager;
@@ -97,6 +115,13 @@ public class ComputerControlAllowlistControllerTest {
     private ComputerControlSessionImpl mSession;
     @Mock
     private Resources mResources;
+    @Mock
+    private ComputerControlDataStore mDataStore;
+    @Mock
+    private RoleManager mRoleManager;
+
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private AutoCloseable mMockitoSession;
     private ComputerControlAllowlistController mAllowlistController;
@@ -114,6 +139,7 @@ public class ComputerControlAllowlistControllerTest {
         mSpyContext = spy(new ContextWrapper(mContext));
         when(mSpyContext.getResources()).thenReturn(mResources);
         doNothing().when(mSpyContext).enforceCallingOrSelfPermission(anyString(), anyString());
+        when(mSpyContext.getSystemService(RoleManager.class)).thenReturn(mRoleManager);
 
         final Signature signature = generateSignature((byte) 42);
         final String superAgentCertificateDigest = preparePackage(SUPER_AGENT_PACKAGE, signature);
@@ -131,6 +157,8 @@ public class ComputerControlAllowlistControllerTest {
                 new File(new File(mContext.getFilesDir(), folderName), "automatable_apps.txt");
         mAutomatableAppDenylistFile =
                 new File(new File(mContext.getFilesDir(), folderName), "blocked_apps.txt");
+        final SparseArray<Map<String, Set<String>>> persistedData = new SparseArray<>();
+        when(mDataStore.readAutomatableAppList()).thenReturn(persistedData);
         createAllowlistController(/* buildIsDebuggable */ true);
 
         when(mSession.isTestSession()).thenReturn(false);
@@ -139,6 +167,8 @@ public class ComputerControlAllowlistControllerTest {
 
         when(mPermissionManager.checkUidPermission(anyInt(), eq(ACCESS_COMPUTER_CONTROL), any()))
                 .thenReturn(PackageManager.PERMISSION_GRANTED);
+        when(mRoleManager.getRoleHoldersAsUser(eq(RoleManager.ROLE_ASSISTANT), any()))
+                .thenReturn(List.of(AGENT_PACKAGE));
     }
 
     @After
@@ -153,7 +183,9 @@ public class ComputerControlAllowlistControllerTest {
 
     @Test
     public void isPackageAllowedToCreateSession_nullPackageName_returnsFalse() {
-        assertFalse(mAllowlistController.isPackageAllowedToCreateSession(null, mPackageManager));
+        assertFalse(mAllowlistController
+                .isPackageAllowedToCreateSession(null, mPackageManager,
+                        USER_HANDLE, VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
@@ -166,76 +198,117 @@ public class ComputerControlAllowlistControllerTest {
     @Test
     public void isPackageAllowedToCreateSession_allowlistedSessionOwner_sameUid_returnsTrue()
             throws Exception {
-        final String packageName = "com.hello.app2";
         final Signature signature = generateSignature((byte) 1);
-        final String certificateDigest = preparePackage(packageName, signature);
+        final String certificateDigest = preparePackage(AGENT_PACKAGE, signature);
         // Make PackageManager infer that the given package is associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid());
 
-        mDeviceConfigWriter.allowlistSessionOwner(packageName, certificateDigest);
+        mDeviceConfigWriter.allowlistSessionOwner(AGENT_PACKAGE, certificateDigest);
         SystemClock.sleep(TIMEOUT_MILLIS);
 
         assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
     public void isPackageAllowedToCreateSession_allowlistedSessionOwners_sameUid_returnsTrue()
             throws Exception {
-        final String packageName1 = "com.hello.appp1";
         final Signature signature1 = generateSignature((byte) 1);
-        final String certificateDigest1 = preparePackage(packageName1, signature1);
+        final String certificateDigest1 = preparePackage(AGENT_PACKAGE, signature1);
         final String packageName2 = "com.hello.appp2";
         final Signature signature2 = generateSignature((byte) 2);
         final String certificateDigest2 = preparePackage(packageName2, signature2);
         final List<ComputerControlAllowlistController.SignedPackage> sessionOwners = List.of(
                 new ComputerControlAllowlistController.SignedPackage(
-                        packageName1, certificateDigest1),
+                        AGENT_PACKAGE, certificateDigest1),
                 new ComputerControlAllowlistController.SignedPackage(
                         packageName2, certificateDigest2));
         // Make PackageManager infer that any package is associated with the calling uid.
         when(mPackageManager.getPackageUidAsUser(any(), anyInt()))
                 .thenReturn(Process.myUid());
+        when(mRoleManager.getRoleHoldersAsUser(eq(RoleManager.ROLE_ASSISTANT), any()))
+                .thenReturn(List.of(AGENT_PACKAGE, packageName2));
 
         mDeviceConfigWriter.allowlistSessionOwners(sessionOwners);
         SystemClock.sleep(TIMEOUT_MILLIS);
 
         assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName1, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
         assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName2, mPackageManager));
+                packageName2, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
     public void isPackageAllowedToCreateSession_allowlistedSessionOwner_differentUid_returnsFalse()
             throws Exception {
-        final String packageName = "com.hello.app3";
         final Signature signature = generateSignature((byte) 2);
-        final String certificateDigest = preparePackage(packageName, signature);
+        final String certificateDigest = preparePackage(AGENT_PACKAGE, signature);
         // Make PackageManager infer that the given package is not associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid() + 1);
 
-        mDeviceConfigWriter.allowlistSessionOwner(packageName, certificateDigest);
+        mDeviceConfigWriter.allowlistSessionOwner(AGENT_PACKAGE, certificateDigest);
         SystemClock.sleep(TIMEOUT_MILLIS);
 
         assertFalse(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
     public void isPackageAllowedToCreateSession_notAllowlistedSessionOwner_sameUid_returnsFalse()
             throws Exception {
-        final String packageName = "com.hello.app1";
         final Signature signature = generateSignature((byte) 1);
-        preparePackage(packageName, signature);
+        preparePackage(AGENT_PACKAGE, signature);
         // Make PackageManager infer that the given package is associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid());
 
         assertFalse(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ROLE_ASSISTANT_REQUIREMENT)
+    public void isPackageAllowedToCreateSession_isNotAssistant_returnsFalse()
+            throws Exception {
+        final Signature signature = generateSignature((byte) 1);
+        final String certificateDigest = preparePackage(AGENT_PACKAGE, signature);
+        // Make PackageManager infer that the given package is associated with the calling uid.
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
+                .thenReturn(Process.myUid());
+        mDeviceConfigWriter.allowlistSessionOwner(AGENT_PACKAGE, certificateDigest);
+        SystemClock.sleep(TIMEOUT_MILLIS);
+        when(mRoleManager.getRoleHoldersAsUser(eq(RoleManager.ROLE_ASSISTANT), any()))
+                .thenReturn(List.of("com.another.app"));
+
+        assertFalse(mAllowlistController.isPackageAllowedToCreateSession(
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ROLE_ASSISTANT_REQUIREMENT)
+    public void isPackageAllowedToCreateSession_isNotAssistant_returnsTrue()
+            throws Exception {
+        final Signature signature = generateSignature((byte) 1);
+        final String certificateDigest = preparePackage(AGENT_PACKAGE, signature);
+        // Make PackageManager infer that the given package is associated with the calling uid.
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
+                .thenReturn(Process.myUid());
+        mDeviceConfigWriter.allowlistSessionOwner(AGENT_PACKAGE, certificateDigest);
+        SystemClock.sleep(TIMEOUT_MILLIS);
+        when(mRoleManager.getRoleHoldersAsUser(eq(RoleManager.ROLE_ASSISTANT), any()))
+                .thenReturn(List.of("com.another.app"));
+
+        assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
@@ -249,7 +322,8 @@ public class ComputerControlAllowlistControllerTest {
                 .thenReturn(Process.myUid());
 
         assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                SUPER_AGENT_PACKAGE, mPackageManager));
+                SUPER_AGENT_PACKAGE, mPackageManager,
+                USER_HANDLE, VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
@@ -265,41 +339,42 @@ public class ComputerControlAllowlistControllerTest {
 
         assertThrows(SecurityException.class, () ->
                 mAllowlistController.isPackageAllowedToCreateSession(
-                        SUPER_AGENT_PACKAGE, mPackageManager));
+                        SUPER_AGENT_PACKAGE, mPackageManager,
+                        USER_HANDLE, VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
     public void isPackageAllowedToCreateSession_noPermission_testOnly_returnsTrue()
             throws Exception {
-        final String packageName = "com.hello.cts";
         final Signature signature = generateSignature((byte) 1);
-        preparePackage(packageName, signature, /* preinstalled= */ false, /* testOnly= */ true);
+        preparePackage(AGENT_PACKAGE, signature, /* preinstalled= */ false, /* testOnly= */ true);
         // Make PackageManager infer that the given package is associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid());
         when(mPermissionManager.checkUidPermission(
                 eq(Process.myUid()), eq(ACCESS_COMPUTER_CONTROL), any()))
                 .thenReturn(PackageManager.PERMISSION_DENIED);
 
-        assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+        assertTrue(
+                mAllowlistController.isPackageAllowedToCreateSession(AGENT_PACKAGE, mPackageManager,
+                        USER_HANDLE, VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
     public void isPackageAllowedToCreateSession_noPermission_nonTestOnly_returnsFalse()
             throws Exception {
-        final String packageName = "com.hello.cts";
         final Signature signature = generateSignature((byte) 1);
-        preparePackage(packageName, signature);
+        preparePackage(AGENT_PACKAGE, signature);
         // Make PackageManager infer that the given package is associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid());
         when(mPermissionManager.checkUidPermission(
                 eq(Process.myUid()), eq(ACCESS_COMPUTER_CONTROL), any()))
                 .thenReturn(PackageManager.PERMISSION_DENIED);
 
         assertFalse(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
@@ -337,6 +412,20 @@ public class ComputerControlAllowlistControllerTest {
         when(mKeyguardManager.isKeyguardSecure()).thenReturn(false);
 
         assertTrue(mAllowlistController.isPackageAutomatable(packageName, mSession));
+    }
+
+    @Test
+    public void isPackageAutomatable_targetIsApprovedAgent_returnsFalse() throws Exception {
+        final String packageName = "com.hello.agent";
+        final Signature signature = generateSignature((byte) 1);
+        final String certificateDigest = preparePackage(packageName, signature);
+
+        mDeviceConfigWriter.allowlistSessionOwner(packageName, certificateDigest);
+        SystemClock.sleep(TIMEOUT_MILLIS);
+
+        assertFalse(
+                mAllowlistController.isPackageAutomatable(
+                        packageName, "com.some.owner", mPackageManager));
     }
 
     @Test
@@ -563,23 +652,23 @@ public class ComputerControlAllowlistControllerTest {
     @Parameters(method = "getMalformedValues")
     public void deviceConfigMalformedValue_sessionOwnerAllowlist_usesLastPersistedValue(
             String malformedValue) throws Exception {
-        final String packageName = "com.hello.app4";
         final Signature signature = generateSignature((byte) 9);
-        final String certificateDigest = preparePackage(packageName, signature);
+        final String certificateDigest = preparePackage(AGENT_PACKAGE, signature);
         // Make PackageManager infer that the given package is associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid());
 
         // Allowlist the package via DeviceConfig.
-        mDeviceConfigWriter.allowlistSessionOwner(packageName, certificateDigest);
+        mDeviceConfigWriter.allowlistSessionOwner(AGENT_PACKAGE, certificateDigest);
         SystemClock.sleep(TIMEOUT_MILLIS);
 
         // Verify that the package is actually allowlisted and the allowlist is persisted to disk.
         final Path filePath = Paths.get(mSessionOwnerAllowlistFile.getAbsolutePath());
-        final String expectedFileContent = packageName + ":" + certificateDigest;
+        final String expectedFileContent = AGENT_PACKAGE + ":" + certificateDigest;
         assertEquals(expectedFileContent, Files.readString(filePath));
         assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
 
         // Write malformed value via DeviceConfig.
         mDeviceConfigWriter.writeValue(COMPUTER_CONTROL_SESSION_OWNER_ALLOWLIST_KEY,
@@ -589,28 +678,29 @@ public class ComputerControlAllowlistControllerTest {
         // Verify that the package is still allowlisted, based on the last persisted allowlist.
         assertEquals(expectedFileContent, Files.readString(filePath));
         assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Test
     public void deviceConfigEmptyString_clearsSessionOwnerAllowlist() throws Exception {
-        final String packageName = "com.hello.app4";
         final Signature signature = generateSignature((byte) 9);
-        final String certificateDigest = preparePackage(packageName, signature);
+        final String certificateDigest = preparePackage(AGENT_PACKAGE, signature);
         // Make PackageManager infer that the given package is associated with the calling uid.
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), anyInt()))
+        when(mPackageManager.getPackageUidAsUser(eq(AGENT_PACKAGE), anyInt()))
                 .thenReturn(Process.myUid());
 
         // Allowlist the package via DeviceConfig.
-        mDeviceConfigWriter.allowlistSessionOwner(packageName, certificateDigest);
+        mDeviceConfigWriter.allowlistSessionOwner(AGENT_PACKAGE, certificateDigest);
         SystemClock.sleep(TIMEOUT_MILLIS);
 
         // Verify that the package is actually allowlisted and the allowlist is persisted to disk.
         final Path filePath = Paths.get(mSessionOwnerAllowlistFile.getAbsolutePath());
-        final String expectedFileContent = packageName + ":" + certificateDigest;
+        final String expectedFileContent = AGENT_PACKAGE + ":" + certificateDigest;
         assertEquals(expectedFileContent, Files.readString(filePath));
-        assertTrue(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+        assertTrue(
+                mAllowlistController.isPackageAllowedToCreateSession(AGENT_PACKAGE, mPackageManager,
+                        USER_HANDLE, VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
 
         // Write empty value via DeviceConfig.
         mDeviceConfigWriter.writeValue(COMPUTER_CONTROL_SESSION_OWNER_ALLOWLIST_KEY, "");
@@ -619,7 +709,8 @@ public class ComputerControlAllowlistControllerTest {
         // Verify that the allowlist is cleared.
         assertEquals("", Files.readString(filePath));
         assertFalse(mAllowlistController.isPackageAllowedToCreateSession(
-                packageName, mPackageManager));
+                AGENT_PACKAGE, mPackageManager, USER_HANDLE,
+                VirtualDeviceManager.COMPUTER_CONTROL_VERSION));
     }
 
     @Parameters(method = "getMalformedValues")
@@ -734,11 +825,199 @@ public class ComputerControlAllowlistControllerTest {
         assertEquals("", Files.readString(filePath));
     }
 
+    @Test
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void isPackageAutomatableByAgent_perAppConsentDisabled_returnsTrue() {
+        assertTrue(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(
+                Process.myUid(), "com.agent", "com.target"));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void isPackageAutomatableByAgent_perAppConsentEnabled_returnsTrueIfAdded() {
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+
+        assertFalse(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(
+                agentUid, agentPkg, targetPkg));
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+
+        assertTrue(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(
+                agentUid, agentPkg, targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void getAutomatableAppListForAgent_returnsCorrectList() {
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg1 = "com.target1";
+        String targetPkg2 = "com.target2";
+
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg1);
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg2);
+
+        String[] result = mAllowlistController.getAutomatableAppListForAgent(agentUid, agentPkg);
+        assertEquals(2, result.length);
+        List<String> resultList = List.of(result);
+        assertTrue(resultList.contains(targetPkg1));
+        assertTrue(resultList.contains(targetPkg2));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void removeAppFromAutomatableAppListForAgent_removesApp() {
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+        mAllowlistController.removeAppFromAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+
+        assertFalse(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(agentUid, agentPkg,
+                targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void clearAutomatableAppListForAgent_clearsList() {
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+        mAllowlistController.clearAutomatableAppListForAgent(agentUid, agentPkg);
+
+        assertFalse(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(
+                agentUid, agentPkg, targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void onPackageRemoved_perAppConsentEnabled_removesAgentFromMap() {
+        ArgumentCaptor<BroadcastReceiver> receiverCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        verify(mSpyContext).registerReceiver(receiverCaptor.capture(), any());
+        BroadcastReceiver receiver = receiverCaptor.getValue();
+
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+
+        // Simulate agent package removal
+        Intent intent = new Intent(Intent.ACTION_PACKAGE_REMOVED);
+        intent.setData(Uri.parse("package:" + agentPkg));
+        intent.putExtra(Intent.EXTRA_UID, agentUid);
+        receiver.onReceive(mContext, intent);
+
+        assertFalse(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(
+                agentUid, agentPkg, targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void onPackageRemoved_perAppConsentEnabled_removesTargetFromMap() {
+        ArgumentCaptor<BroadcastReceiver> receiverCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        verify(mSpyContext).registerReceiver(receiverCaptor.capture(), any());
+        BroadcastReceiver receiver = receiverCaptor.getValue();
+
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+        int targetUid = Process.myUid();
+
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+
+        // Simulate target package removal
+        Intent intent = new Intent(Intent.ACTION_PACKAGE_REMOVED);
+        intent.setData(Uri.parse("package:" + targetPkg));
+        intent.putExtra(Intent.EXTRA_UID, targetUid);
+        receiver.onReceive(mContext, intent);
+
+        assertFalse(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(
+                agentUid, agentPkg, targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void initialize_loadsPersistedAutomatableList() {
+        int agentUid = 12345;
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+        SparseArray<Map<String, Set<String>>> persistedData = new SparseArray<>();
+        Map<String, Set<String>> agentMap = new ArrayMap<>();
+        agentMap.put(agentPkg, Set.of(targetPkg));
+        persistedData.put(agentUid, agentMap);
+
+        when(mDataStore.readAutomatableAppList()).thenReturn(persistedData);
+
+        // Re-initialize controller to trigger data loading
+        mAllowlistController.initialize();
+        // Wait for background thread
+        SystemClock.sleep(TIMEOUT_MILLIS);
+
+        assertTrue(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(agentUid, agentPkg,
+                targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void addAppToAutomatableAppListForAgent_persistsData() {
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+
+        mAllowlistController.addAppToAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+        // Wait for background thread
+        SystemClock.sleep(TIMEOUT_MILLIS);
+
+        ArgumentCaptor<SparseArray<Map<String, Set<String>>>> captor =
+                ArgumentCaptor.forClass(SparseArray.class);
+        verify(mDataStore).writeAutomatableAppList(captor.capture());
+        SparseArray<Map<String, Set<String>>> capturedData = captor.getValue();
+        assertEquals(1, capturedData.size());
+        assertEquals(agentUid, capturedData.keyAt(0));
+        Map<String, Set<String>> agentMap = capturedData.valueAt(0);
+        assertTrue(agentMap.containsKey(agentPkg));
+        assertTrue(agentMap.get(agentPkg).contains(targetPkg));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void removeAppFromAutomatableAppListForAgent_persistsData() {
+        int agentUid = Process.myUid();
+        String agentPkg = "com.agent";
+        String targetPkg = "com.target";
+
+        // Pre-populate data store
+        SparseArray<Map<String, Set<String>>> data = new SparseArray<>();
+        Map<String, Set<String>> agentMap = new ArrayMap<>();
+        agentMap.put(agentPkg, new ArraySet<>(Set.of(targetPkg)));
+        data.put(agentUid, agentMap);
+        when(mDataStore.readAutomatableAppList()).thenReturn(data);
+        DeviceConfig.removeOnPropertiesChangedListener(mAllowlistController);
+        createAllowlistController(/* buildIsDebuggable= */ true);
+        SystemClock.sleep(TIMEOUT_MILLIS);
+
+        mAllowlistController.removeAppFromAutomatableAppListForAgent(agentUid, agentPkg, targetPkg);
+        SystemClock.sleep(TIMEOUT_MILLIS);
+
+        ArgumentCaptor<SparseArray<Map<String, Set<String>>>> captor =
+                ArgumentCaptor.forClass(SparseArray.class);
+        verify(mDataStore).writeAutomatableAppList(captor.capture());
+
+        SparseArray<Map<String, Set<String>>> writtenData = captor.getValue();
+        assertEquals(0, writtenData.size());
+    }
+
     private void createAllowlistController(boolean buildIsDebuggable) {
         mAllowlistController = new ComputerControlAllowlistController(mSpyContext,
                 MoreExecutors.directExecutor(), mSessionOwnerAllowlistFile,
                 mAutomatableAppAllowlistFile, mAutomatableAppDenylistFile, mPermissionManager,
-                buildIsDebuggable);
+                mDataStore, buildIsDebuggable);
         mAllowlistController.initialize();
     }
 

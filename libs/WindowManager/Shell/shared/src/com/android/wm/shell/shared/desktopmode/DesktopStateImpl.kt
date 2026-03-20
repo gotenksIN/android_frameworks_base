@@ -83,13 +83,12 @@ class DesktopStateImpl(context: Context) : DesktopState {
 
     override val enterDesktopByDefaultOnFreeformDisplay: Boolean =
         DesktopExperienceFlags.ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX.isTrue ||
-            DesktopExperienceFlags.ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS.isTrue &&
-                SystemProperties.getBoolean(
-                    ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAY_SYS_PROP,
-                    context
-                        .getResources()
-                        .getBoolean(R.bool.config_enterDesktopByDefaultOnFreeformDisplay),
-                )
+            SystemProperties.getBoolean(
+                ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAY_SYS_PROP,
+                context
+                    .getResources()
+                    .getBoolean(R.bool.config_enterDesktopByDefaultOnFreeformDisplay),
+            )
 
     override val isDeviceEligibleForDesktopMode: Boolean
         get() {
@@ -99,8 +98,7 @@ class DesktopStateImpl(context: Context) : DesktopState {
             return isDesktopModeSupported || desktopModeSupportedByDevOptions
         }
 
-    override val enableMultipleDesktops: Boolean =
-        DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue && canEnterDesktopMode
+    override val enableMultipleDesktops: Boolean = canEnterDesktopMode
 
     override fun isDesktopModeSupportedOnDisplay(displayId: Int): Boolean =
         displayManager?.getDisplay(displayId)?.let { isDesktopModeSupportedOnDisplay(it) } ?: false
@@ -124,8 +122,8 @@ class DesktopStateImpl(context: Context) : DesktopState {
             } ?: false
 
     override val overridesShowAppHandle: Boolean =
-        (Flags.showAppHandleLargeScreens() ||
-            BubbleFlagHelper.enableBubbleToFullscreen()) && deviceHasLargeScreen
+        (Flags.showAppHandleLargeScreens() || BubbleFlagHelper.enableBubbleToFullscreen()) &&
+            deviceHasLargeScreen
 
     private val hasFreeformFeature =
         context.getPackageManager().hasSystemFeature(FEATURE_FREEFORM_WINDOW_MANAGEMENT)
@@ -143,6 +141,11 @@ class DesktopStateImpl(context: Context) : DesktopState {
                 SHOW_HOME_BEHIND_DESKTOP_SYS_PROP,
                 context.resources.getBoolean(R.bool.config_showHomeBehindDesktop),
             )
+
+    /** Clean's up any registered listeners */
+    override fun destroy() {
+        projectedModeState.destroy()
+    }
 
     companion object {
         @VisibleForTesting

@@ -997,6 +997,27 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     }
 
     @Test
+    @TestableLooper.RunWithLooper(setAsMainLooper = true)
+    public void reset_whenHideIsTrue_shouldNotifyKeyguardStateController() {
+        // When showing and provisioned
+        mViewMediator.onSystemReady();
+        when(mUpdateMonitor.isDeviceProvisioned()).thenReturn(true);
+        mViewMediator.setShowingLocked(true, "");
+        processAllMessagesAndBgExecutorMessages();
+
+        // Request keyguard going away, as if the user swiped up with an insecure keyguard
+        mViewMediator.hideLocked();
+        processAllMessagesAndBgExecutorMessages();
+
+        // Before hiding could run, a reset was issued which could happen on a user switch request
+        mViewMediator.resetStateLocked();
+        processAllMessagesAndBgExecutorMessages();
+
+        // KeyguardStateController must be notified to ensure consistent state with mShowing
+        verify(mKeyguardStateController).notifyKeyguardState(true, false);
+    }
+
+    @Test
     public void testBouncerPrompt_deviceLockedByAdmin() {
         // GIVEN no trust agents enabled and biometrics aren't enrolled
         when(mUpdateMonitor.isTrustUsuallyManaged(anyInt())).thenReturn(false);

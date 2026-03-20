@@ -41,9 +41,11 @@ import android.companion.virtual.audio.VirtualAudioDevice.AudioConfigurationChan
 import android.companion.virtual.camera.VirtualCamera;
 import android.companion.virtual.camera.VirtualCameraConfig;
 import android.companion.virtual.computercontrol.AutomatedPackageListener;
+import android.companion.virtual.computercontrol.ComputerControlConsentManager;
 import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IAutomatedPackageListener;
+import android.companion.virtual.computercontrol.IComputerControlConsentManager;
 import android.companion.virtual.computercontrol.IComputerControlSessionCallback;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtualdevice.flags.Flags;
@@ -284,6 +286,29 @@ public final class VirtualDeviceManager {
     }
 
     /**
+     * Provides {@link ComputerControlConsentManager} for managing per-app consent.
+     *
+     * @return consent manager for managing per-app consent.
+     * @see android.Manifest.permission#MANAGE_COMPUTER_CONTROL_CONSENT
+     *
+     * @hide
+     */
+    public ComputerControlConsentManager getComputerControlConsentManager() {
+        if (mService == null) {
+            Log.w(TAG,
+                    "Failed to provide computer control consent manager; no virtual device "
+                            + "manager service.");
+            return null;
+        }
+        try {
+            return new LocalComputerControlConsentManager(
+                    mService.getComputerControlConsentManager());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns the details of all available virtual devices.
      *
      * <p>The returned objects are read-only representations that expose the properties of all
@@ -454,9 +479,10 @@ public final class VirtualDeviceManager {
 
     /**
      * Returns whether the computer control functionality is available for the caller.
+     *
      * @hide
      */
-    public boolean isComputerControlAvailable() {
+    public boolean isComputerControlAvailable(int targetComputerControlVersion) {
         if (mService == null) {
             return false;
         }
@@ -464,7 +490,8 @@ public final class VirtualDeviceManager {
             return false;
         }
         try {
-            return mService.isComputerControlAvailable(mContext.getAttributionSource());
+            return mService.isComputerControlAvailable(mContext.getAttributionSource(),
+                    targetComputerControlVersion);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1548,6 +1575,15 @@ public final class VirtualDeviceManager {
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         default void onActivityLaunchRequested(int displayId, @NonNull ComponentName componentName,
                 @UserIdInt int userId) {}
+
+        /**
+         * Called when biometric authentication is requested.
+         *
+         * @param displayId The display ID on which biometric authentication is requested.
+         * @param packageName Package name of the calling application.
+         * @hide
+         */
+        default void onAuthenticationPrompt(int displayId, String packageName) {}
     }
 
     /**
@@ -1665,6 +1701,62 @@ public final class VirtualDeviceManager {
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mListener.onAutomatedPackagesChanged(
                             automatingPackage, automatedPackages, user)));
+        }
+    }
+
+    /**
+     * A wrapper for {@link ComputerControlConsentManager}
+     */
+    private static class LocalComputerControlConsentManager implements
+            ComputerControlConsentManager {
+        private final IComputerControlConsentManager mConsentManager;
+
+        private LocalComputerControlConsentManager(IComputerControlConsentManager consentManager) {
+            mConsentManager = consentManager;
+        }
+
+        @Override
+        public void addAppToAutomatableAppListForAgent(int agentUid,
+                @NonNull String agentPackageName,
+                @NonNull String packageName) {
+            try {
+                mConsentManager.addAppToAutomatableAppListForAgent(agentUid, agentPackageName,
+                        packageName);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        @Override
+        public void removeAppFromAutomatableAppListForAgent(int agentUid,
+                @NonNull String agentPackageName,
+                @NonNull String packageName) {
+            try {
+                mConsentManager.removeAppFromAutomatableAppListForAgent(agentUid, agentPackageName,
+                        packageName);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        @Override
+        public void clearAutomatableAppListForAgent(int agentUid,
+                @NonNull String agentPackageName) {
+            try {
+                mConsentManager.clearAutomatableAppListForAgent(agentUid, agentPackageName);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        @Override
+        public String[] getAutomatableAppListForAgent(int agentUid,
+                @NonNull String agentPackageName) {
+            try {
+                return mConsentManager.getAutomatableAppListForAgent(agentUid, agentPackageName);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
         }
     }
 }

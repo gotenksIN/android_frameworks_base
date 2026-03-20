@@ -598,9 +598,12 @@ public final class ViewRootImpl implements ViewParent,
 
     final Thread mThread;
 
-    /** The throwable with the stack trace filled when this ViewRootImpl was initialized. */
+    /**
+     * The exception with the stack trace filled when this ViewRootImpl was initialized, only if
+     * {@link #sDebugWrongThreadInit} is enabled.
+     */
     @Nullable
-    private final Throwable mInitStack;
+    private final CalledFromWrongThreadException mInitStack;
 
     final WindowLeaked mLocation;
 
@@ -955,6 +958,15 @@ public final class ViewRootImpl implements ViewParent,
             = new ViewTreeObserver.InternalInsetsInfo();
 
     private WindowInsets mLastWindowInsets;
+
+    /**
+     * Used to store the last calculated synchronized insets in
+     * {@link InsetsController#mAnimCallback}
+     */
+    WindowInsets mLastInsetsDuringAnimationProgress;
+
+    boolean mHandlesWindowInsetsAnimation = false;
+    private int mWindowInsetsAnimationCount = 0;
 
     // Insets types hidden by legacy window flags or system UI flags.
     private @InsetsType int mTypesHiddenByFlags = 0;
@@ -1377,6 +1389,12 @@ public final class ViewRootImpl implements ViewParent,
         sToolkitMetricsForFrameRateDecisionFlagValue = toolkitMetricsForFrameRateDecision();
     }
 
+    /**
+     * Per-process flag to allow recording the stack trace when this ViewRootImpl is initialized,
+     * which can be dumped as additional context to {@link CalledFromWrongThreadException}.
+     */
+    private static boolean sDebugWrongThreadInit = false;
+
     // The latest input event from the gesture that was used to resolve the pointer icon.
     private MotionEvent mPointerIconEvent = null;
     private @ActivityInfo.ColorMode int mCurrentColorMode = ActivityInfo.COLOR_MODE_DEFAULT;
@@ -1402,7 +1420,7 @@ public final class ViewRootImpl implements ViewParent,
         final String name = DisplayProperties.debug_vri_package().orElse(null);
         mExtraDisplayListenerLogging = !TextUtils.isEmpty(name) && name.equals(mBasePackageName);
         mThread = Thread.currentThread();
-        mInitStack = Build.isDebuggable() ? new Throwable("Created") : null;
+        mInitStack = sDebugWrongThreadInit ? new CalledFromWrongThreadException("Created") : null;
         mLocation = new WindowLeaked(null);
         mWidth = -1;
         mHeight = -1;
@@ -3732,9 +3750,13 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     /* package */ WindowInsets getWindowInsets(boolean forceConstruct) {
-        if (mLastWindowInsets == null || forceConstruct) {
-            final Configuration config = getConfiguration();
-            final WindowInsets insets = mInsetsController.calculateInsets(
+        if (mLastWindowInsets != null && !forceConstruct) {
+            return mLastWindowInsets;
+        }
+        final Configuration config = getConfiguration();
+        WindowInsets insets = mLastInsetsDuringAnimationProgress;
+        if (insets == null) {
+            insets = mInsetsController.calculateInsets(
                     config.isScreenRound(), mWindowAttributes.type,
                     config.windowConfiguration.getActivityType(), mWindowAttributes.softInputMode,
                     mWindowAttributes.flags, (mWindowAttributes.systemUiVisibility
@@ -3746,16 +3768,32 @@ public final class ViewRootImpl implements ViewParent,
                     Log.d(mTag, "WindowInsets changed: " + diffString);
                 }
             }
-            mLastWindowInsets = insets;
-
-            mAttachInfo.mContentInsets.set(mLastWindowInsets.getSystemWindowInsets().toRect());
-            mAttachInfo.mStableInsets.set(mLastWindowInsets.getStableInsets().toRect());
+            mAttachInfo.mContentInsets.set(insets.getSystemWindowInsets().toRect());
+            mAttachInfo.mStableInsets.set(insets.getStableInsets().toRect());
             mAttachInfo.mVisibleInsets.set(mInsetsController.calculateVisibleInsets(
                     mInsetsController.getState(), mWindowAttributes.type,
                     config.windowConfiguration.getActivityType(), mWindowAttributes.softInputMode,
                     mWindowAttributes.flags, 0 /* ignoringTypes */).toRect());
         }
+        mLastWindowInsets = insets;
         return mLastWindowInsets;
+    }
+
+    @Nullable
+    public WindowInsetsAnimation.Bounds dispatchWindowInsetsAnimationStart(
+            @NonNull WindowInsetsAnimation animation,
+            @NonNull WindowInsetsAnimation.Bounds bounds, boolean isUserAnimation,
+            boolean isResizeAnimation, boolean hasAnimationCallback) {
+        if (mView == null) {
+            return null;
+        }
+        if (InsetsController.DEBUG) Log.d(mTag, "windowInsetsAnimation started");
+        mWindowInsetsAnimationCount++;
+        if (com.android.window.flags.Flags.syncedInsetsAnimation()
+                && !isUserAnimation && !isResizeAnimation && !hasAnimationCallback) {
+            return null;
+        }
+        return mView.dispatchWindowInsetsAnimationStart(animation, bounds);
     }
 
     @Nullable
@@ -3772,9 +3810,13 @@ public final class ViewRootImpl implements ViewParent,
                 Log.d(mTag, "windowInsetsAnimation progress: " + anim.getInterpolatedFraction());
             }
         }
-        final boolean handlesAnimation =
+        // This acts as a latch to avoid jumping between the synced animation and dispatching the
+        // final insets state (e.g. if a system and user animation were ongoing, but the latter
+        // finishes). It's reset when all animations are finished.
+        mHandlesWindowInsetsAnimation |=
                 hasUserAnimation || hasResizeAnimation || hasAnimationCallback;
-        if (com.android.window.flags.Flags.syncedInsetsAnimation() && !handlesAnimation) {
+        if (com.android.window.flags.Flags.syncedInsetsAnimation()
+                && !mHandlesWindowInsetsAnimation) {
             // will not include IME insets, if softInputMode is different from adjustResize
             mAttachInfo.mContentInsets.set(insets.getSystemWindowInsets().toRect());
             mAttachInfo.mStableInsets.set(insets.getStableInsets().toRect());
@@ -3789,9 +3831,49 @@ public final class ViewRootImpl implements ViewParent,
                             ignoringTypes).toRect());
             mScrollMayChange = true;
             mImmediateScrolling = true;
+            mLastInsetsDuringAnimationProgress = insets;
+            if (dispatchesApplyInsetsDuringAnimationProgress()) {
+                notifyInsetsChanged();
+            }
             return null;
+        } else if (mHandlesWindowInsetsAnimation) {
+            mLastInsetsDuringAnimationProgress = null;
         }
-        return mView.dispatchWindowInsetsAnimationProgress(insets, runningAnimations);
+        return mWindowInsetsAnimationCount > 0
+                ? mView.dispatchWindowInsetsAnimationProgress(insets, runningAnimations)
+                : null;
+    }
+
+    public void dispatchWindowInsetsAnimationEnd(@NonNull WindowInsetsAnimation animation,
+            boolean isUserAnimation, boolean isResizeAnimation, boolean hasAnimationCallback) {
+        if (InsetsController.DEBUG) Log.d(mTag, "windowInsetsAnimation ended");
+        if (mView == null) {
+            // The view has already detached from window.
+            return;
+        }
+        mWindowInsetsAnimationCount--;
+        if (mWindowInsetsAnimationCount == 0) {
+            mHandlesWindowInsetsAnimation = false;
+        }
+        if (com.android.window.flags.Flags.syncedInsetsAnimation()
+                && !isUserAnimation && !isResizeAnimation && !hasAnimationCallback) {
+            return;
+        }
+        mView.dispatchWindowInsetsAnimationEnd(animation);
+    }
+
+    /**
+     * @return {@code true} if the system insets animation might be in sync with the animation
+     * progress, {@code false} otherwise.
+     */
+    @VisibleForTesting
+    public boolean dispatchesApplyInsetsDuringAnimationProgress() {
+        // TODOb(b/463899193): introduce device config to disable synchronized insets animation.
+        return com.android.window.flags.Flags.syncedInsetsAnimation()
+                // The synced animation might take more resources, thus disabling on low-end devices
+                && !ActivityManager.isLowRamDeviceStatic()
+                && !mHandlesWindowInsetsAnimation
+                && CompatChanges.isChangeEnabled(ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION);
     }
 
     public void dispatchApplyInsets(View host) {
@@ -4842,6 +4924,7 @@ public final class ViewRootImpl implements ViewParent,
         mIsInTraversal = false;
         mRelayoutRequested = false;
         mImmediateScrolling = false;
+        mLastInsetsDuringAnimationProgress = null;
 
         if (!cancelAndRedraw) {
             mReportNextDraw = false;
@@ -12061,14 +12144,18 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void throwCalledFromWrongThreadException() {
-        throw newCalledFromWrongThreadException();
+        throw newCalledFromWrongThreadException(/*withInitStack=*/true);
     }
 
-    private CalledFromWrongThreadException newCalledFromWrongThreadException() {
+    private CalledFromWrongThreadException newCalledFromWrongThreadException(
+            boolean withInitStack) {
         return new CalledFromWrongThreadException(
                 "Only the original thread that created a view hierarchy can touch its views."
-                        + " Expected: " + mThread.getName()
-                        + " Calling: " + Thread.currentThread().getName(), mInitStack);
+                        + " Expected: "
+                        + mThread.getName()
+                        + " Calling: "
+                        + Thread.currentThread().getName(),
+                withInitStack ? mInitStack : null);
     }
 
     /**
@@ -12102,7 +12189,13 @@ public final class ViewRootImpl implements ViewParent,
             // If two or more threads race to log, it's not much of a concern.
             if (!sCalledFromWrongThreadLogged) {
                 sCalledFromWrongThreadLogged = true;
-                final CalledFromWrongThreadException e = newCalledFromWrongThreadException();
+                // We don't want the wtf to treat the proxied `mInitStack` origin Throwable as the
+                // root cause, as that shadows the CalledFromWrongThreadException type when
+                // propagating through the ApplicationErrorReport.
+                final CalledFromWrongThreadException e =
+                        newCalledFromWrongThreadException(/* withInitStack= */ false);
+                // TODO(b/485532725): Consider augmenting the exception message with the mInitStack
+                // Throwable rather than discarding it entirely.
                 Log.wtf(
                         TAG,
                         "Attempt to call method from wrong thread. "
@@ -14648,5 +14741,21 @@ public final class ViewRootImpl implements ViewParent,
 
     public boolean isDisablingViewAnimationsRequested() {
         return mIsDisablingViewAnimationsRequested;
+    }
+
+    /**
+     * Enables additional debugging logs to track the initialization stack trace when calling a
+     * method from the wrong thread for all ViewRootImpls in this process.
+     *
+     * @param enabled the value to set.
+     *
+     * @return {@code true} if it was successfully set, {@code false} otherwise.
+     */
+    public static boolean setDebugWrongThreadInit(boolean enabled) {
+        if (!Build.isDebuggable()) {
+            return false;
+        }
+        sDebugWrongThreadInit = enabled;
+        return true;
     }
 }

@@ -17,6 +17,7 @@ package com.android.wm.shell.desktopmode
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.IWallpaperManager
+import android.app.KeyguardManager
 import android.content.Context
 import android.graphics.Rect
 import android.os.ServiceManager
@@ -24,9 +25,13 @@ import android.os.SystemProperties
 import android.util.ArrayMap
 import com.android.internal.annotations.VisibleForTesting
 import com.android.window.flags.Flags
+import com.android.wm.shell.RootTaskDisplayAreaOrganizer
+import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ExitReason
 import com.android.wm.shell.desktopmode.DesktopTasksController.SnapPosition
+import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopScrimListener
+import com.android.wm.shell.sysui.OverviewVisibilityChangeListener
 import com.android.wm.shell.sysui.ShellController
 import java.util.concurrent.Executor
 
@@ -35,7 +40,10 @@ class DesktopScrimController(
     private val desktopRemoteListener: DesktopRemoteListener,
     private val desktopTasksController: DesktopTasksController,
     private val shellController: ShellController,
-) {
+    private val rootTaskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
+    private val keyguardManager: KeyguardManager,
+    @ShellMainThread private val mainExecutor: ShellExecutor,
+) : KeyguardManager.KeyguardLockedStateListener, OverviewVisibilityChangeListener {
     private val mDesktopScrimListeners = ArrayMap<DesktopScrimListener, Executor>()
 
     private val wallpaperService: IWallpaperManager =
@@ -43,6 +51,15 @@ class DesktopScrimController(
 
     private val wallpaperDimAmount: Float =
         SystemProperties.getInt("persist.wm.debug.wallpaper_dim_amount", 100).toFloat() / 100
+
+    fun onInit() {
+        if (Flags.updateDesktopScrimWhenLockedBugfix()) {
+            keyguardManager.addKeyguardLockedStateListener(mainExecutor, this)
+        }
+        if (Flags.handleOverviewDesktopScrimBugfix()) {
+            shellController.addOverviewVisibilityChangeListener(this)
+        }
+    }
 
     /**
      * Adds a listener to the desktop scrim effect changes.
@@ -63,14 +80,32 @@ class DesktopScrimController(
         mDesktopScrimListeners.remove(listener)
     }
 
-    /** Check the current desktop condition and if should apply, apply the scrim effect. */
-    fun updateDesktopScrimIfNeeded(displayId: Int, userId: Int, excludeTaskId: Int? = null) {
+    /**
+     * Check the current desktop condition and if should apply, apply the scrim effect.
+     *
+     * @param displayId the display ID.
+     * @param userId the user ID.
+     * @param excludeTaskId the task ID to exclude from consideration. May be null.
+     * @param targetDeskId the desk ID for which the condition is checked. If null, the active desk
+     *   of [displayId] will be used.
+     * @param pendingTaskBounds the bounds of a task which might not be visible in the desk but
+     *   needs to be considered, e.g., a newly launching task. May be null.
+     */
+    fun updateDesktopScrimIfNeeded(
+        displayId: Int,
+        userId: Int,
+        excludeTaskId: Int? = null,
+        targetDeskId: Int? = null,
+        pendingTaskBounds: Rect? = null,
+    ) {
         val applyLightOutEffect =
             if (Flags.fixWallpaperDimIssues26q2()) {
                 desktopTasksController.isAnyTaskMaximizedOrDoubleTiled(
                     displayId,
                     userId,
                     excludeTaskId,
+                    targetDeskId,
+                    pendingTaskBounds,
                 )
             } else {
                 desktopTasksController.isAnyTaskMaximizedOrSnapped(displayId, userId, excludeTaskId)
@@ -99,6 +134,24 @@ class DesktopScrimController(
             displayId,
             true, /* temporary */
         )
+    }
+
+    override fun onKeyguardLockedStateChanged(isKeyguardLocked: Boolean) {
+        rootTaskDisplayAreaOrganizer.displayIds.forEach { displayId ->
+            if (isKeyguardLocked) {
+                updateDesktopScrim(displayId, false)
+            } else {
+                updateDesktopScrimIfNeeded(displayId, shellController.currentUserId)
+            }
+        }
+    }
+
+    override fun onOverviewHidden(displayId: Int) {
+        updateDesktopScrimIfNeeded(displayId, shellController.currentUserId)
+    }
+
+    override fun onOverviewShown(displayId: Int) {
+        updateDesktopScrim(displayId, false)
     }
 
     /** Response to a task size toggle event, to update the scrim effect when needed. */
@@ -209,6 +262,14 @@ class DesktopScrimController(
     fun handleExitCleanUp(displayId: Int, shouldEndUpAtHome: Boolean, exitReason: ExitReason) {
         if (shouldEndUpAtHome && exitReason == ExitReason.RETURN_HOME_OR_OVERVIEW) {
             // We are going back to home, remove any effects for the maximized/snapped tasks.
+            updateDesktopScrim(displayId, applyLightOutEffect = false)
+        }
+        if (
+            Flags.updateDesktopScrimOnFullscreenLaunch() &&
+                exitReason == ExitReason.FULLSCREEN_LAUNCH
+        ) {
+            // Exiting desktop mode because there is a fullscreen activity launched and taking the
+            // entire display.
             updateDesktopScrim(displayId, applyLightOutEffect = false)
         }
     }

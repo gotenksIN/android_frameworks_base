@@ -18,6 +18,7 @@ package com.android.wm.shell.hierarchy.updates
 import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.UserInfo
+import android.graphics.Rect
 import android.hardware.devicestate.DeviceStateManager
 import android.os.Handler
 import android.os.IBinder
@@ -122,6 +123,14 @@ class HierarchyUpdater(
         ProtoLog.v(WM_SHELL_MODES, "Hierarchy updated requested: %s", updateContext.reason)
         updaterTestHook?.onHierarchyUpdated()
 
+        // If a transaction was not provided, then create one now for convenience and apply it
+        // after notifying the modes
+        var preTransitTx: SurfaceControl.Transaction? = null
+        if (updateContext.preTransitionTx == null) {
+            preTransitTx = SurfaceControl.Transaction()
+            updateContext.preTransitionTx = preTransitTx
+        }
+
         // Iterate the pre-existing containers from bottom-up to notify old modes that their
         // descendants have been removed
         val postUpdateContainers = hierarchy.toContainerList()
@@ -217,6 +226,9 @@ class HierarchyUpdater(
             }
         }
         updaterTestHook?.onModesNotified()
+
+        // Apply the tx created above if necessary
+        preTransitTx?.apply()
 
         // Dump the container requested, or the full hierarchy
         if (updateContext.dumpOnlyContainer != null) {
@@ -484,7 +496,11 @@ class HierarchyUpdater(
 
         // Apply the display changes to the hierarchy first
         val newDisplayProps = display.displayProps().copy()
-        newDisplayProps.updateFromDisplayLayout(displayLayout)
+        val chg = TransitionInfo.Change(display.token, display.leash).apply {
+            setEndAbsBounds(Rect(0, 0, displayLayout.width(), displayLayout.height()))
+            setRotation(display.props.rotation, displayLayout.rotation())
+        }
+        newDisplayProps.updateFromWindowChange(chg)
 
         // Notify the modes associated with this display (ancestors & descendants) of the change
         // FUTURE: This currently assumes the displays exist and are rooted to the hierarchy

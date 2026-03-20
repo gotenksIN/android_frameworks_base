@@ -48,16 +48,6 @@ flag {
 }
 
 flag {
-    name: "fix_bubbles_long_press_nav_handle"
-    namespace: "multitasking"
-    description: "Allows handling of long-press on nav handle when bubbles are expanded"
-    bug: "324910035"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_optional_bubble_overflow"
     namespace: "multitasking"
     description: "Hides the bubble overflow if there aren't any overflowed bubbles"
@@ -274,6 +264,16 @@ flag {
 }
 
 flag {
+    name: "launch_bubble_on_main_display"
+    namespace: "multitasking"
+    description: "Ensure bubble task is created on the main display if triggered from a connected display."
+    bug: "457889029"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "consolidate_split_keyboard_shortcut_controllers"
     namespace: "multitasking"
     description: "Consolidate split desktop keyboard shortcuts handling on shell and launcher side"
@@ -394,6 +394,16 @@ flag {
 }
 
 flag {
+    name: "fix_bubble_bar_flick_on_pinning_animation"
+    namespace: "multitasking"
+    description: "Fixes bubble flickering issue on the taskbar pinning animation completion"
+    bug: "484396747"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "fix_bubble_bar_stashing_with_hardware_keyboard"
     namespace: "multitasking"
     description: "Fixes a bug where bubble bar stashes incorrectly when a hardware keyboard is connected"
@@ -424,6 +434,16 @@ flag {
 }
 
 flag {
+    name: "fix_taskbar_scrim_view_on_home"
+    namespace: "multitasking"
+    description: "Fixes taskbar scrim view when bubbles are expanded on Launcher home screen"
+    bug: "492048302"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "fix_bubbles_stashing_on_home"
     namespace: "multitasking"
     description: "Fixes a bug where bubbles could be stashed on launcher home"
@@ -438,6 +458,16 @@ flag {
     namespace: "multitasking"
     description: "Fixes bubble issues when transitioning between modes due to repeated folding and unfolding"
     bug: "450107220"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubbles_handle_user_education"
+    namespace: "multitasking"
+    description: "Fixes an issue where user education didn't dismiss"
+    bug: "490187640"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

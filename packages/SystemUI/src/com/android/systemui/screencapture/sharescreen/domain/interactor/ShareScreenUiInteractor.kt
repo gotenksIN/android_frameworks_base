@@ -28,14 +28,21 @@ import android.media.projection.StopReason
 import android.os.RemoteException
 import android.os.UserHandle
 import android.util.Log
+import com.android.systemui.activity.data.repository.ActivityManagerRepository
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.log.LogBuffer
+import com.android.systemui.log.core.Logger
+import com.android.systemui.mediaprojection.MediaProjectionLog
 import com.android.systemui.screencapture.common.ScreenCaptureUiScope
 import com.android.systemui.screencapture.common.domain.interactor.ScreenCaptureRecentTaskInteractor
 import com.android.systemui.util.AsyncActivityLauncher
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 
 @ScreenCaptureUiScope
 class ShareScreenUiInteractor
@@ -45,7 +52,10 @@ constructor(
     private val asyncActivityLauncher: AsyncActivityLauncher,
     private val mediaProjectionHelper: MediaProjectionServiceHelperWrapper,
     @param:Application private val context: Context,
+    private val activityManagerRepository: ActivityManagerRepository,
+    @param:MediaProjectionLog private val logBuffer: LogBuffer,
 ) {
+    private val logger = Logger(logBuffer, TAG)
 
     sealed class SharingState {
         object NotStarted : SharingState()
@@ -58,12 +68,26 @@ constructor(
     private val _sharingState = MutableStateFlow<SharingState>(SharingState.NotStarted)
     val sharingState = _sharingState.asStateFlow()
 
-    private lateinit var projection: IMediaProjection
+    private val _uid = MutableStateFlow<Int?>(null)
+    val uid: Int
+        get() = _uid.value ?: -1
+
+    /** Emits true when the host app (that requested the sharing) has died. */
+    val isHostAppDead: Flow<Boolean> =
+        _uid.flatMapLatest { uid ->
+            if (uid == null) {
+                emptyFlow()
+            } else {
+                activityManagerRepository.createIsAppDeadFlow(uid, logger, TAG)
+            }
+        }
+
+    private var projection: IMediaProjection? = null
+    /** Tracks which display the current [projection] token is authorized for. */
+    private var authorizedDisplayId: Int? = null
+
     private var reviewGrantedConsentRequired: Boolean = false
     private lateinit var hostUserHandle: UserHandle
-    var uid: Int = -1
-        private set
-
     var packageName: String = ""
         private set
 
@@ -73,7 +97,7 @@ constructor(
         private set
 
     fun initialize(
-        projection: IMediaProjection,
+        projection: IMediaProjection?,
         reviewGrantedConsentRequired: Boolean,
         hostUserHandle: UserHandle,
         uid: Int,
@@ -82,12 +106,38 @@ constructor(
         config: MediaProjectionConfig?,
     ) {
         this.projection = projection
+        // If a projection was provided upfront, we assume it's for the initial display.
+        this.authorizedDisplayId = if (projection != null) initialDisplayId else null
         this.reviewGrantedConsentRequired = reviewGrantedConsentRequired
         this.hostUserHandle = hostUserHandle
-        this.uid = uid
+        this._uid.value = uid
         this.packageName = packageName
         this.initialDisplayId = initialDisplayId
         this.config = config
+    }
+
+    /**
+     * Returns the current [IMediaProjection] or creates a new one for the given [displayId] if it
+     * doesn't exist or is authorized for a different display.
+     */
+    private fun getOrCreateProjection(displayId: Int): IMediaProjection {
+        val currentProjection = projection
+        // Reuse the existing projection if it exists and matches the requested display.
+        if (currentProjection != null && displayId == authorizedDisplayId) {
+            return currentProjection
+        }
+
+        val newProjection =
+            mediaProjectionHelper.createOrReuseProjection(
+                uid,
+                packageName,
+                reviewGrantedConsentRequired,
+                displayId,
+            )
+
+        projection = newProjection
+        authorizedDisplayId = displayId
+        return newProjection
     }
 
     /**
@@ -100,6 +150,8 @@ constructor(
         isAudioRequested: Boolean,
     ) {
         try {
+            val projection = getOrCreateProjection(initialDisplayId)
+
             val session =
                 object : IAppContentProjectionSession.Stub() {
                     // This is an anonymous implementation of IAppContentProjectionSession.Stub.
@@ -146,6 +198,8 @@ constructor(
 
             // Create a new LaunchCookie and ActivityOptions to perform the security handshake.
             val launchCookie = ActivityOptions.LaunchCookie(MEDIA_PROJECTION_LAUNCH_TOKEN)
+
+            val projection = getOrCreateProjection(initialDisplayId)
 
             if (task.isForegroundTask && task.component?.packageName == packageName) {
                 // The task is already in the foreground and belongs to the host app, so we don't
@@ -230,18 +284,7 @@ constructor(
     /** Called when the user approves sharing of an entire display. */
     fun onDisplaySharingApproved(displayId: Int) {
         try {
-            val projectionToUse =
-                if (displayId == initialDisplayId) {
-                    projection
-                } else {
-                    // Create a new projection instance associated with the *correct* displayId.
-                    mediaProjectionHelper.createOrReuseProjection(
-                        uid,
-                        packageName,
-                        reviewGrantedConsentRequired,
-                        displayId,
-                    )
-                }
+            val projectionToUse = getOrCreateProjection(displayId)
 
             mediaProjectionHelper.setReviewedConsentIfNeeded(
                 ReviewGrantedConsentResult.RECORD_CONTENT_DISPLAY,
@@ -256,6 +299,11 @@ constructor(
     }
 
     fun onClose() {
+        mediaProjectionHelper.setReviewedConsentIfNeeded(
+            ReviewGrantedConsentResult.RECORD_CANCEL,
+            reviewGrantedConsentRequired,
+            projection,
+        )
         _sharingState.value = SharingState.Denied
     }
 

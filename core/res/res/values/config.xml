@@ -2056,6 +2056,9 @@
     <!-- True if live wallpapers can be supported in the deskop experience -->
     <bool name="config_isLiveWallpaperSupportedInDesktopExperience">false</bool>
 
+     <!-- Whether to create scaled versions of the default wallpaper image to match the display size -->
+    <bool name="config_optimizeDefaultWallpaper">false</bool>
+
     <!-- Specifies priority of automatic time sources. Suggestions from higher entries in the list
          take precedence over lower ones.
          See com.android.server.timedetector.TimeDetectorStrategy for available sources. -->
@@ -2725,11 +2728,11 @@
          overridden device-specific resources. A wildcard (fallback) must be supplied.
          Name   - Read from `ro.boot.hardware.color` sysprop. Fallback (*) required.
          Styles - frameworks/libs/systemui/monet/src/com/android/systemui/monet/Style.java
-         Color  - `home_wallpaper` (for color extraction) or a hexadecimal int (#FFcc99) -->
+         Color  - `home_wallpaper` (for color extraction) or a comma-separated list of
+                  hexadecimal int (#FFcc99,#aabbcc). -->
     <string-array name="theming_defaults">
         <item>*|TONAL_SPOT|home_wallpaper</item>
     </string-array>
-
     <!-- A list of legacy theme overlays that ThemeManagerService removes during the boot process.
          Previously, these overlays were managed SystemUI but, because their ownership has moved to
          the Android System, cleaning previous overlays up is necessary to prevent duplicate or
@@ -2867,6 +2870,9 @@
          doze component is specified below since dreaming will supercede dozing and
          will prevent the system from entering a low power state until the dream ends. -->
     <bool name="config_dreamsSupported">true</bool>
+
+    <!-- Specifies whether the dream switcher should be enabled. -->
+    <bool name="config_dreamSwitcherEnabled">false</bool>
 
     <!-- If supported, are dreams enabled? (by default) -->
     <bool name="config_dreamsEnabledByDefault">true</bool>
@@ -3316,6 +3322,14 @@
     <!-- Whether the bouncer screen during initial user sign-in on desktop platforms should indicate
          a neutral space (e.g. system instead of user's lockscreen wallpaper). -->
     <bool name="config_multiuserNeutralSpace">false</bool>
+
+     <!-- Whether the UserSwitchingDialog should use the system wallpaper as the background during
+          the user switching animation. -->
+    <bool name="config_useSystemWallpaperDuringUserSwitch">false</bool>
+
+     <!-- Whether the UserSwitchingDialog should render the user avatar as a 12-sided cookie instead
+          of a circle, and animate it by rotating its border.  -->
+    <bool name="config_animateUserAvatarDuringUserSwitch">false</bool>
 
     <!-- Whether to automatically switch to the designated Dock User (the user chosen for
          displaying dreams, etc.) after a timeout when the device is docked.  -->
@@ -4566,6 +4580,9 @@
 
     <!-- Indicating if keyboard vibration settings supported or not. -->
     <bool name="config_keyboardVibrationSettingsSupported">false</bool>
+
+    <!-- Indicating if keyboard vibration intensity settings are supported or not. Only valid if config_keyboardVibrationSettingsSupported is true. -->
+    <bool name="config_keyboardVibrationSettingsIntensitySupported">false</bool>
 
     <!-- Indicating if ringtone vibration settings supported or not. -->
     <bool name="config_ringtoneVibrationSettingsSupported">false</bool>
@@ -7780,6 +7797,11 @@
     <!-- List of packages which should be excluded from transparency based desktop exemptions. -->
     <string-array name="config_desktopTransparentExemptionIgnoreList" translatable="false"/>
 
+    <!-- List of activities in the home package which should be allowed in desktop mode. -->
+    <string-array name="config_desktopHomePackageFreeformActivities" translatable="false">
+        <item>com.android.launcher3.settings.SettingsActivity</item>
+    </string-array>
+
     <!-- Frame rate compatibility value for Wallpaper
          FRAME_RATE_COMPATIBILITY_MIN (102) is used by default for lower power consumption -->
     <integer name="config_wallpaperFrameRateCompatibility">102</integer>
@@ -7996,8 +8018,8 @@
     <integer name="config_tvWatchdogUidIoUsageSummaryTopCount">20</integer>
 
     <!-- The minimum number of total bytes written to disk by the system required to
-         report the stats on TV watchdog I/O usage summary atom pull. Currently 100 MiB. -->
-    <integer name="config_tvWatchdogIoUsageSummaryMinSystemTotalWrittenBytes">104857600</integer>
+         report the stats on TV watchdog I/O usage summary atom pull. Currently 1 GiB. -->
+    <integer name="config_tvWatchdogIoUsageSummaryMinSystemTotalWrittenBytes">1073741824</integer>
 
     <!-- The number of days past until the current day considered by TV watchdog to
          reset the killable state of a package back to KILLABLE_STATE_YES if the package
@@ -8009,8 +8031,8 @@
     <integer name="config_tvWatchdogRecurringOverusePeriodInDays">30</integer>
 
     <!-- The number of overuses a package has to exceed for TV watchdog to attribute
-         recurring overuse. -->
-    <integer name="config_tvWatchdogRecurringOveruseTimes">3</integer>
+         recurring overuse. Allow many recurring overuses (effectively disabling kill logic). -->
+    <integer name="config_tvWatchdogRecurringOveruseTimes">100</integer>
 
      <!-- Whether to enable app launch blur -->
     <bool name="config_enableAppLaunchBlur">true</bool>
@@ -8065,4 +8087,9 @@
 
     <!-- Whether the Wear-specific charging experience is enabled -->
     <bool name="config_wearChargingExperienceEnabled">false</bool>
+
+    <!-- List of package names to be forced to be dexopted in the synchronous phase of pre-reboot
+         dexopt. -->
+    <string-array translatable="false" name="config_pr_dexopt_sync_forced_packages">
+    </string-array>
 </resources>

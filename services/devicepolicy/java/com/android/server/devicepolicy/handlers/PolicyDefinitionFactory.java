@@ -47,6 +47,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.server.devicepolicy.EnforcingAdmin;
 import com.android.server.devicepolicy.IntegerPolicySerializer;
+import com.android.server.devicepolicy.LeastRecent;
 import com.android.server.devicepolicy.ListOfStringPolicySerializer;
 import com.android.server.devicepolicy.MostRecent;
 import com.android.server.devicepolicy.MostRestrictive;
@@ -163,23 +164,28 @@ public class PolicyDefinitionFactory {
                 PolicyIdentifier.MANAGED_ESIM_OUTGOING_TRANSFER_POLICY,
                 builder -> {
                     return builder.setResolutionMechanism(
-                            new MostRestrictive<>(
-                                    List.of(
-                                           new IntegerPolicyValue(
-                                                   MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED),
-                                           new IntegerPolicyValue(
-                                                   MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED)
-                                    )
-                            )
-                    ).build();
+                                    new MostRestrictive<>(
+                                            List.of(
+                                                    new IntegerPolicyValue(
+                                                            MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED),
+                                                    new IntegerPolicyValue(
+                                                            MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED))))
+                            .build();
                 });
         addFactory(
                 PolicyIdentifier.CONTENT_RESTRICTION_APPS,
                 builder -> {
-                    return builder
-                            .setResolutionMechanism(new PackageListUnion())
+                    return builder.setResolutionMechanism(new PackageListUnion())
                             .setEnforcerCallback(PolicyEnforcerCallbacks::setContentRestrictionApps)
                             .build();
+                });
+        addFactory(
+                PolicyIdentifier.APP_INSTALL,
+                builder -> {
+                    // This (pre-existing) enum policy is stored as a boolean inside DPE, so return
+                    // null here and pass the pre-existing PolicyDefinition into the constructor
+                    // of `EnumStoredAsBooleanPolicyHandler`.
+                    return null;
                 });
         addFactory(
                 PolicyIdentifier.EASTER_EGGS,
@@ -187,6 +193,11 @@ public class PolicyDefinitionFactory {
                     // This (pre-existing) enum policy is stored as a boolean inside DPE, so return
                     // null here and pass the pre-existing PolicyDefinition into the constructor
                     // of `EnumStoredAsBooleanPolicyHandler`.
+                    return null;
+                });
+        addFactory(
+                PolicyIdentifier.FACTORY_RESET,
+                builder -> {
                     return null;
                 });
     }
@@ -280,6 +291,7 @@ public class PolicyDefinitionFactory {
             return switch (input) {
                 case ResolutionMechanismMetadata.MostRestrictive m ->
                         new MostRestrictive<T>(convertValues(m.getMostToLeastRestrictiveValues()));
+                case ResolutionMechanismMetadata.NotCoexistable n -> new LeastRecent<T>();
                 default ->
                         throw new UnsupportedOperationException(
                                 "Unsupported resolution mechanism: " + input.getClass());

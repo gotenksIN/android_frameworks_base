@@ -233,26 +233,6 @@ flag {
 }
 
 flag {
-    name: "enable_camera_compat_external_display_rotation_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Whether to use primary display rotation when sandboxing rotation for camera compatibility."
-    bug: "276432441"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_camera_compat_for_desktop_windowing_opt_out"
-    namespace: "lse_desktop_experience"
-    description: "Whether to allow developers to opt-out of Camera Compat treatment to fixed-orientation apps in desktop windowing mode"
-    bug: "328616176"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_caption_compat_inset_conversion"
     namespace: "lse_desktop_experience"
     description: "Enables compatibility mitigation for apps that don't support caption insets well"
@@ -595,13 +575,6 @@ flag {
 }
 
 flag {
-    name: "enable_drag_to_maximize"
-    namespace: "lse_desktop_experience"
-    description: "Enables a switch to change the concequence of dragging a window to the top edge."
-    bug: "372614715"
-}
-
-flag {
     name: "enable_drawing_app_handle"
     namespace: "lse_desktop_experience"
     description: "Enables app handle being drawn programmatically instead of using Drawables."
@@ -733,13 +706,6 @@ flag {
 }
 
 flag {
-    name: "enable_multiple_desktops_backend"
-    namespace: "lse_desktop_experience"
-    description: "Enable multiple desktop sessions for desktop windowing (backend)."
-    bug: "362720497"
-}
-
-flag {
     name: "enable_multiple_desktops_default_activation_in_desktop_first_displays"
     namespace: "lse_desktop_experience"
     description: "Activate a default desk in desktop-first displays, with multiple desks enabled"
@@ -751,16 +717,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enable no-resize cursors for window drag resizing."
     bug: "444328529"
-}
-
-flag {
-    name: "enable_no_window_decoration_for_desks"
-    namespace: "lse_desktop_experience"
-    description: "Stops the creation of a window decoration for desk tasks."
-    bug: "414449402"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -995,24 +951,10 @@ flag {
 }
 
 flag {
-    name: "enable_windowing_edge_drag_resize"
-    namespace: "lse_desktop_experience"
-    description: "Enables edge drag resizing for stylus input (cursor is enabled by default)"
-    bug: "337782092"
-}
-
-flag {
     name: "enable_windowing_transition_handlers_observers"
     namespace: "lse_desktop_experience"
     description: "Whether to enable desktop windowing transition handler and observer instead of task listeners."
     bug: "332682201"
-}
-
-flag {
-    name: "enter_desktop_by_default_on_freeform_displays"
-    namespace: "lse_desktop_experience"
-    description: "Allow entering desktop mode by default on freeform displays"
-    bug: "361419732"
 }
 
 flag {
@@ -1049,6 +991,16 @@ flag {
     description: "Grant MANAGE_KEY_GESTURES permission to the recents holder."
     bug: "406452076"
     is_fixed_read_only: true
+}
+
+flag {
+    name: "handle_overview_desktop_scrim_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Force disable scrim effect for overview"
+    bug: "487785554"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1239,6 +1191,66 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Don't force-kill processes of Desktop tasks closed through core transitions."
     bug: "438483836"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_desktop_scrim_on_desktop_task_launch"
+    namespace: "lse_desktop_experience"
+    description: "Updates the desktop scrim when a desktop task is launched."
+    bug: "489912400"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_desktop_scrim_on_drag_resize_end"
+    namespace: "lse_desktop_experience"
+    description: "Updates the desktop scrim when drag resize is finihsed"
+    bug: "484100709"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_desktop_scrim_on_fullscreen_launch"
+    namespace: "lse_desktop_experience"
+    description: "Updates the desktop scrim when fullscreen activity launched"
+    bug: "483478809"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_desktop_scrim_on_move_task_to_desk"
+    namespace: "lse_desktop_experience"
+    description: "Updates the desktop scrim when a task is moved to desktop."
+    bug: "489912261"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_desktop_scrim_when_locked_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fixes the issue that desktop scrim effect not get updated when device locked and unlocked."
+    bug: "484800239"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "update_desktop_scrim_when_move_task_to_front_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fixes the issue that desktop scrim effect not get updated when task moves to front."
+    bug: "483868832"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

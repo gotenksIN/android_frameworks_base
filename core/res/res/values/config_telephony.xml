@@ -596,7 +596,6 @@
     <bool name="config_update_operator_name_after_carrier_config_loaded">false</bool>
     <java-symbol type="bool" name="config_update_operator_name_after_carrier_config_loaded" />
 
-
     <!-- Name of the NetworkChangeNotification that prompts the user when the 2G network is
     enabled/disabled by the carrier. -->
     <string name="config_network_change_notification">
@@ -604,4 +603,25 @@
     </string>
     <java-symbol type="string" name="config_network_change_notification" />
 
+    <!-- Default wait time in seconds for dismissing upsell notification after TN is stable -->
+    <integer name="config_upsell_notification_dismiss_delay_after_tn_stable_sec">1800</integer>
+    <java-symbol type="integer" name="config_upsell_notification_dismiss_delay_after_tn_stable_sec" />
+
+    <!-- Default maximum search time in seconds for upsell network scan -->
+    <integer name="config_upsell_network_scan_max_search_time_sec">60</integer>
+    <java-symbol type="integer" name="config_upsell_network_scan_max_search_time_sec" />
+
+    <!-- Configures the packages that are allowed to access the restricted
+         messages in the Telephony database (mmsmsms.db).
+         READ_RESTRICTED_MESSAGES app-op is granted to the packages listed in
+         this configuration at boot time.
+
+         Each element in the array should be a preinstalled package name.
+    -->
+    <string-array name="config_messaging_read_restriction_allowlist" translatable="false"></string-array>
+    <java-symbol type="array" name="config_messaging_read_restriction_allowlist" />
+
+    <!-- These values are the base defaults and are intended to be overridden by device-specific overlays in device/<oem>/<device>/overlay/frameworks/base/core/res/res/values/config_telephony.xml -->
+    <bool name="config_satellite_enabled_reason_user_default">true</bool>
+    <java-symbol type="bool" name="config_satellite_enabled_reason_user_default" />
 </resources>

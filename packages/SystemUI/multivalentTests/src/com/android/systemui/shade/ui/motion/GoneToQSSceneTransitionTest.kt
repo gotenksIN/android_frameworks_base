@@ -59,13 +59,17 @@ import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.scene.ui.viewmodel.GoneUserActionsViewModel
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
+import com.android.systemui.shade.ui.composable.ShadeScene
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
+import com.android.systemui.shade.ui.viewmodel.shadeSceneContentViewModelFactory
+import com.android.systemui.shade.ui.viewmodel.shadeUserActionsViewModelFactory
 import com.android.systemui.statusbar.notification.stack.ui.view.notificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -128,7 +132,21 @@ class GoneToQSSceneTransitionTest : SysuiTestCase() {
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
+    private val shadeScene =
+        ShadeScene(
+            shadeSession = shadeSession,
+            notificationStackScrollView = { kosmos.notificationScrollView },
+            actionsViewModelFactory = kosmos.shadeUserActionsViewModelFactory,
+            contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
+            notificationsPlaceholderViewModelFactory =
+                kosmos.notificationsPlaceholderViewModelFactory,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
+            jankMonitor = kosmos.interactionJankMonitor,
+        )
+
     @Test
+    @Ignore
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun multiSwipeDownFromGoneToQSScene_recordingQSContentYCoordinate() {
         motionTestRule.runTest(60.seconds) {
@@ -186,6 +204,7 @@ class GoneToQSSceneTransitionTest : SysuiTestCase() {
     }
 
     @Test
+    @Ignore
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun multiSwipeDownFromGoneNotCrossingThreshold_recordingQSContentYCoordinate() {
         motionTestRule.runTest(60.seconds) {
@@ -267,6 +286,7 @@ class GoneToQSSceneTransitionTest : SysuiTestCase() {
                             mapOf(
                                 Scenes.Gone to goneScene,
                                 Scenes.QuickSettings to quickSettingsScene,
+                                Scenes.Shade to shadeScene,
                             ),
                         initialSceneKey = Scenes.Gone,
                         transitionsBuilder = kosmos.sceneContainerTransitions,

@@ -22,7 +22,6 @@ import static android.app.NotificationChannel.DEFAULT_CHANNEL_ID;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.service.notification.Flags.splitSoundVibrationForNotificationBreakthrough;
 
-import android.annotation.BroadcastBehavior;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
@@ -3829,6 +3828,69 @@ public class NotificationManager {
             return service.addNotificationRule(mContext.getUserId(), rule, position);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the updated {@link NotificationRule notification rule} or null if the rule could not
+     * be updated.
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH)
+    public @Nullable NotificationRule updateNotificationRule(@NonNull NotificationRule rule) {
+        Objects.requireNonNull(rule);
+        final INotificationManager service = service();
+        try {
+            return service.updateNotificationRule(mContext.getUserId(), rule);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Removes the notification rule with the specified rule ID. Returns true if a rule was removed.
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH)
+    public boolean removeNotificationRule(int ruleId) {
+        final INotificationManager service = service();
+        try {
+            return service.removeNotificationRule(mContext.getUserId(), ruleId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    // TODO(b/414326600): use @IntDef for @AllowlistStatus (currently its' defined on system-server
+    /**
+     * Notifies the metrics system that a notification was posted to the HSU (Headless System User).
+     *
+     * @param sbn notification posted
+     * @param status status of the post request
+     *
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.STATUS_BAR_SERVICE)
+    public void logHsuNotificationPostStatus(StatusBarNotification sbn, int status) {
+        if (localLOGV) {
+            String sender = mContext.getPackageName();
+            // TODO(b/414326600): convert status to user-friendly string
+            Log.v(TAG, sender + ": logHsuNotificationPostStatus(" + sbn + ", " + status + ")");
+        }
+
+        Objects.requireNonNull(sbn, "sbn cannot be null");
+        INotificationManager service = service();
+        try {
+            // TODO(b/414326600): it would be more efficient to create a smaller parcel instead of
+            // passing the whole StatusBarNotification, so it might be changed once the design is
+            // finalized (for example, right now the StatusBarNotification is converted to a
+            // MultiuserNonComplianceLogger.HsuNotification in the server; in the long term, we
+            // should create that DTO here).
+            service.logHsuNotificationPostStatus(sbn, status);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
         }
     }
 }

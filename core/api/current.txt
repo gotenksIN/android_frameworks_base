@@ -9089,6 +9089,9 @@ package android.app.admin {
 
   @FlaggedApi("android.app.admin.flags.policy_streamlining") public final class PolicyIdentifier<T> {
     ctor public PolicyIdentifier(@NonNull String);
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_app_install") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> APP_INSTALL;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_app_install") public static final int APP_INSTALL_ALLOWED = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_app_install") public static final int APP_INSTALL_DISALLOWED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> AUTO_TIME;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED = 3; // 0x3
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED_UNENFORCED = 1; // 0x1
@@ -9105,7 +9108,10 @@ package android.app.admin {
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_easter_eggs") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> EASTER_EGGS;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_easter_eggs") public static final int EASTER_EGGS_ALLOWED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_easter_eggs") public static final int EASTER_EGGS_DISALLOWED = 1; // 0x1
-    field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.String> LOCKSCREEN_MESSAGE;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_disallow_factory_reset") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> FACTORY_RESET;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_disallow_factory_reset") public static final int FACTORY_RESET_ALLOWED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_disallow_factory_reset") public static final int FACTORY_RESET_DISALLOWED = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_lockscreen_message") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.String> LOCKSCREEN_MESSAGE;
     field @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") public static final int MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED = 1; // 0x1
     field @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") public static final int MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> MANAGED_ESIM_OUTGOING_TRANSFER_POLICY;
@@ -11970,6 +11976,7 @@ package android.content {
     field public static final int MODE_PRIVATE = 0; // 0x0
     field @Deprecated public static final int MODE_WORLD_READABLE = 1; // 0x1
     field @Deprecated public static final int MODE_WORLD_WRITEABLE = 2; // 0x2
+    field @FlaggedApi("android.os.multisensory.enable_multisensory_feedback") public static final String MULTISENSORY_MANAGER_SERVICE = "multisensory_manager";
     field public static final String NETWORK_STATS_SERVICE = "netstats";
     field public static final String NFC_SERVICE = "nfc";
     field public static final String NOTIFICATION_SERVICE = "notification";
@@ -26224,14 +26231,12 @@ package android.media {
     method @NonNull public final java.util.List<android.media.RoutingSessionInfo> getAllSessionInfo();
     method @Nullable public final android.media.RoutingSessionInfo getSessionInfo(@NonNull String);
     method public final void notifyRequestFailed(long, int);
-    method @RequiresPermission(allOf={"android.permission.MODIFY_AUDIO_ROUTING", "android.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED"}, conditional=true) public final void notifyRoutes(@NonNull java.util.Collection<android.media.MediaRoute2Info>);
+    method public final void notifyRoutes(@NonNull java.util.Collection<android.media.MediaRoute2Info>);
     method public final void notifySessionCreated(long, @NonNull android.media.RoutingSessionInfo);
-    method @RequiresPermission(allOf={"android.permission.MODIFY_AUDIO_ROUTING", "android.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED"}, conditional=true) public final void notifySessionReleased(@NonNull String);
+    method public final void notifySessionReleased(@NonNull String);
     method public final void notifySessionUpdated(@NonNull android.media.RoutingSessionInfo);
-    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") @Nullable @RequiresPermission(allOf={"android.permission.MODIFY_AUDIO_ROUTING", "android.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED"}) public final android.media.MediaRoute2ProviderService.MediaStreams notifySystemRoutingSessionCreated(long, @NonNull android.media.RoutingSessionInfo, @NonNull android.media.MediaRoute2ProviderService.MediaStreamsFormats);
     method @CallSuper @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
     method public abstract void onCreateSession(long, @NonNull String, @NonNull String, @Nullable android.os.Bundle);
-    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public void onCreateSystemRoutingSession(long, @NonNull String, @NonNull android.media.MediaRoute2ProviderService.SystemRoutingSessionParams);
     method public abstract void onDeselectRoute(long, @NonNull String, @NonNull String);
     method public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference);
     method @FlaggedApi("com.android.media.flags.enable_route_visibility_control_api") @RequiresPermission(value=android.Manifest.permission.MEDIA_CONTENT_CONTROL, conditional=true) public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference, @NonNull java.util.Map<java.lang.String,android.media.RouteDiscoveryPreference>);
@@ -26240,7 +26245,6 @@ package android.media {
     method public abstract void onSetRouteVolume(long, @NonNull String, int);
     method public abstract void onSetSessionVolume(long, @NonNull String, int);
     method public abstract void onTransferToRoute(long, @NonNull String, @NonNull String);
-    field @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final String CATEGORY_SYSTEM_MEDIA = "android.media.MediaRoute2ProviderService.SYSTEM_MEDIA";
     field @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final int REASON_FAILED_TO_REROUTE_SYSTEM_MEDIA = 6; // 0x6
     field public static final int REASON_INVALID_COMMAND = 4; // 0x4
     field public static final int REASON_NETWORK_ERROR = 2; // 0x2
@@ -26250,32 +26254,6 @@ package android.media {
     field public static final int REASON_UNKNOWN_ERROR = 0; // 0x0
     field public static final long REQUEST_ID_NONE = 0L; // 0x0L
     field public static final String SERVICE_INTERFACE = "android.media.MediaRoute2ProviderService";
-  }
-
-  @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final class MediaRoute2ProviderService.MediaStreams {
-    method @Nullable public android.media.AudioRecord getAudioRecord();
-  }
-
-  @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final class MediaRoute2ProviderService.MediaStreamsFormats {
-    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") @Nullable public android.media.AudioFormat getAudioFormat();
-  }
-
-  @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final class MediaRoute2ProviderService.MediaStreamsFormats.Builder {
-    ctor public MediaRoute2ProviderService.MediaStreamsFormats.Builder();
-    method @NonNull public android.media.MediaRoute2ProviderService.MediaStreamsFormats build();
-    method @NonNull public android.media.MediaRoute2ProviderService.MediaStreamsFormats.Builder setAudioFormat(@NonNull android.media.AudioFormat);
-  }
-
-  @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final class MediaRoute2ProviderService.SystemRoutingSessionParams {
-    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") @NonNull public android.os.Bundle getExtras();
-    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") @NonNull public String getPackageName();
-  }
-
-  public static final class MediaRoute2ProviderService.SystemRoutingSessionParams.Builder {
-    ctor public MediaRoute2ProviderService.SystemRoutingSessionParams.Builder();
-    method @NonNull public android.media.MediaRoute2ProviderService.SystemRoutingSessionParams build();
-    method @NonNull public android.media.MediaRoute2ProviderService.SystemRoutingSessionParams.Builder setExtras(@NonNull android.os.Bundle);
-    method @NonNull public android.media.MediaRoute2ProviderService.SystemRoutingSessionParams.Builder setPackageName(@NonNull String);
   }
 
   public class MediaRouter {
@@ -32027,6 +32005,7 @@ package android.opengl {
   public class EGLExt {
     ctor public EGLExt();
     method @NonNull public static android.hardware.SyncFence eglDupNativeFenceFDANDROID(@NonNull android.opengl.EGLDisplay, @NonNull android.opengl.EGLSync);
+    method @FlaggedApi("com.android.graphics.egl.flags.egl_get_native_client_buffer") public static long eglGetNativeClientBufferANDROID(@NonNull android.hardware.HardwareBuffer);
     method public static boolean eglPresentationTimeANDROID(android.opengl.EGLDisplay, android.opengl.EGLSurface, long);
     field public static final int EGL_CONTEXT_FLAGS_KHR = 12540; // 0x30fc
     field public static final int EGL_CONTEXT_MAJOR_VERSION_KHR = 12440; // 0x3098
@@ -36899,30 +36878,32 @@ package android.os.multisensory {
     field public static final int TARGET_PARAMETER_SHARPNESS = 1; // 0x1
   }
 
-  @FlaggedApi("android.os.multisensory.enable_multisensory_feedback") public final class MultisensoryToken {
-    field public static final int CANCEL = 6; // 0x6
-    field public static final int DRAG_INDICATOR_CONTINUOUS = 17; // 0x11
-    field public static final int DRAG_INDICATOR_DISCRETE = 18; // 0x12
-    field public static final int DRAG_INDICATOR_THRESHOLD_LIMIT = 16; // 0x10
-    field public static final int FAILURE = 1; // 0x1
-    field public static final int FAILURE_HIGH_EMPHASIS = 0; // 0x0
-    field public static final int KEYPRESS_DELETE = 22; // 0x16
-    field public static final int KEYPRESS_RETURN = 21; // 0x15
-    field public static final int KEYPRESS_SPACEBAR = 20; // 0x14
-    field public static final int KEYPRESS_STANDARD = 19; // 0x13
-    field public static final int LOCK = 10; // 0xa
-    field public static final int LONG_PRESS = 11; // 0xb
-    field public static final int PAUSE = 4; // 0x4
-    field public static final int START = 3; // 0x3
-    field public static final int STOP = 5; // 0x5
-    field public static final int SUCCESS = 2; // 0x2
-    field public static final int SWIPE_INDICATOR_THRESHOLD_LIMIT = 12; // 0xc
-    field public static final int SWITCH_OFF = 8; // 0x8
-    field public static final int SWITCH_ON = 7; // 0x7
-    field public static final int TAP_HIGH_EMPHASIS = 13; // 0xd
-    field public static final int TAP_LOW_EMPHASIS = 15; // 0xf
-    field public static final int TAP_MEDIUM_EMPHASIS = 14; // 0xe
-    field public static final int UNLOCK = 9; // 0x9
+  @FlaggedApi("android.os.multisensory.enable_multisensory_feedback") public class MultisensoryManager {
+    method @NonNull public static int[] getMultisensoryTokens();
+    method public void playToken(int);
+    field public static final int TOKEN_CANCEL = 6; // 0x6
+    field public static final int TOKEN_DRAG_INDICATOR_CONTINUOUS = 17; // 0x11
+    field public static final int TOKEN_DRAG_INDICATOR_DISCRETE = 18; // 0x12
+    field public static final int TOKEN_DRAG_INDICATOR_THRESHOLD_LIMIT = 16; // 0x10
+    field public static final int TOKEN_FAILURE = 1; // 0x1
+    field public static final int TOKEN_FAILURE_HIGH_EMPHASIS = 0; // 0x0
+    field public static final int TOKEN_KEYPRESS_DELETE = 22; // 0x16
+    field public static final int TOKEN_KEYPRESS_RETURN = 21; // 0x15
+    field public static final int TOKEN_KEYPRESS_SPACEBAR = 20; // 0x14
+    field public static final int TOKEN_KEYPRESS_STANDARD = 19; // 0x13
+    field public static final int TOKEN_LOCK = 10; // 0xa
+    field public static final int TOKEN_LONG_PRESS = 11; // 0xb
+    field public static final int TOKEN_PAUSE = 4; // 0x4
+    field public static final int TOKEN_START = 3; // 0x3
+    field public static final int TOKEN_STOP = 5; // 0x5
+    field public static final int TOKEN_SUCCESS = 2; // 0x2
+    field public static final int TOKEN_SWIPE_INDICATOR_THRESHOLD_LIMIT = 12; // 0xc
+    field public static final int TOKEN_SWITCH_OFF = 8; // 0x8
+    field public static final int TOKEN_SWITCH_ON = 7; // 0x7
+    field public static final int TOKEN_TAP_HIGH_EMPHASIS = 13; // 0xd
+    field public static final int TOKEN_TAP_LOW_EMPHASIS = 15; // 0xf
+    field public static final int TOKEN_TAP_MEDIUM_EMPHASIS = 14; // 0xe
+    field public static final int TOKEN_UNLOCK = 9; // 0x9
   }
 
 }
@@ -56753,6 +56734,7 @@ package android.view {
     field @FlaggedApi("com.android.window.flags.cover_display_opt_in") public static final String PROPERTY_COMPAT_ALLOW_SMALL_COVER_SCREEN = "android.window.PROPERTY_COMPAT_ALLOW_SMALL_COVER_SCREEN";
     field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final String PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE";
     field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final String PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE";
+    field @FlaggedApi("com.android.window.flags.virtual_gamepad_developer_opt_out") public static final String PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE";
     field public static final String PROPERTY_COMPAT_ENABLE_FAKE_FOCUS = "android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS";
     field public static final String PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION = "android.window.PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION";
     field public static final String PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI = "android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI";

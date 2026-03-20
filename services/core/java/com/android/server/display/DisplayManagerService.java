@@ -728,10 +728,16 @@ public final class DisplayManagerService extends SystemService {
                 displayId -> getDisplayInfoInternal(displayId, Process.myUid()));
         Predicate<DisplayInfo> isDisplayAllowedInTopoogy =
                 mDisplayTopologyCoordinator::isDisplayAllowedInTopology;
-        mModeRequestManager = new ModeRequestManager();
+        mModeRequestManager = new ModeRequestManager(mHandler.getLooper(),
+                (ModeRequestManager.UserPreferredModeRequest[] originalData) -> {
+                    synchronized (mSyncRoot) {
+                        handleModeRequestRollbackLocked(originalData);
+                    }
+                });
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext, foldSettingProvider,
                 mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags,
-                isDisplayAllowedInTopoogy, mStableEdidsFlag, mDisplayInfoCache);
+                isDisplayAllowedInTopoogy, mStableEdidsFlag, mDisplayInfoCache,
+                mModeRequestManager);
         mDisplayModeDirector = new DisplayModeDirector(
                 context, mHandler, mFlags, mDisplayDeviceConfigProvider, mModeRequestManager);
         mBrightnessSynchronizer = new BrightnessSynchronizer(mContext, displayThreadLooper);
@@ -1689,6 +1695,19 @@ public final class DisplayManagerService extends SystemService {
             return null;
         }
     }
+
+    private DisplayManagerInternal.DisplayInfos getNonOverrideDisplayInfosInternal() {
+        SparseArray<DisplayInfo> infos = new SparseArray<>();
+        synchronized (mSyncRoot) {
+            mLogicalDisplayMapper.forEachLocked(display -> {
+                int displayId = display.getDisplayIdLocked();
+                infos.put(displayId, mModeRequestManager.getDisplayInfo(displayId,
+                        display.getDisplayInfoLocked()));
+            }, /* includeDisabled= */false);
+            return new DisplayManagerInternal.DisplayInfos(infos);
+        }
+    }
+
 
     private void registerCallbackInternal(IDisplayManagerCallback callback, int callingPid,
             int callingUid, @InternalEventFlag long internalEventFlagsMask) {
@@ -3159,7 +3178,8 @@ public final class DisplayManagerService extends SystemService {
         }
         synchronized (mSyncRoot) {
             boolean requestSuccessful =
-                    mModeRequestManager.onUserPreferredModesRequestedLocked(requests);
+                    mLogicalDisplayMapper.onUserPreferredModesRequestedLocked(requests);
+
             if (requestSuccessful) {
                 boolean changed = false;
                 for (ModeRequestManager.UserPreferredModeRequest request : requests) {
@@ -3169,7 +3189,7 @@ public final class DisplayManagerService extends SystemService {
                     if (displayDevice == null) {
                         Slog.w(ModeRequestManager.TAG, "Device not found for at least one"
                                 + " of the requested displays in a mode change. Requests cleared.");
-                        mModeRequestManager.clearRequests();
+                        mModeRequestManager.onDisplayRemoved(request.mDisplayId);
                         return;
                     }
                     mModeRequestManager.waitingForDeviceInfo(request.mDisplayId);
@@ -3189,10 +3209,13 @@ public final class DisplayManagerService extends SystemService {
                     for (ModeRequestManager.UserPreferredModeRequest request : requests) {
                         DisplayInfo displayInfo = getDisplayInfoInternal(request.mDisplayId,
                                 Process.myUid());
-                        mModeRequestManager.infoUpdated(request.mDisplayId, displayInfo);
+                        if (!mModeRequestManager.infoUpdated(request.mDisplayId, displayInfo)) {
+                            mModeRequestManager.cancelAndRollback();
+                            break;
+                        }
                     }
                 } else {
-                    mModeRequestManager.clearRequests();
+                    mModeRequestManager.cancelAndRollback();
                 }
             }
         }
@@ -4668,6 +4691,12 @@ public final class DisplayManagerService extends SystemService {
 
             return mPersistentDataStore.getUserPreferredHdrMode(displayDevice);
         }
+    }
+
+    @GuardedBy("mSyncRoot")
+    private void handleModeRequestRollbackLocked(
+            ModeRequestManager.UserPreferredModeRequest[] originalData) {
+        setUserPreferredDisplayModesInternal(originalData);
     }
 
     private final class DisplayManagerHandler extends Handler {
@@ -6666,6 +6695,11 @@ public final class DisplayManagerService extends SystemService {
         @Override
         public DisplayInfo getDisplayInfo(int displayId) {
             return getDisplayInfoInternal(displayId, Process.myUid());
+        }
+
+        @Override
+        public DisplayInfos getNonOverrideDisplayInfos() {
+            return getNonOverrideDisplayInfosInternal();
         }
 
         @Override

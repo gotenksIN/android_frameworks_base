@@ -21,7 +21,9 @@ import android.processor.devicepolicy.protos.PolicyMetadataList
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.EnumPolicyMetadata
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.EnumPolicyMetadata.ResolutionMechanism as EnumResolutionMechanismProto
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.IntegerPolicyMetadata
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.ListPolicyMetadata
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.ListPolicyMetadata.ListElementMetadataCase
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.ListPolicyMetadata.ResolutionMechanism as ListResolutionMechanismProto
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.LongPolicyMetadata
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.StringPolicyMetadata
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.TypeMetadataCase
@@ -400,7 +402,8 @@ object Generator {
 
     // Returns a CodeBlock containing `new ListPolicyMetadata<TYPE>(....)`
     private fun generateListPolicyMetadata(policy: PolicyMetadata): CodeBlock {
-        val elementType = getListElementType(policy)
+        val listMetadata = policy.typeSpecificMetadata.listMetadata
+        val elementType = getListElementType(listMetadata)
         val elementMetadata = generateListPolicyElementMetadata(policy)
         return CodeBlock.builder()
             .add("new \$T(\n", ParameterizedTypeName.get(listPolicyMetadataType, elementType))
@@ -410,9 +413,10 @@ object Generator {
             .add(elementMetadata)
             .add(",\n")
             .add(
-                "/* emptyListAllowed= */ \$L\n",
-                policy.typeSpecificMetadata.listMetadata.emptyListAllowed,
+                "/* resolutionMechanism= */ \$L,\n",
+                generateListResolutionMechanism(listMetadata.resolutionMechanism, elementType),
             )
+            .add("/* emptyListAllowed= */ \$L\n", listMetadata.emptyListAllowed)
             .unindent()
             .add(")")
             .build()
@@ -421,33 +425,22 @@ object Generator {
     // Returns a CodeBlock containing the policy metadata for a list element
     //    new ElementTypePolicyMetadata(<element-policy-id>, ...)
     private fun generateListPolicyElementMetadata(policy: PolicyMetadata): CodeBlock {
-        val policyId = policy.generateListElementPolicyId(getListElementType(policy))
-        return when (policy.typeSpecificMetadata.listMetadata.listElementMetadataCase) {
+        val listMetadata = policy.typeSpecificMetadata.listMetadata
+        val policyId = policy.generateListElementPolicyId(getListElementType(listMetadata))
+        return when (listMetadata.listElementMetadataCase) {
             ListElementMetadataCase.ENUM_METADATA ->
-                generateEnumPolicyMetadata(
-                    policy,
-                    policy.typeSpecificMetadata.listMetadata.enumMetadata,
-                    policyId,
-                )
+                generateEnumPolicyMetadata(policy, listMetadata.enumMetadata, policyId)
             ListElementMetadataCase.INTEGER_METADATA ->
-                generateIntegerPolicyMetadata(
-                    policy,
-                    policyId,
-                    policy.typeSpecificMetadata.listMetadata.integerMetadata,
-                )
+                generateIntegerPolicyMetadata(policy, policyId, listMetadata.integerMetadata)
             ListElementMetadataCase.STRING_METADATA ->
-                generateStringPolicyMetadata(
-                    policy,
-                    policy.typeSpecificMetadata.listMetadata.stringMetadata,
-                    policyId,
-                )
+                generateStringPolicyMetadata(policy, listMetadata.stringMetadata, policyId)
             ListElementMetadataCase.LISTELEMENTMETADATA_NOT_SET ->
                 throw IllegalArgumentException("List Element type specific metadata unset")
         }
     }
 
-    private fun getListElementType(policy: PolicyMetadata): ClassName =
-        when (policy.typeSpecificMetadata.listMetadata.listElementMetadataCase) {
+    private fun getListElementType(listMetadata: ListPolicyMetadata): ClassName =
+        when (listMetadata.listElementMetadataCase) {
             ListElementMetadataCase.ENUM_METADATA -> ClassName.get(Integer::class.javaObjectType)
             ListElementMetadataCase.INTEGER_METADATA -> ClassName.get(Integer::class.javaObjectType)
             ListElementMetadataCase.STRING_METADATA -> ClassName.get(String::class.java)
@@ -472,7 +465,22 @@ object Generator {
                     proto.mostRestrictive.mostToLeastRestrictiveList
                 )
             EnumResolutionMechanismProto.MechanismCase.CUSTOM -> CodeBlock.of("null")
+            EnumResolutionMechanismProto.MechanismCase.NOT_COEXISTABLE ->
+                CodeBlock.of("new \$T()", notCoexistableType)
             EnumResolutionMechanismProto.MechanismCase.MECHANISM_NOT_SET ->
+                throw IllegalArgumentException("Resolution mechanism not set")
+        }
+    }
+
+    private fun generateListResolutionMechanism(
+        proto: ListResolutionMechanismProto,
+        elementType: ClassName,
+    ): CodeBlock {
+        return when (proto.mechanismCase) {
+            ListResolutionMechanismProto.MechanismCase.UNION ->
+                generateListUnionResolutionMechanism(elementType)
+            ListResolutionMechanismProto.MechanismCase.CUSTOM -> CodeBlock.of("null")
+            ListResolutionMechanismProto.MechanismCase.MECHANISM_NOT_SET ->
                 throw IllegalArgumentException("Resolution mechanism not set")
         }
     }
@@ -497,6 +505,16 @@ object Generator {
             .build()
     }
 
+    private fun generateListUnionResolutionMechanism(elementType: ClassName): CodeBlock {
+        val parameterizedListUnionType =
+            ParameterizedTypeName.get(
+                listUnionType,
+                ParameterizedTypeName.get(listType, elementType),
+            )
+
+        return CodeBlock.builder().add("new \$T()", parameterizedListUnionType).build()
+    }
+
     private val integerType = ClassName.get(Integer::class.javaObjectType)
     private val setType = ClassName.get(Set::class.java)
     private val listType = ClassName.get(List::class.java)
@@ -517,4 +535,8 @@ object Generator {
             "ResolutionMechanismMetadata",
             "MostRestrictive",
         )
+    private val listUnionType =
+        ClassName.get("android.app.admin.metadata", "ResolutionMechanismMetadata", "ListUnion")
+    private val notCoexistableType =
+        ClassName.get("android.app.admin.metadata", "ResolutionMechanismMetadata", "NotCoexistable")
 }

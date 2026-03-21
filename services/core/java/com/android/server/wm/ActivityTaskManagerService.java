@@ -445,7 +445,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     /** All processes we currently have running mapped by pid and uid */
     final WindowProcessControllerMap mProcessMap = new WindowProcessControllerMap();
     /** All processes that are going through stop activities for a package */
-    private final Map<String, ArraySet<Integer>> mPkgToStoppingProcessMap = new ArrayMap<>();
+    private final ArrayMap<String, ArraySet<Integer>> mPkgToStoppingProcessMap = new ArrayMap<>();
     /** This is the process holding what we currently consider to be the "home" activity. */
     volatile WindowProcessController mHomeProcess;
     /** The currently running heavy-weight process, if any. */
@@ -1516,7 +1516,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 // Change the realCallingUid to the calling activity's uid.
                 // In ActivityStarter, when caller is set, the callingUid and callingPid are
                 // ignored. So now both callingUid and realCallingUid is set to the caller app.
-                final int res = getActivityStartController()
+                final ActivityStarter starter = getActivityStartController()
                         .obtainStarter(intent, "startNextMatchingActivity")
                         .setCaller(r.app.getThread())
                         .setResolvedType(r.resolvedType)
@@ -1525,14 +1525,24 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                         .setResultWho(resultWho)
                         .setRequestCode(requestCode)
                         .setCallingPid(-1)
-                        .setCallingUid(r.launchedFromUid)
-                        .setCallingPackage(r.launchedFromPackage)
-                        .setCallingFeatureId(r.launchedFromFeatureId)
                         .setRealCallingPid(origCallingPid)
                         .setRealCallingUid(origCallingUid)
                         .setActivityOptions(options)
-                        .setUserId(userId)
-                        .execute();
+                        .setUserId(userId);
+                // Restrict identity forwarding to prevent caller ID spoofing (b/471797575).
+                // Only propagate the original caller's identity if the intermediary shares the same
+                // app ID or is a core system component (SYSTEM_UID).
+                final int intermediaryUid = r.getUid();
+                if (!UserHandle.isSameApp(intermediaryUid, r.launchedFromUid)
+                        && UserHandle.getAppId(intermediaryUid) != Process.SYSTEM_UID) {
+                    starter.setCallingUid(intermediaryUid)
+                            .setCallingPackage(r.packageName);
+                } else {
+                    starter.setCallingUid(r.launchedFromUid)
+                            .setCallingPackage(r.launchedFromPackage)
+                            .setCallingFeatureId(r.launchedFromFeatureId);
+                }
+                final int res = starter.execute();
                 r.finishing = wasFinishing;
                 return res == ActivityManager.START_SUCCESS;
             } finally {
@@ -5942,6 +5952,28 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mH.sendMessage(m);
         } finally {
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+        }
+    }
+
+    /**
+     * Removes the specified process ID (PID) from the stopping process map for a given list of
+     * packages.
+     */
+    @GuardedBy("mGlobalLock")
+    void removeProcessFromStoppingMap(@NonNull List<String> packagesToRemoveFrom, int pid) {
+        for (int i = packagesToRemoveFrom.size() - 1; i >= 0; i--) {
+            final String pkg = packagesToRemoveFrom.get(i);
+            ArraySet<Integer> pids = mPkgToStoppingProcessMap.get(pkg);
+            if (pids != null && pids.remove(pid)) {
+                ProtoLog.w(WM_DEBUG_PACKAGE_UPDATE,
+                        "Process with pid %d belonging to %s removed before stopping. This "
+                                + "likely "
+                                + "means that an external party killed the app process.", pid,
+                        pkg);
+                if (pids.isEmpty()) {
+                    mPkgToStoppingProcessMap.remove(pkg);
+                }
+            }
         }
     }
 

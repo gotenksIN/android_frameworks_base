@@ -17,12 +17,15 @@
 package com.android.systemui.notifications.intelligence.rules.ui.composable
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.android.systemui.lifecycle.rememberViewModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRuleEditViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRuleFreeformTextCreationViewModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesScreenViewModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.RulesScreenViewState
 import javax.inject.Inject
@@ -32,6 +35,7 @@ class NotificationRulesScreenImpl @Inject constructor() : NotificationRulesScree
     override fun Content(
         viewModelFactory: NotificationRulesScreenViewModel.Factory,
         editViewModelFactory: NotificationRuleEditViewModel.Factory,
+        freeformTextViewModelFactory: NotificationRuleFreeformTextCreationViewModel.Factory,
         dismissRulesScreen: () -> Unit,
         startingBackStack: List<RulesScreenViewState>,
         modifier: Modifier,
@@ -44,38 +48,55 @@ class NotificationRulesScreenImpl @Inject constructor() : NotificationRulesScree
         val screenViewModel =
             rememberViewModel("NotificationRulesScreen") { viewModelFactory.create(backStack) }
 
+        val onNavigateToEditScreen: (DraftRuleModel) -> Unit = { draftRule ->
+            val newState = RulesScreenViewState.EditRule(editViewModelFactory.create(draftRule))
+            backStack.add(newState)
+        }
+        val onEnterEditField: (RulesScreenViewState.EditField) -> Unit = { backStack.add(it) }
+        val onDismissRequest: () -> Unit = { backStack.removeLast() }
+
         Box(modifier = modifier) {
             when (val viewState = screenViewModel.currentScreen) {
                 is RulesScreenViewState.CurrentRules -> {
                     CurrentRulesScreen(
                         viewModel = screenViewModel,
                         onDismissCurrentRulesScreen = dismissRulesScreen,
-                        onNavigateToEditScreen = { draftRule ->
-                            val newState =
-                                RulesScreenViewState.EditRule(
-                                    editViewModelFactory.create(draftRule)
+                        onNavigateToEditScreen = onNavigateToEditScreen,
+                        onNavigateToFreeformRuleCreationScreen = {
+                            backStack.add(
+                                RulesScreenViewState.FreeformTextRuleCreation(
+                                    freeformTextViewModelFactory.create(onNavigateToEditScreen)
                                 )
-                            backStack.add(newState)
+                            )
                         },
+                    )
+                }
+
+                is RulesScreenViewState.FreeformTextRuleCreation -> {
+                    FreeformTextRuleCreationScreen(
+                        viewModel = viewState.viewModel,
+                        onDismissRequest = onDismissRequest,
+                        onEnterEditField = onEnterEditField,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 is RulesScreenViewState.EditRule -> {
                     NotificationRuleEdit(
                         viewModel = viewState.viewModel,
-                        onDismissRuleEditScreen = { backStack.removeLast() },
-                        onEnterEditField = { backStack.add(it) },
-                        onExitEditField = { backStack.removeLast() },
+                        onDismissRuleEditScreen = onDismissRequest,
+                        onEnterEditField = onEnterEditField,
+                        onExitEditField = onDismissRequest,
                     )
                 }
                 is RulesScreenViewState.EditField.Action -> {
-                    ActionChoiceScreen(viewState, onDismissRequest = { backStack.removeLast() })
+                    ActionChoiceScreen(viewState, onDismissRequest = onDismissRequest)
                 }
                 is RulesScreenViewState.EditField.Contacts -> {
-                    ContactChoiceScreen(viewState, onDismissRequest = { backStack.removeLast() })
+                    ContactChoiceScreen(viewState, onDismissRequest = onDismissRequest)
                 }
                 is RulesScreenViewState.EditField.Apps -> {
-                    AppChoiceScreen(viewState, onDismissRequest = { backStack.removeLast() })
+                    AppChoiceScreen(viewState, onDismissRequest = onDismissRequest)
                 }
             }
         }

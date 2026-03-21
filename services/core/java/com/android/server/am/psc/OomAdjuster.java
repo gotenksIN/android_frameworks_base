@@ -374,11 +374,10 @@ public abstract class OomAdjuster {
     final Object mProcLock;
 
     final Callback mCallback;
-    final StateGetter mStateGetter;
     final HostingTypeProvider mHostingTypeProvider;
     final Injector mInjector;
     protected final Constants mOomConstants;
-    final GlobalState mGlobalState;
+    final @NonNull GlobalState mGlobalState;
     final ProcessListInternal mProcessList;
 
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
@@ -504,6 +503,7 @@ public abstract class OomAdjuster {
          * @param app The process that was updated.
          * @param oldProcState The process's state before the update.
          * @param newProcState The process's state after the update.
+         * @param newOomAdj The process's OOM adjustment after the update.
          * @param now Current uptime.
          * @param nowElapsed Current elapsed time.
          * @param forceUpdatePssTime Whether to force a PSS update.
@@ -511,7 +511,7 @@ public abstract class OomAdjuster {
          * @param reportDebugMsgs Whether to report debug messages.
          */
         void onProcStateUpdated(ProcessRecordInternal app, @ProcessState int oldProcState,
-                @ProcessState int newProcState, long now, long nowElapsed,
+                @ProcessState int newProcState, @OomAdjust int newOomAdj, long now, long nowElapsed,
                 boolean forceUpdatePssTime, boolean doingAll, boolean reportDebugMsgs);
 
         /** Notifies when the process group for an application process has been updated. */
@@ -601,22 +601,6 @@ public abstract class OomAdjuster {
         /** Returns the current percentage of free swap space available on the system. */
         double getFreeSwapPercent();
     }
-
-    /**
-     * An interface for providing global state information required by the OomAdjuster.
-     * TODO: b/302575389 - Remove it after the pushGlobalStateToOomadjuster flag is migrated.
-     */
-    public interface StateGetter {
-        /** Checks if the device is fully awake (not sleeping or dozing). */
-        boolean isDeviceFullyAwake();
-        /** Checks if the given application process is the current target for backup operations. */
-        boolean isBackupProcess(ProcessRecordInternal app);
-        /** Checks if the last reported memory pressure level was normal. */
-        boolean isLastMemoryLevelNormal();
-        /** Returns the number of frozen processes. */
-        int getFrozenProcessCount();
-    }
-
 
     /**
      * An interface for providing hosting type information for a given process.
@@ -875,9 +859,8 @@ public abstract class OomAdjuster {
 
     OomAdjuster(Object serviceLock, Object procLock, ProcessListInternal processList,
             ActiveUidsInternal activeUids, ServiceThread adjusterThread, Constants oomConstants,
-            GlobalState globalState, Injector injector, Callback callback,
-            StateGetter stateGetter, Handler updateHandler,
-            HostingTypeProvider hostingTypeProvider) {
+            @NonNull GlobalState globalState, Injector injector, Callback callback,
+            Handler updateHandler, HostingTypeProvider hostingTypeProvider) {
         mServiceLock = serviceLock;
         mProcLock = procLock;
         mUpdateHandler = updateHandler;
@@ -887,7 +870,6 @@ public abstract class OomAdjuster {
         mInjector = injector;
         mProcessList = processList;
         mActiveUids = activeUids;
-        mStateGetter = stateGetter;
         mHostingTypeProvider = hostingTypeProvider;
 
         mLogger = new OomAdjusterDebugLogger(this, mOomConstants);
@@ -1661,11 +1643,7 @@ public abstract class OomAdjuster {
                 try {
                     int count;
                     if (i == STATE_FROZEN) {
-                        if (Flags.pushGlobalStateToOomadjuster()) {
-                            count = mGlobalState != null ? mGlobalState.getFrozenProcessCount() : 0;
-                        } else {
-                            count = mStateGetter != null ? mStateGetter.getFrozenProcessCount() : 0;
-                        }
+                        count = mGlobalState.getFrozenProcessCount();
                     } else {
                         count = mProcessCountsByState[i];
                     }
@@ -2117,11 +2095,7 @@ public abstract class OomAdjuster {
     }
 
     protected boolean isDeviceFullyAwake() {
-        if (Flags.pushGlobalStateToOomadjuster()) {
-            return mGlobalState.isAwake();
-        } else {
-            return mStateGetter.isDeviceFullyAwake();
-        }
+        return mGlobalState.isAwake();
     }
 
     protected boolean isScreenOnOrAnimatingLocked(ProcessRecordInternal state) {
@@ -2129,19 +2103,11 @@ public abstract class OomAdjuster {
     }
 
     protected boolean isBackupProcess(ProcessRecordInternal app) {
-        if (Flags.pushGlobalStateToOomadjuster()) {
-            return app == mGlobalState.getBackupTarget(app.userId);
-        } else {
-            return mStateGetter.isBackupProcess(app);
-        }
+        return app == mGlobalState.getBackupTarget(app.userId);
     }
 
     protected boolean isLastMemoryLevelNormal() {
-        if (Flags.pushGlobalStateToOomadjuster()) {
-            return mGlobalState.isLastMemoryLevelNormal();
-        } else {
-            return mStateGetter.isLastMemoryLevelNormal();
-        }
+        return mGlobalState.isLastMemoryLevelNormal();
     }
 
     protected boolean isReceivingBroadcast(ProcessRecordInternal app) {
@@ -2593,7 +2559,6 @@ public abstract class OomAdjuster {
             if (uidRec != null) {
                 uidRec.setProcAdjChanged(true);
             }
-            state.setVerifiedAdj(INVALID_ADJ);
         }
     }
 
@@ -2716,7 +2681,7 @@ public abstract class OomAdjuster {
             }
         }
         mCallback.onProcStateUpdated(state, state.getSetProcState(), state.getCurProcState(),
-                now, nowElapsed, forceUpdatePssTime, doingAll, reportDebugMsgs);
+                state.getCurAdj(), now, nowElapsed, forceUpdatePssTime, doingAll, reportDebugMsgs);
 
         int oldProcState = state.getSetProcState();
         if (state.getSetProcState() != state.getCurProcState()) {

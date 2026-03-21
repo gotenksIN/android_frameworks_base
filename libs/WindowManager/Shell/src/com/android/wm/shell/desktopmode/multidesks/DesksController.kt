@@ -129,6 +129,10 @@ class DesksController(
             userId,
             enforceDeskLimit,
         )
+        if (!canCreateDeskInDisplay(displayId, userId, enforceDeskLimit)) {
+            logW("createDeskSuspending new desk cannot be created, ignoring request")
+            return null
+        }
         val repository = userRepositories.getProfile(userId)
         val deskId = createDeskRootSuspending(displayId, userId)
         if (deskId == null) {
@@ -216,12 +220,6 @@ class DesksController(
         if (displayId == INVALID_DISPLAY) {
             logW("createDesk attempt with invalid displayId: %d", displayId)
             onResult(null)
-            return
-        }
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            // In single-desk, the desk reuses the display id.
-            logD("createDesk reusing displayId=%d for single-desk", displayId)
-            onResult(displayId)
             return
         }
         if (UserManager.isHeadlessSystemUserMode() && UserHandle.USER_SYSTEM == userId) {

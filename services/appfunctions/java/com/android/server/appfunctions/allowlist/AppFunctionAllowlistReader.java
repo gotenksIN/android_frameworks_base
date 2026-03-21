@@ -17,8 +17,8 @@
 package com.android.server.appfunctions.allowlist;
 
 import android.annotation.NonNull;
-
-import com.android.internal.infra.AndroidFuture;
+import android.annotation.RequiresPermission;
+import java.util.concurrent.CompletableFuture;
 
 /** Reads the AppFunction allowlist data. */
 public interface AppFunctionAllowlistReader {
@@ -32,6 +32,11 @@ public interface AppFunctionAllowlistReader {
      * @return The {@link AndroidFuture} for the result.
      */
     @NonNull
-    AndroidFuture<Boolean> isAllowlisted(
+    @RequiresPermission(
+            allOf = {
+                android.Manifest.permission.QUERY_ALLOWLIST,
+                android.Manifest.permission.INTERACT_ACROSS_USERS
+            })
+    CompletableFuture<Boolean> isAllowlisted(
             @NonNull String agentPackageName, @NonNull String targetPackageName, int userId);
 }

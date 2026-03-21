@@ -233,7 +233,7 @@
     <string name="tts_engine_network_required" msgid="8722087649733906851">"この言語でテキスト読み上げを出力するには、ネットワーク接続が正常に機能している必要があります。"</string>
     <string name="tts_default_sample_string" msgid="6388016028292967973">"これは音声合成のサンプルです"</string>
     <string name="tts_status_title" msgid="8190784181389278640">"デフォルトの言語のステータス"</string>
-    <string name="tts_status_ok" msgid="8583076006537547379">"<xliff:g id="LOCALE">%1$s</xliff:g>は完全サポート対象です"</string>
+    <string name="tts_status_ok" msgid="8583076006537547379">"<xliff:g id="LOCALE">%1$s</xliff:g>は完全サ⁠ポ⁠ー⁠ト⁠対⁠象⁠で⁠す"</string>
     <string name="tts_status_requires_network" msgid="8327617638884678896">"<xliff:g id="LOCALE">%1$s</xliff:g>ではネットワーク接続が必要です"</string>
     <string name="tts_status_not_supported" msgid="2702997696245523743">"<xliff:g id="LOCALE">%1$s</xliff:g>はサポート対象ではありません"</string>
     <string name="tts_status_checking" msgid="8026559918948285013">"確認しています…"</string>
@@ -760,9 +760,6 @@
     <string name="accessibility_ethernet_disconnected" msgid="2832501530856497489">"イーサネット接続を解除しました。"</string>
     <string name="accessibility_ethernet_connected" msgid="6175942685957461563">"イーサネット。"</string>
     <string name="accessibility_no_calling" msgid="3540827068323895748">"通話なし。"</string>
-    <string name="physical_keyboard_title" msgid="4811935435315835220">"物理キーボード"</string>
-    <string name="keyboard_layout_dialog_title" msgid="3927180147005616290">"キーボード レイアウトの選択"</string>
-    <string name="keyboard_layout_default_label" msgid="1997292217218546957">"デフォルト"</string>
     <string name="turn_screen_on_title" msgid="2662312432042116026">"画面をオンにする"</string>
     <string name="allow_turn_screen_on" msgid="6194845766392742639">"画面をオンにすることを許可する"</string>
     <string name="allow_turn_screen_on_description" msgid="43834403291575164">"画面をオンにすることをアプリに許可します。許可すると、ユーザーからの明示的インテントを必要とせずに、アプリがいつでも画面をオンにできるようになります。"</string>

@@ -22,22 +22,42 @@ import com.android.window.flags.Flags
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.EnterReason
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ExitReason
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.UnminimizeReason
+import com.android.wm.shell.desktopmode.homescreenpeeking.DesktopHomeScreenPeekController
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource.ADB_COMMAND
 import com.android.wm.shell.sysui.ShellCommandHandler
 import com.android.wm.shell.sysui.ShellController
+import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.FocusTransitionObserver
 import java.io.PrintWriter
+import java.util.Optional
 
 /** Handles the shell commands for the DesktopTasksController. */
 class DesktopModeShellCommandHandler(
-    private val controller: DesktopTasksController,
+    private val controller: Optional<DesktopTasksController>,
     private val focusTransitionObserver: FocusTransitionObserver,
     private val userRepositories: DesktopUserRepositories,
     private val shellController: ShellController,
+    desktopState: ShellDesktopState,
+    private val shellCommandHandler: ShellCommandHandler,
+    shellInit: ShellInit,
+    private val desktopHomeScreenPeekController: DesktopHomeScreenPeekController,
 ) : ShellCommandHandler.ShellCommandActionHandler {
 
-    override fun onShellCommand(args: Array<String>, pw: PrintWriter): Boolean =
-        when (args[0]) {
+    init {
+        if (desktopState.canEnterDesktopMode) {
+            shellInit.addInitCallback({ onInit() }, this)
+        }
+    }
+
+    private fun onInit() {
+        shellCommandHandler.addCommandCallback("desktopmode", this, this)
+    }
+
+    override fun onShellCommand(args: Array<String>, pw: PrintWriter): Boolean {
+        if (args.isEmpty()) {
+            return printInvalidCommandAndShowHelp(args, pw)
+        }
+        return when (args[0]) {
             "moveTaskToDesk" -> runMoveTaskToDesk(args, pw)
             "moveToNextDisplay" -> runMoveToNextDisplay(args, pw)
             "createDesk" -> runCreateDesk(args, pw)
@@ -50,11 +70,10 @@ class DesktopModeShellCommandHandler(
             "getActiveDeskId" -> runGetActiveDeskId(args, pw)
             "clearRememberedBounds" -> runClearRememberedBounds(args, pw)
             "clearAllRememberedBounds" -> runClearAllRememberedBounds(args, pw)
-            else -> {
-                pw.println("Invalid command: ${args[0]}")
-                false
-            }
+            "peek" -> runPeekHomeScreen(args, pw)
+            else -> printInvalidCommandAndShowHelp(args, pw)
         }
+    }
 
     private fun runMoveTaskToDesk(args: Array<String>, pw: PrintWriter): Boolean {
         if (args.size < 2) {
@@ -79,12 +98,6 @@ class DesktopModeShellCommandHandler(
             return false
         }
 
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            return controller.moveTaskToDefaultDeskAndActivate(
-                taskId,
-                transitionSource = ADB_COMMAND,
-            )
-        }
         if (args.size < 3) {
             pw.println("Error: desk id should be provided as arguments")
             return false
@@ -96,7 +109,9 @@ class DesktopModeShellCommandHandler(
                 pw.println("Error: desk id should be an integer")
                 return false
             }
-        controller.moveTaskToDesk(taskId = taskId, deskId = deskId, transitionSource = ADB_COMMAND)
+        controller
+            .get()
+            .moveTaskToDesk(taskId = taskId, deskId = deskId, transitionSource = ADB_COMMAND)
         return true
     }
 
@@ -116,15 +131,11 @@ class DesktopModeShellCommandHandler(
             pw.println("Error: no appropriate task found")
             return false
         }
-        controller.moveToNextDisplay(taskId, enterReason = EnterReason.ADB_COMMAND)
+        controller.get().moveToNextDisplay(taskId, enterReason = EnterReason.ADB_COMMAND)
         return true
     }
 
     private fun runCreateDesk(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
         if (args.size < 2) {
             // First argument is the action name.
             pw.println("Error: desk id should be provided as arguments")
@@ -137,15 +148,11 @@ class DesktopModeShellCommandHandler(
                 pw.println("Error: display id should be an integer")
                 return false
             }
-        controller.createDesk(displayId)
+        controller.get().createDesk(displayId)
         return true
     }
 
     private fun runActivateDesk(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
         if (args.size < 2) {
             // First argument is the action name.
             pw.println("Error: desk id should be provided as arguments")
@@ -158,15 +165,11 @@ class DesktopModeShellCommandHandler(
                 pw.println("Error: desk id should be an integer")
                 return false
             }
-        controller.activateDesk(deskId = deskId, enterReason = EnterReason.ADB_COMMAND)
+        controller.get().activateDesk(deskId = deskId, enterReason = EnterReason.ADB_COMMAND)
         return true
     }
 
     private fun runRemoveDesk(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
         if (args.size < 2) {
             // First argument is the action name.
             pw.println("Error: desk id should be provided as arguments")
@@ -179,33 +182,29 @@ class DesktopModeShellCommandHandler(
                 pw.println("Error: desk id should be an integer")
                 return false
             }
-        controller.removeDesk(
-            deskId = deskId,
-            exitReason = ExitReason.ADB_COMMAND_EXIT,
-            shouldEndUpAtHome = true,
-            skipWallpaperAndHomeOrdering = false,
-        )
+        controller
+            .get()
+            .removeDesk(
+                deskId = deskId,
+                exitReason = ExitReason.ADB_COMMAND_EXIT,
+                shouldEndUpAtHome = true,
+                skipWallpaperAndHomeOrdering = false,
+            )
         return true
     }
 
     private fun runRemoveAllDesks(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
-        controller.removeAllDesks(
-            exitReason = ExitReason.ADB_COMMAND_EXIT,
-            shouldEndUpAtHome = true,
-            skipWallpaperAndHomeOrdering = false,
-        )
+        controller
+            .get()
+            .removeAllDesks(
+                exitReason = ExitReason.ADB_COMMAND_EXIT,
+                shouldEndUpAtHome = true,
+                skipWallpaperAndHomeOrdering = false,
+            )
         return false
     }
 
     private fun runMoveTaskToFront(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
         if (args.size < 2) {
             // First argument is the action name.
             pw.println("Error: task id should be provided as arguments")
@@ -218,19 +217,17 @@ class DesktopModeShellCommandHandler(
                 pw.println("Error: task id should be an integer")
                 return false
             }
-        controller.moveTaskToFront(
-            taskId = taskId,
-            remoteTransition = null,
-            unminimizeReason = UnminimizeReason.UNKNOWN,
-        )
+        controller
+            .get()
+            .moveTaskToFront(
+                taskId = taskId,
+                remoteTransition = null,
+                unminimizeReason = UnminimizeReason.UNKNOWN,
+            )
         return true
     }
 
     private fun runMoveTaskOutOfDesk(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
         if (args.size < 2) {
             // First argument is the action name.
             pw.println("Error: task id should be provided as arguments")
@@ -243,13 +240,14 @@ class DesktopModeShellCommandHandler(
                 pw.println("Error: task id should be an integer")
                 return false
             }
-        controller.moveToFullscreen(taskId, transitionSource = ADB_COMMAND)
+        controller.get().moveToFullscreen(taskId, transitionSource = ADB_COMMAND)
         return true
     }
 
     private fun runCanCreateDesk(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
+        if (args.size < 2) {
+            // First argument is the displayId.
+            pw.println("Error: displayId should be provided as an argument")
             return false
         }
         val displayId =
@@ -264,10 +262,6 @@ class DesktopModeShellCommandHandler(
     }
 
     private fun runGetActiveDeskId(args: Array<String>, pw: PrintWriter): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("Not supported.")
-            return false
-        }
         if (args.size < 2) {
             // First argument is the action name.
             pw.println("Error: task id should be provided as arguments")
@@ -312,17 +306,30 @@ class DesktopModeShellCommandHandler(
         return true
     }
 
-    override fun printShellCommandHelp(pw: PrintWriter, prefix: String) {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            pw.println("$prefix moveTaskToDesk <taskId|0>")
-            pw.println(
-                "$prefix  Move a task with given id to desktop mode. " +
-                    "TaskId 0 means focused task on the default display."
-            )
-            pw.println("$prefix moveToNextDisplay <taskId> ")
-            pw.println("$prefix  Move a task with given id to next display.")
-            return
+    private fun runPeekHomeScreen(args: Array<String>, pw: PrintWriter): Boolean {
+        if (!Flags.enableHomeScreenPeeking()) {
+            pw.println("Not supported.")
+            return false
         }
+        if (desktopHomeScreenPeekController.isPeeking) {
+            desktopHomeScreenPeekController.unpeek()
+        } else {
+            desktopHomeScreenPeekController.peek()
+        }
+        return true
+    }
+
+    private fun printInvalidCommandAndShowHelp(args: Array<String>, pw: PrintWriter): Boolean {
+        if (args.isNotEmpty()) {
+            pw.println("Invalid command: ${args[0]}")
+        } else {
+            pw.println("No command provided.")
+        }
+        printShellCommandHelp(pw, "    ")
+        return false
+    }
+
+    override fun printShellCommandHelp(pw: PrintWriter, prefix: String) {
         pw.println("$prefix moveTaskToDesk <taskId|0> <deskId>")
         pw.println(
             "$prefix  Move a task with given id to the given desk and activate it. " +
@@ -350,5 +357,7 @@ class DesktopModeShellCommandHandler(
         pw.println("$prefix  Clears the remembered bounds for the given package.")
         pw.println("$prefix clearAllRememberedBounds")
         pw.println("$prefix  Clears the remembered bounds for all packages.")
+        pw.println("$prefix peek")
+        pw.println("$prefix  Peeks the home screen by moving desktop tasks to sides of the screen.")
     }
 }

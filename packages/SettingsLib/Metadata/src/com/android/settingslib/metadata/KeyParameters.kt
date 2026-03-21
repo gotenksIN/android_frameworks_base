@@ -156,13 +156,13 @@ class KeyParametersSchema private constructor(
         val name: String,
         @StringRes val purpose: Int,
         val required: Boolean,
-        val type: ApiType<*>
+        val type: ApiType<*, *>
     ) {
         constructor(
             name: String,
             description: String,
             required: Boolean,
-            type: ApiType<*>
+            type: ApiType<*, *>
         ) : this(name, description.hashCode(), required, type) {
             purposeHashMap[description.hashCode()] = description
         }
@@ -214,7 +214,7 @@ class KeyParametersSchema private constructor(
          * @param type The type of the parameter, used to generate its possible values.
          * @throws IllegalArgumentException if a parameter with the same name is already defined.
          */
-        fun parameter(name: String, @StringRes purpose: Int, required: Boolean = false, type: ApiType<*>): Builder {
+        fun parameter(name: String, @StringRes purpose: Int, required: Boolean = false, type: ApiType<*, *>): Builder {
             if (parameters.containsKey(name)) {
                 throw IllegalArgumentException("Parameter '$name' is already defined.")
             }
@@ -223,7 +223,7 @@ class KeyParametersSchema private constructor(
         }
 
         // TODO (b/468973102): remove this when all current parameterized screens migrated to string res purpose
-        fun parameter(name: String, purpose: String, required: Boolean = false, type: ApiType<*>): Builder {
+        fun parameter(name: String, purpose: String, required: Boolean = false, type: ApiType<*, *>): Builder {
             if (parameters.containsKey(name)) {
                 throw IllegalArgumentException("Parameter '$name' is already defined.")
             }
@@ -338,7 +338,11 @@ class KeyParametersSchema private constructor(
      * the parameterized screen is expected to gracefully accept and handle empty [ValidatedKeyParameters]
      * to ensure compatibility with older configurations or entry points.
      */
-    fun prepareEmpty() = prepare(emptyMap())
+    fun prepareEmpty(): ValidatedKeyParameters {
+        // This skips the required check as it is used when there are no
+        // parameters.
+        return ValidatedKeyParameters(this, mapOf())
+    }
 
     /**
      * Returns the map of parameter definitions.

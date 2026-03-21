@@ -759,6 +759,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_markup">Markup</string>
+    <!-- Label for a button opening a color picker menu in screen recording. [CHAR LIMIT=NONE] -->
+    <string name="screen_record_color_picker">Color picker</string>
     <!-- Snackbar shows after the screen recording is saved [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4780,8 +4782,14 @@
     <string name="notification_rules_activity_title" translatable="false">Notification Rules</string>
     <!-- Title for a page where users can create a new notification rule. [CHAR LIMIT=NONE]-->
     <string name="notification_rules_create_new_title" translatable="false">Create New</string>
-    <!-- Title for a button that will let users create a new notification rule. [CHAR LIMIT=NONE]-->
-    <string name="notification_rules_create_new_rule" translatable="false">Create new rule</string>
+    <!-- Text explaining that a notification rule is being generated and the user must wait for generation to finish. [CHAR LIMIT=NONE]-->
+    <string name="notification_rules_generating" translatable="false">Generating a rule\u2026</string>
+    <!-- Title for an error box explaining that a notification rule could not be generated. [CHAR LIMIT=NONE]-->
+    <string name="notification_rules_generation_error_title" translatable="false">Generation error</string>
+    <!-- Error text explaining that a notification rule could not be generated. [CHAR LIMIT=NONE]-->
+    <string name="notification_rules_generation_error_body" translatable="false">The rule could not be generated. Please try again.</string>
+    <!-- Title for a button that will let users move to the next step of creating a new notification rule. [CHAR LIMIT=NONE]-->
+    <string name="notification_rules_next" translatable="false">Next</string>
 
     <!-- Notifications with this action will be highlighted in the list and will alert the user via sound and/or vibration if enabled. [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4815,6 +4823,8 @@
     <!-- Title for a page where users choose the action for a notification rule. [CHAR LIMIT=50]-->
     <string name="notification_rules_choose_action_title" translatable="false">Choose Action</string>
 
+    <!-- The full text for a notification rule. Includes substrings for particular parts of the rule, like what apps are part of the rule or what contacts are part of the rule. [CHAR LIMIT=NONE] -->
+    <string name="notification_rules_full_text" translatable="false">Notifications<xliff:g id="appsSubstring">%1$s</xliff:g><xliff:g id="contactsSubstring">%2$s</xliff:g></string>
     <!-- Text explaining that the notification rule applies to a single item. For example, "from Phone" explains that the rule applies to just notifications from the 'Phone' app.
      The "valueField" annotation specifies that 'Phone' is the item value. When the user taps on 'Phone', they will be able to change which items(s) are selected. [CHAR LIMIT=NONE]-->
     <string name="notification_rules_from_single_item" translatable="false">\u0020from <annotation valueField="true"><xliff:g id="item">^1</xliff:g></annotation></string>
@@ -6549,7 +6559,7 @@
     <string name="controls_media_settings_button">Settings</string>
     <!-- Description for media control's playing media item, including information for the media's title, the artist, and source app [CHAR LIMIT=NONE]-->
     <string name="controls_media_playing_item_description"><xliff:g id="song_name" example="Daily mix">%1$s</xliff:g> by <xliff:g id="artist_name" example="Various artists">%2$s</xliff:g> is playing from <xliff:g id="app_label" example="Spotify">%3$s</xliff:g></string>
-    <!-- Content description for media cotnrols progress bar [CHAR_LIMIT=NONE] -->
+    <!-- Content description for media controls progress bar [CHAR_LIMIT=NONE] -->
     <string name="controls_media_seekbar_description"><xliff:g id="elapsed_time" example="1:30">%1$s</xliff:g> of <xliff:g id="total_time" example="3:00">%2$s</xliff:g></string>
     <!-- Placeholder title to inform user that an app has posted media controls [CHAR_LIMIT=NONE] -->
     <string name="controls_media_empty_title"><xliff:g id="app_name" example="Foo Music App">%1$s</xliff:g> is running</string>
@@ -6564,6 +6574,8 @@
     <string name="controls_media_button_next">Next track</string>
     <!-- Description for button in media controls. Used when media is connecting to a remote device (via something like chromecast). Pressing button does nothing [CHAR_LIMIT=NONE] -->
     <string name="controls_media_button_connecting">Connecting</string>
+    <!-- Description for a button that opens the output switcher dialog [CHAR_LIMIT=NONE] -->
+    <string name="controls_media_output_chip">Open output settings</string>
 
     <!--- ****** Media tap-to-transfer ****** -->
     <!-- Text for a button to undo the media transfer. [CHAR LIMIT=20] -->
@@ -7635,6 +7647,9 @@
     <!-- Accessibility text for the click action of the Box embedding full-screen overlays. When clicked, it will close the overlay. This will be used following "Double-tap to..." [CHAR LIMIT=NONE] -->
     <string name="accessibility_close_overlay_action">go back</string>
 
+    <!-- Content description for the Box embedding full-screen overlays which, when clicked, will close the overlay. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_close_overlay_box_description">back</string>
+
     <!-- Description for the Ambient Cue accessibility action label for autofilling. [CHAR LIMIT=NONE] -->
     <string name="ambient_cue_autofill_action">autofill</string>
 
@@ -7687,29 +7702,29 @@
     <!-- Label for the camera toggle [CHAR LIMIT=NONE] -->
     <string name="av_camera_label">Camera</string>
     <!-- Title for background blur drill in page [CHAR LIMIT=20] -->
-    <string name="av_camera_blur_drill_in_title">Background Blur</string>
+    <string name="av_camera_blur_drill_in_title">Background blur</string>
     <!-- Title for background blur off [CHAR LIMIT=NONE] -->
     <string name="av_camera_blur_off">Off</string>
     <!-- Title for background blur light [CHAR LIMIT=NONE] -->
-    <string name="av_camera_blur_light">Light</string>
+    <string name="av_camera_blur_light">Light blur</string>
     <!-- Title for background blur full [CHAR LIMIT=NONE] -->
-    <string name="av_camera_blur_full">Full</string>
+    <string name="av_camera_blur_full">Heavy blur</string>
     <!-- Title for portrait relight button [CHAR LIMIT=NONE] -->
     <string name="av_camera_improve_lighting">Improve lighting</string>
     <!-- Title for portrait retouch button [CHAR LIMIT=NONE] -->
     <string name="av_camera_face_retouch">Portrait touch-up</string>
     <!-- Title for camera framing button [CHAR LIMIT=NONE] -->
-    <string name="av_camera_framing">Camera Framing</string>
+    <string name="av_camera_framing">Camera framing</string>
     <!-- Title for studio mic button [CHAR LIMIT=NONE] -->
-    <string name="av_studio_mic">Studio Mic</string>
+    <string name="av_studio_mic">Studio mic</string>
     <!-- Title for studio look button [CHAR LIMIT=NONE] -->
-    <string name="av_studio_look">Studio Look</string>
+    <string name="av_studio_look">Studio look</string>
     <!-- Subtitle for studio look button showing number of active effects [CHAR LIMIT=NONE] -->
     <string name="av_studio_look_effects">%d effects</string>
     <!-- Title for blur button [CHAR LIMIT=NONE] -->
     <string name="av_blur">Blur</string>
     <!-- Title for live captions button [CHAR LIMIT=NONE] -->
-    <string name="av_live_captions">Live Captions</string>
+    <string name="av_live_captions">Live captions</string>
     <!-- Content description for return action -->
     <string name="av_drill_in_return_to_main">Back</string>
 
@@ -7740,4 +7755,21 @@
     <string name="dream_setup_button_not_now">Not now</string>
     <!-- Label for the "Set up" button in the dream contextual setup bottom sheet. [CHAR LIMIT=20] -->
     <string name="dream_setup_button_setup">Set up</string>
+
+    <!-- Android Context Engine Usecases -->
+    <!-- Label for the settings button on data attribution dialog. [CHAR LIMIT=30] -->
+    <string name="ace_attribution_dialog_settings_label">Settings</string>
+    <!-- Label for the title of the data attribution dialog. [CHAR LIMIT=50] -->
+    <string name="ace_attribution_dialog_title">Magic Cue Suggestions</string>
+    <!-- Label for the attribution description shown prior to the Attributions. [CHAR_LIMIT=50] -->
+    <string name="ace_attribution_dialog_description">Items considered in this suggestion</string>
+    <!-- Accessibility label for the attribution header icon. [CHAR_LIMIT=NONE] -->
+    <string name="ace_attribution_header_icon_accessibility_description">Android Device Intelligence icon</string>
+    <!-- Accessibility label for the settings button on attribution dialog. [CHAR_LIMIT=NONE] -->
+    <string name="ace_attribution_settings_button_accessibility_description">Settings button</string>
+    <!-- Accessibility label for the thumbs up button on attribution dialog. [CHAR_LIMIT=NONE] -->
+    <string name="ace_attribution_thumbs_up_button_accessibility_description">Thumbs up feedback button</string>
+    <!-- Accessibility label for the thumbs down button on attribution dialog. [CHAR_LIMIT=NONE] -->
+    <string name="ace_attribution_thumbs_down_button_accessibility_description">Thumbs down feedback button</string>
+
 </resources>

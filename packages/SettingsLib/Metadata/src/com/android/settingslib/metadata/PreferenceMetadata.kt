@@ -19,11 +19,14 @@ package com.android.settingslib.metadata
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.provider.Settings
 import androidx.annotation.AnyThread
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.android.settingslib.metadata.preferencesapi.ApiPreference
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen
+import com.android.settingslib.utils.applications.AppUtils
 
 /** Indicates how sensitive of the data. */
 @Retention(AnnotationRetention.SOURCE)
@@ -203,6 +206,54 @@ interface PreferenceMetadata {
     fun intent(context: Context): Intent? = null
 }
 
+/**
+ * If this metadata can be exposed to the user
+ */
+fun PreferenceMetadata.isExposable(context: Context) : Boolean {
+    val showUiOnlyPreferences=
+        AppUtils.isDebuggable() && (Settings.Global.getInt(
+            context.contentResolver,
+            "com.android.settings.EXCLUDE_UI_ONLY_PREFERENCES",
+            1,
+        ) == 0)
+    val showDoNotExposePreferences =
+        AppUtils.isDebuggable() && (Settings.Global.getInt(
+            context.contentResolver,
+            "com.android.settings.UNKNOWN_SENSITIVITY_IS_AVAILABLE",
+            0,
+        ) == 1)
+    return (this.isExposureAllowed() || showDoNotExposePreferences)
+            && (!this.isUiOnlyPreference(context) || showUiOnlyPreferences)
+}
+
+/**
+ * If this metadata object has a sensitivity which allows exposure
+ */
+fun PreferenceMetadata.isExposureAllowed() : Boolean = listOf(
+    SensitivityLevel.NO_SENSITIVITY,
+    SensitivityLevel.MUST_PROVIDE_UNDO,
+    SensitivityLevel.REQUIRES_CONFIRMATION,
+    SensitivityLevel.DEEP_LINK_ONLY
+).contains(sensitivityLevel)
+
+/**
+ * If this metadata is allowed to have a get value
+ */
+fun PreferenceMetadata.isGetAllowed() : Boolean = listOf(
+    SensitivityLevel.NO_SENSITIVITY,
+    SensitivityLevel.MUST_PROVIDE_UNDO,
+    SensitivityLevel.REQUIRES_CONFIRMATION,
+    SensitivityLevel.DEEP_LINK_ONLY
+).contains(sensitivityLevel)
+
+/**
+ * If this metadata is allowed to have a set value
+ */
+fun PreferenceMetadata.isSetAllowed() : Boolean = listOf(
+    SensitivityLevel.NO_SENSITIVITY,
+    SensitivityLevel.MUST_PROVIDE_UNDO
+).contains(sensitivityLevel)
+
 /** Metadata of preference group. */
 @AnyThread
 interface PreferenceGroup : PreferenceMetadata {
@@ -247,7 +298,7 @@ const val MUSTPASS_SET = "mustpass_set"
 /** Returns a string describing the preconditions for accessing the preference. */
 fun PreferenceMetadata.accessPreconditionsAsString(context: Context): String? {
     val preconditions =
-        if (this is ApiPreference<*>) {
+        if (this is ApiPreference<*, *>) {
             listOfNotNull(
                     screenPreconditions?.getDescription(context),
                     preconditions?.getDescription(context),
@@ -264,39 +315,55 @@ fun PreferenceMetadata.accessPreconditionsAsString(context: Context): String? {
 
 /** Returns a string describing the preconditions for reading the preference. */
 fun PreferenceMetadata.getPreconditionsAsString(context: Context): String? {
-    return (this as? ApiPreference<*>)?.get?.preconditions?.getDescription(context)?.let {
+    return (this as? ApiPreference<*, *>)?.get?.preconditions?.getDescription(context)?.let {
         "Preconditions to reading: $it."
     }
 }
 
 /** Returns a string describing the preconditions for writing the preference. */
 fun PreferenceMetadata.setPreconditionsAsString(context: Context): String? {
-    return (this as? ApiPreference<*>)?.set?.preconditions?.getDescription(context)?.let {
+    return (this as? ApiPreference<*, *>)?.set?.preconditions?.getDescription(context)?.let {
         "Preconditions to writing: $it."
     }
 }
 
 /** Returns a string describing the warning for writing the preference. */
 fun PreferenceMetadata.setWarningAsString(context: Context): String? {
-    return (this as? ApiPreference<*>)?.set?.warning?.let { warningConfig ->
-        val warningMessage = warningConfig.getWarning(context)
+    val warningInfo = when (this) {
+        is ApiPreference<*, *> -> {
+            this.set?.warning?.let { warningConfig ->
+                val warningMessage = warningConfig.getWarning(context)
 
-        val preconditionsDescription = when {
-            warningConfig.preconditions != null ->
-                warningConfig.preconditions.getDescription(context)
+                val preconditionsDescription = when {
+                    warningConfig.preconditions != null ->
+                        warningConfig.preconditions.getDescription(context)
 
-            warningConfig.valuePreconditions != null ->
-                warningConfig.valuePreconditions.getDescription(context)
+                    warningConfig.valuePreconditions != null ->
+                        warningConfig.valuePreconditions.getDescription(context)
 
-            else -> null
+                    else -> null
+                }
+
+                WarningInfo(preconditionsDescription, warningMessage)
+            }
         }
 
+        is PreferenceSetWarningProvider -> {
+            this.setWarning
+        }
+
+        else -> {
+            null
+        }
+    }
+
+    return warningInfo?.let { warning ->
         // Compute the set warning as a string message
         val conditionalText =
-            preconditionsDescription?.takeIf { it.isNotBlank() }?.let { description ->
-                " if preconditions are met: $description"
+            warning.preconditionsDescription?.takeIf { it.isNotBlank() }?.let { description ->
+                " (if preconditions are met: $description)"
             } ?: ""
 
-        "Warning before writing: $warningMessage (must be shown$conditionalText)."
+        "[Must show to user]: ${warning.warningMessage}$conditionalText."
     }
 }

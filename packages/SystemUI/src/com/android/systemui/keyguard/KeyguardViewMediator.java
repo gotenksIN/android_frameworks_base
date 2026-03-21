@@ -194,6 +194,7 @@ import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 import com.android.window.flags.Flags;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 import com.android.wm.shell.shared.compat.AnimatedSurface;
+import com.android.wm.shell.shared.compat.AnimatedSurfaceUtils;
 import com.android.wm.shell.shared.compat.SurfaceTransition;
 
 import dagger.Lazy;
@@ -2751,7 +2752,8 @@ public class KeyguardViewMediator implements CoreStartable,
      * Send message to keyguard telling it to reset its state.
      * @see #handleReset
      */
-    private void resetStateLocked() {
+    @VisibleForTesting
+    void resetStateLocked() {
         resetStateLocked(/* hideBouncer= */ true);
     }
 
@@ -3637,18 +3639,21 @@ public class KeyguardViewMediator implements CoreStartable,
                 // Filter out any closing apps, such as the dream.
                 AnimatedSurface[] openingApps = params.getApps();
                 if (dismissDreamOnKeyguardDismiss()) {
-                    openingApps = Arrays.stream(params.getApps()).filter(AnimatedSurface::isOpening)
+                    openingApps = Arrays.stream(params.getApps())
+                            .filter(AnimatedSurfaceUtils::isOpening)
                             .toArray(AnimatedSurface[]::new);
                 }
 
                 // Pass the surface and metadata to the unlock animation controller.
                 AnimatedSurface[] openingWallpapers =
                         Arrays.stream(Objects.requireNonNull(params.getWallpapers()))
-                                .filter(AnimatedSurface::isOpening).toArray(AnimatedSurface[]::new);
+                                .filter(AnimatedSurfaceUtils::isOpening)
+                                .toArray(AnimatedSurface[]::new);
 
                 AnimatedSurface[] closingWallpapers =
                         Arrays.stream(Objects.requireNonNull(params.getWallpapers()))
-                                .filter(AnimatedSurface::isClosing).toArray(AnimatedSurface[]::new);
+                                .filter(AnimatedSurfaceUtils::isClosing)
+                                .toArray(AnimatedSurface[]::new);
 
                 mKeyguardUnlockAnimationControllerLazy.get()
                         .notifyStartSurfaceBehindRemoteAnimation(
@@ -4112,10 +4117,13 @@ public class KeyguardViewMediator implements CoreStartable,
             mIsKeyguardExitAnimationCanceled = true;
 
             // There are cases where a reset will be triggered as the process to hide keyguard
-            // begins. Make sure to tell WM to cancel any requests to go away.
+            // begins. Make sure to tell WM to cancel any requests to go away and notify
+            // KeyguardStateController to ensure both understand that keyguard is showing.
             if (mHiding) {
                 setShowingLocked(true /* showing */, true /* force */,
                         "handleReset while mHiding == true");
+                mKeyguardStateController.notifyKeyguardState(true,
+                        mKeyguardStateController.isOccluded());
                 mKeyguardInteractor.showKeyguard();
             }
 

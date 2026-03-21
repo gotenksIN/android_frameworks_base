@@ -641,6 +641,14 @@ class StorageManagerService extends IStorageManager.Stub
     // Not guarded by lock, always used on the ActivityManager thread
     private final SparseArray<PackageMonitor> mPackageMonitorsForUser = new SparseArray<>();
 
+    private int getAppId(int uid) {
+        int appUid = mContext.getPackageManager().getAppUidForPrivateComputeCoreUid(uid);
+        if (appUid != Process.INVALID_UID) {
+            return UserHandle.getAppId(appUid);
+        }
+        return UserHandle.getAppId(uid);
+    }
+
     class ObbState implements IBinder.DeathRecipient {
         public ObbState(String rawPath, String canonicalPath, int callingUid,
                 IObbActionListener token, int nonce, String volId) {
@@ -2201,19 +2209,19 @@ class StorageManagerService extends IStorageManager.Stub
 
         ProviderInfo provider = getProviderInfo(MediaStore.AUTHORITY);
         if (provider != null) {
-            mMediaStoreAuthorityAppId = UserHandle.getAppId(provider.getUid());
+            mMediaStoreAuthorityAppId = getAppId(provider.getUid());
             mMediaStorePackageName = provider.packageName;
             sMediaStoreAuthorityProcessName = provider.applicationInfo.processName;
         }
 
         provider = getProviderInfo(Downloads.Impl.AUTHORITY);
         if (provider != null) {
-            mDownloadsAuthorityAppId = UserHandle.getAppId(provider.getUid());
+            mDownloadsAuthorityAppId = getAppId(provider.getUid());
         }
 
         provider = getProviderInfo(DocumentsContract.EXTERNAL_STORAGE_PROVIDER_AUTHORITY);
         if (provider != null) {
-            mExternalStorageAuthorityAppId = UserHandle.getAppId(provider.getUid());
+            mExternalStorageAuthorityAppId = getAppId(provider.getUid());
         }
     }
 
@@ -3680,7 +3688,7 @@ class StorageManagerService extends IStorageManager.Stub
      */
     private void enforceExternalStorageService() {
         enforcePermission(android.Manifest.permission.WRITE_MEDIA_STORAGE);
-        int callingAppId = UserHandle.getAppId(Binder.getCallingUid());
+        int callingAppId = getAppId(Binder.getCallingUid());
         if (callingAppId != mMediaStoreAuthorityAppId) {
             throw new SecurityException("Only the ExternalStorageService is permitted");
         }
@@ -4606,8 +4614,9 @@ class StorageManagerService extends IStorageManager.Stub
                 return StorageManager.MOUNT_MODE_EXTERNAL_PASS_THROUGH;
             }
 
-            if ((mDownloadsAuthorityAppId == UserHandle.getAppId(uid)
-                    || mExternalStorageAuthorityAppId == UserHandle.getAppId(uid))) {
+            int pccAwareAppId = getAppId(uid);
+            if ((mDownloadsAuthorityAppId == pccAwareAppId
+                    || mExternalStorageAuthorityAppId == pccAwareAppId)) {
                 // DownloadManager can write in app-private directories on behalf of apps;
                 // give it write access to Android/
                 // ExternalStorageProvider can access Android/{data,obb} dirs in managed mode
@@ -5006,7 +5015,7 @@ class StorageManagerService extends IStorageManager.Stub
 
         @Override
         public boolean isExternalStorageService(int uid) {
-            return mMediaStoreAuthorityAppId == UserHandle.getAppId(uid);
+            return mMediaStoreAuthorityAppId == getAppId(uid);
         }
 
         @Override
@@ -5032,7 +5041,7 @@ class StorageManagerService extends IStorageManager.Stub
         private void killAppForOpChange(int code, int uid) {
             final IActivityManager am = ActivityManager.getService();
             try {
-                am.killUid(UserHandle.getAppId(uid), UserHandle.USER_ALL,
+                am.killUid(getAppId(uid), UserHandle.USER_ALL,
                         AppOpsManager.opToName(code) + " changed.");
             } catch (RemoteException e) {
             }

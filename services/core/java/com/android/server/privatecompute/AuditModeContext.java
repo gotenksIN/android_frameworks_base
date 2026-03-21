@@ -127,6 +127,10 @@ class AuditModeContext {
         return Executors.newFixedThreadPool(N_THREADS);
     }
 
+    private static File getAuditLogFilesDirectory() {
+        return new File(Environment.getDataSystemCeDirectory(), AUDIT_LOG_FILES_DIRNAME);
+    }
+
     /**
      * Instantiates an AuditModeContext, including an output stream to the audit log file, or
      * returns null if an error occurred.
@@ -138,6 +142,11 @@ class AuditModeContext {
                 getDiskWriterExecutorService(),
                 folder,
                 new Injector());
+    }
+
+    /** Deletes all audit log files from the default audit log directory. */
+    static void deleteAuditLogFiles() {
+        AuditLogFileManager.deleteAuditLogFiles(getAuditLogFilesDirectory());
     }
 
     @VisibleForTesting

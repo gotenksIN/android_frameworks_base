@@ -28,7 +28,9 @@ import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 import javax.inject.Inject
 
 /** Helper class to query Bubble info from other components. */
-class BubbleHelperImpl @Inject constructor(private val bubbleRootTask: BubbleRootTask) :
+class BubbleHelperImpl
+@Inject
+constructor(private val bubbleRootTask: BubbleRootTask, private val bubbleData: BubbleData) :
     BubbleHelper {
     override fun getAppBubbleRootTaskToken(): WindowContainerToken? =
         bubbleRootTask.windowContainerToken
@@ -41,12 +43,16 @@ class BubbleHelperImpl @Inject constructor(private val bubbleRootTask: BubbleRoo
     override fun isAppBubbleRootTask(taskId: Int): Boolean =
         bubbleRootTask.taskId == taskId && taskId != INVALID_TASK_ID
 
-    override fun isAppBubbleRootTask(taskInfo: ActivityManager.RunningTaskInfo): Boolean =
-        isAppBubbleRootTask(taskInfo.taskId)
+    override fun isAppBubbleRootTask(taskInfo: ActivityManager.RunningTaskInfo?): Boolean {
+        val info = taskInfo ?: return false
+        return isAppBubbleRootTask(info.taskId)
+    }
 
-    override fun isAppBubbleTask(taskInfo: ActivityManager.RunningTaskInfo): Boolean {
+    override fun isAppBubbleTask(taskInfo: ActivityManager.RunningTaskInfo?): Boolean {
+        val info = taskInfo ?: return false
+
         if (BubbleFlagHelper.enableRootTaskForBubble()) {
-            return isAppBubbleRootTask(taskInfo.parentTaskId)
+            return isAppBubbleRootTask(info.parentTaskId)
         }
 
         // Skip treating the task as an app bubble if it's transitioning from bubble to split or
@@ -58,11 +64,16 @@ class BubbleHelperImpl @Inject constructor(private val bubbleRootTask: BubbleRoo
         // Later, TaskViewTransitions#onExternalDone unblocks the animation. Without this check,
         // DefaultMixedHandler could misinterpret the OPEN change as a bubble-enter transition,
         // incorrectly re-creating the bubble instead of completing the split-screen transition.
-        if (taskInfo.hasParentTask()) {
+        if (info.hasParentTask()) {
             return false
         }
 
-        return taskInfo.isAppBubble
+        return info.isAppBubble
+    }
+
+    override fun isBubbleTask(taskInfo: ActivityManager.RunningTaskInfo?): Boolean {
+        val info = taskInfo ?: return false
+        return isAppBubbleTask(info) || bubbleData.hasAnyBubbleWithTaskId(info.taskId)
     }
 
     override fun getEnterBubbleTask(info: TransitionInfo): TransitionInfo.Change? =

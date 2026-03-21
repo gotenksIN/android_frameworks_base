@@ -216,7 +216,7 @@ class KeyguardQuickAffordanceInteractorTest : SysuiTestCase() {
                 appContext = context,
                 accessibilityInteractor = accessibilityInteractor,
                 sceneInteractor = { kosmos.sceneInteractor },
-                msdlPlayer = msdlPlayer,
+                msdlPlayer = { msdlPlayer },
             )
         kosmos.keyguardQuickAffordanceInteractor = underTest
 
@@ -713,16 +713,18 @@ class KeyguardQuickAffordanceInteractorTest : SysuiTestCase() {
                 )
         }
 
+    @DisableSceneContainer
     @Test
-    fun useLongPress_withA11yEnabled_isFalse() =
+    fun useLongPress_sceneContainerDisabled_withA11yEnabled_isFalse() =
         testScope.runTest {
             whenever(accessibilityInteractor.isEnabledFiltered).thenReturn(MutableStateFlow(true))
             val useLongPress by collectLastValue(underTest.useLongPress())
             assertThat(useLongPress).isFalse()
         }
 
+    @DisableSceneContainer
     @Test
-    fun useLongPress_withA11yDisabled_isFalse() =
+    fun useLongPress_sceneContainerDisabled_withA11yDisabled_isFalse() =
         testScope.runTest {
             whenever(accessibilityInteractor.isEnabledFiltered).thenReturn(MutableStateFlow(false))
             val useLongPress by collectLastValue(underTest.useLongPress())

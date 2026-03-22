@@ -112,4 +112,118 @@ TEST(ResourceTypesTest, ResXMLTree_ValidateNode_SmallAttributeSize) {
   ASSERT_THAT(tree.setTo(&mock, sizeof(mock)), Eq(BAD_TYPE));
 }
 
+static void CreateTestStringPool(bool utf8, std::unique_ptr<uint8_t[]>& outData,
+                                 std::unique_ptr<ResStringPool>& outPool) {
+  StringPool pool;
+  pool.MakeRef("apple");
+  pool.MakeRef("banana");
+  pool.MakeRef("cherry");
+  pool.MakeRef("date");
+  pool.MakeRef("elderberry");
+
+  NoOpDiagnostics diag;
+  BigBuffer buffer(1024);
+  if (utf8) {
+    StringPool::FlattenUtf8(&buffer, pool, &diag);
+  } else {
+    StringPool::FlattenUtf16(&buffer, pool, &diag);
+  }
+
+  outData = android::util::Copy(buffer);
+  outPool = std::make_unique<ResStringPool>(outData.get(), buffer.size(), true, true);
+  EXPECT_THAT(outPool->getError(), Eq(NO_ERROR));
+  EXPECT_FALSE(outPool->isSorted());
+  EXPECT_EQ(outPool->isUTF8(), utf8);
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf8_InitialSearch) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(true, data, test);
+
+  auto idx = test->indexOfString(u"date", 4);
+  ASSERT_TRUE(idx.has_value());
+  EXPECT_THAT(*idx, Eq(3u));
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf8_BackwardSearch) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(true, data, test);
+
+  test->indexOfString(u"date", 4);
+  auto idx = test->indexOfString(u"banana", 6);
+  ASSERT_TRUE(idx.has_value());
+  EXPECT_THAT(*idx, Eq(1u));
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf8_CacheHit) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(true, data, test);
+
+  test->indexOfString(u"date", 4);
+  auto idx = test->indexOfString(u"elderberry", 10);
+  ASSERT_TRUE(idx.has_value());
+  EXPECT_THAT(*idx, Eq(4u));
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf8_NotFound) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(true, data, test);
+
+  auto idx = test->indexOfString(u"fig", 3);
+  ASSERT_FALSE(idx.has_value());
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf16_InitialSearch) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(false, data, test);
+
+  auto idx = test->indexOfString(u"date", 4);
+  ASSERT_TRUE(idx.has_value());
+  EXPECT_THAT(*idx, Eq(3u));
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf16_BackwardSearch) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(false, data, test);
+
+  test->indexOfString(u"date", 4);
+  auto idx = test->indexOfString(u"banana", 6);
+  ASSERT_TRUE(idx.has_value());
+  EXPECT_THAT(*idx, Eq(1u));
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf16_CacheHit) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(false, data, test);
+
+  test->indexOfString(u"date", 4);
+  auto idx = test->indexOfString(u"elderberry", 10);
+  ASSERT_TRUE(idx.has_value());
+  EXPECT_THAT(*idx, Eq(4u));
+}
+
+TEST(ResourceTypesTest, ResStringPool_indexOfString_OptimizeNameLookups_Utf16_NotFound) {
+  using namespace android;
+  std::unique_ptr<uint8_t[]> data;
+  std::unique_ptr<ResStringPool> test;
+  CreateTestStringPool(false, data, test);
+
+  auto idx = test->indexOfString(u"fig", 3);
+  ASSERT_FALSE(idx.has_value());
+}
+
 }  // namespace android

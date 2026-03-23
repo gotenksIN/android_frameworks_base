@@ -76,6 +76,7 @@ test_module_config {
         "com.android.wm.shell.functional.appcompat.ShowAppDialogInDesktopModeTest",
         "com.android.wm.shell.functional.apptoweb.AppToWebFirstRunDialogTest",
         "com.android.wm.shell.functional.clientfullscreenrequest.FullscreenModeRequestFromDesktopAndBackTest",
+        "com.android.wm.shell.functional.desktopfirst.DesktopFirstPolicyTest",
         "com.android.wm.shell.functional.drag.DragAppWindowMultiWindowAndPipTest",
         "com.android.wm.shell.functional.drag.DragAppWindowMultiWindowTest",
         "com.android.wm.shell.functional.drag.DragAppWindowSingleWindowTest",
@@ -218,6 +219,13 @@ test_module_config {
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.functional.clientfullscreenrequest.FullscreenModeRequestFromDesktopAndBackTest"],
+}
+
+test_module_config {
+    name: "FunctionalTestsDesktopMode-desktopfirst-DesktopFirstPolicyTest",
+    base: "FunctionalTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.functional.desktopfirst.DesktopFirstPolicyTest"],
 }
 
 test_module_config {

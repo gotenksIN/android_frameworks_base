@@ -1103,7 +1103,8 @@ public class InternetDetailsContentController implements AccessPointController.A
                 activeAutoSwitchNonDdsSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         // Set network description for the carrier network when connecting to the carrier network
         // under the airplane mode ON.
-        if (activeNetworkIsCellular() || isCarrierNetworkActive()) {
+        if ((!isDualDataEnabled() || isDataStateInService(subId))
+                && (activeNetworkIsCellular() || isCarrierNetworkActive())) {
             summary = context.getString(
                     com.android.settingslib.R.string.preference_summary_default_combination,
                     context.getString(

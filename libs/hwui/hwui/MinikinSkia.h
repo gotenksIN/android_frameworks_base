@@ -23,8 +23,9 @@
 #include <string>
 #include <string_view>
 
+#include "include/core/SkTypeface.h"
+
 class SkFont;
-class SkTypeface;
 
 namespace android {
 

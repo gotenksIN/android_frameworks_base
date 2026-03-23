@@ -20,17 +20,23 @@ import android.app.ActivityOptions
 import android.app.Instrumentation
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
+import android.platform.systemui_tapl.ui.Root
 import android.platform.test.annotations.RequiresFlagsEnabled
+import android.platform.uiautomatorhelpers.DeviceHelpers
 import android.tools.device.apphelpers.BrowserAppHelper
+import android.tools.device.apphelpers.SettingsHelper
 import android.tools.traces.parsers.WindowManagerStateHelper
 import android.view.Display.DEFAULT_DISPLAY
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import com.android.launcher3.tapl.LauncherInstrumentation
 import com.android.server.wm.flicker.helpers.DesktopModeAppHelper
+import com.android.server.wm.flicker.helpers.NotificationAppHelper
 import com.android.server.wm.flicker.helpers.SimpleAppHelper
 import com.android.window.flags.Flags
 import com.android.wm.shell.Utils
+import com.android.wm.shell.shared.desktopmode.DesktopState
 import org.junit.After
 import org.junit.Assume
 import org.junit.Before
@@ -40,11 +46,12 @@ import org.junit.Test
 /**
  * Tests the desktop-first policy for app launches, verifying that apps open in the correct
  * windowing mode (freeform or fullscreen) based on their launch type (New Launch, Freeform refocus,
- * Fullscreen refocus), regardless of the background state.
+ * Fullscreen refocus), regardless of the background state or the launch source.
  */
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
 @Ignore("Base Test Class")
 abstract class DesktopFirstPolicy(
+    private val launchSource: LaunchSource,
     private val backgroundState: BackgroundState,
     private val launchType: LaunchType,
 ) : TestScenarioBase() {
@@ -53,16 +60,36 @@ abstract class DesktopFirstPolicy(
     private val wmHelper = WindowManagerStateHelper(instrumentation)
     private val device = UiDevice.getInstance(instrumentation)
 
-    private val targetApp = BrowserAppHelper(instrumentation)
+    private val notificationAppHelper = NotificationAppHelper(instrumentation)
+    private val targetApp =
+        when (launchSource) {
+            LaunchSource.NOTIFICATION -> notificationAppHelper
+            LaunchSource.SHADE_SETTINGS -> SettingsHelper(instrumentation)
+            else -> BrowserAppHelper(instrumentation)
+        }
     private val backgroundApp = DesktopModeAppHelper(SimpleAppHelper(instrumentation))
+
+    /** Represents the different sources of app launches being tested. */
+    enum class LaunchSource {
+        /** App is launched from the taskbar icon. */
+        TASKBAR_ICON,
+        /** App is launched from the all apps icon. */
+        ALL_APPS_ICON,
+        /** App is launched from a shortcut on the home screen. */
+        HOME_SHORTCUT,
+        /** App is launched by tapping on the settings icon on the quick settings panel. */
+        SHADE_SETTINGS,
+        /** App is launched by tapping a notification. */
+        NOTIFICATION,
+    }
 
     /** Represents the different states of the device background before an app is launched. */
     enum class BackgroundState {
         /** The home activity is on top. */
         HOME_ON_TOP,
-        /** The non-home fullscreen activity is on top. */
+        /** A non-home fullscreen activity is on top. */
         FULLSCREEN_ON_TOP,
-        /** The empty desk is on top. */
+        /** An empty desk is on top. */
         DESK_ON_TOP,
     }
 
@@ -79,6 +106,8 @@ abstract class DesktopFirstPolicy(
     @Before
     fun setup() {
         Assume.assumeTrue(Utils.isInDesktopFirstMode(wmHelper, DEFAULT_DISPLAY))
+
+        setupLaunchSourcePrerequisites()
         setupLaunchTypePrerequisites()
         setupBackgroundState()
     }
@@ -91,9 +120,7 @@ abstract class DesktopFirstPolicy(
 
     @Test
     fun testAppLaunchWindowingMode() {
-        tapl.showTaskbarIfHidden()
-        tapl.launchedAppState.taskbar.getAppIcon(targetApp.appName).launch(targetApp.packageName)
-
+        triggerLaunchFromSource()
         val expectedWindowingMode =
             when (launchType) {
                 LaunchType.NEW_LAUNCH -> WINDOWING_MODE_FREEFORM
@@ -102,6 +129,30 @@ abstract class DesktopFirstPolicy(
             }
 
         Utils.waitForAndVerifyActivityState(wmHelper, targetApp, expectedWindowingMode)
+    }
+
+    private fun setupLaunchSourcePrerequisites() {
+        if (launchSource == LaunchSource.NOTIFICATION) {
+            notificationAppHelper.launchViaIntent(wmHelper)
+            notificationAppHelper.postNotification(wmHelper)
+            // Close the notification app after the setup. Otherwise, the next open would be
+            // "refocus" instead of "new launch".
+            DesktopModeAppHelper(notificationAppHelper).closeDesktopApp(wmHelper, device)
+        } else if (launchSource == LaunchSource.HOME_SHORTCUT) {
+            // Ensure the target app shortcut is on the workspace
+            if (tapl.workspace.tryGetWorkspaceAppIcon(targetApp.appName) == null) {
+                tapl.workspace
+                    .switchToAllApps()
+                    .getAppIcon(targetApp.appName)
+                    .dragToWorkspace(/* startsActivity= */ false, /* isWidgetShortcut= */ false)
+            }
+        }
+        wmHelper
+            .StateSyncBuilder()
+            .withHomeActivityVisible()
+            .add("targetApp is not visible") { dump -> !dump.wmState.isActivityVisible(targetApp) }
+            .withAppTransitionIdle()
+            .waitForAndVerify()
     }
 
     private fun setupLaunchTypePrerequisites() {
@@ -155,6 +206,49 @@ abstract class DesktopFirstPolicy(
             check(tapl.overview.currentTask.isDesktop) { "Failed to find Desktop task in Overview" }
             tapl.overview.currentTask.open()
             wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+        }
+    }
+
+    private fun triggerLaunchFromSource() {
+        when (launchSource) {
+            LaunchSource.TASKBAR_ICON -> {
+                tapl.showTaskbarIfHidden()
+                tapl.launchedAppState.taskbar
+                    .getAppIcon(targetApp.appName)
+                    .launch(targetApp.packageName)
+            }
+            LaunchSource.ALL_APPS_ICON -> {
+                val shouldHomeBeVisible =
+                    backgroundState == BackgroundState.HOME_ON_TOP ||
+                        (DesktopState.fromContext(instrumentation.context)
+                            .shouldShowHomeBehindDesktop &&
+                            backgroundState == BackgroundState.DESK_ON_TOP)
+                if (shouldHomeBeVisible) {
+                    tapl.workspace
+                        .switchToAllApps()
+                        .getAppIcon(targetApp.appName)
+                        .launch(targetApp.packageName)
+                } else {
+                    tapl.showTaskbarIfHidden()
+                    tapl.launchedAppState.taskbar
+                        .openAllApps()
+                        .getAppIcon(targetApp.appName)
+                        .launch(targetApp.packageName)
+                }
+            }
+            LaunchSource.HOME_SHORTCUT -> {
+                tapl.workspace.getWorkspaceAppIcon(targetApp.appName).launch(targetApp.packageName)
+            }
+            LaunchSource.SHADE_SETTINGS -> {
+                Root.get().openQuickSettingsWithRetry().openSettings()
+            }
+            LaunchSource.NOTIFICATION -> {
+                // Tapping the posted notification
+                Root.get().openNotificationShadeWithRetry()
+                val notification =
+                    DeviceHelpers.waitForObj(By.text(NotificationAppHelper.NOTIFICATION_TEXT))
+                notification.click()
+            }
         }
     }
 

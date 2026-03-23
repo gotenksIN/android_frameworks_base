@@ -10588,6 +10588,15 @@
         android:protectionLevel="signature"
         android:featureFlag="com.android.internal.telephony.flags.message_promotion" />
 
+    <!-- Permission required to be able to request going fullscreen by an app
+         {@link android.app.Activity.requestFullscreenMode}.
+         @FlaggedApi(com.android.window.flags.Flags.FLAG_REQUEST_FULLSCREEN_API_PERMISSION)
+    -->
+    <permission
+        android:name="android.permission.REQUEST_FULLSCREEN_MODE"
+        android:protectionLevel="dangerous|signature"
+        android:featureFlag="com.android.window.flags.request_fullscreen_api_permission" />
+
     <!-- Attribution for Geofencing service. -->
     <attribution android:tag="GeofencingService" android:label="@string/geofencing_service"/>
     <!-- Attribution for Country Detector. -->

@@ -69,7 +69,9 @@ public class NotificationChannelExtractor implements NotificationSignalExtractor
                 record.getSbn().getPackageName(),
                 record.getSbn().getUid(), record.getChannel().getId(),
                 record.getSbn().getShortcutId(), true, false);
-        record.updateSystemNotificationChannel(updatedChannel);
+        if (!record.getChannel().equals(updatedChannel)) {
+            record.updateSystemNotificationChannel(updatedChannel);
+        }
 
         AudioAttributes attributes = record.getChannel().getAudioAttributes();
         if (attributes == null) {

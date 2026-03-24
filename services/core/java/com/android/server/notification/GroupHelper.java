@@ -839,7 +839,6 @@ public class GroupHelper {
         final StatusBarNotification sbn = record.getSbn();
         final String pkgName = sbn.getPackageName();
         final int userId = record.getUserId();
-
         final FullyQualifiedGroupKey fullAggregateGroupKey = getSectionGroupKeyWithFallback(record);
         if (fullAggregateGroupKey == null) {
             if (DEBUG) {

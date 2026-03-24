@@ -105,7 +105,6 @@ import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.policy.DesktopModeCompatPolicy
 import com.android.testing.wm.util.MockToken
 import com.android.window.flags.Flags
-import com.android.window.flags.Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
 import com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION
 import com.android.window.flags.Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY
@@ -4639,7 +4638,6 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
     fun closeTask_lockTask_doesNothing() {
         val task = setUpFullscreenTask()
         task.baseActivity = ComponentName("mypacakge", "mypacakge.MyActivity")
@@ -4652,7 +4650,6 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
     fun closeTask_fullscreen_closesTask() {
         val task = setUpFullscreenTask()
         task.baseActivity = ComponentName("mypacakge", "mypacakge.MyActivity")

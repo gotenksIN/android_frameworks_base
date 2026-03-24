@@ -32,7 +32,6 @@ import org.junit.Test
 /** Base scenario test for closing a fullscreen task via the keyboard shortcut. */
 @RequiresFlagsEnabled(
     Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-    Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT,
     Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM,
 )
 abstract class CloseFullscreenTaskViaKeyboardShortcut : TestScenarioBase() {

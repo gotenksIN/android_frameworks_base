@@ -15,17 +15,21 @@
  */
 package com.android.wm.shell.hierarchy.updates
 
+import android.app.ActivityManager
 import android.os.IBinder
+import android.view.InsetsState
 import android.view.SurfaceControl
 import android.view.WindowManager
 import android.window.DisplayAreaOrganizer
 import android.window.TaskAppearedInfo
 import android.window.TransitionInfo
 import android.window.WindowContainerToken
-import androidx.annotation.VisibleForTesting
+import android.window.WindowContainerTransaction
 import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.Flags
 import com.android.wm.shell.ShellTaskOrganizer
+import com.android.wm.shell.common.DisplayInsetsController
+import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.hierarchy.ContainerHierarchy
 import com.android.wm.shell.hierarchy.containers.Container
 import com.android.wm.shell.hierarchy.modes.FormFactorModes
@@ -34,11 +38,9 @@ import com.android.wm.shell.hierarchy.properties.ActivityContainerProperties
 import com.android.wm.shell.hierarchy.properties.ContainerProperties
 import com.android.wm.shell.hierarchy.properties.DisplayAreaContainerProperties
 import com.android.wm.shell.hierarchy.properties.DisplayContainerProperties
-import com.android.wm.shell.hierarchy.properties.RootContainerProperties
 import com.android.wm.shell.hierarchy.properties.TaskContainerProperties
 import com.android.wm.shell.hierarchy.properties.WallpaperContainerProperties
 import com.android.wm.shell.hierarchy.utils.HierarchyDebugUtils
-import com.android.wm.shell.hierarchy.utils.HierarchyDebugUtils.Companion.WHITE
 import com.android.wm.shell.hierarchy.utils.HierarchyUtils
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_MODES
 import com.android.wm.shell.shared.TransitionUtil
@@ -52,6 +54,7 @@ import com.android.wm.shell.transition.Transitions
 class HierarchyUpdater(
     private val shellTaskOrganizer: ShellTaskOrganizer,
     private val transitions: Transitions,
+    private val displayInsetsController: DisplayInsetsController,
     private val hierarchy: ContainerHierarchy,
     private val formFactorModes: FormFactorModes,
     shellInit: ShellInit,
@@ -69,7 +72,12 @@ class HierarchyUpdater(
         shellTaskOrganizer.setContainerHierarchyCreateRootTaskListener(
             ContainerHierarchyRootTaskHook()
         )
-        transitions.registerContainerHierarchyAdapter(ContainerHierarchyTransitionObserver())
+        shellTaskOrganizer.addTaskInfoChangedListener(ContainerHierarchyTaskInfoListener())
+        displayInsetsController.addGlobalInsetsChangedListener(DisplayContainerInsetsUpdater())
+        if (!com.android.window.flags.Flags.transitMixpatcherBase()) {
+            // The planner will update the hierarchy in lieu of the observer with mixpatcher
+            transitions.registerObserver(ContainerHierarchyTransitionObserver())
+        }
     }
 
     /**
@@ -79,37 +87,41 @@ class HierarchyUpdater(
         updateContext: Mode.UpdateContext,
         snapshot: HierarchySnapshot,
     ) {
+        ProtoLog.v(WM_SHELL_MODES, "Hierarchy updated requested: %s", updateContext.reason)
         updaterTestHook?.onHierarchyUpdated()
-
-        val postUpdateContainers = hierarchy.toContainerList()
-        val preUpdateDisplays =
-            snapshot.preUpdateContainers.filter { it.props is DisplayContainerProperties }
-        val postUpdateDisplays =
-            postUpdateContainers.filter { it.props is DisplayContainerProperties }
 
         // Iterate the pre-existing containers from bottom-up to notify old modes that their
         // descendants have been removed
-        for (container in snapshot.preUpdateContainers.asReversed()) {
-            val oldModes = snapshot.snapshots.getValue(container).modes
-            val modes = HierarchyUtils.getModes(container)
-            val removedModesBottomUp = (oldModes - modes).reversed()
-            for (mode in removedModesBottomUp) {
-                ProtoLog.v(
-                    WM_SHELL_MODES,
-                    "\tDetaching container: %s to %s",
-                    container.name,
-                    mode.getId()
-                )
-                mode.detachFromContainer(updateContext, container)
-            }
+        val postUpdateContainers = hierarchy.toContainerList()
+        val removedContainers =
+            snapshot.preUpdateContainers.asReversed() - postUpdateContainers.toSet()
+        val removedContainersByMode = removedContainers
+            // Ignore containers that aren't in a mode (should generally not happen unless there
+            // is no root)
+            .filter { snapshot.snapshots[it]!!.mode != null }
+            .groupBy { snapshot.snapshots[it]!!.modeContainer }
+        for ((oldModeContainer, removed) in removedContainersByMode) {
+            val oldMode = oldModeContainer!!.mode!!
+            ProtoLog.v(
+                WM_SHELL_MODES,
+                "\tRemoving: %s from %s (%s)",
+                removed,
+                oldModeContainer,
+                oldMode.getId()
+            )
+            oldMode.containersRemoved(updateContext, oldModeContainer, removed, snapshot)
         }
 
         // After pre-existing containers' modes have been notified, notify the modes globally for
         // displays have been removed
+        val preUpdateDisplays =
+            snapshot.preUpdateContainers.filter { it.props is DisplayContainerProperties }
+        val postUpdateDisplays =
+            postUpdateContainers.filter { it.props is DisplayContainerProperties }
         val removedDisplays = preUpdateDisplays - postUpdateDisplays
         for (display in removedDisplays) {
             val modes = formFactorModes.getAvailableModesForDisplay(
-                display.props<DisplayContainerProperties>().displayId
+                display.displayProps().displayId
             )
             for (mode in modes) {
                 mode.cleanupForDisplay(updateContext, display)
@@ -121,69 +133,57 @@ class HierarchyUpdater(
         val addedDisplays = postUpdateDisplays - preUpdateDisplays
         for (display in addedDisplays) {
             val modes = formFactorModes.getAvailableModesForDisplay(
-                display.props<DisplayContainerProperties>().displayId
+                display.displayProps().displayId
             )
             for (mode in modes) {
                 mode.prepareForDisplay(updateContext, display)
             }
         }
 
-        // Iterate the current containers from top-down to notify new modes that they have new
-        // descendants. We have to do this iteratively as modes can manipulate the hierarchy (only
-        // descendants of notified containers) as they are notified.
-        val postUpdateContainersList = mutableListOf(hierarchy.root)
-        while (postUpdateContainersList.isNotEmpty()) {
-            val container = postUpdateContainersList.removeFirst()
-            val oldModes = if (container in snapshot.snapshots) {
-                snapshot.snapshots.getValue(container).modes
-            } else {
-                listOf()
-            }
-            val modes = HierarchyUtils.getModes(container)
-            for (mode in modes) {
-                if (mode !in oldModes) {
-                    // This container has not been associated with the mode yet (either directly
-                    // or indirectly)
+        // Update each mode with containers that have changed either along its ancestor path or
+        // in the set of containers it manages
+        val postUpdateContainersByMode = postUpdateContainers
+            // Ignore containers that aren't in a mode (should generally not happen unless there
+            // is no root)
+            .filter { HierarchyUtils.getMode(it) != null }
+            .groupBy { HierarchyUtils.getModeContainer(it) }
+        for ((modeContainer, containers) in postUpdateContainersByMode) {
+            val mode = modeContainer!!.mode!!
+            // Notify changed ancestors first to this mode, but only do so if the mode has already
+            // been notified of the root
+            if (snapshot.snapshots.containsKey(modeContainer)) {
+                val ancestors = snapshot.getChangedAncestors(modeContainer)
+                if (!ancestors.isEmpty()) {
                     ProtoLog.v(
                         WM_SHELL_MODES,
-                        "\tAttaching container: %s to %s",
-                        container.name, mode.getId()
+                        "\tGlobal state changed: %s for %s",
+                        modeContainer, mode.getId()
                     )
-                    mode.attachToContainer(updateContext, container, container.mode == mode)
-                } else if (container.mode == mode) {
-                    // This container is directly associated with the mode
-                    if (snapshot.hasChangesIncludingAncestors(container)) {
-                        ProtoLog.v(
-                            WM_SHELL_MODES,
-                            "\tContainer or ancestor has changed: %s in %s",
-                            container.name, mode.getId()
-                        )
-                        mode.containerChanged(updateContext, container, snapshot)
-                    }
-                } else {
-                    // This container is indirectly associated wit the mode
-                    if (!snapshot.getChanges(container).isEmpty) {
-                        // The container has still changed, so notify that mode
-                        ProtoLog.v(
-                            WM_SHELL_MODES,
-                            "\tDescendant container has changed: %s in %s",
-                            container.name, mode.getId()
-                        )
-                        mode.containerChanged(updateContext, container, snapshot)
-                    }
+                    mode.globalStateChanged(updateContext, modeContainer, snapshot)
                 }
             }
-            postUpdateContainersList.addAll(container.children)
+
+            // Notify added or changed containers in this mode
+            val added = containers.filter { !snapshot.snapshots.containsKey(it) }
+            val changed = containers.filter { snapshot.hasChanges(it) }
+            if (!added.isEmpty() || !changed.isEmpty()) {
+                if (!added.isEmpty()) {
+                    ProtoLog.v(WM_SHELL_MODES, "\tAdding: %s to %s", added, mode.getId())
+                }
+                if (!changed.isEmpty()) {
+                    ProtoLog.v(WM_SHELL_MODES, "\tChanged: %s in %s", changed, mode.getId())
+                }
+                mode.containersChanged(updateContext, modeContainer, added, changed, snapshot)
+            }
         }
         updaterTestHook?.onModesNotified()
 
-        // Dump the hierarchy
-        ProtoLog.v(WM_SHELL_MODES, "=======================================================")
-        val hierarchyDump =
-            HierarchyDebugUtils.dumpToString(hierarchy.root, "", snapshot, WHITE)
-        @SuppressWarnings("ProtoLogNoContext")
-        ProtoLog.v(WM_SHELL_MODES, "%s", hierarchyDump)
-        ProtoLog.v(WM_SHELL_MODES, "=======================================================")
+        // Dump the container requested, or the full hierarchy
+        if (updateContext.dumpOnlyContainer != null) {
+            HierarchyDebugUtils.dumpContainer(updateContext.dumpOnlyContainer!!, snapshot)
+        } else {
+            HierarchyDebugUtils.dumpHierarchy(hierarchy, snapshot)
+        }
     }
 
     fun handleCreateRootTask(
@@ -217,7 +217,7 @@ class HierarchyUpdater(
                 }
             }
 
-        notifyModes(Mode.UpdateContext(), snapshot)
+        notifyModes(Mode.UpdateContext(reason = "Create root task: $name"), snapshot)
         return createdTask
     }
 
@@ -232,18 +232,40 @@ class HierarchyUpdater(
 
         // Remove the task from the hierarchy
         val container = hierarchy.getContainer(token)
-        container?.parent = null
+        if (container != null) {
+            container.parent = null
 
-        notifyModes(Mode.UpdateContext(), snapshot)
+            notifyModes(
+                Mode.UpdateContext(reason = "Remove root task: ${container.name}"),
+                snapshot
+            )
+        }
     }
 
-    @VisibleForTesting
+    fun handleTaskInfoChanged(taskInfo: ActivityManager.RunningTaskInfo) {
+        val container = hierarchy.getContainer(taskInfo.token)
+        if (container == null || container.props !is TaskContainerProperties) {
+            return
+        }
+
+        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
+        container.taskProps().updateFromTaskInfoChanged(taskInfo)
+
+        if (snapshot.hasChanges(container)) {
+            notifyModes(
+                Mode.UpdateContext(
+                    reason = "${container.name} info change",
+                    dumpOnlyContainer = container
+                ), snapshot
+            )
+        }
+    }
+
     fun handleTransition(
         transition: IBinder,
         info: TransitionInfo,
-        startTransaction: SurfaceControl.Transaction,
-        finishTransaction: SurfaceControl.Transaction
-    ) {
+        startTransaction: SurfaceControl.Transaction
+    ): HierarchySnapshot {
         ProtoLog.v(
             WM_SHELL_MODES,
             "Updating hierarchy from transition: %d",
@@ -253,8 +275,9 @@ class HierarchyUpdater(
         val snapshot = HierarchySnapshot(hierarchy.toContainerList())
 
         // Update the root first
-        hierarchy.root.props<RootContainerProperties>().updateFromTransition(info)
+        hierarchy.root.rootProps().updateFromTransition(info)
 
+        // Update the rest of the hierarchy
         // We iterate the changes in reverse order to handle parent containers first (especially
         // when new containers are being added)
         val reversedChanges = info.changes.reversed()
@@ -262,10 +285,45 @@ class HierarchyUpdater(
             updateHierarchyFromChange(change)
         }
 
-        notifyModes(Mode.UpdateContext(startTransaction, finishTransaction), snapshot)
+        // Notify all the modes
+        notifyModes(
+            Mode.UpdateContext(
+                reason = "Transition #${info.debugId}",
+                preTransitionTx = startTransaction
+            ),
+            snapshot
+        )
 
-        // TODO: Move this to *after* transitions play when they are finally hooked up
-        HierarchyUtils.removeAllTransientContainers(hierarchy.root)
+        if (HierarchyUtils.hasTemporaryAnimatingContainers(hierarchy.root)) {
+            // If there are temporary containers, then schedule them to be cleaned up after all
+            // transitions finish playing
+            transitions.runOnIdle {
+                ProtoLog.v(
+                    WM_SHELL_MODES,
+                    "Cleaning up temporary animating containers from transition: %d",
+                    info.debugId
+                )
+                val snapshot = HierarchySnapshot(hierarchy.toContainerList())
+                HierarchyUtils.removeAllTemporaryAnimatingContainers(hierarchy.root)
+                notifyModes(
+                    Mode.UpdateContext(reason = "Removing temporary animating containers"),
+                    snapshot
+                )
+            }
+        }
+        return snapshot
+    }
+
+    fun handleDisplayInsetsChanged(displayId: Int, insetsState: InsetsState) {
+        val display = hierarchy.getDisplay(displayId)
+        if (display == null) {
+            return
+        }
+
+        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
+        if (display.displayProps().updateInsetsState(insetsState)) {
+            notifyModes(Mode.UpdateContext(reason = "${display.name} insets changed"), snapshot)
+        }
     }
 
     /**
@@ -377,9 +435,43 @@ class HierarchyUpdater(
     }
 
     /**
+     * Updates the hierarchy from a display change signal to give modes an opportunity to update
+     * their tasks in final state before the display change completes.
+     *
+     * The caller is responsible for verifying that there is a given display container for the
+     * provided displayId.
+     */
+    fun updateDisplay(
+        displayId: Int,
+        displayLayout: DisplayLayout,
+        outWct: WindowContainerTransaction
+    ) {
+        val display = hierarchy.getDisplay(displayId)!!
+        ProtoLog.v(WM_SHELL_MODES, "Updating display: %s", display.name)
+
+        // Apply the display changes to the hierarchy first
+        val newDisplayProps = display.displayProps().copy()
+        newDisplayProps.updateFromDisplayLayout(displayLayout)
+
+        // Notify the modes associated with this display (ancestors & descendants) of the change
+        // FUTURE: This currently assumes the displays exist and are rooted to the hierarchy
+        val containers = listOf(hierarchy.root) + HierarchyUtils.toContainersList(display)
+        for (c in containers) {
+            if (c.mode != null) {
+                c.mode!!.requestUpdateForDisplayChange(
+                    c,
+                    display.displayProps(),
+                    newDisplayProps,
+                    outWct
+                )
+            }
+        }
+    }
+
+    /**
      * Hooks into ShellTaskOrganizer to listen for changes to root tasks.
      */
-    inner class ContainerHierarchyRootTaskHook
+    private inner class ContainerHierarchyRootTaskHook
         : ShellTaskOrganizer.ContainerHierarchyRootTaskListener {
         override fun onRootTaskCreated(appearedInfo: TaskAppearedInfo, name: String) {
             handleCreateRootTask(appearedInfo, name)
@@ -391,16 +483,35 @@ class HierarchyUpdater(
     }
 
     /**
+     * Hooks into ShellTaskOrganizer to listen for task info changes.
+     */
+    private inner class ContainerHierarchyTaskInfoListener : ShellTaskOrganizer.TaskInfoChangedListener {
+        override fun onTaskInfoChanged(taskInfo: ActivityManager.RunningTaskInfo?) {
+            handleTaskInfoChanged(taskInfo!!)
+        }
+    }
+
+    /**
      * Hooks into transitions to listen for, and update from, incoming transitions.
      */
-    inner class ContainerHierarchyTransitionObserver : Transitions.TransitionObserver {
+    private inner class ContainerHierarchyTransitionObserver : Transitions.TransitionObserver {
         override fun onTransitionReady(
             transition: IBinder,
             info: TransitionInfo,
             startTransaction: SurfaceControl.Transaction,
             finishTransaction: SurfaceControl.Transaction
         ) {
-            handleTransition(transition, info, startTransaction, finishTransaction)
+            handleTransition(transition, info, startTransaction)
+        }
+    }
+
+    /**
+     * Hooks into display insets updates from WM.
+     */
+    private inner class DisplayContainerInsetsUpdater : DisplayInsetsController.OnInsetsChangedListener {
+        /** @see DisplayInsetsController.OnInsetsChangedListener.insetsChanged */
+        override fun insetsChanged(displayId: Int, insetsState: InsetsState?) {
+            handleDisplayInsetsChanged(displayId, insetsState!!)
         }
     }
 

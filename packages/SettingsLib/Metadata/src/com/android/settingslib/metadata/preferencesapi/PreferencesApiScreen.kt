@@ -19,6 +19,7 @@ package com.android.settingslib.metadata.preferencesapi
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import com.android.settingslib.datastore.Permissions
@@ -39,6 +40,11 @@ import com.android.settingslib.metadata.preferencesapi.preconditions.ApiPrecondi
 import com.android.settingslib.metadata.preferencesapi.types.ApiType
 import com.android.settingslib.metadata.preferencesapi.types.FiniteOptionsType
 import com.android.settingslib.metadata.preferenceHierarchy
+import com.android.settingslib.metadata.preferencesapi.multiusers.ManagementScope
+import com.android.settingslib.metadata.preferencesapi.multiusers.ManagementScope.OWN_USER
+import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget
+import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget.USER
+import com.android.settingslib.metadata.preferencesapi.preconditions.Disallowed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -50,7 +56,17 @@ import kotlin.reflect.KClass
  * Interface for preference screens that provide parameters in a non-static method.
  */
 interface ProvidesParametersNonStatically {
-    fun getAllPossibleParameters(context: Context): Flow<ValidatedKeyParameters>
+    suspend fun getAllPossibleParameters(context: Context): Flow<ValidatedKeyParameters>
+
+    /**
+    * Synchronous version of [getAllPossibleParameters] for Java.
+    *
+    * This should go away soon once we support suspending calls throughout.
+    */
+    // TODO(469317113): Remove this once suspending calls are supported.
+    fun getAllPossibleParametersSync(context: Context) = runBlocking {
+        getAllPossibleParameters(context)
+    }
 }
 
 /**
@@ -116,7 +132,7 @@ class ParameterizationConfig {
      */
     internal fun buildSchema(): KeyParametersSchema = KeyParametersSchema {
         parameters.values.map {
-            parameter(name = it.name, purpose = it.purpose, required = it.required)
+            parameter(name = it.name, purpose = it.purpose, required = it.required, type = it.type)
         }
     }
 }
@@ -131,6 +147,7 @@ abstract class PreferencesApiScreen private constructor(
     val fragment: KClass<out Fragment>?,
     override val purpose: Int,
     val alreadyPartiallyMigrated: KClass<*>? = null,
+    val canManage: ManagementScope = OWN_USER,
     /**
      * The route prefix for screens implemented using the Settings Platform Architecture (SPA).
      * This is only relevant if this screen's UI is implemented using SPA.
@@ -154,7 +171,16 @@ abstract class PreferencesApiScreen private constructor(
         fragment: KClass<out Fragment>,
         purpose: Int,
         alreadyPartiallyMigrated: KClass<*>? = null,
-    ) : this(key, topLevelSettingsCategory, fragment, purpose, alreadyPartiallyMigrated, null)
+        canManage: ManagementScope = OWN_USER,
+    ) : this(
+        key,
+        topLevelSettingsCategory,
+        fragment,
+        purpose,
+        alreadyPartiallyMigrated,
+        canManage,
+        null
+    )
 
     /**
      * Constructor for screens implemented using the Settings Platform Architecture (SPA) with a
@@ -166,7 +192,16 @@ abstract class PreferencesApiScreen private constructor(
         spaRoutePrefix: String,
         purpose: Int,
         alreadyPartiallyMigrated: KClass<*>? = null,
-    ) : this(key, topLevelSettingsCategory, null, purpose, alreadyPartiallyMigrated, spaRoutePrefix)
+        canManage: ManagementScope = OWN_USER,
+    ) : this(
+        key,
+        topLevelSettingsCategory,
+        null,
+        purpose,
+        alreadyPartiallyMigrated,
+        canManage,
+        spaRoutePrefix
+    )
 
     /**
      * Constructor for screens implemented using the Settings Platform Architecture (SPA) with a
@@ -177,7 +212,16 @@ abstract class PreferencesApiScreen private constructor(
         topLevelSettingsCategory: Category,
         purpose: Int,
         alreadyPartiallyMigrated: KClass<*>? = null,
-    ) : this(key, topLevelSettingsCategory, null, purpose, alreadyPartiallyMigrated, null)
+        canManage: ManagementScope = OWN_USER,
+    ) : this(
+        key,
+        topLevelSettingsCategory,
+        null,
+        purpose,
+        alreadyPartiallyMigrated,
+        canManage,
+        null
+    )
 
     override fun fragmentClass(): Class<out Fragment>? {
         // If it's a valid fragment screen, return the class
@@ -218,6 +262,9 @@ abstract class PreferencesApiScreen private constructor(
             runBlocking { screenPreconditions?.check(opContext) } ?: Allowed
 
         if (checkScreenPreconditions != Allowed) {
+            if (checkScreenPreconditions is Disallowed) {
+                Log.d(TAG, "Screen precondition failed: ${checkScreenPreconditions.getReason(context)}")
+            }
             return null
         }
 
@@ -228,6 +275,10 @@ abstract class PreferencesApiScreen private constructor(
     var parametersSchema: KeyParametersSchema? = null
     var screenPermissions: Permissions? = null
     var screenPreconditions: PreconditionsConfig? = null
+    var screenTags: List<String>? = null
+
+    override val keyParametersSchema: KeyParametersSchema?
+        get() = parametersSchema
 
     override val keyParameters: ValidatedKeyParameters?
         get() = if (::screenParameters.isInitialized) screenParameters else super.keyParameters
@@ -252,7 +303,7 @@ abstract class PreferencesApiScreen private constructor(
     private lateinit var screenParameters: ValidatedKeyParameters
     private var prepareScreenExtras: ((ValidatedKeyParameters, Bundle) -> Unit)? = null
     private var prepareSpaRoute: ((ValidatedKeyParameters) -> String)? = null
-    private var allPossibleParameters: ((Context) -> Collection<ValidatedKeyParameters>) = { emptyList() }
+    private var allPossibleParameters: suspend ((Context) -> Collection<ValidatedKeyParameters>) = { emptyList() }
 
     val preferencesPermissions = mutableListOf<String>()
 
@@ -266,7 +317,8 @@ abstract class PreferencesApiScreen private constructor(
      * preference(
      *     key = "PREFERENCE_KEY",
      *     purpose = R.string.my_preference_purpose,
-     *     type = AnyString
+     *     type = AnyString,
+     *     appliesTo = DEVICE
      * ) {
      *     flag { Flags.FooBarFlag() }
      *     permissions(Manifest.permission.PERMISSION)
@@ -319,19 +371,21 @@ abstract class PreferencesApiScreen private constructor(
      * }
      * ```
      */
-    protected inline fun <reified V : Any> preference(
+    protected fun <V : Any> preference(
         key: String,
         purpose: Int,
         type: ApiType<V>,
+        appliesTo: PreferenceTarget = USER(canManage = OWN_USER),
         lambda: ApiPreferenceConfigBuilder<V>.() -> Unit
     ) {
         val builder = ApiPreferenceConfigBuilder(
             key,
             purpose,
             type,
-            V::class.java,
+            appliesTo,
             screenPermissions,
             screenPreconditions,
+            { keyParametersSchema },
             { keyParameters },
         )
         builder.lambda()
@@ -357,7 +411,7 @@ abstract class PreferencesApiScreen private constructor(
      * @param context The application context.
      * @return A [Flow] emitting all possible [ValidatedKeyParameters].
      */
-    override fun getAllPossibleParameters(context: Context) = allPossibleParameters(context).asFlow()
+    override suspend fun getAllPossibleParameters(context: Context) = allPossibleParameters(context).asFlow()
 
     /**
      * Returns the SPA route for this screen, generating it dynamically if parameters are present.
@@ -367,12 +421,22 @@ abstract class PreferencesApiScreen private constructor(
         return prepareSpaRoute?.invoke(keyParams) ?: spaRoutePrefix
     }
 
+    override fun tags(context: Context): Array<String> {
+        val tags = (screenTags ?: emptyList()).toMutableList()
+        tags.add("api-first")
+
+        if (tags.none { it in deviceStateTags }) {
+            tags.add(APP_FUNCTION_UNCATEGORIZED)
+        }
+        return tags.toTypedArray()
+    }
+
     protected fun flag(lambda: () -> Boolean) {
         if (flag != null) {
             error(getExceptionMessageMultipleDefines("flag"))
         }
 
-        if (parametersSchema != null || preferences.isNotEmpty() || screenPermissions != null || screenPreconditions != null) {
+        if (parametersSchema != null || preferences.isNotEmpty() || screenPermissions != null || screenPreconditions != null || screenTags != null) {
             error(getExceptionMessageWrongOrder("flag"))
         }
 
@@ -457,6 +521,24 @@ abstract class PreferencesApiScreen private constructor(
     }
 
     /**
+     * Configure arbitrary tags related to this screen.
+     *
+     * These tags are visible in the API surface for clients to identify groups
+     * of screens and preferences.
+     */
+    protected fun tags(vararg tags: String) {
+        if (screenTags != null) {
+            error(getExceptionMessageMultipleDefines("tags"))
+        }
+
+        if (preferences.isNotEmpty()) {
+            error(getExceptionMessageWrongOrder("tags"))
+        }
+
+        screenTags = tags.toList()
+    }
+
+    /**
      * Declares the permissions for this preference screen.
      */
     protected fun permissions(permissions: Permissions) {
@@ -517,6 +599,27 @@ abstract class PreferencesApiScreen private constructor(
     }
 
     companion object {
+        private const val TAG = "PreferencesApiScreen"
+
         const val PARTIALLY_MIGRATED_PREFIX = "api_"
+
+        // Matches DeviceStateConfig.DeviceStateAppFunctionType
+        const val APP_FUNCTION_UNCATEGORIZED = "getUncategorizedDeviceState"
+        const val APP_FUNCTION_STORAGE = "getStorageDeviceState"
+        const val APP_FUNCTION_BATTERY = "getBatteryDeviceState"
+        const val APP_FUNCTION_MOBILE_DATA = "getMobileDataUsageDeviceState"
+        const val APP_FUNCTION_NOTIFICATIONS = "getNotificationsDeviceState"
+        const val APP_FUNCTION_APPS = "getAppsDeviceState"
+        const val APP_FUNCTION_NONE = "excludedFromAppFunctions"
+
+        private val deviceStateTags =
+            setOf(
+                APP_FUNCTION_UNCATEGORIZED,
+                APP_FUNCTION_STORAGE,
+                APP_FUNCTION_BATTERY,
+                APP_FUNCTION_MOBILE_DATA,
+                APP_FUNCTION_NOTIFICATIONS,
+                APP_FUNCTION_APPS,
+            )
     }
 }

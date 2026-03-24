@@ -21,6 +21,7 @@ import static android.os.Process.INVALID_UID;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_ACTIVITY;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_ADDED_APPLICATION;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_BACKUP;
+import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_BOUND_SERVICE;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_BROADCAST;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_CONTENT_PROVIDER;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_EMPTY;
@@ -29,7 +30,7 @@ import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HO
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_NEXT_TOP_ACTIVITY;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_ON_HOLD;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_RESTART;
-import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_SERVICE;
+import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_STARTED_SERVICE;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_SYSTEM;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_TOP_ACTIVITY;
 import static com.android.internal.util.FrameworkStatsLog.PROCESS_START_TIME__TRIGGER_TYPE__TRIGGER_TYPE_ALARM;
@@ -91,7 +92,8 @@ public final class HostingRecord {
     public static final String HOSTING_TYPE_NEXT_ACTIVITY = "next-activity";
     public static final String HOSTING_TYPE_NEXT_TOP_ACTIVITY = "next-top-activity";
     public static final String HOSTING_TYPE_RESTART = "restart";
-    public static final String HOSTING_TYPE_SERVICE = "service";
+    public static final String HOSTING_TYPE_STARTED_SERVICE = "started-service";
+    public static final String HOSTING_TYPE_BOUND_SERVICE = "bound-service";
     public static final String HOSTING_TYPE_SYSTEM = "system";
     public static final String HOSTING_TYPE_TOP_ACTIVITY = "top-activity";
     public static final String HOSTING_TYPE_EMPTY = "";
@@ -118,32 +120,24 @@ public final class HostingRecord {
     private final int mCallerUid;
     @Nullable private final String mCallerProcessName;
 
+    /** The authority of the content provider that triggered the process start. */
+    @Nullable private final String mHostingAuthority;
+
+    /** Whether the content provider connection that triggered the process start is stable. */
+    private final boolean mIsProviderStable;
+
     public HostingRecord(@NonNull String hostingType) {
         this(hostingType, null /* hostingName */, REGULAR_ZYGOTE, null /* definingPackageName */,
                 INVALID_UID /* mDefiningUid */, false /* isTopApp */,
                 null /* definingProcessName */,
                 null /* action */, TRIGGER_TYPE_UNKNOWN, false /* isPcc */,
                 false /* isNativeService */, INVALID_UID /* callerUid */,
-                null /* callerProcessName */);
+                null /* callerProcessName */,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     public HostingRecord(@NonNull String hostingType, ComponentName hostingName) {
         this(hostingType, hostingName, REGULAR_ZYGOTE);
-    }
-
-    public HostingRecord(@NonNull String hostingType, ComponentName hostingName,
-            @Nullable String action, @Nullable String triggerType) {
-        this(hostingType, hostingName, action, triggerType, false /* isPcc */);
-    }
-
-    public HostingRecord(@NonNull String hostingType, ComponentName hostingName,
-            @Nullable String action, @Nullable String triggerType, boolean isPcc) {
-        this(hostingType, hostingName.toShortString(), REGULAR_ZYGOTE,
-                null /* definingPackageName */, INVALID_UID /* mDefiningUid */,
-                false /* isTopApp */,
-                null /* definingProcessName */, action, triggerType, isPcc,
-                false /* isNativeService */, INVALID_UID /* callerUid */,
-                null /* callerProcessName */);
     }
 
     public HostingRecord(@NonNull String hostingType, ComponentName hostingName,
@@ -153,16 +147,18 @@ public final class HostingRecord {
                 null /* definingPackageName */, INVALID_UID /* mDefiningUid */,
                 false /* isTopApp */,
                 null /* definingProcessName */, action, triggerType, isPcc,
-                false /* isNativeService */, callerUid, callerProcessName);
+                false /* isNativeService */, callerUid, callerProcessName,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     public HostingRecord(@NonNull String hostingType, ComponentName hostingName,
             String definingPackageName, int definingUid, String definingProcessName,
             String triggerType, boolean isPcc, int callerUid, @Nullable String callerProcessName) {
-        this(hostingType, hostingName.toShortString(), REGULAR_ZYGOTE, definingPackageName,
-                definingUid, false /* isTopApp */, definingProcessName, null /* action */,
-                triggerType, isPcc /* isPcc */, false /* isNativeService */,
-                callerUid, callerProcessName);
+        this(hostingType, hostingName.toShortString(), REGULAR_ZYGOTE,
+                definingPackageName, definingUid, false /* isTopApp */,
+                definingProcessName, null /* action */, triggerType, isPcc,
+                false /* isNativeService */, callerUid, callerProcessName,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     public HostingRecord(@NonNull String hostingType, ComponentName hostingName,
@@ -172,7 +168,8 @@ public final class HostingRecord {
                 isTopApp /* isTopApp */,
                 null /* definingProcessName */, null /* action */, TRIGGER_TYPE_UNKNOWN, isPcc,
                 false /* isNativeService */, INVALID_UID /* callerUid */,
-                null /* callerProcessName */);
+                null /* callerProcessName */,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     public HostingRecord(@NonNull String hostingType, ComponentName hostingName,
@@ -181,7 +178,8 @@ public final class HostingRecord {
                 null /* definingPackageName */, INVALID_UID /* mDefiningUid */,
                 isTopApp /* isTopApp */,
                 null /* definingProcessName */, null /* action */, TRIGGER_TYPE_UNKNOWN, isPcc,
-                false /* isNativeService */, callerUid, callerProcessName);
+                false /* isNativeService */, callerUid, callerProcessName,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     public HostingRecord(@NonNull String hostingType, String hostingName) {
@@ -203,7 +201,8 @@ public final class HostingRecord {
                 null /* definingProcessName */,
                 null /* action */, TRIGGER_TYPE_UNKNOWN, false /* isPcc */,
                 false /* isNativeService */, INVALID_UID /* callerUid */,
-                null /* callerProcessName */);
+                null /* callerProcessName */,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     private HostingRecord(@NonNull String hostingType, String hostingName, int hostingZygote,
@@ -212,14 +211,16 @@ public final class HostingRecord {
                 INVALID_UID /* mDefiningUid */, false /* isTopApp */,
                 null /* definingProcessName */,
                 null /* action */, TRIGGER_TYPE_UNKNOWN, isPcc, false /* isNativeService */,
-                INVALID_UID /* callerUid */, null /* callerProcessName */);
+                INVALID_UID /* callerUid */, null /* callerProcessName */,
+                null /* hostingAuthority */, false /* isProviderStable */);
     }
 
     private HostingRecord(@NonNull String hostingType, String hostingName, int hostingZygote,
             String definingPackageName, int definingUid, boolean isTopApp,
             String definingProcessName, @Nullable String action, String triggerType,
             boolean isPcc, boolean isNativeService, int callerUid,
-            @Nullable String callerProcessName) {
+            @Nullable String callerProcessName, @Nullable String hostingAuthority,
+            boolean isProviderStable) {
         mHostingType = hostingType;
         mHostingName = hostingName;
         mHostingZygote = hostingZygote;
@@ -233,6 +234,8 @@ public final class HostingRecord {
         mIsNativeService = isNativeService;
         mCallerUid = callerUid;
         mCallerProcessName = callerProcessName;
+        mHostingAuthority = hostingAuthority;
+        mIsProviderStable = isProviderStable;
     }
 
     public @NonNull String getType() {
@@ -314,21 +317,42 @@ public final class HostingRecord {
     }
 
     /**
+     * Returns the authority for the content provider that triggered the process start.
+     *
+     * @return the content provider authority.
+     */
+    public @Nullable String getHostingAuthority() {
+        return mHostingAuthority;
+    }
+
+    /**
+     * Returns whether the provider connection that triggered the process start is stable.
+     *
+     * @return true if stable.
+     */
+    public boolean isProviderStable() {
+        return mIsProviderStable;
+    }
+
+    /**
      * Creates a HostingRecord for a process that must spawn from the webview zygote
+     * @param hostingType type of the component to be hosted in this process
      * @param hostingName name of the component to be hosted in this process
      * @return The constructed HostingRecord
      */
-    public static HostingRecord byWebviewZygote(ComponentName hostingName,
-            String definingPackageName, int definingUid, String definingProcessName,
-            int callerUid, @Nullable String callerProcessName) {
-        return new HostingRecord(HostingRecord.HOSTING_TYPE_EMPTY, hostingName.toShortString(),
+    public static HostingRecord byWebviewZygote(@NonNull String hostingType,
+            ComponentName hostingName, String definingPackageName, int definingUid,
+            String definingProcessName, int callerUid, @Nullable String callerProcessName) {
+        return new HostingRecord(hostingType, hostingName.toShortString(),
                 WEBVIEW_ZYGOTE, definingPackageName, definingUid, false /* isTopApp */,
                 definingProcessName, null /* action */, TRIGGER_TYPE_UNKNOWN, false /* isPcc */,
-                false /* isNativeService */, callerUid, callerProcessName);
+                false /* isNativeService */, callerUid, callerProcessName,
+                null /* authority */, false /* isProviderStable */);
     }
 
     /**
      * Creates a HostingRecord for a process that must spawn from the application zygote
+     * @param hostingType type of the component to be hosted in this process
      * @param hostingName name of the component to be hosted in this process
      * @param definingPackageName name of the package defining the service
      * @param definingUid uid of the package defining the service
@@ -336,13 +360,32 @@ public final class HostingRecord {
      *                        support services with {@code android:nativeService="true"}.
      * @return The constructed HostingRecord
      */
-    public static HostingRecord byAppZygote(ComponentName hostingName, String definingPackageName,
+    public static HostingRecord byAppZygote(@NonNull String hostingType, ComponentName hostingName,
+            String definingPackageName,
             int definingUid, String definingProcessName, boolean isNativeService,
             int callerUid, @Nullable String callerProcessName) {
-        return new HostingRecord(HostingRecord.HOSTING_TYPE_EMPTY, hostingName.toShortString(),
+        return new HostingRecord(hostingType, hostingName.toShortString(),
                 APP_ZYGOTE, definingPackageName, definingUid, false /* isTopApp */,
                 definingProcessName, null /* action */, TRIGGER_TYPE_UNKNOWN, false /* isPcc */,
-                isNativeService, callerUid, callerProcessName);
+                isNativeService, callerUid, callerProcessName,
+                null /* authority */, false /* isProviderStable */);
+    }
+
+    /**
+     * Creates a HostingRecord for a process that must be started for a content provider.
+     * @param hostingName name of the component to be hosted in this process
+     * @param authority the authority of the content provider
+     * @param isPcc if true, the process will be started in the PCC sandbox
+     * @param isProviderStable true if the provider connection is stable
+     * @return The constructed HostingRecord
+     */
+    public static HostingRecord forContentProvider(ComponentName hostingName, boolean isPcc,
+            int callerUid, String callerProcessName, String authority, boolean isProviderStable) {
+        return new HostingRecord(HostingRecord.HOSTING_TYPE_CONTENT_PROVIDER,
+                hostingName.toShortString(), REGULAR_ZYGOTE, null /* definingPackageName */,
+                INVALID_UID /* definingUid */, false /* isTopApp */, null /* definingProcessName */,
+                null /* action */, TRIGGER_TYPE_UNKNOWN, isPcc, false /* isNativeService */,
+                callerUid, callerProcessName, authority, isProviderStable);
     }
 
     /**
@@ -393,8 +436,10 @@ public final class HostingRecord {
                 return PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_NEXT_TOP_ACTIVITY;
             case HOSTING_TYPE_RESTART:
                 return PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_RESTART;
-            case HOSTING_TYPE_SERVICE:
-                return PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_SERVICE;
+            case HOSTING_TYPE_STARTED_SERVICE:
+                return PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_STARTED_SERVICE;
+            case HOSTING_TYPE_BOUND_SERVICE:
+                return PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_BOUND_SERVICE;
             case HOSTING_TYPE_SYSTEM:
                 return PROCESS_START_TIME__HOSTING_TYPE_ID__HOSTING_TYPE_SYSTEM;
             case HOSTING_TYPE_TOP_ACTIVITY:

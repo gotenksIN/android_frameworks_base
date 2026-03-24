@@ -49,11 +49,9 @@ import android.os.vibrator.Flags;
 import android.os.vibrator.PrebakedSegment;
 import android.os.vibrator.PrimitiveSegment;
 import android.os.vibrator.PwleSegment;
-import android.os.vibrator.RampSegment;
 import android.os.vibrator.StepSegment;
 import android.os.vibrator.VibrationConfig;
 import android.os.vibrator.VibrationEffectSegment;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.util.SparseArray;
@@ -70,11 +68,10 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class DeviceAdapterTest {
     private static final int EMPTY_VIBRATOR_ID = 1;
-    private static final int PWLE_VIBRATOR_ID = 2;
-    private static final int PWLE_WITHOUT_FREQUENCIES_VIBRATOR_ID = 3;
     private static final int PWLE_V2_VIBRATOR_ID = 4;
     private static final int PWLE_V2_BASIC_VIBRATOR_ID = 5;
     private static final int PWLE_V2_EMPTY_PROFILE_VIBRATOR_ID = 6;
@@ -126,10 +123,6 @@ public class DeviceAdapterTest {
 
         SparseArray<HalVibrator> vibrators = new SparseArray<>();
         vibrators.put(EMPTY_VIBRATOR_ID, createEmptyVibrator(EMPTY_VIBRATOR_ID));
-        vibrators.put(PWLE_VIBRATOR_ID, createPwleVibrator(PWLE_VIBRATOR_ID));
-        vibrators.put(PWLE_WITHOUT_FREQUENCIES_VIBRATOR_ID,
-                createPwleWithoutFrequenciesVibrator(
-                        PWLE_WITHOUT_FREQUENCIES_VIBRATOR_ID));
         vibrators.put(PWLE_V2_VIBRATOR_ID, createPwleV2Vibrator(PWLE_V2_VIBRATOR_ID));
         vibrators.put(PWLE_V2_BASIC_VIBRATOR_ID,
                 createPwleV2Vibrator(PWLE_V2_VIBRATOR_ID, TEST_BASIC_FREQUENCIES_HZ,
@@ -164,113 +157,15 @@ public class DeviceAdapterTest {
         VibrationEffect effect = VibrationEffect.createVendorEffect(vendorData);
 
         assertThat(mAdapter.adaptToVibrator(EMPTY_VIBRATOR_ID, effect)).isEqualTo(effect);
-        assertThat(mAdapter.adaptToVibrator(PWLE_VIBRATOR_ID, effect)).isEqualTo(effect);
-    }
-
-    @Test
-    public void testStepAndRampSegments_withoutPwleCapability_convertsRampsToSteps() {
-        VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(0, 200, 10),
-                new StepSegment(0.5f, 150, 100),
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(1, 0.2f, 1, 300, 10),
-                new RampSegment(0.8f, 0.2f, 0, 0, 100),
-                new RampSegment(0.65f, 0.65f, 0, 1, 1000)),
-                /* repeatIndex= */ 3);
-
-        VibrationEffect.Composed adaptedEffect =
-                (VibrationEffect.Composed) mAdapter.adaptToVibrator(EMPTY_VIBRATOR_ID, effect);
-        assertThat(adaptedEffect.getSegments().size()).isGreaterThan(effect.getSegments().size());
-        assertThat(adaptedEffect.getRepeatIndex()).isAtLeast(effect.getRepeatIndex());
-
-        for (VibrationEffectSegment adaptedSegment : adaptedEffect.getSegments()) {
-            assertThat(adaptedSegment).isInstanceOf(StepSegment.class);
-        }
-    }
-
-    @Test
-    public void testStepAndRampSegments_withPwleCapability_convertsStepsToRamps() {
-        VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(0, 175, 10),
-                new StepSegment(0.5f, 150, 60),
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(1, 1, 50, 200, 50),
-                new RampSegment(0.8f, 0.2f, 1000, 1, 20)),
-                /* repeatIndex= */ 2);
-
-        VibrationEffect.Composed expected = new VibrationEffect.Composed(Arrays.asList(
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(0, 0, 175, 175, 10),
-                new RampSegment(0.5f, 0.5f, 150, 150, 60),
-                new RampSegment(0.08f, 0.64f, 50, 200, 50),
-                new RampSegment(0.64f, 0.08f, 200, 50, 20)),
-                /* repeatIndex= */ 2);
-
-        assertThat(mAdapter.adaptToVibrator(PWLE_VIBRATOR_ID, effect)).isEqualTo(expected);
-    }
-
-    @Test
-    public void testStepAndRampSegments_withEmptyFreqMapping_returnsAmplitudesWithResonantFreq() {
-        VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(0, 175, 10),
-                new StepSegment(0.5f, 0, 100),
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(0.8f, 1, 50, 200, 50),
-                new RampSegment(0.7f, 0.5f, 1000, 1, 20)),
-                /* repeatIndex= */ 2);
-
-        VibrationEffect.Composed expected = new VibrationEffect.Composed(Arrays.asList(
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(0, 0, 0, 0, 10),
-                new RampSegment(0.5f, 0.5f, 0, 0, 100),
-                new RampSegment(0.8f, 1, 0, 0, 50),
-                new RampSegment(0.7f, 0.5f, 0, 0, 20)),
-                /* repeatIndex= */ 2);
-
-        assertThat(mAdapter.adaptToVibrator(PWLE_WITHOUT_FREQUENCIES_VIBRATOR_ID, effect))
-                .isEqualTo(expected);
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_NORMALIZED_PWLE_EFFECTS)
-    public void testStepAndRampSegments_withValidFreqMapping_returnsClippedValuesOnlyInRamps() {
-        VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                // Individual step without frequency control, will not use PWLE composition
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(1, 0, 10),
-                new PrimitiveSegment(PRIMITIVE_TICK, 1, 10),
-                // Step with frequency control and followed by ramps, will use PWLE composition
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(0.5f, 0, 10),
-                new StepSegment(1, 125, 100),
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(1, 1, 50, 200, 50),
-                new RampSegment(0.8f, 0.2f, 1000, 1, 20)),
-                /* repeatIndex= */ 2);
-
-        VibrationEffect.Composed expected = new VibrationEffect.Composed(Arrays.asList(
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(1, 0, 10),
-                new PrimitiveSegment(PRIMITIVE_TICK, 1, 10),
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(0.5f, 0.5f, 150, 150, 10),
-                new RampSegment(0.64f, 0.64f, 125, 125, 100),
-                new RampSegment(0.08f, 0.64f, 50, 200, 50),
-                new RampSegment(0.64f, 0.08f, 200, 50, 20)),
-                /* repeatIndex= */ 2);
-
-        assertThat(mAdapter.adaptToVibrator(PWLE_VIBRATOR_ID, effect)).isEqualTo(expected);
+        assertThat(mAdapter.adaptToVibrator(PWLE_V2_VIBRATOR_ID, effect)).isEqualTo(effect);
     }
 
     @Test
     public void testMonoCombinedVibration_returnsSameVibrationWhenEffectsUnchanged() {
         // Only on-off effects are supported by all vibrators.
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new StepSegment(1, 0, 10),
-                new StepSegment(1, 0, 100)),
+                new StepSegment(1, 10),
+                new StepSegment(1, 100)),
                 /* repeatIndex= */ -1);
 
         CombinedVibration expected = CombinedVibration.createParallel(effect);
@@ -279,85 +174,28 @@ public class DeviceAdapterTest {
     }
 
     @Test
-    public void testMonoCombinedVibration_mapsEffectsToAllVibrators() {
-        VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(1, 175, 10),
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                new RampSegment(1, 1, 50, 200, 50)),
-                /* repeatIndex= */ 1);
-
-        CombinedVibration expected = CombinedVibration.startParallel()
-                .addVibrator(EMPTY_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                        // Step(amplitude, frequencyHz, duration)
-                        new StepSegment(1, 175, 10),
-                        new StepSegment(1, 0, 50)),
-                        /* repeatIndex= */ 1))
-                .addVibrator(BASIC_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                        // Step(amplitude, frequencyHz, duration)
-                        new StepSegment(1, 175, 10),
-                        new StepSegment(1, 0, 50)),
-                        /* repeatIndex= */ 1))
-                .addVibrator(PWLE_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                        new RampSegment(0.72f, 0.72f, 175, 175, 10),
-                        new RampSegment(0.08f, 0.64f, 50, 200, 50)),
-                        /* repeatIndex= */ 1))
-                .addVibrator(PWLE_WITHOUT_FREQUENCIES_VIBRATOR_ID,
-                        new VibrationEffect.Composed(Arrays.asList(
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                                new RampSegment(1, 1, 0, 0, 10),
-                                new RampSegment(1, 1, 0, 0, 50)),
-                                /* repeatIndex= */ 1))
-                .addVibrator(PWLE_V2_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                        // Step(amplitude, frequencyHz, duration)
-                        new StepSegment(1, 175, 10),
-                        new StepSegment(1, 50, 50)),
-                        /* repeatIndex= */ 1))
-                .addVibrator(PWLE_V2_BASIC_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                        // Step(amplitude, frequencyHz, duration)
-                        new StepSegment(1, 175, 10),
-                        new StepSegment(1, 50, 50)),
-                        /* repeatIndex= */ 1))
-                .addVibrator(BASIC_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                        // Step(amplitude, frequencyHz, duration)
-                        new StepSegment(1, 175, 10),
-                        new StepSegment(1, 0, 50)),
-                        /* repeatIndex= */ 1))
-                .addVibrator(PWLE_V2_EMPTY_PROFILE_VIBRATOR_ID,
-                        new VibrationEffect.Composed(Arrays.asList(
-                                // Step(amplitude, frequencyHz, duration)
-                                new StepSegment(1, 175, 10),
-                                new StepSegment(1, 0, 50)),
-                                /* repeatIndex= */ 1))
-                .combine();
-
-        assertThat(CombinedVibration.createParallel(effect).adapt(mAdapter)).isEqualTo(expected);
-    }
-
-    @Test
     public void testStereoCombinedVibration_adaptMappedEffectsAndLeaveUnmappedOnesUnchanged() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                // Step(amplitude, frequencyHz, duration)
-                new StepSegment(1, 175, 10)),
+                // Step(amplitude, duration)
+                new StepSegment(1, 10)),
                 /* repeatIndex= */ -1);
 
         int missingVibratorId = 1234;
         CombinedVibration vibration = CombinedVibration.startParallel()
                 .addVibrator(missingVibratorId, effect)
                 .addVibrator(EMPTY_VIBRATOR_ID, effect)
-                .addVibrator(PWLE_VIBRATOR_ID, effect)
+                .addVibrator(PWLE_V2_VIBRATOR_ID, effect)
                 .combine();
 
         CombinedVibration expected = CombinedVibration.startParallel()
                 .addVibrator(missingVibratorId, effect) // unchanged
                 .addVibrator(EMPTY_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                        // Step(amplitude, frequencyHz, duration)
-                        new StepSegment(1, 175, 10)),
+                        // Step(amplitude, duration)
+                        new StepSegment(1, 10)),
                         /* repeatIndex= */ -1))
-                .addVibrator(PWLE_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
-                // Ramp(startAmplitude, endAmplitude, startFrequencyHz, endFrequencyHz, duration)
-                        new RampSegment(0.72f, 0.72f, 175, 175, 10)),
+                .addVibrator(PWLE_V2_VIBRATOR_ID, new VibrationEffect.Composed(Arrays.asList(
+                        // Step(amplitude, duration)
+                        new StepSegment(1, 10)),
                         /* repeatIndex= */ -1))
                 .combine();
 
@@ -369,9 +207,9 @@ public class DeviceAdapterTest {
     public void testPwleSegment_withoutPwleV2Capability_returnsNull() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
                 new PrimitiveSegment(PRIMITIVE_SPIN, 0.5f, 100),
-                new PwleSegment(1, 0.2f, 30, 60, 20, true),
-                new PwleSegment(0.8f, 0.2f, 60, 100, 100, false),
-                new PwleSegment(0.65f, 0.65f, 100, 50, 50, false)),
+                new PwleSegment(1, 0.2f, 30, 60, 20),
+                new PwleSegment(0.8f, 0.2f, 60, 100, 100),
+                new PwleSegment(0.65f, 0.65f, 100, 50, 50)),
                 /* repeatIndex= */ 1);
 
         VibrationEffect.Composed adaptedEffect =
@@ -383,15 +221,15 @@ public class DeviceAdapterTest {
     @EnableFlags(Flags.FLAG_NORMALIZED_PWLE_EFFECTS)
     public void testPwleSegment_withPwleV2Capability_returnsAdaptedSegments() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new PwleSegment(1, 0.2f, 30, 60, 20, true),
-                new PwleSegment(0.8f, 0.2f, 60, 100, 100, false),
-                new PwleSegment(0.65f, 0.65f, 100, 50, 50, false)),
+                new PwleSegment(1, 0.2f, 30, 60, 20),
+                new PwleSegment(0.8f, 0.2f, 60, 100, 100),
+                new PwleSegment(0.65f, 0.65f, 100, 50, 50)),
                 /* repeatIndex= */ 1);
 
         VibrationEffect.Composed expected = new VibrationEffect.Composed(Arrays.asList(
-                new PwleSegment(1, 0.2f, 30, 60, 20, true),
-                new PwleSegment(0.8f, 0.2f, 60, 100, 100, false),
-                new PwleSegment(0.65f, 0.65f, 100, 50, 50, false)),
+                new PwleSegment(1, 0.2f, 30, 60, 20),
+                new PwleSegment(0.8f, 0.2f, 60, 100, 100),
+                new PwleSegment(0.65f, 0.65f, 100, 50, 50)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(PWLE_V2_VIBRATOR_ID, effect)).isEqualTo(expected);
@@ -402,9 +240,9 @@ public class DeviceAdapterTest {
     public void testPwleSegment_withFrequenciesBelowSupportedRange_returnsNull() {
         float frequencyBelowSupportedRange = PWLE_V2_MIN_FREQUENCY - 1f;
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new PwleSegment(0, 0.2f, 30, 60, 20, true),
-                new PwleSegment(0.8f, 0.2f, 60, frequencyBelowSupportedRange, 100, false),
-                new PwleSegment(0.65f, 0.65f, frequencyBelowSupportedRange, 50, 50, false)),
+                new PwleSegment(0, 0.2f, 30, 60, 20),
+                new PwleSegment(0.8f, 0.2f, 60, frequencyBelowSupportedRange, 100),
+                new PwleSegment(0.65f, 0.65f, frequencyBelowSupportedRange, 50, 50)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(PWLE_V2_VIBRATOR_ID, effect)).isNull();
@@ -415,9 +253,9 @@ public class DeviceAdapterTest {
     public void testPwleSegment_withFrequenciesAboveSupportedRange_returnsNull() {
         float frequencyAboveSupportedRange = PWLE_V2_MAX_FREQUENCY + 1f;
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new PwleSegment(0, 0.2f, 30, frequencyAboveSupportedRange, 20, true),
-                new PwleSegment(0.8f, 0.2f, frequencyAboveSupportedRange, 100, 100, false),
-                new PwleSegment(0.65f, 0.65f, 100, 50, 50, false)),
+                new PwleSegment(0, 0.2f, 30, frequencyAboveSupportedRange, 20),
+                new PwleSegment(0.8f, 0.2f, frequencyAboveSupportedRange, 100, 100),
+                new PwleSegment(0.65f, 0.65f, 100, 50, 50)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(PWLE_V2_VIBRATOR_ID, effect)).isNull();
@@ -427,9 +265,9 @@ public class DeviceAdapterTest {
     @EnableFlags(Flags.FLAG_NORMALIZED_PWLE_EFFECTS)
     public void testPwleSegment_withEmptyProfile_returnsNull() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new PwleSegment(1, 0.2f, 30, 60, 20, true),
-                new PwleSegment(0.8f, 0.2f, 60, 100, 100, false),
-                new PwleSegment(0.65f, 0.65f, 100, 50, 50, false)),
+                new PwleSegment(1, 0.2f, 30, 60, 20),
+                new PwleSegment(0.8f, 0.2f, 60, 100, 100),
+                new PwleSegment(0.65f, 0.65f, 100, 50, 50)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(PWLE_V2_EMPTY_PROFILE_VIBRATOR_ID, effect)).isNull();
@@ -440,9 +278,9 @@ public class DeviceAdapterTest {
     public void testBasicPwleSegment_withoutPwleV2Capability_returnsNull() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
                 new PrimitiveSegment(PRIMITIVE_SPIN, 0.5f, 100),
-                new BasicPwleSegment(0.2f, 0.8f, 0.2f, 0.4f, 20, true),
-                new BasicPwleSegment(0.8f, 0.2f, 0.4f, 0.5f, 100, false),
-                new BasicPwleSegment(0.2f, 0.65f, 0.5f, 0.5f, 50, false)),
+                new BasicPwleSegment(0.2f, 0.8f, 0.2f, 0.4f, 20),
+                new BasicPwleSegment(0.8f, 0.2f, 0.4f, 0.5f, 100),
+                new BasicPwleSegment(0.2f, 0.65f, 0.5f, 0.5f, 50)),
                 /* repeatIndex= */ 1);
 
         VibrationEffect.Composed adaptedEffect =
@@ -454,15 +292,15 @@ public class DeviceAdapterTest {
     @EnableFlags(Flags.FLAG_NORMALIZED_PWLE_EFFECTS)
     public void testBasicPwleSegment_withPwleV2Capability_returnsAdaptedSegments() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new BasicPwleSegment(0.0f, 0.5f, 0.0f, 0.5f, 20, true),
-                new BasicPwleSegment(0.5f, 1.0f, 0.5f, 1.0f, 100, false),
-                new BasicPwleSegment(1.0f, 0.0f, 1.0f, 0.5f, 100, false)),
+                new BasicPwleSegment(0.0f, 0.5f, 0.0f, 0.5f, 20),
+                new BasicPwleSegment(0.5f, 1.0f, 0.5f, 1.0f, 100),
+                new BasicPwleSegment(1.0f, 0.0f, 1.0f, 0.5f, 100)),
                 /* repeatIndex= */ 1);
 
         VibrationEffect.Composed expected = new VibrationEffect.Composed(Arrays.asList(
-                new PwleSegment(0.0f, 0.16522837f, 63.52442f, 281.7622f, 20, true),
-                new PwleSegment(0.16522837f, 1.0f, 281.7622f, 500f, 100, false),
-                new PwleSegment(1.0f, 0.0f, 500, 281.7622f, 100, false)),
+                new PwleSegment(0.0f, 0.16522837f, 63.52442f, 281.7622f, 20),
+                new PwleSegment(0.16522837f, 1.0f, 281.7622f, 500f, 100),
+                new PwleSegment(1.0f, 0.0f, 500, 281.7622f, 100)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(PWLE_V2_BASIC_VIBRATOR_ID, effect)).isEqualTo(expected);
@@ -472,9 +310,9 @@ public class DeviceAdapterTest {
     @EnableFlags(Flags.FLAG_NORMALIZED_PWLE_EFFECTS)
     public void testBasicPwleSegment_withEmptyProfile_returnsNull() {
         VibrationEffect.Composed effect = new VibrationEffect.Composed(Arrays.asList(
-                new BasicPwleSegment(0.0f, 0.5f, 0.0f, 0.5f, 20, true),
-                new BasicPwleSegment(0.5f, 1.0f, 0.5f, 1.0f, 100, false),
-                new BasicPwleSegment(1.0f, 0.0f, 1.0f, 0.5f, 100, false)),
+                new BasicPwleSegment(0.0f, 0.5f, 0.0f, 0.5f, 20),
+                new BasicPwleSegment(0.5f, 1.0f, 0.5f, 1.0f, 100),
+                new BasicPwleSegment(1.0f, 0.0f, 1.0f, 0.5f, 100)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(PWLE_V2_EMPTY_PROFILE_VIBRATOR_ID, effect)).isNull();
@@ -530,10 +368,10 @@ public class DeviceAdapterTest {
                 /* repeatIndex= */ 2);
         VibrationEffect.Composed adaptedEffect1 = new VibrationEffect.Composed(Arrays.asList(
                 new PrebakedSegment(EFFECT_CLICK, true, VibrationEffect.EFFECT_STRENGTH_LIGHT),
-                new StepSegment(0, 0, 10),
-                new StepSegment(DEFAULT_AMPLITUDE, 0, 10),
-                new StepSegment(0, 0, 10),
-                new StepSegment(DEFAULT_AMPLITUDE, 0, 10),
+                new StepSegment(0, 10),
+                new StepSegment(DEFAULT_AMPLITUDE, 10),
+                new StepSegment(0, 10),
+                new StepSegment(DEFAULT_AMPLITUDE, 10),
                 new PrebakedSegment(EFFECT_TICK, true, VibrationEffect.EFFECT_STRENGTH_STRONG)),
                 /* repeatIndex= */ 5);
 
@@ -543,10 +381,10 @@ public class DeviceAdapterTest {
                 /* repeatIndex= */ 1);
         VibrationEffect.Composed adaptedEffect2 = new VibrationEffect.Composed(Arrays.asList(
                 new PrebakedSegment(EFFECT_CLICK, true, VibrationEffect.EFFECT_STRENGTH_LIGHT),
-                new StepSegment(0, 0, 10),
-                new StepSegment(DEFAULT_AMPLITUDE, 0, 10),
-                new StepSegment(0, 0, 10),
-                new StepSegment(DEFAULT_AMPLITUDE, 0, 10)),
+                new StepSegment(0, 10),
+                new StepSegment(DEFAULT_AMPLITUDE, 10),
+                new StepSegment(0, 10),
+                new StepSegment(DEFAULT_AMPLITUDE, 10)),
                 /* repeatIndex= */ 1);
 
         assertThat(mAdapter.adaptToVibrator(BASIC_VIBRATOR_ID, effect1)).isEqualTo(adaptedEffect1);
@@ -570,6 +408,47 @@ public class DeviceAdapterTest {
 
         assertThat(mAdapter.adaptToVibrator(BASIC_VIBRATOR_ID, effect1)).isNull();
         assertThat(mAdapter.adaptToVibrator(BASIC_VIBRATOR_ID, effect2)).isNull();
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_REMOVE_HIDL_SUPPORT, Flags.FLAG_NORMALIZED_PWLE_EFFECTS})
+    public void testAdaptToVibrator_propagatesStartTimeThroughMultipleAdapters() {
+        // Config to enable RampDownAdapter
+        Context context = ApplicationProvider.getApplicationContext();
+        VibrationConfig.Builder configBuilder = new VibrationConfig.Builder(context.getResources());
+        configBuilder.setRampDownDurationMs(20);
+        VibrationSettings settings = new VibrationSettings(context,
+                new Handler(mTestLooper.getLooper()),
+                configBuilder.build(), mFallbackEffects);
+        SparseArray<HalVibrator> vibrators = new SparseArray<>();
+        vibrators.put(BASIC_VIBRATOR_ID, createBasicVibrator(BASIC_VIBRATOR_ID));
+        DeviceAdapter adapter = new DeviceAdapter(settings, vibrators);
+
+        // This test case exercises:
+        // 1. PrebakedFallbackAdapter: EFFECT_THUD -> Waveform (StepSegment)
+        // 2. RampDownAdapter: StepSegment (amplitude 0) -> Ramp down Steps
+        mFallbackEffects.put(EFFECT_THUD, VibrationEffect.createWaveform(
+                new long[] { 10 }, -1));
+        long startTime = 1234L;
+        VibrationEffect effect = new VibrationEffect.Composed(Arrays.asList(
+                new StepSegment(1f, 10),
+                new PrebakedSegment(EFFECT_THUD, true, VibrationEffect.EFFECT_STRENGTH_MEDIUM,
+                        startTime)),
+                -1);
+
+        VibrationEffect adapted = adapter.adaptToVibrator(BASIC_VIBRATOR_ID, effect);
+
+        assertThat(adapted).isInstanceOf(VibrationEffect.Composed.class);
+        List<VibrationEffectSegment> segments = ((VibrationEffect.Composed) adapted).getSegments();
+
+        // 1f/10ms step -> ramp down steps (1 step of 0.5f/5ms + 1 step of 0f/5ms)
+        // The replaced THUD (Step(0f, 10ms)) is consumed by the ramp down.
+        // So we have:
+        // [0] Step(1f, 10ms), start -1
+        // [1] Step(0.5f, 5ms), start startTime (propagated)
+        // [2] Step(0f, 5ms), start -1
+        assertThat(segments.size()).isEqualTo(3);
+        assertThat(segments.get(1).getStartTimeMillis()).isEqualTo(startTime);
     }
 
     private HalVibrator createEmptyVibrator(int vibratorId) {

@@ -39,6 +39,7 @@ import com.android.systemui.flags.Flags
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.media.NotificationMediaManager
 import com.android.systemui.media.dialog.MediaOutputDialogManager
+import com.android.systemui.notifications.content.icon.FakeNotificationPackage
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.plugins.statusbar.statusBarStateController
@@ -81,7 +82,6 @@ import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow.OnExpandClickListener
 import com.android.systemui.statusbar.notification.row.NotificationRowContentBinder.FLAG_CONTENT_VIEW_ALL
 import com.android.systemui.statusbar.notification.row.NotificationRowContentBinder.InflationFlag
-import com.android.systemui.statusbar.notification.row.icon.FakeNotificationPackage
 import com.android.systemui.statusbar.notification.row.icon.notificationRowIconViewInflaterFactory
 import com.android.systemui.statusbar.notification.stack.NotificationChildrenContainerLogger
 import com.android.systemui.statusbar.phone.KeyguardBypassController
@@ -350,6 +350,9 @@ class ExpandableNotificationRowBuilder(
                 NotificationManager.IMPORTANCE_DEFAULT,
             )
         channel.isBlockable = true
+        if (notification.isImportantConversation) {
+            channel.setImportantConversation(true)
+        }
 
         val promoted = notification.isOngoingEvent && notification.isRequestPromotedOngoing
         val packageName = fakePackage?.packageName ?: PKG
@@ -451,8 +454,13 @@ class ExpandableNotificationRowBuilder(
         }
         mBindPipelineEntryListener.onEntryInit(entry)
         mBindPipeline.manageRow(entry, row)
+
         mBindStage.getStageParams(entry).requireContentViews(extraInflationFlags)
         inflateAndWait(entry)
+
+        if (entry.sbn.notification.isRecentlyAudiblyAlerted) {
+            row.setLastAudiblyAlertedMs(System.currentTimeMillis())
+        }
         return row
     }
 
@@ -476,14 +484,31 @@ class ExpandableNotificationRowBuilder(
         private val USER_HANDLE = UserHandle.of(ActivityManager.getCurrentUser())
         private const val INFLATION_FLAGS = FLAG_CONTENT_VIEW_ALL
         private const val IS_CONVERSATION_FLAG = "test.isConversation"
+        private const val IS_IMPORTANT_CONVERSATION_FLAG = "test.isImportantConversation"
+        private const val IS_RECENTLY_AUDIBLY_ALERTED_FLAG = "test.isRecentlyAudiblyAlerted"
 
         private val Notification.isConversationStyleNotification
             get() = extras.getBoolean(IS_CONVERSATION_FLAG, false)
 
+        private val Notification.isImportantConversation
+            get() = extras.getBoolean(IS_IMPORTANT_CONVERSATION_FLAG, false)
+
+        private val Notification.isRecentlyAudiblyAlerted
+            get() = extras.getBoolean(IS_RECENTLY_AUDIBLY_ALERTED_FLAG, false)
+
         private val STUB_ONLY = Mockito.withSettings().stubOnly()
 
-        fun markAsConversation(builder: Notification.Builder) {
-            builder.addExtras(bundleOf(IS_CONVERSATION_FLAG to true))
+        fun markAsRecentlyAudiblyAlerted(builder: Notification.Builder) {
+            builder.addExtras(bundleOf(IS_RECENTLY_AUDIBLY_ALERTED_FLAG to true))
+        }
+
+        fun markAsConversation(builder: Notification.Builder, isImportant: Boolean = false) {
+            builder.addExtras(
+                bundleOf(
+                    IS_CONVERSATION_FLAG to true,
+                    IS_IMPORTANT_CONVERSATION_FLAG to isImportant,
+                )
+            )
         }
     }
 }

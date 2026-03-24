@@ -55,7 +55,6 @@ import android.window.ScreenCaptureInternal.ScreenshotHardwareBuffer;
 
 import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.server.input.InputManagerService;
-import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.wm.SensitiveContentPackages.PackageInfo;
 
 import java.lang.annotation.Retention;
@@ -280,11 +279,8 @@ public abstract class WindowManagerInternal {
 
         /**
          * Called when a pending app transition gets cancelled.
-         *
-         * @param keyguardGoingAwayCancelled {@code true} if keyguard going away transition was
-         *        cancelled.
          */
-        public void onAppTransitionCancelledLocked(boolean keyguardGoingAwayCancelled) {}
+        public void onAppTransitionCancelledLocked() {}
 
         /**
          * Called when an app transition is timed out.
@@ -298,15 +294,9 @@ public abstract class WindowManagerInternal {
          *        the status bar caused by this app transition in uptime millis
          * @param statusBarAnimationDuration the duration for all visual animations in the status
          *        bar caused by this app transition in millis
-         *
-         * @return Return any bit set of {@link WindowManagerPolicy#FINISH_LAYOUT_REDO_LAYOUT},
-         * {@link WindowManagerPolicy#FINISH_LAYOUT_REDO_WALLPAPER},
-         * or {@link WindowManagerPolicy#FINISH_LAYOUT_REDO_ANIM}.
          */
-        public int onAppTransitionStartingLocked(long statusBarAnimationStartTime,
-                long statusBarAnimationDuration) {
-            return 0;
-        }
+        public void onAppTransitionStartingLocked(long statusBarAnimationStartTime,
+                long statusBarAnimationDuration) {}
 
         /**
          * Called when an app transition is finished running.
@@ -1296,7 +1286,7 @@ public abstract class WindowManagerInternal {
         /**
          * Get the mirror surface. The same SurfaceControl reference is returned throughout the
          * lifecycle of this mirror. This SurfaceControl will be released automatically on
-         * {@link #close()}.
+         * {@link #close()}. The SurfaceControl is initially hidden.
          */
         SurfaceControl getMirrorSurfaceControl();
     }
@@ -1366,4 +1356,13 @@ public abstract class WindowManagerInternal {
      * animations on the display.
      */
     public abstract void enableClientRenderingLimitationsOnDisplay(int displayId, boolean enable);
+
+    /**
+     * Allows for applying the behavior of {@link Display#FLAG_STEAL_TOP_FOCUS_DISABLED} dynamically
+     * when the flag is not set on a display.
+     *
+     * @param displayId The display to override.
+     * @param canStealTopFocus The override value, or {@code null} to clear the override.
+     */
+    public abstract void setCanStealTopFocusForDisplay(int displayId, boolean canStealTopFocus);
 }

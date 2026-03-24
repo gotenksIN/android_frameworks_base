@@ -30,12 +30,10 @@ import android.view.Display
 import android.view.MotionEvent
 import android.view.SurfaceControl
 import android.view.View
-import android.window.DesktopExperienceFlags
 import android.window.TaskSnapshot
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
 import com.android.internal.policy.SystemBarUtils
-import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.apptoweb.AppToWebRepository
@@ -47,14 +45,18 @@ import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.MultiInstanceHelper
 import com.android.wm.shell.desktopmode.CaptionState
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
+import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
+import com.android.wm.shell.recents.PerDisplayRecentsTransitionStateListener
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
 import com.android.wm.shell.splitscreen.SplitScreenController
+import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.windowdecor.DesktopHandleManageWindowsMenu
 import com.android.wm.shell.windowdecor.HandleMenu
@@ -66,7 +68,6 @@ import com.android.wm.shell.windowdecor.HandleMenuController
 import com.android.wm.shell.windowdecor.ManageWindowsMenuController
 import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
 import com.android.wm.shell.windowdecor.WindowDecoration2.RelayoutParams
-import com.android.wm.shell.windowdecor.WindowDecoration2.SurfaceControlViewHostFactory
 import com.android.wm.shell.windowdecor.WindowDecorationActions
 import com.android.wm.shell.windowdecor.WindowManagerWrapper
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
@@ -111,15 +112,16 @@ class AppHandleController(
     private val decorWindowContext: Context,
     private val onCaptionTouchListener: View.OnTouchListener,
     private val appToWebRepository: AppToWebRepository,
+    private val recentsTransitionStateListener: PerDisplayRecentsTransitionStateListener,
+    private val focusTransitionObserver: FocusTransitionObserver,
+    private val pinnedLayerController: PinnedLayerController?,
+    private val desktopTasksController: DesktopTasksController,
     private val handleMenuFactory: HandleMenuFactory = HandleMenuFactory,
     private val appHandleViewHolderFactory: AppHandleViewHolder.Factory =
         AppHandleViewHolder.Factory(),
     private val surfaceControlTransactionSupplier: () -> SurfaceControl.Transaction = {
         SurfaceControl.Transaction()
     },
-    surfaceControlBuilderSupplier: () -> SurfaceControl.Builder = { SurfaceControl.Builder() },
-    surfaceControlViewHostFactory: SurfaceControlViewHostFactory =
-        object : SurfaceControlViewHostFactory {},
 ) :
     CaptionController<WindowDecorLinearLayout>(
         taskInfo,
@@ -147,17 +149,15 @@ class AppHandleController(
     private val isOpenByDefaultDialogActive
         get() = openByDefaultDialog != null
 
+    private val isRecentsTransitionRunning
+        get() =
+            display.let { recentsTransitionStateListener.isRecentsAnimationActive(it.displayId) }
+
     private val showInputLayer
         // Don't show the input layer during the recents transition, otherwise it could become
         // touchable while in overview, during quick-switch or even for a short moment after
         // going home.
         get() = isCaptionVisible && !isRecentsTransitionRunning
-
-    private val isEducationOrHandleReportingEnabled =
-        Flags.enableDesktopWindowingAppHandleEducation() ||
-            DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
-                .isTrue ||
-            DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
 
     override fun relayout(
         params: RelayoutParams,
@@ -220,12 +220,10 @@ class AppHandleController(
         }
 
     private fun notifyNoCaption() {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) return
         windowDecorHandleRepository.notifyCaptionChanged(CaptionState.NoCaption(taskInfo.taskId))
     }
 
     private fun notifyCaptionStateChanged(captionLayoutResult: CaptionRelayoutResult) {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) return
         if (!isCaptionVisible) {
             notifyNoCaption()
             return
@@ -437,13 +435,7 @@ class AppHandleController(
                         openInAppOrBrowserClickListener = { intent ->
                             windowDecorationActions.onOpenInBrowser(taskInfo.taskId, intent)
                             appToWebRepository.onCapturedLinkUsed(taskInfo.taskId)
-                            if (
-                                DesktopExperienceFlags
-                                    .ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
-                                    .isTrue
-                            ) {
-                                windowDecorHandleRepository.onAppToWebUsage()
-                            }
+                            windowDecorHandleRepository.onAppToWebUsage()
                         },
                         onOpenByDefaultClickListener = { createOpenByDefaultDialog() },
                         onCloseMenuClickListener = { closeHandleMenu() },
@@ -461,9 +453,7 @@ class AppHandleController(
         viewHolder.onHandleMenuClosed()
         handleMenu?.close()
         handleMenu = null
-        if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-            notifyCaptionStateChanged(captionLayoutResult)
-        }
+        notifyCaptionStateChanged(captionLayoutResult)
     }
 
     /** Checks if a [MotionEvent] occurs in caption. */
@@ -508,6 +498,10 @@ class AppHandleController(
                 windowManagerWrapper = windowManagerWrapper,
                 handler = mainHandler,
                 desktopModeUiEventLogger = desktopModeUiEventLogger,
+                handleMenuController = handleMenuController,
+                focusTransitionObserver = focusTransitionObserver,
+                pinnedLayerController = pinnedLayerController,
+                desktopTasksController = desktopTasksController,
             )
         viewHolder = appHandleViewHolder
         return appHandleViewHolder

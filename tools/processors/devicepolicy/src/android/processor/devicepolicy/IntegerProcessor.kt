@@ -49,7 +49,7 @@ class IntegerProcessor(processingEnv: ProcessingEnvironment) :
         val integerDefinition =
             element.getAnnotation(IntegerPolicyDefinition::class.java)
                 ?: throw IllegalStateException(
-                    "Processor should only be called on elements with @IntegerPolicyMetadata"
+                    "Processor should only be called on elements with @IntegerPolicyDefinition"
                 )
 
         val actualType = policyType(element)
@@ -66,6 +66,9 @@ class IntegerProcessor(processingEnv: ProcessingEnvironment) :
         }
         if (integerDefinition.maxValue != Integer.MAX_VALUE) {
             integerMetadataBuilder.setMaxValue(integerDefinition.maxValue)
+        }
+        if (integerDefinition.minValue > integerDefinition.maxValue) {
+          printError(element, "minValue cannot be larger than maxValue.")
         }
 
         val typeSpecificMetadata =

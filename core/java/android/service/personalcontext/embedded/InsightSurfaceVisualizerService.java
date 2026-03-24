@@ -34,14 +34,19 @@ import android.os.OutcomeReceiver;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.service.personalcontext.Flags;
+import android.service.personalcontext.IOpCallback;
 import android.service.personalcontext.RenderToken;
+import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
+import android.service.personalcontext.util.BinderRequestProcessor;
 import android.util.Log;
 import android.view.Display;
 import android.view.SurfaceControlViewHost;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.window.InputTransferToken;
 
 import androidx.annotation.NonNull;
@@ -49,29 +54,52 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 
 /**
- * The base class for insight surface visualizer implementations. Implementations should subclass
- * this class and override the createVisualizationForClient() method to return a {@link View} to be
- * installed in the client surface. Subclasses will be notified that a client has connected or
- * disconnected via the {@link #onClientConnected} and {@link #onClientDisconnected} methods.
+ * An InsightSurfaceVisualizerService is a personal context system component that is responsible
+ * for generating embeddable {@link View}s from {@link ContextInsight}s produced by the
+ * personal context engine. Implementations should subclass this class and override the
+ * {@link #onCreateEmbeddedView} method to return a {@link View} to be installed in a connected
+ * client surface. Subclasses will be notified that a client has connected or disconnected via the
+ * {@link #onClientConnected} and {@link #onClientDisconnected} methods. The
+ * {@link #onClientConnected} callback will be called after {@link #onCreateEmbeddedView} returns a
+ * non-null {@link View}. A connected client will remain connected until it explicitly disconnects,
+ * at which point the {@link #onClientDisconnected} callback will be called.
+ *
+ * <p>Visualizer subclasses are expected to create a {@link View} that will be embedded in a
+ * connected client surface based on the {@link ContextInsight} they receive in
+ * {@link #onCreateEmbeddedView}. Client apps publish {@link ContextHint}s to the personal context
+ * engine, which can then produce insights that will arrive at a visualizer to be turned into
+ * a {@link View}. For example, a messaging application might publish hints about the current
+ * conversation that turn into an insight to display a time to meet or a phone number to call. A
+ * visualizer can then use that insight to create a suitable {@link View} that would be embedded in
+ * the client application.
+ *
+ * <p>Client properties (such as configuration and dimensions) are passed to visualizers in
+ * an {@link InsightSurfaceClientInfo} object, which visualizers receive in
+ * {@link #onClientConnected}. Updates to client properties will be reported to visualizer
+ * subclasses by calls to {@link #onClientUpdated}, which will receive both old and updated
+ * {@link InsightSurfaceClientInfo} objects. See {@link InsightSurfaceClientInfo} for more
+ * information about the properties that a client can report to a visualizer.
  *
  * <p>You must declare the service in the AndroidManifest of the app hosting the service with the
- * {@link Manifest.permission#BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE} permission,
- * and include an intent filter with the necessary action indicating that it is an
- * {@link InsightSurfaceVisualizerService} ({@link #SERVICE_INTERFACE}).
+ * {@link Manifest.permission#BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE} permission, and include an
+ * intent filter with the necessary action indicating that it is an {@link
+ * InsightSurfaceVisualizerService} ({@link #SERVICE_INTERFACE}). The application must have the
+ * {@link Manifest.permission#PERSONAL_CONTEXT_RECEIVE_INSIGHTS} permission.
  *
  * <p>For example:
  * <pre>
+ *     &lt;uses-permission
+ *         android:name="android.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS"/&gt;
+ *
  *     &lt;service android:name=".ExampleInsightSurfaceVisualizerService"
- *             android:exported="true"
- *             android:permission="android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE"&gt;
+ *         android:exported="true"
+ *         android:permission="android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE"&gt;
  *         &lt;intent-filter&gt;
  *             &lt;action
  *           android:name="android.service.personalcontext.embedded.InsightSurfaceVisualizerService"
@@ -93,6 +121,8 @@ public abstract class InsightSurfaceVisualizerService extends Service {
             "android.service.personalcontext.embedded.InsightSurfaceVisualizerService";
 
     private final Injector mInjector;
+
+    private Executor mBinderExecutor;
     private BinderService mBinder;
 
     /**
@@ -131,21 +161,19 @@ public abstract class InsightSurfaceVisualizerService extends Service {
         Display getDisplay();
 
         /**
-         * Return the executor on which binder work will be performed.
-         * @return the {@link Executor}
-         */
-        Executor getExecutor();
-
-        /**
          * Return the SurfaceControlViewHostFactory used to create a new
          * {@link SurfaceControlViewHost}.
          */
         SurfaceControlViewHostFactory getSurfaceControlViewHostFactory();
+
+        /**
+         * Create a new root view to hold the surface view.
+         */
+        FrameLayout createRootView(Context context);
     }
 
     private static final class DefaultInjector implements Injector {
         private final Context mContext;
-        private final Executor mExecutor = new HandlerExecutor(new Handler(Looper.getMainLooper()));
         private final SurfaceControlViewHostFactory mSurfaceControlViewHostFactory =
                 SurfaceControlViewHost::new;
 
@@ -169,13 +197,13 @@ public abstract class InsightSurfaceVisualizerService extends Service {
         }
 
         @Override
-        public Executor getExecutor() {
-            return mExecutor;
+        public SurfaceControlViewHostFactory getSurfaceControlViewHostFactory() {
+            return mSurfaceControlViewHostFactory;
         }
 
         @Override
-        public SurfaceControlViewHostFactory getSurfaceControlViewHostFactory() {
-            return mSurfaceControlViewHostFactory;
+        public FrameLayout createRootView(Context context) {
+            return new FrameLayout(context);
         }
     }
 
@@ -197,21 +225,33 @@ public abstract class InsightSurfaceVisualizerService extends Service {
         mInjector = injector;
     }
 
-    @Override
-    public void onCreate() {
-        mBinder =
-                new BinderService(
-                        this,
-                        mInjector.getDisplayContext(),
-                        mInjector.getDisplay(),
-                        mInjector.getExecutor(),
-                        mInjector.getSurfaceControlViewHostFactory());
+    /**
+     * Sets the executor to be used when methods are invoked on this service. By default, an
+     * Executor running on the main looper is used. This method should be called within
+     * {@link #onCreate()}.
+     *
+     * @param executor The {@link Executor} to run calls on.
+     */
+    public final void setExecutor(@androidx.annotation.NonNull Executor executor) {
+        mBinderExecutor = executor;
     }
 
     @Nullable
     @Override
     public final IBinder onBind(@Nullable Intent intent) {
+
         if (intent != null && SERVICE_INTERFACE.equals(intent.getAction())) {
+            if (mBinder == null) {
+                mBinder =
+                        new BinderService(
+                                this,
+                                mInjector.getDisplayContext(),
+                                mInjector.getDisplay(),
+                                mBinderExecutor != null
+                                    ? mBinderExecutor
+                                    : new HandlerExecutor(new Handler(Looper.getMainLooper())),
+                                mInjector.getSurfaceControlViewHostFactory());
+            }
             return mBinder;
         }
         Log.w(
@@ -236,19 +276,20 @@ public abstract class InsightSurfaceVisualizerService extends Service {
 
     /**
      * Create and return a {@link View} for the given {@link InsightSurfaceClientInfo} based on the
-     * list of {@link ContextInsight}s.
+     * list of {@link PublishedContextInsight}s.
      *
      * @param context a {@link Context} suitable for creating {@link View}s in the current display
-     * @param insight the {@link ContextInsight} that subclasses can use to create the
-     *                 embedded {@link View}
+     * @param publishedContextInsight insight the {@link PublishedContextInsight} that subclasses
+     *                                can use to create the embedded {@link View}
      * @param renderToken the {@link RenderToken} associated with the insight
-     * @param info the {@link InsightSurfaceClientInfo} containing information about the client
+     * @param info        the {@link InsightSurfaceClientInfo} containing information about the
+     *                    client
      * @return the {@link View} that will be passed to the client
      */
     @Nullable
     public abstract View onCreateEmbeddedView(
             @NonNull Context context,
-            @NonNull ContextInsight insight,
+            @NonNull PublishedContextInsight publishedContextInsight,
             @Nullable RenderToken renderToken,
             @NonNull InsightSurfaceClientInfo info);
 
@@ -284,13 +325,27 @@ public abstract class InsightSurfaceVisualizerService extends Service {
     }
 
     private static final class BinderService extends IInsightSurfaceVisualizer.Stub {
-        private final WeakReference<InsightSurfaceVisualizerService> mService;
         private final Context mContext;
         private final Display mDisplay;
-        private final Executor mExecutor;
         private final SurfaceControlViewHostFactory mSurfaceControlViewHostFactory;
-        private final Map<UUID, SurfaceControlViewHost> mSurfaceControlViewHostsByClient =
-                new HashMap<>();
+        private final Map<UUID, SurfaceInfo> mSurfacesByClient = new HashMap<>();
+        private final BinderRequestProcessor<InsightSurfaceVisualizerService> mRequestProcessor;
+
+        private record SurfaceLayoutChangeListener(
+                InsightSurfaceClientInfo clientInfo,
+                SurfaceControlViewHost surfaceHost) implements View.OnLayoutChangeListener {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                remeasureView(clientInfo, surfaceHost);
+            }
+        }
+
+        private record SurfaceInfo(
+                FrameLayout rootView,
+                SurfaceControlViewHost host,
+                SurfaceControlViewHost.SurfacePackage surfacePackage,
+                SurfaceLayoutChangeListener surfaceLayoutChangeListener) {}
 
         BinderService(
                 InsightSurfaceVisualizerService service,
@@ -298,94 +353,142 @@ public abstract class InsightSurfaceVisualizerService extends Service {
                 Display display,
                 Executor executor,
                 SurfaceControlViewHostFactory surfaceControlViewHostFactory) {
-            mService = new WeakReference<>(service);
             mContext = context;
             mDisplay = display;
-            mExecutor = executor;
             mSurfaceControlViewHostFactory = surfaceControlViewHostFactory;
+            mRequestProcessor = new BinderRequestProcessor.Builder<>(service, executor)
+                    .build();
         }
 
         @Override
         public void createVisualizationForClient(
-                ContextInsightWrapper insight,
+                PublishedContextInsightWrapper insightWrapper,
                 InsightSurfaceClientInfo clientInfo,
                 RenderToken renderToken,
-                IVisualizationResult result) {
-            post(service -> {
+                IVisualizationResult result,
+                IOpCallback callback) {
+            mRequestProcessor.execute(new BinderRequestProcessor.ExecutionParams
+                    .Builder<InsightSurfaceVisualizerService>(callback, serviceInstance -> {
+                        final View view = serviceInstance.onCreateEmbeddedView(
+                                mContext,
+                                insightWrapper.getPublishedContextInsight(),
+                                renderToken,
+                                clientInfo);
 
-                final View view = service.onCreateEmbeddedView(
-                        mContext, insight.getContextInsight(), renderToken, clientInfo);
-                if (view == null) {
-                    Log.e(TAG, "onCreateEmbeddedView returned null for client: " + clientInfo);
-                    sendResult(/*visualizationCreated= */ false, result);
-                    return;
-                }
+                        final SurfaceInfo existingSurface =
+                                mSurfacesByClient.get(clientInfo.getId());
 
-                // Disconnect from the client if we are connected to it. This will also release
-                // the host, in case one already exists. We will re-connect below. This is to
-                // make sure the lifecycle is maintained.
-                disconnectClient(clientInfo, service);
-
-                final SurfaceControlViewHost surfaceControlViewHost =
-                        mSurfaceControlViewHostFactory.createSurfaceControlViewHost(
-                                mContext, mDisplay, null);
-                mSurfaceControlViewHostsByClient.put(clientInfo.getId(), surfaceControlViewHost);
-
-                // TODO(b/479575802): Just a temporary fix for setting the view dimensions.
-                view.addOnLayoutChangeListener(
-                        (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-                            view.measure(
-                                    clientInfo.getMeasureSpecWidth(),
-                                    clientInfo.getMeasureSpecHeight());
-                            final int measuredWidth = view.getMeasuredWidth();
-                            final int measuredHeight = view.getMeasuredHeight();
-                            surfaceControlViewHost.relayout(measuredWidth, measuredHeight);
-                            clientInfo.onSizeChanged(measuredWidth, measuredHeight);
-                        });
-                surfaceControlViewHost.setView(view, 0, 0);
-
-                clientInfo.onSurfaceCreated(
-                        surfaceControlViewHost.getSurfacePackage(),
-                        new IInsightSurfaceSession.Stub() {
-                            @Override
-                            public void onClientUpdated(
-                                    InsightSurfaceClientInfo oldClientInfo,
-                                    InsightSurfaceClientInfo newClientInfo,
-                                    ResultReceiver receiver) {
-                                post(service ->
-                                        service.onClientUpdated(
-                                                oldClientInfo, newClientInfo, receiver));
+                        if (view == null) {
+                            Log.e(TAG, "onCreateEmbeddedView returned null for client: "
+                                    + clientInfo);
+                            if (existingSurface != null) {
+                                clientInfo.onSurfaceReleased(existingSurface.surfacePackage());
                             }
-                        });
+                            disconnectClient(clientInfo, serviceInstance);
+                            sendResult(/*visualizationCreated= */ false, result);
+                            return;
+                        }
 
-                // Tell the visualizer the client is now connected.
-                service.onClientConnected(clientInfo);
+                        if (existingSurface == null) {
+                            final FrameLayout rootView =
+                                    serviceInstance.mInjector.createRootView(mContext);
+                            rootView.addView(view);
+                            final SurfaceControlViewHost newSurfaceHost =
+                                    mSurfaceControlViewHostFactory.createSurfaceControlViewHost(
+                                        mContext, mDisplay, null);
+                            final SurfaceLayoutChangeListener listener =
+                                    new SurfaceLayoutChangeListener(clientInfo, newSurfaceHost);
 
-                sendResult(/*visualizationCreated= */ true, result);
-            });
+                            newSurfaceHost.setView(rootView, 0, 0);
+                            rootView.addOnLayoutChangeListener(listener);
+
+                            final SurfaceInfo newSurface =
+                                    new SurfaceInfo(
+                                            rootView,
+                                            newSurfaceHost,
+                                            newSurfaceHost.getSurfacePackage(),
+                                            listener);
+                            mSurfacesByClient.put(clientInfo.getId(), newSurface);
+
+                            clientInfo.onSurfaceCreated(
+                                    newSurface.surfacePackage(),
+                                    new IInsightSurfaceSession.Stub() {
+                                        @Override
+                                        public void onClientUpdated(
+                                                InsightSurfaceClientInfo oldClientInfo,
+                                                InsightSurfaceClientInfo newClientInfo,
+                                                ResultReceiver receiver,
+                                                IOpCallback opCallback) {
+                                            handleClientUpdate(oldClientInfo, newClientInfo,
+                                                    receiver, opCallback);
+                                        }
+                                    });
+
+                            // Tell the visualizer that a new client is now connected.
+                            serviceInstance.onClientConnected(clientInfo);
+                        } else {
+                            existingSurface.rootView().removeAllViews();
+                            existingSurface.rootView().addView(view);
+                            remeasureView(clientInfo, existingSurface.host());
+                            clientInfo.onSurfaceUpdated(existingSurface.surfacePackage());
+                        }
+
+                        sendResult(/*visualizationCreated= */ true, result);
+                    }).build());
+        }
+
+        private static void remeasureView(
+                InsightSurfaceClientInfo clientInfo,
+                SurfaceControlViewHost surfaceHost) {
+            final View rootView = surfaceHost.getView();
+            rootView.measure(
+                    clientInfo.getMeasureSpecWidth(),
+                    clientInfo.getMeasureSpecHeight());
+            final int measuredWidth = rootView.getMeasuredWidth();
+            final int measuredHeight = rootView.getMeasuredHeight();
+            surfaceHost.relayout(
+                    measuredWidth, measuredHeight);
+            clientInfo.onSizeChanged(measuredWidth, measuredHeight);
+        }
+
+        private void handleClientUpdate(InsightSurfaceClientInfo oldClientInfo,
+                InsightSurfaceClientInfo newClientInfo,
+                ResultReceiver receiver,
+                IOpCallback opCallback) {
+            mRequestProcessor.execute(new BinderRequestProcessor
+                    .ExecutionParams.Builder<InsightSurfaceVisualizerService>(
+                            opCallback,
+                            serviceInstance -> serviceInstance.onClientUpdated(
+                                    oldClientInfo, newClientInfo, receiver)).build());
         }
 
         @Override
-        public void onClientDisconnected(InsightSurfaceClientInfo client) {
-            post(service -> disconnectClient(client, service));
+        public void onClientDisconnected(InsightSurfaceClientInfo client, IOpCallback callback) {
+            mRequestProcessor.execute(new BinderRequestProcessor
+                    .ExecutionParams.Builder<InsightSurfaceVisualizerService>(
+                            callback,
+                            serviceInstance -> {
+                                disconnectClient(client, serviceInstance);
+                            }
+                    ).build());
         }
 
         // This method must be called on the executor thread.
         private void disconnectClient(
                 InsightSurfaceClientInfo client, InsightSurfaceVisualizerService service) {
-            if (releaseHostForClient(client)) {
+            if (releaseSurfaceForClient(client)) {
                 service.onClientDisconnected(client);
             }
         }
 
-        private boolean releaseHostForClient(InsightSurfaceClientInfo client) {
-            final SurfaceControlViewHost host =
-                    mSurfaceControlViewHostsByClient.remove(client.getId());
-            if (host == null) {
+        private boolean releaseSurfaceForClient(InsightSurfaceClientInfo client) {
+            final SurfaceInfo surface = mSurfacesByClient.remove(client.getId());
+            if (surface == null) {
                 return false;
             }
 
-            host.release();
+            surface.rootView().removeOnLayoutChangeListener(surface.surfaceLayoutChangeListener);
+            surface.host().release();
             return true;
         }
 
@@ -396,15 +499,6 @@ public abstract class InsightSurfaceVisualizerService extends Service {
             } catch (RemoteException e) {
                 Log.e(TAG, "Error sending result", e);
             }
-        }
-
-        private void post(Consumer<InsightSurfaceVisualizerService> consumer) {
-            mExecutor.execute(() -> {
-                final InsightSurfaceVisualizerService service = mService.get();
-                if (service != null) {
-                    consumer.accept(service);
-                }
-            });
         }
     }
 }

@@ -87,6 +87,7 @@ import android.content.pm.InstantAppResolveInfo;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.KeySet;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageInfoList;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ParceledListSlice;
@@ -1698,12 +1699,12 @@ public class ComputerEngine implements Computer {
         }
     }
 
-    public final ParceledListSlice<PackageInfo> getInstalledPackages(long flags, int userId) {
+    public final PackageInfoList getInstalledPackages(long flags, int userId) {
         final int callingUid = Binder.getCallingUid();
         if (getInstantAppPackageName(callingUid) != null) {
-            return ParceledListSlice.emptyList();
+            return PackageInfoList.emptyList();
         }
-        if (!mUserManager.exists(userId)) return ParceledListSlice.emptyList();
+        if (!mUserManager.exists(userId)) return PackageInfoList.emptyList();
         flags = updateFlagsForPackage(flags, userId);
 
         enforceCrossUserPermission(callingUid, userId, false /* requireFullPermission */,
@@ -1712,8 +1713,7 @@ public class ComputerEngine implements Computer {
         return getInstalledPackagesBody(flags, userId, callingUid);
     }
 
-    protected ParceledListSlice<PackageInfo> getInstalledPackagesBody(long flags, int userId,
-            int callingUid) {
+    protected PackageInfoList getInstalledPackagesBody(long flags, int userId, int callingUid) {
         // writer
         final boolean listUninstalled = (flags & MATCH_KNOWN_PACKAGES) != 0;
         final boolean listApex = (flags & MATCH_APEX) != 0;
@@ -1783,7 +1783,7 @@ public class ComputerEngine implements Computer {
                 }
             }
         }
-        return new ParceledListSlice<>(list);
+        return new PackageInfoList(list);
     }
 
     public final ResolveInfo createForwardingResolveInfoUnchecked(WatchedIntentFilter filter,
@@ -2783,16 +2783,18 @@ public class ComputerEngine implements Computer {
             }
         }
         if (android.security.Flags.appLockApis()
-                && (flags & (PackageManager.GET_APP_LOCK_INFO)) != 0) {
+                && (flags & (PackageManager.GET_APP_LOCK_INFO)) != 0
+                && !hasPermission(Manifest.permission.LOCK_APPS, Binder.getCallingUid())) {
             // If the caller specifies the GET_ATTRIBUTIONS int flag, when the flag gets converted
             // to a long, it will result in unintended sign extension, causing the first 32 bits of
             // the long to be set to 1. This means that the bit representing the GET_APP_LOCK_INFO
-            // flag will be set to 1, even if the caller did not specify the flag. If sign extension
-            // can be reasonably assumed to have happened, remove the GET_APP_LOCK_INFO flag since
-            // it was unintentionally added, and requires the LOCK_APPS permission to use. If a
-            // caller wants to both retrieve attributions and app lock info, they should use the
-            // long flag GET_ATTRIBUTIONS_LONG instead of GET_ATTRIBUTIONS, combined with whatever
-            // other flags the caller wants.
+            // flag will be set to 1, even if the caller did not specify the flag. For callers
+            // without the LOCK_APPS permission, the GET_APP_LOCK_INFO flag will be removed if sign
+            // extension is suspected, and a warning logged. For callers who specify the flag, but
+            // do not have the permission, an exception will be thrown.
+            // If a caller wants to both retrieve attributions and app lock info, they should use
+            // the long flag GET_ATTRIBUTIONS_LONG instead of GET_ATTRIBUTIONS, combined with
+            // whatever other flags the caller wants.
             final boolean isGetAttributionsBitSet =
                     (flags & PackageManager.GET_ATTRIBUTIONS_LONG) != 0;
             // Check if the upper 32 bits are all 1s
@@ -2805,7 +2807,7 @@ public class ComputerEngine implements Computer {
                         "updateFlags: Removing GET_APP_LOCK_INFO due to likely sign extension of "
                                 + "the deprecated GET_ATTRIBUTIONS flag. Please use "
                                 + "GET_ATTRIBUTIONS_LONG");
-            } else if (!hasPermission(Manifest.permission.LOCK_APPS, Binder.getCallingUid())) {
+            } else {
                 throw new SecurityException("Caller must hold the LOCK_APPS permission to use "
                         + "GET_APP_LOCK_INFO");
             }

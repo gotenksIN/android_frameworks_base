@@ -165,16 +165,46 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
         }
     }
 
+    /**
+     * Closes the session of the virtual camera with the given config.
+     *
+     * @param cameraConfig The {@link VirtualCameraConfig} sent by the client.
+     */
+    public void closeVirtualCameraSession(@NonNull VirtualCameraConfig cameraConfig) {
+        connectVirtualCameraServiceIfNeeded();
+
+        final IVirtualCameraService service;
+        synchronized (mServiceLock) {
+            service = mVirtualCameraService;
+        }
+
+        if (service != null) {
+            try {
+                service.closeSession(cameraConfig.getCallback().asBinder());
+            } catch (RemoteException e) {
+                e.rethrowFromSystemServer();
+            }
+        }
+    }
+
     @Override
     public void binderDied() {
         Slog.w(TAG, "virtual_camera_service died.");
         synchronized (mServiceLock) {
             mVirtualCameraService = null;
         }
-        closeAllCameras();
+        notifyCameraClosureFromServer();
     }
 
-    private void closeAllCameras() {
+    /**
+     * This directly notifies all the currently connected virtual camera of closure.
+     * <p>
+     * Usually this is done by the virtual_camera_service (the HAL side) by calling
+     * {@link IVirtualCameraService#unregisterCamera(IBinder)}, but if for some reason
+     * (e.g. service crash), be can't call the virtual camera service to close the camera, we still
+     * need to notify the virtual camera owner using this method.
+     */
+    private void notifyCameraClosureFromServer() {
         List<CameraDescriptor> camerasToNotify;
         synchronized (mRegisteredCameras) {
             camerasToNotify = new ArrayList<>(mRegisteredCameras.values());
@@ -199,6 +229,7 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
 
     /** Release resources associated with this controller. */
     public void close() {
+        Slog.i(TAG, "Closing VirtualCameraController for deviceId:" + mDeviceId);
         Set<IBinder> camerasToClose = null;
         synchronized (mRegisteredCameras) {
             if (!mRegisteredCameras.isEmpty()) {
@@ -215,14 +246,17 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
                 service = mVirtualCameraService;
             }
 
-            if (service != null) {
-                for (IBinder binder : camerasToClose) {
-                    try {
-                        service.unregisterCamera(binder);
-                    } catch (RemoteException e) {
-                        Slog.w(TAG, "close(): Camera failed to be removed on camera "
-                                + "service.", e);
-                    }
+            if (service == null) {
+                Slog.w(TAG, "VirtualCameraService is null. Failed to unregister cameras.");
+                return;
+            }
+
+            for (IBinder binder : camerasToClose) {
+                try {
+                    service.unregisterCamera(binder);
+                } catch (RemoteException e) {
+                    Slog.w(TAG, "close(): Camera failed to be removed on camera "
+                            + "service.", e);
                 }
             }
         }
@@ -288,6 +322,7 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
             }
             // Throw exception if we are unable to connect to service.
             if (mVirtualCameraService == null) {
+                notifyCameraClosureFromServer();
                 throw new IllegalStateException("Virtual camera service is not connected.");
             }
         }

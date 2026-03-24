@@ -3,6 +3,16 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
+    name: "adaptive_low_freq_mode_on_aod"
+    namespace: "systemui"
+    description: "Enables low frequency updates for Chronometers within promoted notifications on Always-on Display after the device has been dozing for 30 seconds, to save power."
+    bug: "460119077"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "ambient_cue_plugin"
     namespace: "ailabs"
     description: "Enable plugin for ambient cue project"
@@ -217,16 +227,6 @@ flag {
 }
 
 flag {
-  name: "communal_shade_touch_handling_fixes"
-  namespace: "systemui"
-  description: "Flags some minor bug fixes for opening the shade on the hub"
-  bug: "409682586"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "communal_standalone_support"
   namespace: "systemui"
   description: "Support communal features without a dock"
@@ -234,13 +234,13 @@ flag {
 }
 
 flag {
-  name: "communal_timer_flicker_fix"
-  namespace: "systemui"
-  description: "fixes timers on the hub flickering when pausing"
-  bug: "353801573"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
+    name: "communal_widget_population_optimization"
+    namespace: "systemui"
+    description: "Optimizes communal widget population by checking if the feature is enabled"
+    bug: "469741006"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -324,16 +324,6 @@ flag {
 }
 
 flag {
-    name: "disable_dream_suppression"
-    namespace: "systemui"
-    description: "Disable suppression of dream when device is in a vehicle."
-    bug: "457463098"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "disable_screen_off_low_light_behavior"
     namespace: "systemui"
     description: "Makes the screen off low light behavior do nothing"
@@ -341,16 +331,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-  name: "display_aware_shade_controller_impl"
-  namespace: "systemui"
-  description: "Make ShadeControllerImpl display aware"
-  bug: "444658034"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -375,26 +355,6 @@ flag {
     namespace: "systemui"
     description: "Enable Double Tap to Sleep"
     bug: "385194612"
-}
-
-flag {
-   name: "doze_time_tick_invalid_state_check"
-   namespace: "systemui"
-   description: "Ignore requests to schedule a doze time tick while in an invalid state"
-   bug: "448867811"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
-  name: "dream_biometric_prompt_fixes"
-  namespace: "systemui"
-  description: "Flags the behavior of  turning off dream back gesture disablement and gesture handling when the biometric prompt is showing"
-  bug: "413511537"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -423,16 +383,6 @@ flag {
     description: "Flag to enable updated UI for dream overlay"
     bug: "368587927"
     is_fixed_read_only: true
-}
-
-flag {
-    name: "dream_privacy_indicator"
-    namespace: "systemui"
-    description: "Show mic and camera privacy indicators in dream"
-    bug: "367251365"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -669,12 +619,12 @@ flag {
 }
 
 flag {
-    name: "fix_canceled_notification_launch_animation"
+    name: "fix_collapsing_overshoot_timing"
     namespace: "systemui"
-    description: "Fix an issue where the Shade ends up in the wrong state if a launch animation controller receives the intent started callback after the animation is cancelled."
-    bug: "461158751"
+    description: "Fixes the timing of maxOvershoot calculation during collapsing animations."
+    bug: "452479381"
     metadata {
-       purpose: PURPOSE_BUGFIX
+        purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -689,16 +639,6 @@ flag {
 }
 
 flag {
-  name: "fix_dot_not_visible_race"
-  namespace: "systemui"
-  description: "Fix privacy indicator dot not visible due to a possible race condition"
-  bug: "447129739"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "fix_notes_role_in_freeform"
     namespace: "note"
     description: "Fix issues related to notes role under the freeform environment."
@@ -709,22 +649,22 @@ flag {
 }
 
 flag {
-  name: "fix_privacy_indicator_both_dot_chip_visible_qs"
-  namespace: "systemui"
-  description: "Fix privacy indicator both dot and chip visible in QS"
-  bug: "443507159"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
+    name: "fix_nssl_blocking_qs"
+    namespace: "systemui"
+    description: "Fix NSSL blocks the touch event when the QS panel is expanded."
+    bug: "477421025"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
-    name: "fix_shade_header_wrong_dnd_icon_size"
-    namespace: "lse_desktop_experience"
-    description: "Fix DnD icon size in shade header on connected displays"
-    bug: "445347372"
+    name: "fix_scene_container_action_outside_touch"
+    namespace: "systemui"
+    description: "Fix the shade auto-closing on status bar touch on lock screen."
+    bug: "486078670"
     metadata {
-        purpose: PURPOSE_BUGFIX
+       purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -978,12 +918,23 @@ flag {
 }
 
 flag {
-    name: "launch_internet_details"
+    name: "launcher_proxy_service_short_reconnect"
     namespace: "systemui"
-    description: "Fix the crash when launching details view with INTERNET_CONNECTIVITY"
-    bug: "425987324"
+    description: "Marks previous launcher proxy service as cleanup when it gets disconnected"
+            " the connection to the service had time to get established."
+    bug: "459609903"
     metadata {
-       purpose: PURPOSE_BUGFIX
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "log_state_on_shade_gesture_failure"
+    namespace: "systemui"
+    description: "Logs state of relevant classes if the shade fails to open."
+    bug: "467878509"
+    metadata {
+        purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -1067,6 +1018,16 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+    name: "nesteddraggable_gesture_pickup"
+    namespace: "systemui"
+    description: "Gesture drag pick up in NestedDraggable"
+    bug: "487588670"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1327,16 +1288,6 @@ flag {
 }
 
 flag {
-    name: "qs_delete_uninstalled_tile_service"
-    namespace: "systemui"
-    description: "When a TileService package is uninstalled, remove the tile completely and all associated data."
-    bug: "362234193"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "qs_edit_mode_focus_fixes"
     namespace: "systemui"
     description: "Various fixes for the focus states of the quick settings edit mode"
@@ -1413,16 +1364,6 @@ flag {
 }
 
 flag {
-   name: "register_wallpaper_notifier_background"
-   namespace: "systemui"
-   description: "Decide whether to register wallpaper change broadcast receiver on background executor."
-   bug: "327315860"
-   metadata {
-     purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
     name: "remove_launch_display_id_override"
     namespace: "systemui"
     description: "Remove the launchDisplayId override when launching pending intents, allowing launches on secondary displays"
@@ -1467,16 +1408,6 @@ flag {
    metadata {
      purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-  name: "restrict_communal_app_widget_host_listening"
-  namespace: "systemui"
-  description: "Only listens to AppWidgetHost when the communal hub is showing"
-  bug: "406044666"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1623,16 +1554,6 @@ flag {
 }
 
 flag {
-    name: "slice_manager_binder_call_background"
-    namespace: "systemui"
-    description: "Move the ISliceManager#getPinnedSpecs binder call to the background thread."
-    bug: "322745650"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "smartspace_relocate_to_bottom"
    namespace: "systemui"
    description: "Relocate Smartspace to bottom of the Lock Screen"
@@ -1739,16 +1660,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_chronometer_width_reset"
-    namespace: "systemui"
-    description: "Bugfix flag to reset status bar chip chronometer width in more circumstances"
-    bug: "450956553"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "status_bar_date"
     namespace: "systemui"
     description: "Show date in the status bar for the desktop experience"
@@ -1806,6 +1717,17 @@ flag {
     namespace: "systemui"
     description: "Feature flag for replacing the status bar fragment with a compose root"
     bug: "364360986"
+}
+
+flag {
+    name: "status_bar_screen_decor_touch_handling_fix"
+    namespace: "systemui"
+    description: "Re-enable touch capture for ScreenDecorations so that privacy dot views can "
+        "be announced by accessibility."
+    bug: "423676187"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1941,6 +1863,13 @@ flag {
     description: "Updates the touchpad gesture tutorial to reflect the latest gesture and "
             "animation changes"
     bug: "456784841"
+}
+
+flag {
+    name: "transition_to_bouncer_while_switching_users"
+    namespace: "systemui"
+    description: "Always dismiss keyguard while switching users and await transition to bouncer"
+    bug: "433921220"
 }
 
 flag {

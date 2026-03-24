@@ -40,7 +40,7 @@ import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesShadeStateViewModelFactory
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesParentViewModelFactory
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.qs.ui.composable.QuickSettingsScene
 import com.android.systemui.qs.ui.viewmodel.quickSettingsSceneContentViewModelFactory
@@ -55,13 +55,13 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.notification.stack.ui.view.notificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,7 +71,6 @@ import org.junit.runner.RunWith
 import platform.test.motion.compose.ComposeRecordingSpec
 import platform.test.motion.compose.MotionControl
 import platform.test.motion.compose.asDataPoint
-import platform.test.motion.compose.feature
 import platform.test.motion.compose.recordMotion
 import platform.test.motion.compose.runTest
 import platform.test.motion.golden.DataPoint
@@ -109,8 +108,8 @@ class QuickSettingsElementTransitionTest : SysuiTestCase() {
                 kosmos.notificationsPlaceholderViewModelFactory,
             actionsViewModelFactory = kosmos.quickSettingsUserActionsViewModelFactory,
             contentViewModelFactory = kosmos.quickSettingsSceneContentViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
@@ -199,9 +198,7 @@ class QuickSettingsElementTransitionTest : SysuiTestCase() {
                                         endVelocity = 3000.dp.toPx(),
                                     )
                                 }
-                                // await some time for the animation to settle
-                                // TODO replace this with waitForIdle until ComposeToolkitV2 lands
-                                awaitDelay(450.milliseconds)
+                                awaitIdle()
                             }
                         ) {
                             val firstTileXCoordinate =
@@ -239,6 +236,7 @@ class QuickSettingsElementTransitionTest : SysuiTestCase() {
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )

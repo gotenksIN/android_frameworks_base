@@ -51,6 +51,7 @@ import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
 import static android.media.audio.Flags.roForegroundAudioControl;
+import static com.android.media.audio.Flags.hardeningBfgs;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BACKUP;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ_REASON;
@@ -615,13 +616,16 @@ public class OomAdjusterImpl extends OomAdjuster {
     public OomAdjusterImpl(Object serviceLock, Object procLock, ProcessListInternal processList,
             ActiveUidsInternal activeUids, ServiceThread adjusterThread, Constants oomConstants,
             GlobalState globalState, Injector injector, Callback callback,
-            StateGetter stateGetter, Handler updateHandler) {
+            StateGetter stateGetter, Handler updateHandler,
+            HostingTypeProvider hostingTypeProvider) {
         super(serviceLock, procLock, processList, activeUids, adjusterThread, oomConstants,
-                globalState, injector, callback, stateGetter, updateHandler);
+                globalState, injector, callback, stateGetter, updateHandler, hostingTypeProvider);
 
         if(mPerfBoost != null) {
             mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
         }
+
+        SystemNode.initInstance(processList);
     }
 
     private final ProcessRecordNodes mProcessRecordProcStateNodes = new ProcessRecordNodes(
@@ -635,6 +639,8 @@ public class OomAdjusterImpl extends OomAdjuster {
     /** A list of edges for partial graph updates in {@link #partialUpdateProcessGraphLSP}. */
     private final ArrayList<GraphEdge> mEdgesToUpdate =
             Flags.enableCapabilityControllerComputation() ? new ArrayList<>() : null;
+    private final Consumer<GraphEdge> mAddEdgeToUpdateConsumer =
+            Flags.enableCapabilityControllerComputation() ? mEdgesToUpdate::add : null;
 
     void unlinkProcessRecordFromList(@NonNull ProcessRecordInternal app) {
         mProcessRecordProcStateNodes.unlink(app);
@@ -890,9 +896,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         }
 
         for (int i = 0, size = targets.size(); i < size; i++) {
-            final ProcessRecordInternal target = targets.valueAt(i);
-            // TODO(b/466961280): Add other incoming service/provider binding edges.
-            mEdgesToUpdate.add(target.getProcessEdge());
+            targets.valueAt(i).getProcessNode().forEachIncomingEdge(mAddEdgeToUpdateConsumer);
         }
 
         // Only triggers computation without using its result.
@@ -990,6 +994,7 @@ public class OomAdjusterImpl extends OomAdjuster {
      * Stream the connections with {@code app} as a client to
      * {@code connectionConsumer}.
      */
+    // LINT.IfChange(forEachConnectionLSP)
     @GuardedBy({"mServiceLock", "mProcLock"})
     private static void forEachConnectionLSP(ProcessRecordInternal app,
             BiConsumer<Connection, ProcessRecordInternal> connectionConsumer) {
@@ -1032,6 +1037,10 @@ public class OomAdjusterImpl extends OomAdjuster {
             connectionConsumer.accept(cpc, provider);
         }
     }
+    // LINT.ThenChange(
+    //     ProcessNode.java:forEachOutgoingEdge|
+    //     ServiceBindingEdge.java:getServiceHost
+    // )
 
     /**
      * This is one of the condition that blocks the skipping of connection evaluation. This method
@@ -1071,6 +1080,7 @@ public class OomAdjusterImpl extends OomAdjuster {
      * Stream the connections from clients with {@code app} as the host to {@code
      * connectionConsumer}.
      */
+    // LINT.IfChange(forEachClientConnectionLSP)
     @GuardedBy({"mServiceLock", "mProcLock"})
     private static void forEachClientConnectionLSP(ProcessRecordInternal app,
             BiConsumer<Connection, ProcessRecordInternal> connectionConsumer) {
@@ -1104,6 +1114,10 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
         }
     }
+    // LINT.ThenChange(
+    //     ProcessNode.java:forEachIncomingEdge|
+    //     ServiceBindingEdge.java:getServiceClient
+    // )
 
     /**
      * Returns true if at least one the provided values is more important than those in {@code app}.
@@ -1167,7 +1181,7 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         if (Flags.enableCapabilityControllerComputation()) {
             // We'll set this later when evaluating implicit CPU time capability.
-            app.getGraphNode().setHasIntrinsicImplicitCpuTime(false);
+            app.getProcessNode().setHasIntrinsicImplicitCpuTime(false);
         }
 
         // Remove any follow up update this process might have. It will be rescheduled if still
@@ -1209,7 +1223,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             app.addCurCpuTimeReasons(CPU_TIME_REASON_OTHER);
             app.addCurImplicitCpuTimeReasons(IMPLICIT_CPU_TIME_REASON_OTHER);
             if (Flags.enableCapabilityControllerComputation()) {
-                app.getGraphNode().setHasIntrinsicImplicitCpuTime(true);
+                app.getProcessNode().setHasIntrinsicImplicitCpuTime(true);
             }
             app.setCurProcState(ActivityManager.PROCESS_STATE_PERSISTENT);
             // System processes can do UI, and when they do we want to have
@@ -2209,9 +2223,12 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         capability |= getDefaultCapability(app, procState);
 
-        // Procstates below BFGS should never have this capability.
+        // Procstates below BFGS should never have these capabilities
         if (procState > PROCESS_STATE_BOUND_FOREGROUND_SERVICE) {
             capability &= ~PROCESS_CAPABILITY_BFSL;
+            if (hardeningBfgs()) {
+                capability &= ~PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
+            }
         }
         if (!updated) {
             if (adj < prevRawAdj || procState < prevProcState || schedGroup > prevSchedGroup) {

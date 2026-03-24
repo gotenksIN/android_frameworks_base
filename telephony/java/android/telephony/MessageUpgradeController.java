@@ -18,20 +18,21 @@ package android.telephony;
 
 import static android.service.messaging.AlternativeMessageTransportService.UPGRADE_STATUS_REJECTED;
 
-import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.net.Uri;
-import android.os.Binder;
-import android.provider.Telephony;
+import android.os.UserHandle;
 import android.service.messaging.AlternativeMessageTransportService;
-import android.service.messaging.AlternativeMessageTransportServiceWrapper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.SparseArray;
 
 import java.util.List;
 import java.util.Objects;
@@ -39,176 +40,205 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 /**
+ * This class exposes the message upgrade capabilities to the platform code i.e.
  * Checks if message upgrade is supported and enables android system to bind with the
  * available {@link android.service.messaging.AlternativeMessageTransportService} in the default
- * SMS app to upgrade SMS/MMS messages to another transport.
+ * SMS app to upgrade SMS/MMS messages to richer protocols like RCS etc.
  *
  * @hide
  */
-// TODO(b/474304887): Make this class thread-safe
 public final class MessageUpgradeController {
+    private static final String TAG = MessageUpgradeController.class.getSimpleName();
+    private static final SparseArray<MessageUpgradeWorker> sUpgradeWorkers = new SparseArray<>();
+    private static volatile MessageUpgradeController sInstance;
 
-    private static final String TAG = "MsgUpgradeController";
-    private static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
-    private final Context mContext;
-    private final AlternativeMessageTransportServiceWrapper mServiceWrapper =
-            new AlternativeMessageTransportServiceWrapper();
-
-    /** @hide */
-    public MessageUpgradeController(@NonNull Context context) {
-        mContext = Objects.requireNonNull(context);
-    }
-
-    /**
-     * Upgrades a SMS/MMS message.
-     *
-     * @param contentUri The content URI of the SMS/MMS message.
-     * @param clientCallbackExecutor The executor to run the callback on.
-     * @param clientCallback The callback to report the upgrade status.
-     */
-    // TODO(b/473520736): Add timeout logic if service doesn't respond within specified duration
-    public void upgradeMessage(
-            @NonNull Uri contentUri,
-            @NonNull Executor clientCallbackExecutor,
-            @NonNull Consumer<Integer> clientCallback) {
-        Objects.requireNonNull(contentUri, "contentUri cannot be null");
-        Objects.requireNonNull(clientCallbackExecutor, "clientCallbackExecutor cannot be null");
-        Objects.requireNonNull(clientCallback, "clientCallback cannot be null");
-
-        if (!isMessageUpgradeSupported()) {
-            clientCallbackExecutor.execute(() -> clientCallback.accept(UPGRADE_STATUS_REJECTED));
-            return;
-        }
-
-        final long identity = Binder.clearCallingIdentity();
-        try {
-            String smsAppPackage = getDefaultSmsAppPackage();
-            if (mServiceWrapper.bindToService(
-                    mContext, smsAppPackage, Runnable::run,
-                    () -> onServiceReady(contentUri, clientCallbackExecutor, clientCallback))) {
-                if (VDBG) {
-                    Log.v(TAG, "bindService() to the message upgrade service: "
-                            + smsAppPackage + " succeeded.");
+    private static MessageUpgradeController getInstance(Context context) {
+        if (sInstance == null) {
+            synchronized (MessageUpgradeController.class) {
+                if (sInstance == null) {
+                    sInstance = new MessageUpgradeController(context);
                 }
-            } else {
-                Log.e(TAG, "bindService() to the message upgrade service: "
-                        + smsAppPackage + " failed.");
-                clientCallbackExecutor.execute(() ->
-                        clientCallback.accept(UPGRADE_STATUS_REJECTED));
             }
-        } finally {
-            Binder.restoreCallingIdentity(identity);
         }
+        return sInstance;
     }
 
     /**
-     * Checks if the calling package is not the default messaging app (DMA) and if the DMA has a
-     * valid {@link AlternativeMessageTransportService}.
+     * Checks if the calling package is not the default messaging app (DMA) and has a valid
+     * {@link AlternativeMessageTransportService} to upgrade messages.
      *
-     * @param callingPkg the calling app's package.
+     * @param context The calling app's context.
+     * @param callingUser The calling app's user id.
+     * @param callingPkg The calling app's package.
      * @return {@code true} if the calling package is not the default messaging app (DMA) and if the
      *         DMA has a valid {@link AlternativeMessageTransportService}, returns false otherise.
      */
-    public boolean isMessageUpgradeSupportedAndNotDma(String callingPkg) {
+    public static boolean isMessageUpgradeSupportedForPackage(
+            @NonNull Context context,
+            int callingUser,
+            @NonNull String callingPkg) {
+        Objects.requireNonNull(context, "context cannot be null");
         if (TextUtils.isEmpty(callingPkg)) {
             throw new IllegalArgumentException("callingPkg cannot be null or empty");
         }
-        String defaultSmsAppPackage = getDefaultSmsAppPackage();
-        return !TextUtils.isEmpty(defaultSmsAppPackage)
-                && !callingPkg.equals(defaultSmsAppPackage) && isMessageUpgradeSupported();
-    }
 
-    /**
-     * Checks if the default SMS app has implemented the
-     * {@link android.service.messaging.AlternativeMessageTransportService}.
-     *
-     * @return {@code true} if the default SMS app has a AlternativeMessageTransportService.
-     */
-    // TODO(b/470708258): cache the result of message upgrade supported check
-    private boolean isMessageUpgradeSupported() {
-        String smsAppPackage = getDefaultSmsAppPackage();
-        if (TextUtils.isEmpty(smsAppPackage)) {
-            Log.e(TAG, "No default sms app found.");
+        MessageUpgradeWorker upgradeWorker = getInstance(context).getUpgradeWorkerForUser(
+                context, callingUser);
+        if (upgradeWorker == null) {
+            Log.e(TAG, "Could not get upgrade worker for user " + callingUser);
             return false;
         }
 
-        Intent intent = new Intent(AlternativeMessageTransportService.SERVICE_INTERFACE);
-        intent.setPackage(smsAppPackage);
-
-        List<ResolveInfo> services = mContext.getPackageManager().queryIntentServices(
-                intent, PackageManager.GET_META_DATA);
-
-        for (int i = 0; i < services.size(); i++) {
-            ResolveInfo info = services.get(i);
-            if (info.serviceInfo != null
-                    && Manifest.permission.BIND_ALTERNATIVE_MESSAGE_TRANSPORT_SERVICE.equals(
-                            info.serviceInfo.permission)) {
-                return true;
-            }
-        }
-        return false;
+        return upgradeWorker.isMessageUpgradeSupportedForPackage(callingPkg);
     }
 
     /**
-     * Disposes the service connection to the AlternativeMessageTransportService.
-     */
-    private void disposeServiceConnection() {
-        mServiceWrapper.close();
-    }
-
-    // TODO(b/473718205): cache default sms package and update on sms app change
-    @Nullable
-    private String getDefaultSmsAppPackage() {
-        return Telephony.Sms.getDefaultSmsPackage(mContext);
-    }
-
-    private void onServiceReady(
-            Uri contentUri, Executor clientCallbackExecutor,
-            Consumer<Integer> clientCallback) {
-        MessageUpgradeCallback controllerCallback = new MessageUpgradeControllerCallback(
-                clientCallbackExecutor, clientCallback);
-        try {
-            mServiceWrapper.upgradeMessage(contentUri, Runnable::run, controllerCallback);
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Exception while upgrading message.", e);
-            controllerCallback.onUpgradeStatusAvailable(UPGRADE_STATUS_REJECTED);
-        }
-    }
-
-    /**
-     * Callback wrapper used by {@link MessageUpgradeController} to report the message upgrade
-     * status to the caller and manage service lifecycle.
+     * Enables sending SMS/MMS message by the default messaging app using richer protocols like RCS.
      *
-     * @hide
+     * @param context The calling app's context.
+     * @param callingUser The calling app's user id.
+     * @param messageUri The uri of the message in the telephony db.
+     * @param sentIntents A list of {@link PendingIntent}s to broadcast when the message is
+     * successfully sent or failed. For multipart messages, these intents
+     * are all broadcast at once after the last part is sent or failed.
+     * @param deliveryIntents A list of {@link PendingIntent}s to broadcast when the message is
+     * delivered to the recipient. For multipart messages, these intents
+     * are all broadcast at once after the last part is delivered or failed.
+     * @param clientCallbackExecutor The executor to run the callback on.
+     * @param clientCallback The callback to report the upgrade status.
      */
-    public interface MessageUpgradeCallback {
-        /**
-         * Called when the upgrade status is available.
-         *
-         * @param status the status of the upgrade request.
-         */
-        default void onUpgradeStatusAvailable(int status) {
+    public static void upgradeMessage(
+            @NonNull Context context,
+            int callingUser,
+            @NonNull Uri messageUri,
+            @Nullable List<PendingIntent> sentIntents,
+            @Nullable List<PendingIntent> deliveryIntents,
+            @NonNull Executor clientCallbackExecutor,
+            @NonNull Consumer<Integer> clientCallback) {
+        Objects.requireNonNull(context, "context cannot be null");
+        Objects.requireNonNull(messageUri, "messageUri cannot be null");
+        Objects.requireNonNull(clientCallbackExecutor, "clientCallbackExecutor cannot be null");
+        Objects.requireNonNull(clientCallback, "clientCallback cannot be null");
 
+        MessageUpgradeWorker upgradeWorker = getInstance(context).getUpgradeWorkerForUser(
+                context, callingUser);
+        if (upgradeWorker != null) {
+            upgradeWorker.upgradeMessage(messageUri,
+                    sentIntents,
+                    deliveryIntents,
+                    clientCallbackExecutor,
+                    clientCallback);
+        } else {
+            Log.e(TAG, "Upgrade message failed, no upgrade worker for user " + callingUser);
+            clientCallbackExecutor.execute(() -> clientCallback.accept(UPGRADE_STATUS_REJECTED));
         }
     }
 
-    private final class MessageUpgradeControllerCallback implements MessageUpgradeCallback {
-        private final Executor mClientCallbackExecutor;
-        private final Consumer<Integer> mClientCallback;
+    /**
+     * Called when an SMS message is updated in the Telephony provider.
+     *
+     * <p>Checks if the updated SMS corresponds to an upgraded message and dispatches the associated
+     * PendingIntents (sent/delivery) if the status or type has changed.
+     *
+     * @param context The calling app's context.
+     * @param callingUser The calling app's user id.
+     * @param messageUri The URI of the updated SMS message.
+     * @param values     The updated values of the SMS message.
+     */
+    public static void dispatchSmsPendingIntentsIfUpgraded(@NonNull Context context,
+            int callingUser, Uri messageUri, @NonNull ContentValues values) {
+        Objects.requireNonNull(context, "context cannot be null");
+        Objects.requireNonNull(messageUri, "messageUri cannot be null");
+        Objects.requireNonNull(values, "values cannot be null");
 
-        private MessageUpgradeControllerCallback(
-                Executor executor, Consumer<Integer> callback) {
-            mClientCallbackExecutor = executor;
-            mClientCallback = callback;
+        MessageUpgradeWorker upgradeWorker = getInstance(context).getUpgradeWorkerForUser(
+                context, callingUser);
+        if (upgradeWorker != null) {
+            upgradeWorker.dispatchSmsPendingIntentsIfUpgraded(messageUri, values);
+        } else {
+            Log.e(TAG, "dispatchSmsPendingIntentsIfUpgraded, no upgrade worker for user "
+                    + callingUser);
         }
+    }
 
-        @Override
-        public void onUpgradeStatusAvailable(int status) {
+    /**
+     * Called when an MMS message is updated in the Telephony provider.
+     *
+     * <p>Checks if the updated MMS corresponds to an upgraded message and dispatches the associated
+     * PendingIntents (sent) if the message box has changed.
+     *
+     * @param context The calling app's context.
+     * @param callingUser The calling app's user id.
+     * @param messageUri The URI of the updated MMS message.
+     * @param values     The updated values of the MMS message.
+     */
+    public static void dispatchMmsPendingIntentsIfUpgraded(@NonNull Context context,
+            int callingUser, Uri messageUri, @NonNull ContentValues values) {
+        Objects.requireNonNull(context, "context cannot be null");
+        Objects.requireNonNull(messageUri, "messageUri cannot be null");
+        Objects.requireNonNull(values, "values cannot be null");
+
+        MessageUpgradeWorker upgradeWorker = getInstance(context).getUpgradeWorkerForUser(
+                context, callingUser);
+        if (upgradeWorker != null) {
+            upgradeWorker.dispatchMmsPendingIntentsIfUpgraded(messageUri, values);
+        } else {
+            Log.e(TAG, "dispatchSmsPendingIntentsIfUpgraded, no upgrade worker for user "
+                    + callingUser);
+        }
+    }
+
+    private MessageUpgradeController(Context context) {
+        registerUserRemovedReceiver(context);
+    }
+
+    private void registerUserRemovedReceiver(Context context) {
+        IntentFilter intentFilter = new IntentFilter(Intent.ACTION_USER_REMOVED);
+        BroadcastReceiver userRemovedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (Intent.ACTION_USER_REMOVED.equals(intent.getAction())) {
+                    int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+                    if (userId != UserHandle.USER_NULL) {
+                        Log.i(TAG, "User " + userId + " removed, cleaning up resources.");
+                        onUserRemoved(UserHandle.of(userId));
+                    }
+                }
+            }
+        };
+        context.registerReceiverAsUser(userRemovedReceiver, UserHandle.ALL, intentFilter,
+                null, null);
+    }
+
+    private synchronized void onUserRemoved(@NonNull UserHandle user) {
+        MessageUpgradeWorker upgradeWorker = sUpgradeWorkers.get(user.getIdentifier());
+        if (upgradeWorker != null) {
+            sUpgradeWorkers.remove(user.getIdentifier());
+            upgradeWorker.close();
+            Log.i(TAG, "Cleaned up MessageUpgradeWorker for removed user "
+                    + user.getIdentifier());
+        }
+    }
+
+    @Nullable
+    private synchronized MessageUpgradeWorker getUpgradeWorkerForUser(
+            @NonNull Context context, int userId) {
+        MessageUpgradeWorker upgradeWorker = sUpgradeWorkers.get(userId);
+        if (upgradeWorker == null) {
             try {
-                mClientCallbackExecutor.execute(() -> mClientCallback.accept(status));
-            } finally {
-                disposeServiceConnection();
+                // Create a context for the specific user.
+                Context userContext = context.createPackageContextAsUser(
+                        context.getPackageName(), 0, UserHandle.of(userId));
+                upgradeWorker = new MessageUpgradeWorker(userContext);
+                sUpgradeWorkers.put(userId, upgradeWorker);
+                Log.i(TAG, "Created new MessageUpgradeWorker for user "
+                        + userId);
+            } catch (PackageManager.NameNotFoundException e) {
+                // This should not happen as we are using our own package.
+                Log.e(TAG, "Could not create context for user " + userId, e);
+                return null;
             }
         }
+        return upgradeWorker;
     }
 }

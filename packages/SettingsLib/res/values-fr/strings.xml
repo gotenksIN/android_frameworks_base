@@ -97,7 +97,7 @@
     <string name="bluetooth_connected_no_a2dp_battery_level" msgid="6499078454894324287">"Connecté (aucun contenu multimédia), batterie à <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g><xliff:g id="ACTIVE_DEVICE">%2$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_headset_no_a2dp_battery_level" msgid="8477440576953067242">"Connecté (aucun téléphone ni contenu multimédia), batterie à <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g><xliff:g id="ACTIVE_DEVICE">%2$s</xliff:g>"</string>
     <string name="bluetooth_active_battery_level" msgid="2685517576209066008">"Actif. <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> de batterie."</string>
-    <string name="bluetooth_active_battery_level_untethered" msgid="4961338936672922617">"Actif. Gauche : <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> de batterie, droit : <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g> de batterie."</string>
+    <string name="bluetooth_active_battery_level_untethered" msgid="4961338936672922617">"Actif. G : <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> de batterie, D : <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g> de batterie."</string>
     <string name="bluetooth_active_battery_level_untethered_left" msgid="2895644748625343977">"Actif. G : <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> de batterie."</string>
     <string name="bluetooth_active_battery_level_untethered_right" msgid="7407517998880370179">"Actif. D : <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> de batterie."</string>
     <string name="bluetooth_battery_level" msgid="2893696778200201555">"<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> de batterie"</string>
@@ -217,7 +217,7 @@
     <string name="launch_defaults_none" msgid="8049374306261262709">"Aucun paramètre par défaut défini"</string>
     <string name="tts_settings" msgid="8130616705989351312">"Paramètres de la synthèse vocale"</string>
     <string name="tts_settings_title" msgid="7602210956640483039">"Sortie de la synthèse vocale"</string>
-    <string name="tts_default_rate_title" msgid="3964187817364304022">"Débit"</string>
+    <string name="tts_default_rate_title" msgid="3964187817364304022">"Vitesse d\'élocution"</string>
     <string name="tts_default_rate_summary" msgid="3781937042151716987">"Modifie la vitesse à laquelle le texte est énoncé"</string>
     <string name="tts_default_pitch_title" msgid="6988592215554485479">"Ton"</string>
     <string name="tts_default_pitch_summary" msgid="9132719475281551884">"Modifie le ton utilisé pour la synthèse vocale"</string>

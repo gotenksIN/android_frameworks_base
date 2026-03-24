@@ -16,7 +16,6 @@
 
 package com.android.systemui.communal.dagger
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.res.Resources
 import com.android.systemui.CoreStartable
@@ -30,9 +29,12 @@ import com.android.systemui.communal.data.repository.CommunalSmartspaceRepositor
 import com.android.systemui.communal.data.repository.CommunalTutorialRepositoryModule
 import com.android.systemui.communal.data.repository.CommunalWidgetRepositoryModule
 import com.android.systemui.communal.domain.definition.ContextualSetupDefinition
-import com.android.systemui.communal.domain.definition.SetupTarget
 import com.android.systemui.communal.domain.definition.UprightChargingSetupDefinition
 import com.android.systemui.communal.domain.interactor.CommunalSceneTransitionInteractor
+import com.android.systemui.communal.domain.interactor.UprightChargingInteractor
+import com.android.systemui.communal.domain.interactor.UprightChargingInteractorImpl
+import com.android.systemui.communal.domain.preconditions.CommonSetupPreconditions
+import com.android.systemui.communal.domain.preconditions.CommonSetupPreconditionsImpl
 import com.android.systemui.communal.domain.suppression.dagger.CommunalSuppressionModule
 import com.android.systemui.communal.shared.log.CommunalMetricsLogger
 import com.android.systemui.communal.shared.log.CommunalStatsLogProxyImpl
@@ -109,6 +111,14 @@ interface CommunalModule {
         impl: UprightChargingSetupDefinition
     ): ContextualSetupDefinition
 
+    @Binds
+    fun bindUprightChargingInteractor(
+        impl: UprightChargingInteractorImpl
+    ): UprightChargingInteractor
+
+    @Binds
+    fun bindCommonSetupPreconditions(impl: CommonSetupPreconditionsImpl): CommonSetupPreconditions
+
     companion object {
         const val LOGGABLE_PREFIXES = "loggable_prefixes"
         const val LAUNCHER_PACKAGE = "launcher_package"
@@ -172,15 +182,6 @@ interface CommunalModule {
         @Named(TOUCH_NOTIFICATION_RATE_LIMIT)
         fun providesRateLimit(): Int {
             return TOUCH_NOTIFIFCATION_RATE_LIMIT_MS
-        }
-
-        @Provides
-        fun provideUprightChargingSetupTarget(@Main resources: Resources): SetupTarget {
-            val componentNameString =
-                resources.getString(R.string.config_communalUprightChargingSetupActivityComponent)
-            val componentName =
-                ComponentName.unflattenFromString(componentNameString) ?: ComponentName("", "")
-            return SetupTarget.Activity(componentName)
         }
     }
 }

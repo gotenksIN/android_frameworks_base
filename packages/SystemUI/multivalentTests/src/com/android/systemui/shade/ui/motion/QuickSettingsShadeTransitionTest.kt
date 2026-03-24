@@ -16,6 +16,7 @@
 
 package com.android.systemui.shade.ui.motion
 
+import android.content.res.mainResources
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.annotations.MotionTest
@@ -55,6 +56,7 @@ import com.android.systemui.scene.transitionState
 import com.android.systemui.scene.ui.composable.GoneScene
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.scene.ui.viewmodel.GoneUserActionsViewModel
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
@@ -129,7 +131,10 @@ class QuickSettingsShadeTransitionTest() : SysuiTestCase() {
             viewModelFactory =
                 object : GoneUserActionsViewModel.Factory {
                     override fun create(): GoneUserActionsViewModel {
-                        return GoneUserActionsViewModel(kosmos.shadeModeInteractor)
+                        return GoneUserActionsViewModel(
+                            kosmos.shadeModeInteractor,
+                            kosmos.mainResources,
+                        )
                     }
                 },
         )
@@ -321,6 +326,7 @@ class QuickSettingsShadeTransitionTest() : SysuiTestCase() {
                             mapOf(Overlays.QuickSettingsShade to quickSettingsShadeOverlay),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )

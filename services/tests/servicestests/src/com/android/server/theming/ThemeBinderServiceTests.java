@@ -22,6 +22,8 @@ import static android.content.theming.FieldColorSource.VALUE_PRESET;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -49,10 +51,6 @@ import com.android.server.LocalServices;
 import com.android.server.om.OverlayManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
-
-import com.google.ux.material.libmonet.dynamiccolor.ColorSpec.SpecVersion;
-import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme;
-import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme.Platform;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -83,10 +81,11 @@ public class ThemeBinderServiceTests {
 
     private int mUserId;
     private ThemeBinderService mUnderTest;
-    private ThemeManagerInternal mInternal;
+    private ThemeManagerImpl mInternal;
     private ThemeSettings mDefaultSettings;
     private ThemeStateManager mThemeStateManager;
     private FakeScheduledExecutorService mSchedulerExecutor;
+    private ThemeEnvironment mEnvironment;
 
     @Mock
     private WallpaperManagerInternal mMockWmi;
@@ -98,6 +97,8 @@ public class ThemeBinderServiceTests {
     private ActivityManagerInternal mActivityManagerInternal;
     @Mock
     private ThemeOverlayHelper mOverlayHelper;
+    @Mock
+    private ThemeUserLifecycle mUserLifecycle;
 
     @Before
     public void setup() {
@@ -128,10 +129,14 @@ public class ThemeBinderServiceTests {
         perms.setPermission(android.Manifest.permission.INTERACT_ACROSS_USERS, PERMISSION_GRANTED);
 
         when(mUserManager.getProfileParentId(eq(mUserId))).thenReturn(mUserId);
+        when(mUserManager.getProfileIds(anyInt(), anyBoolean())).thenAnswer(invocation -> {
+            int requestedUserId = invocation.getArgument(0);
+            return new int[]{requestedUserId};
+        });
         when(mActivityManagerInternal.getCurrentUserId()).thenReturn(mUserId);
+        when(mUserLifecycle.loadUserStateAndNotifyStateManager(anyInt())).thenReturn(true);
 
-        ThemeWallpaperManager themeWallpaperManager = new ThemeWallpaperManager(mMockWmi);
-        ThemeSettingsManager themeSettingsManager = new ThemeSettingsManager(themeWallpaperManager);
+        ThemeWallpaperManager themeWallpaperManager = new ThemeWallpaperManager();
         SystemPropertiesReader systemPropertiesReader = new SystemPropertiesReader() {
             @NonNull
             @Override
@@ -139,16 +144,27 @@ public class ThemeBinderServiceTests {
                 return mHardwareColorRule.color;
             }
         };
+
+        mEnvironment = new ThemeEnvironment(context, systemPropertiesReader);
+        mEnvironment.setBootingComplete(mUserLifecycle);
+        ThemeSettingsManager themeSettingsManager = new ThemeSettingsManager(themeWallpaperManager,
+                mEnvironment.getConfig());
         mSchedulerExecutor = new FakeScheduledExecutorService();
-        mThemeStateManager = new ThemeStateManager(context, mSchedulerExecutor,
-                Platform.PHONE, SpecVersion.SPEC_2025);
+        mThemeStateManager = new ThemeStateManager(context, mSchedulerExecutor, mEnvironment);
         mThemeStateManager.onServicesReady();
-        mInternal = new ThemeManagerInternal(context, themeSettingsManager,
-                systemPropertiesReader, mThemeStateManager, mOverlayHelper,
-                Platform.PHONE, SpecVersion.SPEC_2025);
+        mThemeStateManager.onUserStart(UserHandle.of(mUserId), true, Color.BLUE, 0.5f,
+                ThemeStyle.VIBRANT);
+        mInternal = new ThemeManagerImpl(context, themeSettingsManager,
+                mThemeStateManager, mOverlayHelper, mEnvironment, themeWallpaperManager,
+                systemPropertiesReader) {
+            @Override
+            public boolean onBootAnimationDismissing() {
+                return true;
+            }
+        };
+        // mInternal.setup() is not called here in the provided snippet.
         mUnderTest = new ThemeBinderService(context, mInternal);
-        mDefaultSettings = themeSettingsManager.createDefaultThemeSettings(context.getResources(),
-                systemPropertiesReader, mUserId);
+        mDefaultSettings = themeSettingsManager.createDefaultThemeSettings(mUserId);
     }
 
     @Test
@@ -274,8 +290,8 @@ public class ThemeBinderServiceTests {
         assertThat(returnedValue[0].style).isEqualTo(ThemeStyle.VIBRANT);
         assertThat(returnedValue[0].contrast).isEqualTo(0.5f);
         assertThat(returnedValue[0].specVersion).isEqualTo(
-                DynamicScheme.DEFAULT_SPEC_VERSION.name());
-        assertThat(returnedValue[0].platform).isEqualTo(DynamicScheme.DEFAULT_PLATFORM.name());
+                mEnvironment.getConfig().specVersion().name());
+        assertThat(returnedValue[0].platform).isEqualTo(mEnvironment.getConfig().platform().name());
     }
 
     @Test

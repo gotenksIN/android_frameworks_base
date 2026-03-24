@@ -16,6 +16,7 @@
 
 package com.android.systemui.shade.ui.motion
 
+import android.content.res.mainResources
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.MotionTest
 import android.testing.TestableLooper.RunWithLooper
@@ -39,9 +40,7 @@ import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
-import com.android.systemui.notifications.intelligence.rules.ui.composable.notificationRulesScreen
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesScreenViewModelFactory
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesShadeStateViewModelFactory
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesParentViewModelFactory
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.TileMotionTestKeys
 import com.android.systemui.scene.domain.interactor.sceneInteractor
@@ -55,6 +54,7 @@ import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.GoneScene
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.scene.ui.viewmodel.GoneUserActionsViewModel
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
@@ -118,7 +118,10 @@ class GoneSceneToQuickQuickSettingsSceneTest : SysuiTestCase() {
             viewModelFactory =
                 object : GoneUserActionsViewModel.Factory {
                     override fun create(): GoneUserActionsViewModel {
-                        return GoneUserActionsViewModel(kosmos.shadeModeInteractor)
+                        return GoneUserActionsViewModel(
+                            kosmos.shadeModeInteractor,
+                            kosmos.mainResources,
+                        )
                     }
                 },
         )
@@ -131,11 +134,8 @@ class GoneSceneToQuickQuickSettingsSceneTest : SysuiTestCase() {
             contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
             notificationsPlaceholderViewModelFactory =
                 kosmos.notificationsPlaceholderViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
-            notificationRulesScreenViewModelFactory =
-                kosmos.notificationRulesScreenViewModelFactory,
-            notificationRulesScreen = kosmos.notificationRulesScreen,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
@@ -366,6 +366,7 @@ class GoneSceneToQuickQuickSettingsSceneTest : SysuiTestCase() {
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )

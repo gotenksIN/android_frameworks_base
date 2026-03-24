@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package android.os;
@@ -322,10 +326,7 @@ public class Process {
     /**
      * Defines the start of a range of UIDs going from this number to
      * {@link #LAST_PCC_UID} that are reserved for assigning to
-     * processes that need to run in a PCC sandbox.
-     *
-     * Note that there are no GIDs associated with these processes; storage
-     * attribution for them will be done using project IDs.
+     * processes that need to run in a Private Compute Core (PCC) sandbox.
      * @hide
      */
     public static final int FIRST_PCC_UID = 30000;
@@ -335,6 +336,13 @@ public class Process {
      * @hide
      */
     public static final int LAST_PCC_UID = 39999;
+
+    /**
+     * Defines the start of range of GIDs for the cache directory of Private Compute Core (PCC)
+     * sandbox storage.
+     * @hide
+     */
+    public static final int FIRST_PCC_CACHE_GID = 60000;
 
     /**
      * First uid used for fully isolated sandboxed processes spawned from an app zygote
@@ -777,6 +785,7 @@ public class Process {
                                            int zygotePolicyFlags,
                                            boolean isTopApp,
                                            @Nullable long[] disabledCompatChanges,
+                                           @Nullable long[] enabledCompatChanges,
                                            boolean useDeliQueue,
                                            @Nullable Map<String, Pair<String, Long>>
                                                    pkgDataInfoMap,
@@ -793,7 +802,8 @@ public class Process {
         return process.start(processClass, niceName, uid, gid, gids,
                     runtimeFlags, mountExternal, targetSdkVersion, seInfo,
                     abi, instructionSet, appDataDir, invokeWith, packageName,
-                    zygotePolicyFlags, isTopApp, disabledCompatChanges, useDeliQueue,
+                    zygotePolicyFlags, isTopApp, disabledCompatChanges,
+                    enabledCompatChanges, useDeliQueue,
                     pkgDataInfoMap, whitelistedDataInfoMap, bindMountAppsData,
                     bindMountAppStorageDirs, bindMountSystemOverrides, startSeq, zygoteArgs);
     }
@@ -812,19 +822,40 @@ public class Process {
                                                   @Nullable String invokeWith,
                                                   @Nullable String packageName,
                                                   @Nullable long[] disabledCompatChanges,
+                                                  @Nullable long[] enabledCompatChanges,
                                                   boolean useDeliQueue,
                                                   long startSeq,
                                                   @Nullable String[] zygoteArgs) {
         // Webview zygote can't access app private data files, so doesn't need to know its data
         // info.
-        return WebViewZygote.getProcess().start(processClass, niceName, uid, gid, gids,
-                    runtimeFlags, mountExternal, targetSdkVersion, seInfo,
-                    abi, instructionSet, appDataDir, invokeWith, packageName,
-                    /*zygotePolicyFlags=*/ ZYGOTE_POLICY_FLAG_EMPTY, /*isTopApp=*/ false,
-                disabledCompatChanges, useDeliQueue, /* pkgDataInfoMap */ null,
-                /* whitelistedDataInfoMap */ null, /* bindMountAppsData */ false,
-                /* bindMountAppStorageDirs */ false, /* bindMountSyspropOverrides */ false,
-                startSeq, zygoteArgs);
+        return WebViewZygote.getProcess()
+                .start(
+                        processClass,
+                        niceName,
+                        uid,
+                        gid,
+                        gids,
+                        runtimeFlags,
+                        mountExternal,
+                        targetSdkVersion,
+                        seInfo,
+                        abi,
+                        instructionSet,
+                        appDataDir,
+                        invokeWith,
+                        packageName,
+                        /* zygotePolicyFlags= */ ZYGOTE_POLICY_FLAG_EMPTY,
+                        /* isTopApp= */ false,
+                        disabledCompatChanges,
+                        enabledCompatChanges,
+                        useDeliQueue, /* pkgDataInfoMap */
+                        null,
+                        /* whitelistedDataInfoMap */ null, /* bindMountAppsData */
+                        false,
+                        /* bindMountAppStorageDirs */ false, /* bindMountSyspropOverrides */
+                        false,
+                        startSeq,
+                        zygoteArgs);
     }
 
     /**
@@ -1762,7 +1793,7 @@ public class Process {
      * pid.
      * @hide
      */
-    public static final native int killProcessGroup(int uid, int pid);
+    public static final native boolean killProcessGroup(int uid, int pid);
 
     /**
      * Send a signal to all processes in a group under the given PID, but do not wait for the
@@ -1936,4 +1967,14 @@ public class Process {
     }
 
     private static native int nativePidFdOpen(int pid, int flags) throws ErrnoException;
+
+    /**
+    * Set thread affinity to performance cores.
+    *
+    * @param tid The thread ID to set affinity for
+    * @param enable Whether to enable performance core affinity
+    *
+    * @hide
+    */
+    public static native boolean setPerfCoreAffinity(int tid, boolean enable);
 }

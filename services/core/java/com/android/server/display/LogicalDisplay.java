@@ -289,6 +289,13 @@ final class LogicalDisplay {
     }
 
     /**
+     * Gets the ID of the display group to which this logical display belongs.
+     */
+    public int getDisplayGroupIdLocked() {
+        return mDisplayGroupId;
+    }
+
+    /**
      * Gets the primary display device associated with this logical display.
      *
      * @return The primary display device.
@@ -664,8 +671,7 @@ final class LogicalDisplay {
         int userPreferredModeId = deviceInfo.userPreferredModeId;
 
         // external display with no userPreferredMode selected
-        if (Flags.anisotropyCorrectedModeByDefault() && userPreferredModeId == INVALID_MODE_ID
-                && deviceInfo.type == Display.TYPE_EXTERNAL) {
+        if (userPreferredModeId == INVALID_MODE_ID && deviceInfo.type == Display.TYPE_EXTERNAL) {
             // we will try to find corresponding anisotropy corrected mode
             for (Display.Mode mode : modes) {
                 if (selectedModeId == mode.getParentModeId()
@@ -768,6 +774,12 @@ final class LogicalDisplay {
     public void configureDisplayLocked(SurfaceControl.Transaction t,
                                        DisplayDevice device,
                                        boolean isBlanked, Executor executor) {
+        configureDisplayLocked(t, device, isBlanked, executor, false);
+    }
+
+    public void configureDisplayLocked(SurfaceControl.Transaction t,
+                                       DisplayDevice device,
+                                       boolean isBlanked, Executor executor, boolean isInBatch) {
         // Set the layer stack.
         device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : mLayerStack, mDisplayId);
         // Also inform whether the device is the same one sent to inputflinger for its layerstack.
@@ -784,12 +796,12 @@ final class LogicalDisplay {
 
         // Set the color mode and allowed display mode.
         if (device == mPrimaryDisplayDevice) {
-            device.setDesiredDisplayModeSpecsLocked(mDesiredDisplayModeSpecs);
+            device.setDesiredDisplayModeSpecsLocked(mDesiredDisplayModeSpecs, isInBatch);
             device.setRequestedColorModeLocked(mRequestedColorMode);
         } else {
             // Reset to default for non primary displays
             device.setDesiredDisplayModeSpecsLocked(
-                    new DisplayModeDirector.DesiredDisplayModeSpecs());
+                    new DisplayModeDirector.DesiredDisplayModeSpecs(), isInBatch);
             device.setRequestedColorModeLocked(0);
         }
 

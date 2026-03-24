@@ -17,10 +17,21 @@
 package com.android.settingslib.metadata.preferencesapi.types
 
 import android.content.Context
+import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.R
 
 /** Any int in the given range, along the given step. */
-class IntInRange(val min: Int?, val max: Int?, val step: Int = 1): ApiType<Int> {
+class IntInRange(val min: Int?, val max: Int?, val step: Int = 1, private val unitOfMeasurement: String? = null): ApiType<Int> {
+
+    override fun getType(): Class<Int> = Int::class.java
+
+    override fun getParametersSchema() = KeyParametersSchema.Builder()
+        .parameter("unit", "The unit of measurement (if any) such as dB or milliseconds.", type = AnyString)
+        .build()
+
+    override fun getParameters() = getParametersSchema().prepare(buildMap {
+        unitOfMeasurement?.let { put("unit", it) }
+    })
 
     init {
         require(min != null || max != null)
@@ -35,4 +46,6 @@ class IntInRange(val min: Int?, val max: Int?, val step: Int = 1): ApiType<Int> 
             else -> error("There needs to be at least a minimum bound or a maximum bound in an IntInRange")
         }
     }
+
+    override fun getKey(): String = "IntInRange:${min}:${max}:${step}"
 }

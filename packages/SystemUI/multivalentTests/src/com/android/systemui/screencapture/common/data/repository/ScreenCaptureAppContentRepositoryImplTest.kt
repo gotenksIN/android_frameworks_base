@@ -321,7 +321,7 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
-    fun appContentFor_failsToBind_unbindsFromServiceAndEmitsFailure() =
+    fun appContentFor_failsToBind_doesNotUnbindFromServiceAndEmitsFailure() =
         kosmos.runTest {
             // Arrange
             val repository =
@@ -356,6 +356,7 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
                     any<UserHandle>(),
                 )
             assertThat(serviceConnectionCaptor.allValues).hasSize(1)
+            // If bindService returns false, unbindService SHOULD still be called.
             verify(mockedContext).unbindService(same(serviceConnectionCaptor.lastValue))
             verify(mockedContext, times(2)).packageManager
             verify(pm).queryIntentServicesAsUser(any<Intent>(), any<Int>(), any<UserHandle>())
@@ -367,7 +368,7 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
-    fun appContentFor_failsToBind_doesNotUnbindAgainWhenCollectionStops() =
+    fun appContentFor_failsToBind_doesNotUnbindWhenCollectionStops() =
         kosmos.runTest {
             // Arrange
             val repository =
@@ -405,6 +406,7 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
             job.cancel()
 
             // Assert
+            verify(mockedContext).unbindService(any())
             verify(mockedContext, times(2)).packageManager
             verify(pm).queryIntentServicesAsUser(any<Intent>(), any<Int>(), any<UserHandle>())
             verifyNoMoreInteractions(mockedContext)
@@ -449,11 +451,12 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
             verify(mockedContext, never()).unbindService(any())
             assertThat(fakeAppContentProjectionCallback.onContentRequestCalls).hasSize(1)
             assertThat(fakeAppContentProjectionCallback.onSessionStoppedCallCount).isEqualTo(0)
-            fakeAppContentProjectionCallback.onContentRequestCalls.last().let {
-                (listener, width, height) ->
-                assertThat(listener).isNotNull()
-                assertThat(width).isEqualTo(200)
-                assertThat(height).isEqualTo(100)
+            fakeAppContentProjectionCallback.onContentRequestCalls.last().let { call ->
+                assertThat(call.newContentConsumer).isNotNull()
+                assertThat(call.thumbnailWidth).isEqualTo(200)
+                assertThat(call.thumbnailHeight).isEqualTo(100)
+                assertThat(call.iconWidth).isEqualTo(50)
+                assertThat(call.iconHeight).isEqualTo(50)
             }
             assertThat(result).isNull()
 
@@ -501,6 +504,48 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
             assertThat(fakeAppContentProjectionCallback.onContentRequestCalls).isEmpty()
             assertThat(fakeAppContentProjectionCallback.onSessionStoppedCallCount).isEqualTo(0)
             assertThat(result?.isFailure).isTrue()
+
+            // Cleanup
+            job.cancel()
+        }
+
+    @Test
+    fun onBindingDied_unbindsServiceAndEmitsFailure() =
+        kosmos.runTest {
+            // Arrange
+            val repository =
+                ScreenCaptureAppContentRepositoryImpl(
+                    scope = backgroundScope,
+                    bgContext = testDispatcher,
+                    context = mockedContext,
+                )
+            val pm = mockedContext.packageManager
+            val job = startCollection(repository)
+            verify(mockedContext)
+                .bindServiceAsUser(
+                    any<Intent>(),
+                    serviceConnectionCaptor.capture(),
+                    any<Int>(),
+                    any<UserHandle>(),
+                )
+            verify(mockedContext, times(2)).packageManager
+            verify(pm).queryIntentServicesAsUser(any<Intent>(), any<Int>(), any<UserHandle>())
+            verifyNoMoreInteractions(mockedContext)
+            assertThat(serviceConnectionCaptor.allValues).hasSize(1)
+            val serviceConnection = serviceConnectionCaptor.lastValue
+            assertThat(result).isNull()
+
+            // Act
+            serviceConnection.onBindingDied(/* name= */ null)
+
+            // Assert
+            // unbindService is called via awaitClose when flow is closed by onBindingDied
+            verify(mockedContext).unbindService(same(serviceConnection))
+            verify(mockedContext, times(2)).packageManager
+            verify(pm).queryIntentServicesAsUser(any<Intent>(), any<Int>(), any<UserHandle>())
+            verifyNoMoreInteractions(mockedContext)
+            assertThat(result?.isFailure).isTrue()
+            assertThat(result?.exceptionOrNull()).isInstanceOf(IllegalStateException::class.java)
 
             // Cleanup
             job.cancel()
@@ -592,7 +637,8 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
                 /* service= */ fakeAppContentProjectionCallback.asBinder(),
             )
             assertThat(fakeAppContentProjectionCallback.onContentRequestCalls).hasSize(1)
-            val remoteCallback = fakeAppContentProjectionCallback.onContentRequestCalls.last().first
+            val remoteCallback =
+                fakeAppContentProjectionCallback.onContentRequestCalls.last().newContentConsumer
             assertThat(result).isNull()
 
             // Act
@@ -639,7 +685,8 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
                 /* service= */ fakeAppContentProjectionCallback.asBinder(),
             )
             assertThat(fakeAppContentProjectionCallback.onContentRequestCalls).hasSize(1)
-            val callback = fakeAppContentProjectionCallback.onContentRequestCalls.last().first
+            val callback =
+                fakeAppContentProjectionCallback.onContentRequestCalls.last().newContentConsumer
             assertThat(result).isNull()
 
             // Act
@@ -681,7 +728,8 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
                 /* service= */ fakeAppContentProjectionCallback.asBinder(),
             )
             assertThat(fakeAppContentProjectionCallback.onContentRequestCalls).hasSize(1)
-            val remoteCallback = fakeAppContentProjectionCallback.onContentRequestCalls.last().first
+            val remoteCallback =
+                fakeAppContentProjectionCallback.onContentRequestCalls.last().newContentConsumer
             assertThat(result).isNull()
 
             // Act
@@ -700,6 +748,7 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
         user: UserHandle = fakeUserHandle,
         thumbnailWidthPx: Int = 200,
         thumbnailHeightPx: Int = 100,
+        iconSizePx: Int = 50,
     ): Job =
         testScope.launch {
             repository
@@ -708,6 +757,7 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
                     user = user,
                     thumbnailWidthPx = thumbnailWidthPx,
                     thumbnailHeightPx = thumbnailHeightPx,
+                    iconSizePx = iconSizePx,
                 )
                 .collect { result = it }
         }

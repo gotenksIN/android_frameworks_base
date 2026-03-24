@@ -29,6 +29,7 @@ import android.view.Surface;
 import android.widget.Toast;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.window.flags.Flags;
 
 /**
  * Encapsulate policy logic related to app compat display rotation.
@@ -89,6 +90,15 @@ class AppCompatCameraPolicy {
     static AppCompatCameraPolicy getAppCompatCameraPolicy(@NonNull ActivityRecord activityRecord) {
         return activityRecord.mDisplayContent != null
                 ? activityRecord.mDisplayContent.mAppCompatCameraPolicy : null;
+    }
+
+    static void onDisplayRotationChanged(@NonNull ActivityRecord activity,
+            @Surface.Rotation int newDisplayRotation) {
+        final AppCompatCameraPolicy cameraPolicy = getAppCompatCameraPolicy(activity);
+        if (cameraPolicy != null && cameraPolicy.mSimReqOrientationPolicy != null) {
+            cameraPolicy.mSimReqOrientationPolicy.onDisplayRotationChanged(activity,
+                    newDisplayRotation);
+        }
     }
 
     /**
@@ -228,6 +238,22 @@ class AppCompatCameraPolicy {
                 || (cameraPolicy.mSimReqOrientationPolicy != null
                         && cameraPolicy.mSimReqOrientationPolicy
                                 .shouldCameraCompatControlAspectRatio(activity));
+    }
+
+    static boolean shouldIgnoreReqOrientationForCameraCompat(@NonNull ActivityRecord activity) {
+        final AppCompatCameraPolicy cameraPolicy = getAppCompatCameraPolicy(activity);
+        if (cameraPolicy == null) {
+            return false;
+        }
+        final boolean ignoreForForceRotatePolicy = cameraPolicy.mDisplayRotationPolicy != null
+                && cameraPolicy.mDisplayRotationPolicy
+                .shouldIgnoreReqOrientationForCameraCompat(activity);
+        final boolean ignoreForSimulateRequestedOrientationPolicy =
+                Flags.cameraCompatIgnoreRequestedOrientationAllowed()
+                        && cameraPolicy.mSimReqOrientationPolicy != null
+                        && cameraPolicy.mSimReqOrientationPolicy
+                        .shouldIgnoreReqOrientationForCameraCompat(activity);
+        return ignoreForForceRotatePolicy || ignoreForSimulateRequestedOrientationPolicy;
     }
 
     // TODO(b/369070416): have policies implement the same interface.

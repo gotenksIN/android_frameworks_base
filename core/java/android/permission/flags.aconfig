@@ -699,14 +699,6 @@ flag {
 }
 
 flag {
-    name: "allowlist_service_enabled"
-    is_exported: true
-    namespace: "permissions"
-    description: "This flag controls the enabled state of the AllowlistService"
-    bug: "461828838"
-}
-
-flag {
     name: "new_default_app_confirmation_dialog_enabled"
     is_exported: true
     namespace: "permissions"
@@ -728,4 +720,12 @@ flag {
     is_exported: true
     description: "Whether location button (rendered by a system process) APIs are enabled."
     bug: "413293601"
+}
+
+flag {
+    name: "device_controller_role_api_enabled"
+    is_exported: true
+    namespace: "device_controller_hsum"
+    description: "This flag enables the device controller role API"
+    bug: "483629130"
 }

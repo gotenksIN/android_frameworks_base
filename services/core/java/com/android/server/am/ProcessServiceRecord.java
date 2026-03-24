@@ -231,7 +231,7 @@ final class ProcessServiceRecord extends ProcessServiceRecordInternal {
 
     @GuardedBy("mService")
     boolean incServiceCrashCountLocked(long now) {
-        final boolean procIsBoundForeground = mApp.getCurProcState()
+        final boolean procIsBoundForeground = mApp.getProcState()
                 == ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE;
         boolean tryAgain = false;
         // Bump up the crash count of any services currently running in the proc.
@@ -303,9 +303,9 @@ final class ProcessServiceRecord extends ProcessServiceRecordInternal {
             pw.print(" mLastTopStartedAlmostPerceptibleBindRequestUptimeMs=");
             pw.println(getLastTopStartedAlmostPerceptibleBindRequestUptimeMs());
         }
-        if (hasClientActivities() || isHasAboveClient() || isTreatLikeActivity()) {
+        if (hasClientActivities() || hasBindAboveClient() || isTreatLikeActivity()) {
             pw.print(prefix); pw.print("hasClientActivities="); pw.print(hasClientActivities());
-            pw.print(" hasAboveClient="); pw.print(isHasAboveClient());
+            pw.print(" hasAboveClient="); pw.print(hasBindAboveClient());
             pw.print(" treatLikeActivity="); pw.println(isTreatLikeActivity());
         }
         if (getConnectionGroup() != 0) {

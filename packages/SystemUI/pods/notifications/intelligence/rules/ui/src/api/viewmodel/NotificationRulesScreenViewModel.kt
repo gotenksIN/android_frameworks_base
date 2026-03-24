@@ -24,10 +24,19 @@ public interface NotificationRulesScreenViewModel : Activatable {
     /** The list of current saved rules for the user. */
     public val rules: List<RuleModel>
 
+    /**
+     * The back stack of screens viewed within the activity. The last screen in the list is the
+     * current one.
+     */
+    public val backStack: List<RulesScreenViewState>
+
+    /** The screen currently being displayed. */
+    public val currentScreen: RulesScreenViewState
+
     /** Creates a new rule and adds it to the list of saved rules. */
     public fun createRule(newRule: RuleModel)
 
     public interface Factory {
-        public fun create(): NotificationRulesScreenViewModel
+        public fun create(backStack: List<RulesScreenViewState>): NotificationRulesScreenViewModel
     }
 }

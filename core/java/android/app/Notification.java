@@ -78,6 +78,7 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
+import android.icu.number.Notation;
 import android.icu.number.NumberFormatter;
 import android.icu.number.Precision;
 import android.media.AudioAttributes;
@@ -784,6 +785,15 @@ public class Notification implements Parcelable
      * {@link android.service.notification.NotificationListenerService} can read it.
      */
     public static final int FLAG_PROMOTED_ONGOING = 0x00040000;
+
+    /**
+     * Bit to be bitwise-ORed into the {@link #flags} field that should be
+     * set by the system if this notification is associated with a ComputerControlSession.
+     *
+     * <p>This flag is for internal use only; applications cannot set this flag directly.
+     * @hide
+     */
+    public static final int FLAG_COMPUTER_CONTROL = 0x00080000;
 
     private static final Set<Class<? extends Style>> PLATFORM_STYLE_CLASSES = Set.of(
             BigTextStyle.class,
@@ -6604,6 +6614,7 @@ public class Notification implements Parcelable
             // Metrics are considered as second line for MetricStyle.
             final boolean showMetrics = apiMetricStyle()
                     && (resId == getCollapsedMetricLayoutResource()
+                    || resId == getHeadsUpMetricLayoutResource()
                     || resId == getExpandedMetricLayoutResource());
             hasSecondLine |= showMetrics;
             if (p.hasTitle()) {
@@ -12657,7 +12668,9 @@ public class Notification implements Parcelable
                                             + metric);
                         }
                     } else {
-                        contentView.setTextViewText(metricView.textValueId(), valueString.text());
+                        contentView.setCharSequenceList(metricView.textValueId(),
+                                "setTextVariants",
+                                new ArrayList<>(valueString.textVariants()));
                     }
                 } else {
                     contentView.setViewVisibility(metricView.containerId(), View.GONE);
@@ -12900,13 +12913,32 @@ public class Notification implements Parcelable
             /** @hide */
             protected abstract void toBundle(Bundle bundle);
 
-            /** @hide */
-            public record ValueString(String text, @Nullable String subtext) {
+            /**
+             * Text representation of a {@link MetricValue}.
+             *
+             * @param textVariants options for the text representation of a {@link MetricValue}.
+             *     The first one is required and must be the "canonical" (i.e. preferred)
+             *     representation. Any further items in the collection are alternative (presumably
+             *     shorter and less precise) versions of the same value.
+             * @param subtext optional subtext. Usually the "unit" of the associated value.
+
+             * @hide
+             */
+            public record ValueString(List<String> textVariants, @Nullable String subtext) {
+                public ValueString {
+                    checkArgument(!textVariants.isEmpty());
+                    textVariants = textVariants.stream().distinct().toList();
+                }
+
                 public ValueString(String text) {
                     this(text, null);
                 }
 
-                private static final ValueString EMPTY = new ValueString("", null);
+                public ValueString(String text, @Nullable String subtext) {
+                    this(List.of(text), subtext);
+                }
+
+                private static final ValueString EMPTY = new ValueString("");
             }
 
             /**
@@ -13254,6 +13286,8 @@ public class Notification implements Parcelable
             /**
              * Creates a {@link FixedDate} where the {@link LocalDate} will be displayed in the
              * specified formatting option.
+             *
+             * <p>Note that the formatting option might be ignored to make the text fit.
              */
             public FixedDate(@NonNull LocalDate value, @Format int format) {
                 mValue = requireNonNull(value);
@@ -13318,12 +13352,32 @@ public class Notification implements Parcelable
             public ValueString toValueString(Context context) {
                 // DateUtils.formatDateTime expects epoch millis, so make up a time.
                 LocalDateTime localDateTime = mValue.atStartOfDay();
+                long epochMillis = localDateTime.atZone(ZoneId.systemDefault()).toInstant()
+                        .toEpochMilli();
 
-                String formatted = DateUtils.formatDateTime(context,
-                        localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-                        getFormatFlags(mFormat, mValue));
+                if (Flags.metricValueAlternativeStrings()) {
+                    int formatFlags = getFormatFlags(mFormat, mValue);
+                    ArrayList<String> alternatives = new ArrayList<>();
+                    // Requested formatting.
+                    alternatives.add(DateUtils.formatDateTime(context, epochMillis, formatFlags));
+                    // Same general format (short/long) but without year if suitable.
+                    if ((formatFlags & DateUtils.FORMAT_SHOW_YEAR) != 0
+                            && isDateCloseToToday(mValue)) {
+                        alternatives.add(DateUtils.formatDateTime(context, epochMillis,
+                                (formatFlags & ~DateUtils.FORMAT_SHOW_YEAR)
+                                        | DateUtils.FORMAT_NO_YEAR));
+                    }
+                    // Automatic is often shorter than Long and removes year if suitable.
+                    if (mFormat == FORMAT_LONG_DATE) {
+                        alternatives.add(DateUtils.formatDateTime(context, epochMillis,
+                                getAutomaticFormatFlags(mValue)));
+                    }
 
-                return new ValueString(formatted, null);
+                    return new ValueString(alternatives, null);
+                } else {
+                    return new ValueString(DateUtils.formatDateTime(context, epochMillis,
+                            getFormatFlags(mFormat, mValue)), null);
+                }
             }
 
             private static int getFormatFlags(@Format int format, LocalDate date) {
@@ -13340,17 +13394,8 @@ public class Notification implements Parcelable
                 }
             }
 
-            // Whole-month interval in either direction of the current month in which a date is
-            // considered "close to today" (e.g. if today is Feb 10 2025 then any date in
-            // Nov 1 2024 .. May 31 2025 is considered "close").
-            private static final int CLOSE_DATE_MONTH_SPAN = 3;
-
             private static int getAutomaticFormatFlags(LocalDate date) {
-                YearMonth currentMonth = YearMonth.from(getToday());
-                YearMonth dateMonth = YearMonth.from(date);
-                long monthsBetween = Math.abs(ChronoUnit.MONTHS.between(currentMonth, dateMonth));
-
-                if (monthsBetween <= CLOSE_DATE_MONTH_SPAN) {
+                if (isDateCloseToToday(date)) {
                     // Date is "close" to today -> FORMAT_SHORT_DATE but without year
                     return DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_NUMERIC_DATE
                             | DateUtils.FORMAT_NO_YEAR;
@@ -13359,6 +13404,19 @@ public class Notification implements Parcelable
                     return DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_NUMERIC_DATE
                             | DateUtils.FORMAT_SHOW_YEAR;
                 }
+            }
+
+            // Whole-month interval in either direction of the current month in which a date is
+            // considered "close to today" (e.g. if today is Feb 10 2025 then any date in
+            // Nov 1 2024 .. May 31 2025 is considered "close").
+            private static final int CLOSE_DATE_MONTH_SPAN = 3;
+
+            private static boolean isDateCloseToToday(LocalDate date) {
+                YearMonth currentMonth = YearMonth.from(getToday());
+                YearMonth dateMonth = YearMonth.from(date);
+                long monthsBetween = Math.abs(ChronoUnit.MONTHS.between(currentMonth, dateMonth));
+
+                return monthsBetween <= CLOSE_DATE_MONTH_SPAN;
             }
         }
 
@@ -13375,6 +13433,10 @@ public class Notification implements Parcelable
         public static final class FixedTime extends MetricValue {
 
             private static final String KEY_VALUE = "value";
+
+            private static final int NORMAL_FORMAT = DateUtils.FORMAT_SHOW_TIME
+                    | DateUtils.FORMAT_NO_NOON | DateUtils.FORMAT_NO_MIDNIGHT;
+            private static final int ABBREV_FORMAT = NORMAL_FORMAT | DateUtils.FORMAT_ABBREV_TIME;
 
             private final LocalTime mValue;
 
@@ -13432,13 +13494,20 @@ public class Notification implements Parcelable
             public ValueString toValueString(Context context) {
                 // DateUtils.formatDateTime expects epoch millis, so make up a date.
                 LocalDateTime localDateTime = mValue.atDate(getToday());
+                long epochMillis = localDateTime.atZone(ZoneId.systemDefault()).toInstant()
+                        .toEpochMilli();
 
-                String formatted = DateUtils.formatDateTime(context,
-                        localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-                        DateUtils.FORMAT_SHOW_TIME | DateUtils.FORMAT_NO_NOON
-                                | DateUtils.FORMAT_NO_MIDNIGHT);
+                if (Flags.metricValueAlternativeStrings()) {
+                    return new ValueString(
+                            List.of(
+                                    DateUtils.formatDateTime(context, epochMillis, NORMAL_FORMAT),
+                                    DateUtils.formatDateTime(context, epochMillis, ABBREV_FORMAT)),
+                            null);
 
-                return new ValueString(formatted, null);
+                } else {
+                    return new ValueString(
+                            DateUtils.formatDateTime(context, epochMillis, NORMAL_FORMAT), null);
+                }
             }
         }
 
@@ -13524,7 +13593,24 @@ public class Notification implements Parcelable
             @Override
             @NonNull
             public ValueString toValueString(Context context) {
-                return new ValueString(String.valueOf(mValue), mUnit);
+                if (Flags.metricValueAlternativeStrings()) {
+                    return new ValueString(
+                            List.of(
+                                    NumberFormatter.withLocale(Locale.getDefault())
+                                            .format(mValue)
+                                            .toString(),
+                                    NumberFormatter.withLocale(Locale.getDefault())
+                                            .notation(Notation.compactShort())
+                                            .format(mValue)
+                                            .toString()),
+                            mUnit);
+                } else {
+                    return new ValueString(
+                            NumberFormatter.withLocale(Locale.getDefault())
+                                    .format(mValue)
+                                    .toString(),
+                            mUnit);
+                }
             }
         }
 
@@ -13547,7 +13633,7 @@ public class Notification implements Parcelable
             private final int mMaxFractionDigits;
 
             /**
-             * Creates a {@link FixedFloat} instance with no unit and 0 minimum and 3 maximum
+             * Creates a {@link FixedFloat} instance with no unit and 0 minimum and 2 maximum
              * fractional digits.
              */
             public FixedFloat(float value) {
@@ -13564,6 +13650,9 @@ public class Notification implements Parcelable
 
             /**
              * Creates a {@link FixedFloat} instance.
+             *
+             * <p>Note that the specified fraction digits might be ignored to make the text fit.
+             *
              * @param unit optional unit for the value. Limit this to a few characters.
              * @param minFractionDigits minimum number of factional digits to display (0-6)
              * @param maxFractionDigits maximum number of factional digits to display (0-6 and
@@ -13669,11 +13758,30 @@ public class Notification implements Parcelable
             @Override
             @NonNull
             public ValueString toValueString(Context context) {
-                String formatted = NumberFormatter.withLocale(Locale.getDefault())
-                        .precision(Precision.minMaxFraction(mMinFractionDigits, mMaxFractionDigits))
-                        .format(mValue)
-                        .toString();
-                return new ValueString(formatted, mUnit);
+                if (Flags.metricValueAlternativeStrings()) {
+                    return new ValueString(
+                            List.of(
+                                    // First with requested precision, then compact (with default
+                                    // precision).
+                                    NumberFormatter.withLocale(Locale.getDefault())
+                                            .precision(Precision.minMaxFraction(mMinFractionDigits,
+                                                    mMaxFractionDigits))
+                                            .format(mValue)
+                                            .toString(),
+                                    NumberFormatter.withLocale(Locale.getDefault())
+                                            .notation(Notation.compactShort())
+                                            .format(mValue)
+                                            .toString()),
+                            mUnit);
+                } else {
+                    return new ValueString(
+                            NumberFormatter.withLocale(Locale.getDefault())
+                                    .precision(Precision.minMaxFraction(mMinFractionDigits,
+                                            mMaxFractionDigits))
+                                    .format(mValue)
+                                    .toString(),
+                            mUnit);
+                }
             }
         }
 
@@ -16324,28 +16432,6 @@ public class Notification implements Parcelable
      */
     @FlaggedApi(FLAG_BRIDGED_NOTIFICATIONS)
     public static final class BridgedNotificationMetadata implements Parcelable {
-        public static final int BRIDGED_METADATA_TYPE_UNKNOWN = 0;
-        public static final int BRIDGED_METADATA_TYPE_PHONE = 1;
-        public static final int BRIDGED_METADATA_TYPE_TABLET = 2;
-        public static final int BRIDGED_METADATA_TYPE_LAPTOP = 3;
-        public static final int BRIDGED_METADATA_TYPE_WATCH = 4;
-        public static final int BRIDGED_METADATA_TYPE_TV = 5;
-        public static final int BRIDGED_METADATA_TYPE_XR = 6;
-
-        /** @hide */
-        @IntDef(prefix = { "BRIDGED_METADATA_TYPE_" }, value = {
-                BRIDGED_METADATA_TYPE_UNKNOWN,
-                BRIDGED_METADATA_TYPE_PHONE,
-                BRIDGED_METADATA_TYPE_TABLET,
-                BRIDGED_METADATA_TYPE_LAPTOP,
-                BRIDGED_METADATA_TYPE_WATCH,
-                BRIDGED_METADATA_TYPE_TV,
-                BRIDGED_METADATA_TYPE_XR
-        })
-        @Retention(RetentionPolicy.SOURCE)
-        public @interface BridgedMetadataType {}
-
-        private int mOriginDeviceType = BRIDGED_METADATA_TYPE_UNKNOWN;
         @NonNull
         private String mOriginDeviceName;
         @NonNull
@@ -16355,12 +16441,10 @@ public class Notification implements Parcelable
         @NonNull
         private Icon mAppIcon;
 
-        public BridgedNotificationMetadata(@BridgedMetadataType int type,
-                                           @NonNull String originDeviceName,
+        public BridgedNotificationMetadata(@NonNull String originDeviceName,
                                            @NonNull String packageName,
                                            @NonNull String channelId,
                                            @NonNull Icon appIcon) {
-            mOriginDeviceType = type;
             mOriginDeviceName = originDeviceName;
             mPackageName = requireNonNull(packageName);
             mChannelId = requireNonNull(channelId);
@@ -16368,9 +16452,6 @@ public class Notification implements Parcelable
         }
 
         private BridgedNotificationMetadata(Parcel in) {
-            if (in.readInt() != 0) {
-                mOriginDeviceType = in.readInt();
-            }
             if (in.readInt() != 0) {
                 mOriginDeviceName = in.readString8();
             }
@@ -16409,9 +16490,6 @@ public class Notification implements Parcelable
             requireNonNull(out);
 
             out.writeInt(1);
-            out.writeInt(mOriginDeviceType);
-
-            out.writeInt(1);
             out.writeString8(mOriginDeviceName);
 
             out.writeInt(1);
@@ -16422,14 +16500,6 @@ public class Notification implements Parcelable
 
             out.writeInt(1);
             mAppIcon.writeToParcel(out, 0);
-        }
-
-        /**
-         * The device type int representation of the device the notification was bridged from.
-         */
-        @BridgedMetadataType
-        public int getOriginDeviceType() {
-            return mOriginDeviceType;
         }
 
         /**

@@ -16,11 +16,14 @@
 
 package com.android.systemui.deviceentry.domain.interactor
 
+import android.platform.test.annotations.EnableFlags
 import android.testing.TestableLooper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.ObservableTransitionState
+import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
+import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
 import com.android.systemui.authentication.data.repository.fakeAuthenticationRepository
@@ -33,7 +36,6 @@ import com.android.systemui.authentication.shared.model.AuthenticationMethodMode
 import com.android.systemui.biometrics.data.repository.fakeFingerprintPropertyRepository
 import com.android.systemui.bouncer.data.repository.keyguardBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.alternateBouncerInteractor
-import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.dreams.dreamStartable
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.keyguard.data.repository.biometricSettingsRepository
@@ -68,6 +70,7 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
@@ -106,7 +109,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
     fun isUnlocked_whenAuthMethodIsNoneAndLockscreenDisabled_isTrue() =
         kosmos.runTest {
             fakeAuthenticationRepository.setAuthenticationMethod(None)
-            fakeDeviceEntryRepository.setLockscreenEnabled(false)
+            fakeKeyguardRepository.setKeyguardEnabled(false)
 
             val isUnlocked by collectLastValue(underTest.isUnlocked)
             assertThat(isUnlocked).isTrue()
@@ -184,7 +187,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
     fun isDeviceEntered_onBouncer_isFalse() =
         kosmos.runTest {
             fakeAuthenticationRepository.setAuthenticationMethod(Pattern)
-            fakeDeviceEntryRepository.setLockscreenEnabled(true)
+            fakeKeyguardRepository.setKeyguardEnabled(true)
             switchToScene(Scenes.Lockscreen)
             showBouncer()
 
@@ -244,7 +247,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
     fun canSwipeToEnter_onLockscreenWithPin_isFalse() =
         kosmos.runTest {
             fakeAuthenticationRepository.setAuthenticationMethod(Pin)
-            fakeDeviceEntryRepository.setLockscreenEnabled(true)
+            fakeKeyguardRepository.setKeyguardEnabled(true)
             switchToScene(Scenes.Lockscreen)
 
             val canSwipeToEnter by collectLastValue(underTest.canSwipeToEnter)
@@ -351,7 +354,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_notLocked_switchesToGoneScene() =
+    fun attemptDeviceEntry_notLocked_switchesToGoneScene() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             switchToScene(Scenes.Lockscreen)
@@ -369,7 +372,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_notLocked_replacesLockscreenWithGoneInTheBackStack() =
+    fun attemptDeviceEntry_notLocked_replacesLockscreenWithGoneInTheBackStack() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val backStack by collectLastValue(sceneBackInteractor.backStack)
@@ -392,7 +395,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_authMethodNotSecure_switchesToGoneScene() =
+    fun attemptDeviceEntry_authMethodNotSecure_switchesToGoneScene() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             switchToScene(Scenes.Lockscreen)
@@ -406,7 +409,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_authMethodNotSecure_replacesLockscreenWithGoneInTheBackStack() =
+    fun attemptDeviceEntry_authMethodNotSecure_replacesLockscreenWithGoneInTheBackStack() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val backStack by collectLastValue(sceneBackInteractor.backStack)
@@ -425,7 +428,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_authMethodNotSecure_switchesToGoneSceneWhenOnCommunal() =
+    fun attemptDeviceEntry_authMethodNotSecure_switchesToGoneSceneWhenOnCommunal() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val backStack by collectLastValue(sceneBackInteractor.backStack)
@@ -444,7 +447,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_dismissActionAnimates_runsTransitionToGone() =
+    fun attemptDeviceEntry_dismissActionAnimates_runsTransitionToGone() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val backStack by collectLastValue(sceneBackInteractor.backStack)
@@ -476,13 +479,126 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_authMethodSwipe_switchesToGoneScene() =
+    fun attemptDeviceEntrySingleShade_leaveOpenOnKeyguardHide_expandsNotificationShade() =
+        kosmos.runTest {
+            // GIVEN single shade
+            enableSingleShade()
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val backStack by collectLastValue(sceneBackInteractor.backStack)
+
+            // GIVEN authentication is not required
+            fakeAuthenticationRepository.setAuthenticationMethod(None)
+
+            // GIVEN keyguard showing
+            switchToScene(Scenes.Lockscreen)
+            runCurrent()
+
+            // GIVEN setLeaveOpenOnKeyguardHide=true
+            statusBarStateController.setLeaveOpenOnKeyguardHide(true)
+            runCurrent()
+
+            // WHEN attemptDeviceEntry
+            underTest.attemptDeviceEntry("test")
+            runCurrent()
+
+            // THEN shade shows and the backstack is Gone (not Lockscreen)
+            assertThat(currentScene).isEqualTo(Scenes.Shade)
+            assertThat(backStack!!.asIterable()).contains(Scenes.Gone)
+        }
+
+    @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
+    fun attemptDeviceEntryDualShade_leaveOpenOnKeyguardHide_expandsNotificationShade() =
+        kosmos.runTest {
+            // GIVEN dual shade
+            enableDualShade()
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val overlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            // GIVEN authentication is not required
+            fakeAuthenticationRepository.setAuthenticationMethod(None)
+
+            // GIVEN keyguard showing
+            switchToScene(Scenes.Lockscreen)
+            runCurrent()
+
+            // GIVEN setLeaveOpenOnKeyguardHide=true
+            statusBarStateController.setLeaveOpenOnKeyguardHide(true)
+            runCurrent()
+
+            // WHEN attemptDeviceEntry
+            underTest.attemptDeviceEntry("test")
+            runCurrent()
+
+            // THEN shade shows on the Gone Scene
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+            assertThat(overlays).contains(Overlays.NotificationsShade)
+        }
+
+    @Test
+    fun attemptDeviceEntrySingleShade_leaveOpenOnKeyguardHide_replacesLockscreenWithGone() =
+        kosmos.runTest {
+            enableSingleShade()
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val backStack by collectLastValue(sceneBackInteractor.backStack)
+
+            // GIVEN authentication is not required
+            fakeAuthenticationRepository.setAuthenticationMethod(None)
+
+            // GIVEN the shade showing over keyguard
+            switchToScene(Scenes.Lockscreen)
+            switchToScene(Scenes.Shade)
+            assertThat(backStack!!.asIterable()).containsExactly(Scenes.Lockscreen)
+
+            // GIVEN setLeaveOpenOnKeyguarddHide=true
+            statusBarStateController.setLeaveOpenOnKeyguardHide(true)
+            runCurrent()
+
+            // WHEN attempt device entry
+            underTest.attemptDeviceEntry("test")
+            runCurrent()
+
+            // THEN shade continues to show and the backstack is Gone (not Lockscreen)
+            assertThat(currentScene).isEqualTo(Scenes.Shade)
+            assertThat(backStack!!.asIterable()).containsExactly(Scenes.Gone)
+        }
+
+    @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
+    fun attemptDeviceEntryDualShade_leaveOpenOnKeyguardHide() =
+        kosmos.runTest {
+            enableDualShade()
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val overlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            // GIVEN authentication is not required
+            fakeAuthenticationRepository.setAuthenticationMethod(None)
+
+            // GIVEN the shade showing over keyguard
+            switchToScene(Scenes.Lockscreen)
+            showOverlay(Overlays.NotificationsShade)
+
+            // GIVEN setLeaveOpenOnKeyguarddHide=true
+            statusBarStateController.setLeaveOpenOnKeyguardHide(true)
+            runCurrent()
+
+            // WHEN attempt device entry
+            underTest.attemptDeviceEntry("test")
+            runCurrent()
+
+            // THEN shade continues to show on Scenes.Gone
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+            assertThat(overlays).contains(Overlays.NotificationsShade)
+        }
+
+    @Test
+    fun attemptDeviceEntry_authMethodSwipe_switchesToGoneScene() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             switchToScene(Scenes.Lockscreen)
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
-            fakeDeviceEntryRepository.setLockscreenEnabled(true)
+            fakeKeyguardRepository.setKeyguardEnabled(true)
             fakeAuthenticationRepository.setAuthenticationMethod(None)
 
             underTest.attemptDeviceEntry("test")
@@ -491,7 +607,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_authMethodSwipe_replacesLockscreenWithGoneInTheBackStack() =
+    fun attemptDeviceEntry_authMethodSwipe_replacesLockscreenWithGoneInTheBackStack() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val backStack by collectLastValue(sceneBackInteractor.backStack)
@@ -501,7 +617,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.Shade)
             assertThat(backStack!!.asIterable()).containsExactly(Scenes.Lockscreen)
 
-            fakeDeviceEntryRepository.setLockscreenEnabled(true)
+            fakeKeyguardRepository.setKeyguardEnabled(true)
             fakeAuthenticationRepository.setAuthenticationMethod(None)
 
             underTest.attemptDeviceEntry("test")
@@ -511,7 +627,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_noAlternateBouncer_switchesToBouncerScene() =
+    fun attemptDeviceEntry_noAlternateBouncer_showsBouncerOverlay() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
@@ -527,18 +643,39 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun showOrUnlockDevice_showsAlternateBouncer_staysOnLockscreenScene() =
+    fun attemptDeviceEntry_showsAlternateBouncer_staysOnLockscreenScene_noBouncerOverlay() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
             switchToScene(Scenes.Lockscreen)
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
             fakeAuthenticationRepository.setAuthenticationMethod(Pin)
             givenCanShowAlternateBouncer()
 
-            underTest.attemptDeviceEntry("test")
+            underTest.attemptDeviceEntry(
+                loggingReason = "test",
+                skipShowingAlternateBouncer = false,
+            )
 
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+            assertThat(currentOverlays).isEmpty()
+        }
+
+    @Test
+    fun attemptDeviceEntry_skipShowingAlternateBouncer_showsBouncerOverlay() =
+        kosmos.runTest {
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+            switchToScene(Scenes.Lockscreen)
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+
+            fakeAuthenticationRepository.setAuthenticationMethod(Pin)
+            givenCanShowAlternateBouncer()
+
+            underTest.attemptDeviceEntry(loggingReason = "test", skipShowingAlternateBouncer = true)
+
+            assertThat(currentOverlays).contains(Overlays.Bouncer)
         }
 
     @Test
@@ -546,7 +683,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         kosmos.runTest {
             val isUnlocked by collectLastValue(underTest.isUnlocked)
             fakeAuthenticationRepository.setAuthenticationMethod(Pin)
-            fakeDeviceEntryRepository.setLockscreenEnabled(true)
+            fakeKeyguardRepository.setKeyguardEnabled(true)
             assertThat(isUnlocked).isFalse()
 
             authenticationInteractor.authenticate(FakeAuthenticationRepository.DEFAULT_PIN)
@@ -682,7 +819,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         kosmos.runTest {
             val isUnlocked by collectLastValue(underTest.isUnlocked)
             val currentScene by collectLastValue(sceneInteractor.currentScene)
-            fakeDeviceEntryRepository.setLockscreenEnabled(false)
+            fakeKeyguardRepository.setKeyguardEnabled(false)
             fakeAuthenticationRepository.setAuthenticationMethod(None)
             switchToScene(Scenes.Gone)
             assertThat(isUnlocked).isTrue()
@@ -696,7 +833,7 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
 
     private fun Kosmos.setupSwipeDeviceEntryMethod() {
         fakeAuthenticationRepository.setAuthenticationMethod(None)
-        fakeDeviceEntryRepository.setLockscreenEnabled(true)
+        fakeKeyguardRepository.setKeyguardEnabled(true)
     }
 
     private fun Kosmos.switchToScene(sceneKey: SceneKey) {
@@ -705,13 +842,14 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
     }
 
     private fun Kosmos.showBouncer() {
-        sceneInteractor.showOverlay(Overlays.Bouncer, "reason")
+        showOverlay(Overlays.Bouncer)
+    }
+
+    private fun Kosmos.showOverlay(overlay: OverlayKey) {
+        sceneInteractor.showOverlay(overlay, "reason")
         sceneInteractor.setTransitionState(
             flowOf(
-                ObservableTransitionState.Idle(
-                    sceneInteractor.currentScene.value,
-                    setOf(Overlays.Bouncer),
-                )
+                ObservableTransitionState.Idle(sceneInteractor.currentScene.value, setOf(overlay))
             )
         )
     }

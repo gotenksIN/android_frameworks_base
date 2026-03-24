@@ -17,7 +17,6 @@
 package com.android.systemui.bouncer.ui.composable
 
 import android.security.Flags.lockscreenTimeoutDeactivatePinPad
-import android.view.View
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
@@ -70,6 +69,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.Easings
 import com.android.compose.grid.VerticalGrid
@@ -188,7 +188,7 @@ fun DigitButton(
     digit: Int,
     isInputEnabled: Boolean,
     onClicked: (Int) -> Unit,
-    onPointerDown: (View?) -> Unit,
+    onPointerDown: () -> Unit,
     scaling: () -> Float,
     isAnimationEnabled: Boolean,
 ) {
@@ -208,7 +208,7 @@ fun DigitButton(
     ) { contentColor ->
         BasicText(
             text = digit.toString(),
-            style = MaterialTheme.typography.displaySmallEmphasized,
+            style = MaterialTheme.typography.labelSmallEmphasized.merge(fontSize = 32.sp),
             color = { contentColor() },
         )
     }
@@ -220,7 +220,7 @@ fun ActionButton(
     isInputEnabled: Boolean,
     onClicked: () -> Unit,
     elementId: String,
-    onPointerDown: ((View?) -> Unit),
+    onPointerDown: () -> Unit,
     onLongPressed: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     appearance: ActionButtonAppearance,
@@ -267,7 +267,7 @@ private fun PinPadButton(
     foregroundColor: Color,
     isAnimationEnabled: Boolean,
     modifier: Modifier = Modifier,
-    onPointerDown: ((View?) -> Unit),
+    onPointerDown: () -> Unit,
     elementId: String? = null,
     onLongPressed: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
@@ -335,7 +335,7 @@ private fun PinPadButton(
                 .clip(CircleShape)
                 .pinPadButtonInput(
                     isEnabled = isEnabled,
-                    onPointerDown = { onPointerDown(view) },
+                    onPointerDown = onPointerDown,
                     onClicked = onClicked,
                     onLongPressed = onLongPressed,
                     onLongClickLabel = onLongClickLabel,
@@ -539,7 +539,7 @@ private fun calculateHorizontalSpacingBetweenColumns(gridWidth: Dp): Dp {
 /** Number of columns in the PIN pad grid. */
 private const val columns = 3
 /** Maximum size (width and height) of each PIN pad button. */
-private val pinButtonMaxSize = 96.dp
+private val pinButtonMaxSize = 84.dp
 /** Scale factor to apply to buttons when animating the "error" animation on them. */
 private val pinButtonErrorShrinkFactor = 67.dp / pinButtonMaxSize
 /** Animation duration of the "shrink" phase of the error animation, on each PIN pad button. */

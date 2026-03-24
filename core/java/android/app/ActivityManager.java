@@ -744,17 +744,9 @@ public class ActivityManager {
 
     /**
      * Process states, describing the kind of state a particular process is in.
-     * When updating these, make sure to also check all related references to the
-     * constant in code, and update these arrays:
-     *
-     * @see com.android.internal.app.procstats.ProcessState#PROCESS_STATE_TO_STATE
-     * @see com.android.server.am.ProcessList#sProcStateToProcMem
-     * @see com.android.server.am.ProcessList#sFirstAwakePssTimes
-     * @see com.android.server.am.ProcessList#sSameAwakePssTimes
-     * @see com.android.server.am.ProcessList#sTestFirstPssTimes
-     * @see com.android.server.am.ProcessList#sTestSamePssTimes
      * @hide
      */
+    // LINT.IfChange
     @IntDef(flag = false, prefix = { "PROCESS_STATE_" }, value = {
         PROCESS_STATE_UNKNOWN, // -1
         PROCESS_STATE_PERSISTENT, // 0
@@ -777,9 +769,14 @@ public class ActivityManager {
         PROCESS_STATE_CACHED_ACTIVITY_CLIENT,
         PROCESS_STATE_CACHED_RECENT,
         PROCESS_STATE_CACHED_EMPTY,
+        PROCESS_STATE_NONEXISTENT,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ProcessState {}
+    // LINT.ThenChange(
+    //     /core/java/com/android/internal/app/procstats/ProcessState.java:process_state_to_state,
+    //     /services/core/java/com/android/server/am/ProcessList.java:process_state_to_memory
+    // )
 
     /*
      * PROCESS_STATE_* must come from frameworks/base/core/java/android/app/ProcessStateEnum.aidl.
@@ -3347,32 +3344,6 @@ public class ActivityManager {
     }
 
     /**
-     * Checks if a task opened on the display with the given ID can be repositioned on screen using
-     * the {@link android.app.ActivityManager.AppTask#moveTaskTo} method.
-     * <p>
-     * This method does not guarantee that a subsequent call to reposition a task on the given
-     * display will succeed. Instead, it indicates whether the given display's windowing mode
-     * configuration allows for handling repositioning requests.
-     * <p>
-     * Apps without the {@link android.Manifest.permission#REPOSITION_SELF_WINDOWS} permission are
-     * not allowed to move tasks and this method will always return {@code false} for such apps.
-     *
-     * @param displayId Target display ID
-     * @return Whether the windowing mode active on display with given ID allows task repositioning
-     *
-     * @throws IllegalArgumentException if there is no display with given display ID
-     */
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
-    @SuppressLint("RequiresPermission")
-    public boolean isTaskMoveAllowedOnDisplay(int displayId) {
-        try {
-            return getTaskService().isTaskMoveAllowedOnDisplay(displayId);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Information you can retrieve about a particular Service that is
      * currently running in the system.
      */
@@ -3587,7 +3558,6 @@ public class ActivityManager {
         private final @NonNull String mPackageName;
 
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
-        /** @hide */
         public ConnectionInfo(long flags,
                 @NonNull String processName,
                 @NonNull String packageName) {
@@ -3597,7 +3567,6 @@ public class ActivityManager {
         }
 
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
-        /** @hide */
         private ConnectionInfo(@NonNull Parcel source) {
             mFlags = source.readLong();
             mProcessName = source.readString8();
@@ -3605,7 +3574,6 @@ public class ActivityManager {
         }
 
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
-        /** @hide */
         public static final @NonNull Creator<ConnectionInfo> CREATOR =
                 new Creator<ConnectionInfo>() {
                     public ConnectionInfo createFromParcel(Parcel source) {
@@ -3618,7 +3586,6 @@ public class ActivityManager {
 
         /**
          * Write parcel.
-         * @hide
          */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         public void writeToParcel(@NonNull Parcel dest, int flags) {
@@ -3629,7 +3596,6 @@ public class ActivityManager {
 
         /**
          * Describe contents.
-         * @hide
          */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         public int describeContents() {

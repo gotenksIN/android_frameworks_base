@@ -24,6 +24,7 @@ import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 
 import static com.android.internal.policy.DesktopModeCompatUtils.shouldExcludeCaptionFromAppBounds;
+import static com.android.internal.policy.DesktopModeLaunchBoundsUtils.centerInScreen;
 import static com.android.internal.policy.SystemBarUtils.getDesktopViewAppHeaderHeightPx;
 import static com.android.server.wm.LaunchParamsUtil.applyLayoutGravity;
 import static com.android.server.wm.LaunchParamsUtil.calculateLayoutBounds;
@@ -42,8 +43,11 @@ import android.view.Display;
 import android.view.Gravity;
 
 import com.android.internal.policy.DesktopModeCompatUtils;
+import com.android.internal.policy.DesktopModeLaunchBoundsUtils;
 import com.android.window.flags.Flags;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -56,13 +60,6 @@ public final class DesktopModeBoundsCalculator {
             .getInt("persist.wm.debug.desktop_mode_initial_bounds_scale", 72) / 100f;
     public static final int DESKTOP_MODE_LANDSCAPE_APP_PADDING = SystemProperties
             .getInt("persist.wm.debug.desktop_mode_landscape_app_padding", 25);
-
-    /**
-     * Proportion of window height top offset with respect to bottom offset, used for central task
-     * positioning. Should be kept in sync with constant in
-     * {@link com.android.wm.shell.desktopmode.DesktopTaskPosition}
-     */
-    public static final float WINDOW_HEIGHT_PROPORTION = 0.375f;
 
     /**
      * Updates launch bounds for an activity with respect to its activity options, window layout,
@@ -113,7 +110,7 @@ public final class DesktopModeBoundsCalculator {
                 logger.accept("layout specifies sizes, inheriting size and applying gravity");
             } else if (verticalGravity > 0 || horizontalGravity > 0) {
                 outParams.mBounds.set(calculateInitialBounds(task, activity, stableBounds, options,
-                        displayContent, shouldRespectOptionPosition, captionHeight));
+                        displayContent, shouldRespectOptionPosition, captionHeight, logger));
                 applyLayoutGravity(verticalGravity, horizontalGravity, outParams.mBounds,
                         stableBounds);
                 logger.accept("layout specifies gravity, applying desired bounds and gravity");
@@ -122,7 +119,7 @@ public final class DesktopModeBoundsCalculator {
             }
         } else {
             outParams.mBounds.set(calculateInitialBounds(task, activity, stableBounds, options,
-                    displayContent, shouldRespectOptionPosition, captionHeight));
+                    displayContent, shouldRespectOptionPosition, captionHeight, logger));
             logger.accept("layout not specified, applying desired bounds");
             logger.accept("respecting option bounds cascaded position="
                     + shouldRespectOptionPosition);
@@ -145,20 +142,20 @@ public final class DesktopModeBoundsCalculator {
     private static Rect calculateInitialBounds(@NonNull Task task,
             @Nullable ActivityRecord activity, @NonNull Rect stableBounds,
             @Nullable ActivityOptions options, @NonNull DisplayContent displayContent,
-            boolean shouldRespectOptionPosition, int captionHeight
-    ) {
+            boolean shouldRespectOptionPosition, int captionHeight,
+            @NonNull Consumer<String> logger) {
         // Display bounds not taking into account insets.
         final Rect screenBounds = displayContent.getBounds();
         final Size idealSize = calculateIdealSize(screenBounds, DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
         if (activity == null) {
-            return centerInScreen(idealSize, screenBounds);
+            return DesktopModeLaunchBoundsUtils.centerInScreen(idealSize, screenBounds);
         }
         if (activity.mAppCompatController.getAspectRatioOverrides()
                 .hasFullscreenOverride()) {
             // If the activity has a fullscreen override applied, it should be treated as
             // resizeable and match the device orientation. Thus the ideal size can be
             // applied.
-            return centerInScreen(idealSize, screenBounds);
+            return DesktopModeLaunchBoundsUtils.centerInScreen(idealSize, screenBounds);
         }
         final DesktopAppCompatAspectRatioPolicy desktopAppCompatAspectRatioPolicy =
                 activity.mAppCompatController.getDesktopAspectRatioPolicy();
@@ -229,10 +226,9 @@ public final class DesktopModeBoundsCalculator {
             }
             default -> idealSize;
         };
-        if (shouldRespectOptionPosition) {
-            return respectShellCascading(initialSize, stableBounds, options.getLaunchBounds());
-        }
-        return centerInScreen(initialSize, screenBounds);
+
+        return applyCascadingIfNeeded(initialSize, stableBounds, options, task,
+                shouldRespectOptionPosition, logger);
     }
 
     /**
@@ -336,19 +332,41 @@ public final class DesktopModeBoundsCalculator {
         return new Size(width, height);
     }
 
-    /**
-     * Adjusts bounds to be positioned in the middle of the screen.
-     */
-    @NonNull
-    static Rect centerInScreen(@NonNull Size desiredSize,
-            @NonNull Rect screenBounds) {
-        final int heightOffset = (int)
-                ((screenBounds.height() - desiredSize.getHeight()) * WINDOW_HEIGHT_PROPORTION);
-        final int widthOffset = (screenBounds.width() - desiredSize.getWidth()) / 2;
-        final Rect resultBounds = new Rect(0, 0,
-                desiredSize.getWidth(), desiredSize.getHeight());
-        resultBounds.offset(screenBounds.left + widthOffset, screenBounds.top + heightOffset);
-        return resultBounds;
+    private static Rect applyCascadingIfNeeded(@NonNull Size desiredSize,
+            @NonNull Rect stableBounds, @NonNull ActivityOptions options, @NonNull Task task,
+            boolean shouldRespectOptionPosition, @NonNull Consumer<String> logger) {
+        final Rect desizedSizeBounds = centerInScreen(desiredSize, stableBounds);
+        if (!shouldRespectOptionPosition) {
+            return desizedSizeBounds;
+        }
+
+        final Rect optionBounds = options.getLaunchBounds();
+        if (!Flags.enableSteppedCascading()) {
+            return respectShellCascading(desiredSize, stableBounds, optionBounds);
+        }
+
+        final boolean isSizeAdjusted = optionBounds.width() != desiredSize.getWidth()
+                || optionBounds.height() != desiredSize.getHeight();
+        if (!isSizeAdjusted) {
+            return optionBounds;
+        }
+
+        final Task deskTask = task.getRootTask();
+        if (deskTask == null) {
+            logger.accept("unexpected-null-root-task");
+            return desizedSizeBounds;
+        }
+
+        final List<Rect> prevTaskBounds = new ArrayList<>();
+        deskTask.forAllLeafTasks(leaf -> {
+            if (task != leaf && leaf.inFreeformWindowingMode() && leaf.isVisibleRequested()) {
+                prevTaskBounds.add(leaf.getBounds());
+            }
+        }, /* traverseTopToBottom */ true);
+        DesktopModeLaunchBoundsUtils.cascadeWindowStepped(stableBounds, desizedSizeBounds,
+                prevTaskBounds, task.mWmService.mContext.getResources());
+        logger.accept("stepped-cascade=" + desizedSizeBounds);
+        return desizedSizeBounds;
     }
 
     /**
@@ -399,6 +417,6 @@ public final class DesktopModeBoundsCalculator {
                     optionBounds.bottom);
         }
         // Bounds not cascaded to any corner, default to center position.
-        return centerInScreen(desiredSize, stableBounds);
+        return DesktopModeLaunchBoundsUtils.centerInScreen(desiredSize, stableBounds);
     }
 }

@@ -24,6 +24,7 @@ import android.app.privatecompute.IDataMigrationToPccService;
 import android.app.privatecompute.IMigrationRequestResultReceiver;
 import android.app.privatecompute.IMigrationRequestResultSender;
 import android.app.privatecompute.IPccSandboxManager;
+import android.app.privatecompute.IPccSandboxManagerNative;
 import android.app.privatecompute.MigrationException;
 import android.app.privatecompute.MigrationRequestResult;
 import android.content.ComponentName;
@@ -54,6 +55,8 @@ import com.android.server.LocalServices;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -77,6 +80,7 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
     private final ExecutorService mExecutorService = Executors.newSingleThreadExecutor();
 
     private PccSandboxManagerInternal mInternal;
+    private final PccSandboxManagerNativeImpl mNativeImpl = new PccSandboxManagerNativeImpl();
 
     public PccSandboxManagerServiceImpl(Context context) {
         this(context, new Injector());
@@ -110,6 +114,10 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
 
     public ExecutorService getExecutorService() {
         return mExecutorService;
+    }
+
+    public IBinder getNativeBinder() {
+        return mNativeImpl;
     }
 
     @Override
@@ -158,10 +166,37 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
         }
     }
 
-    /** Internal method with feedback to the caller, for testing. Returns true if the write was
-     * successfully scheduled.*/
+    @Override
+    @RequiresNoPermission
+    public void batchWriteToAuditLog(
+            @NonNull List<PersistableBundle> data, @NonNull String packageName) {
+        try {
+            writeToAuditLogInternal(data, packageName);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Failed to batch write to audit log: " + e);
+            // No feedback is given to the app.
+        }
+    }
+
+    /**
+     * Internal method with feedback to the caller, for testing. Returns true if the write was
+     * successfully scheduled.
+     */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     boolean writeToAuditLogInternal(@NonNull PersistableBundle bundle, @NonNull String packageName)
+            throws SecurityException {
+        List<PersistableBundle> data = new ArrayList<>(1);
+        data.add(bundle);
+        return writeToAuditLogInternal(data, packageName);
+    }
+
+    /**
+     * Internal method with feedback to the caller, for testing. Returns true if the write was
+     * successfully scheduled.
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    boolean writeToAuditLogInternal(
+            @NonNull List<PersistableBundle> data, @NonNull String packageName)
             throws SecurityException {
         final int callingUid = Binder.getCallingUid();
         if (!mPackageManagerInternal.isSameApp(
@@ -192,9 +227,20 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
             if (mAuditModeContext == null) {
                 mAuditModeContext = AuditModeContext.create();
             }
-            mAuditModeContext.writeToAuditLog(bundle, packageName);
+            for (PersistableBundle bundle : data) {
+                mAuditModeContext.writeToAuditLog(bundle, packageName);
+            }
         }
         return true;
+    }
+
+    private class PccSandboxManagerNativeImpl extends IPccSandboxManagerNative.Stub {
+        @Override
+        @RequiresNoPermission
+        public void writeToAuditLog(@NonNull PersistableBundle bundle) {
+            String packageName = mContext.getPackageManager().getNameForUid(Binder.getCallingUid());
+            writeToAuditLogInternal(bundle, packageName);
+        }
     }
 
     @Override

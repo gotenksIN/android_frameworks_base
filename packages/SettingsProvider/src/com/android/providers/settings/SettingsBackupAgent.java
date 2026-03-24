@@ -38,6 +38,7 @@ import android.app.backup.BackupDataInput;
 import android.app.backup.BackupDataOutput;
 import android.app.backup.BackupRestoreEventLogger;
 import android.app.backup.FullBackupDataOutput;
+import android.app.compat.CompatChanges;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -65,6 +66,7 @@ import android.provider.settings.validators.SecureSettingsValidators;
 import android.provider.settings.validators.SystemSettingsValidators;
 import android.provider.settings.validators.Validator;
 import android.telephony.SubscriptionManager;
+import android.text.ShowSecretsSetting;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.BackupUtils;
@@ -255,6 +257,8 @@ public class SettingsBackupAgent extends BackupAgentHelper {
     // Populated in onRestore().
     private int mRestoredFromSdkInt;
 
+    private boolean mIsShowPasswordsTouchRestored;
+
     // The available font scale for the current device
     @Nullable
     private String[] mAvailableFontScales;
@@ -389,6 +393,9 @@ public class SettingsBackupAgent extends BackupAgentHelper {
 
         // versionCode of com.android.providers.settings corresponds to SDK_INT
         mRestoredFromSdkInt = (int) appVersionCode;
+
+        // Reset the flag before starting the restore process.
+        mIsShowPasswordsTouchRestored = false;
 
         Set<String> movedToGlobal = getMovedToGlobalSettings();
         Set<String> movedToSecure = getMovedToSecureSettings();
@@ -554,6 +561,9 @@ public class SettingsBackupAgent extends BackupAgentHelper {
         int version = in.readInt();
         if (DEBUG_BACKUP) Log.d(TAG, "Flattened data version " + version);
         if (version <= FULL_BACKUP_VERSION) {
+            // Reset the flag before starting the restore process.
+            mIsShowPasswordsTouchRestored = false;
+
             // Generate the moved-to-global lookup table
             Set<String> movedToGlobal = getMovedToGlobalSettings();
             Set<String> movedToSecure = getMovedToSecureSettings();
@@ -1153,6 +1163,37 @@ public class SettingsBackupAgent extends BackupAgentHelper {
                         mNoBlinkInterval,
                         mDefaultBlinkInterval);
                 Log.d(TAG, "Restored text cursor blink from: " + toRestore + " to " + value);
+            }
+
+            if (com.android.text.flags.Flags.splitShowPasswordsToTouchAndPhysical()
+                    && CompatChanges.isChangeEnabled(
+                            ShowSecretsSetting.SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)) {
+                // Synchronize the legacy TEXT_SHOW_PASSWORD setting and the new
+                // TEXT_SHOW_PASSWORD_TOUCH setting.
+                // If both settings exist in the backup, the touch setting's value is applied to
+                // both.
+                // If only one of the settings is present, its value is mirrored to the other.
+                if (Settings.System.TEXT_SHOW_PASSWORD.equals(key)) {
+                    if (mIsShowPasswordsTouchRestored) {
+                        // Skipping TEXT_SHOW_PASSWORD restore because TEXT_SHOW_PASSWORD_TOUCH was
+                        // already restored.
+                        continue;
+                    }
+                    // Mirror the restoring legacy setting to the touch setting.
+                    ContentValues touchValues = new ContentValues(2);
+                    touchValues.put(
+                            Settings.NameValueTable.NAME, Settings.Secure.TEXT_SHOW_PASSWORD_TOUCH);
+                    touchValues.put(Settings.NameValueTable.VALUE, value);
+                    cr.insert(Settings.Secure.CONTENT_URI, touchValues);
+                } else if (Settings.Secure.TEXT_SHOW_PASSWORD_TOUCH.equals(key)) {
+                    mIsShowPasswordsTouchRestored = true;
+                    // Mirror the restoring touch setting to the legacy setting.
+                    ContentValues legacyValues = new ContentValues(2);
+                    legacyValues.put(
+                            Settings.NameValueTable.NAME, Settings.System.TEXT_SHOW_PASSWORD);
+                    legacyValues.put(Settings.NameValueTable.VALUE, value);
+                    cr.insert(Settings.System.CONTENT_URI, legacyValues);
+                }
             }
 
             settingsHelper.restoreValue(this, cr, contentValues, destination, key, value,

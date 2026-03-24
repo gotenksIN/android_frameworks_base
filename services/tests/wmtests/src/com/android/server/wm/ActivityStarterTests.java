@@ -112,12 +112,12 @@ import android.window.TaskFragmentOrganizerToken;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.server.wm.LaunchParamsController.LaunchParams;
 import com.android.server.wm.LaunchParamsController.LaunchParamsModifier;
 import com.android.server.wm.utils.MockTracker;
-import com.android.window.flags.Flags;
 
 import org.junit.Ignore;
 import org.junit.Test;
@@ -223,13 +223,14 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         prepareStarter(launchFlags);
         final IApplicationThread caller = mock(IApplicationThread.class);
         final WindowProcessListener listener = mock(WindowProcessListener.class);
+        final ProcessRecordInternal owner = mock(ProcessRecordInternal.class);
 
         final ApplicationInfo ai = new ApplicationInfo();
         ai.packageName = "com.android.test.package";
         final WindowProcessController wpc =
                 containsConditions(preconditions, PRECONDITION_NO_CALLER_APP)
                         ? null
-                        : new WindowProcessController(service, ai, null, 0, -1, null, listener);
+                        : new WindowProcessController(service, ai, null, 0, -1, owner, listener);
         doReturn(wpc).when(service).getProcessController(any());
 
         final Intent intent = new Intent();
@@ -654,12 +655,13 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         mAtm.mActiveUids.onUidActive(UNIMPORTANT_UID2, PROCESS_STATE_BOUND_TOP);
         // foreground activities
         final IApplicationThread caller = mock(IApplicationThread.class);
+        final ProcessRecordInternal owner = mock(ProcessRecordInternal.class);
         final WindowProcessListener listener = mock(WindowProcessListener.class);
         final ApplicationInfo ai = new ApplicationInfo();
         ai.uid = UNIMPORTANT_UID;
         ai.packageName = "com.android.test.package";
         final WindowProcessController callerApp = spy(new WindowProcessController(
-                mAtm, ai, null, UNIMPORTANT_UID, -1, null, listener));
+                mAtm, ai, null, UNIMPORTANT_UID, -1, owner, listener));
         doReturn(false).when(callerApp).hasForegroundActivities();
         doReturn(callerApp).when(mAtm).getProcessController(caller);
         // caller is recents
@@ -1030,10 +1032,7 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
      * disallowed, and a SecurityException should be thrown.
      */
     @Test
-    @RequiresFlagsEnabled({
-            FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
-            Flags.FLAG_ENABLE_MIRROR_DISPLAY_NO_ACTIVITY
-    })
+    @RequiresFlagsEnabled(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
     public void testStartActivityOnDisplayCannotHostTasks() {
         final ActivityStarter starter = prepareStarter(0);
 
@@ -1205,6 +1204,15 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
 
     @Test
     public void testMovableTaskRequired_succeedsIfTaskAllowedToMove() {
+        // Registering no-op modifier so that the test actually tests the ActivityStarter's
+        // behavior, not LPMs'.
+        final LaunchParamsModifier modifier = mock(LaunchParamsModifier.class);
+        doReturn(LaunchParamsModifier.RESULT_DONE)
+                .when(modifier)
+                .onCalculate(any(), any(), any(), any(), any(), any(), anyInt(), any(),
+                    any(LaunchParams.class));
+        mAtm.mTaskSupervisor.getLaunchParamsController().registerModifier(modifier);
+
         final ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK);
         final ActivityOptions options = ActivityOptions.makeBasic().setMovableTaskRequired(true);
 
@@ -2046,6 +2054,8 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
                 eq(privilegedPackage), anyLong(), anyInt());
         doReturn(maliciousUid).when(mMockPackageManager).getPackageUid(
                 eq(maliciousPackage), anyLong(), anyInt());
+        doReturn(false).when(mMockPackageManager).isSameApp(eq(privilegedPackage),
+                eq(maliciousUid), anyInt());
         starter.setCallingPackage(maliciousPackage);
         starter.setCallingUid(maliciousUid);
 

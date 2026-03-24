@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.testScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assume
 import org.junit.rules.RuleChain
 import org.junit.rules.TestRule
@@ -32,7 +33,7 @@ import platform.test.motion.testing.createGoldenPathManager
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.Displays
 import platform.test.screenshot.PathConfig
-import platform.test.screenshot.utils.compose.ComposeScreenshotTestRule
+import platform.test.screenshot.utils.compose.createComposeScreenshotTestRule
 
 /**
  * Create a [MotionTestRule] for motion tests of Compose-based System UI.
@@ -55,9 +56,19 @@ fun createSysUiComposeMotionTestRule(
         createGoldenPathManager("frameworks/base/packages/SystemUI/tests/goldens", pathConfig)
     val testScope = kosmos.testScope
     val composeScreenshotTestRule =
-        ComposeScreenshotTestRule(deviceEmulationSpec, goldenPathManager)
+        createComposeScreenshotTestRule(
+            deviceEmulationSpec,
+            goldenPathManager,
+            effectContext = testScope.coroutineContext + Dispatchers.Main,
+        )
     val fixedConfiguration =
-        FixedConfiguration(density = Density(deviceEmulationSpec.display.densityDpi / 160f))
+        FixedConfiguration(
+            density =
+                Density(
+                    density = deviceEmulationSpec.display.densityDpi / 160f,
+                    fontScale = deviceEmulationSpec.fontScale,
+                )
+        )
     return MotionTestRule(
         ComposeToolkit(composeScreenshotTestRule.composeRule, testScope, fixedConfiguration),
         goldenPathManager,

@@ -28,6 +28,7 @@ import com.android.keyguard.keyguardUpdateMonitor
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.activity.data.repository.activityIntentRepository
 import com.android.systemui.activity.data.repository.fake
+import com.android.systemui.animation.dialogTransitionAnimator
 import com.android.systemui.biometrics.data.repository.fingerprintPropertyRepository
 import com.android.systemui.bouncer.data.repository.bouncerRepository
 import com.android.systemui.bouncer.data.repository.fakeKeyguardBouncerRepository
@@ -50,6 +51,7 @@ import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteract
 import com.android.systemui.display.data.repository.displayPhoneSubcomponentPerDisplayRepository
 import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
+import com.android.systemui.dump.realDumpManager
 import com.android.systemui.globalactions.actionsDialogLiteDelegateFactory
 import com.android.systemui.globalactions.data.repository.globalActionsRepository
 import com.android.systemui.globalactions.domain.interactor.globalActionsInteractor
@@ -295,7 +297,9 @@ class KosmosJavaAdapter() {
     val uiEventLoggerFake by lazy { kosmos.uiEventLoggerFake }
     val actionsDialogLiteDelegateFactory by lazy { kosmos.actionsDialogLiteDelegateFactory }
     val fakeGlobalSettings by lazy { kosmos.fakeGlobalSettings }
+    val dialogTransitionAnimator by lazy { kosmos.dialogTransitionAnimator }
     val systemUIDialogDotFactory by lazy { kosmos.systemUIDialogDotFactory }
+    val dumpManager by lazy { kosmos.realDumpManager }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {

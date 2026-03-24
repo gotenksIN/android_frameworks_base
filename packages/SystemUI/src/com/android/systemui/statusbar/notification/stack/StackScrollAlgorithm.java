@@ -180,6 +180,12 @@ public class StackScrollAlgorithm {
                     // AOD=>lockscreen transition
                     viewState.setAlpha(1f - ambientState.getDozeAmount(), "keyguard notif");
                 }
+            } else if (SceneContainerFlag.isEnabled() && ambientState.isPlaceholderFading()) {
+                // Use STL-provided alpha value for the overall stack if applicable. While
+                // conceptually this is an alpha for the entire notifications stack, we apply this
+                // alpha to each notification individually in order to allow tracked HUNs to remain
+                // visible.
+                viewState.setAlpha(ambientState.getPlaceholderAlpha(), "placeholder transition");
             } else if (SceneContainerFlag.isEnabled() && (ambientState.isShowingStackOnLockscreen()
                     || ambientState.isLockscreenStackFadingIn())) {
                     // Adjust alpha for wakeup to lockscreen.
@@ -190,15 +196,21 @@ public class StackScrollAlgorithm {
                 } else {
                     // Take into account scene container-specific Lockscreen fade-in progress
                     final float alpha;
-                    if (ambientState.isLockscreenStackFadingIn()) {
+                    if (!ambientState.isShowingStackOnLockscreen()
+                            && ambientState.isCurrentSceneLockscreen()) {
+                        alpha = 0f;
+                    } else if (ambientState.isLockscreenStackFadingIn()) {
                         alpha = ambientState.getLockscreenStackFadeInProgress();
                     } else {
                         alpha = 1f - ambientState.getDozeAmount();
                     }
+
                     viewState.setAlpha(alpha, "keyguard notif");
                 }
-            } else if (ambientState.isExpansionChanging()) {
+            } else if (!SceneContainerFlag.isEnabled() && ambientState.isExpansionChanging()) {
                 // Adjust alpha for shade open & close.
+                // In flexiglass, notification alpha during shade expand/collapse is handled via
+                // STL transition and therefore does not need to be explicitly calculated here.
                 float expansion = ambientState.getExpansionFraction();
                 if (ambientState.isBouncerInTransit()) {
                     viewState.setAlpha(

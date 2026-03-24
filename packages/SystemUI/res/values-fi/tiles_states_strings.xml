@@ -201,4 +201,9 @@
     <item msgid="6641673879029894995">"Pois päältä"</item>
     <item msgid="5806682401126108403">"Päällä"</item>
   </string-array>
+  <string-array name="tile_states_battery_charging">
+    <item msgid="7997022271404074195">"Ei käytettävissä"</item>
+    <item msgid="9200787142547749446">"Pois päältä"</item>
+    <item msgid="1965665798398064399">"Päällä"</item>
+  </string-array>
 </resources>

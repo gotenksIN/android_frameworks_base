@@ -1433,12 +1433,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                     .setName("DisplayMirrorParent")
                     .setCallsite("DisplayContent#createMirrorForDisplay")
                     .setContainerLayer()
+                    .setHidden(true)
                     .build();
             mMirrorSurfaceControl = SurfaceControl.mirrorSurface(source);
             try (var t = mWmService.mTransactionFactory.get()) {
                 t.reparent(mMirrorSurfaceControl, mMirrorParent)
                         .show(mMirrorSurfaceControl)
-                        .show(mMirrorParent)
                         .apply();
             }
         }
@@ -2100,7 +2100,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 }
             }
             if (handleTopActivityLaunchingInDifferentOrientation(
-                    topCandidate, r, true /* checkOpening */)) {
+                    topCandidate, r, true /* checkOpening */, ROTATION_UNDEFINED)) {
                 // Display orientation should be deferred until the top fixed rotation is finished.
                 return false;
             }
@@ -2238,8 +2238,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     boolean handleTopActivityLaunchingInDifferentOrientation(@NonNull ActivityRecord r,
-            boolean checkOpening) {
-        return handleTopActivityLaunchingInDifferentOrientation(r, r, checkOpening);
+            boolean checkOpening, int knownRotation) {
+        return handleTopActivityLaunchingInDifferentOrientation(r, r, checkOpening, knownRotation);
     }
 
     /**
@@ -2252,10 +2252,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      *                       "behind" orientation.
      * @param checkOpening Whether to check if the activity is animating by transition. Set to
      *                     {@code true} if the caller is not sure whether the activity is launching.
+     * @param knownRotation The rotation to apply. Usually ROTATION_UNDEFINED to calculate it from
+     *                      {@code orientationSrc}, unless a specific rotation (e.g. from a task
+     *                      snapshot) is already known.
      * @return {@code true} if the fixed rotation is started.
      */
     private boolean handleTopActivityLaunchingInDifferentOrientation(@NonNull ActivityRecord r,
-            @NonNull ActivityRecord orientationSrc, boolean checkOpening) {
+            @NonNull ActivityRecord orientationSrc, boolean checkOpening, int knownRotation) {
         if (!WindowManagerService.ENABLE_FIXED_ROTATION_TRANSFORM) {
             return false;
         }
@@ -2306,7 +2309,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // animation is not running (it may be swiping to home).
             return false;
         }
-        final int rotation = rotationForActivityInDifferentOrientation(orientationSrc);
+        final int rotation = knownRotation == ROTATION_UNDEFINED
+                ? rotationForActivityInDifferentOrientation(orientationSrc)
+                : knownRotation;
         if (rotation == ROTATION_UNDEFINED) {
             // The display rotation won't be changed by current top activity. The client side
             // adjustments of previous rotated activity should be cleared earlier. Otherwise if
@@ -2685,6 +2690,19 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         return mDisplayCutoutCache.getOrCompute(
                 mIsSizeForced ? mBaseDisplayCutout : mInitialDisplayCutout, rotation)
                         .getDisplayCutout();
+    }
+
+    InsetsState getInsetsStateForRotation(int rotation) {
+        final DisplayInfo displayInfo = computeScreenConfiguration(mTmpConfiguration, rotation);
+        final DisplayCutout cutout = displayInfo.displayCutout != null
+                ? displayInfo.displayCutout : DisplayCutout.NO_CUTOUT;
+        final DisplayFrames rotatedDisplayFrames = new DisplayFrames(new InsetsState(),
+                displayInfo, cutout,
+                calculateRoundedCornersForRotation(rotation),
+                calculatePrivacyIndicatorBoundsForRotation(rotation),
+                calculateDisplayShapeForRotation(rotation));
+        mDisplayPolicy.simulateLayoutDisplay(rotatedDisplayFrames);
+        return rotatedDisplayFrames.mInsetsState;
     }
 
     static WmDisplayCutout calculateDisplayCutoutForRotationAndDisplaySizeUncached(
@@ -4249,7 +4267,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * @return True if this display can become the top focused display, false otherwise.
      */
     boolean canStealTopFocus() {
-        return (mDisplayInfo.flags & Display.FLAG_STEAL_TOP_FOCUS_DISABLED) == 0;
+        if ((mDisplayInfo.flags & Display.FLAG_STEAL_TOP_FOCUS_DISABLED) != 0) {
+            return false;
+        }
+        return mWmService.mDisplayWindowSettings.canStealTopFocus(this);
     }
 
     /**
@@ -5184,8 +5205,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
             // Report ImeDrawn to Shell when the visible IME is reparented, allowing Shell to
             // proceed with starting window removal after a task or activity switch.
-            if (Flags.deferSnapshotRemovalForPredictiveBackWithIme()
-                    && mImeControlTarget != null && originalParent != newParent
+            if (mImeControlTarget != null && originalParent != newParent
                     && mInsetsStateController.getImeSourceProvider().isImeShowing()) {
                 mInsetsStateController.getImeSourceProvider()
                         .reportImeDrawnForOrganizerIfNeeded(mImeControlTarget);
@@ -6983,13 +7003,15 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * need to be reevaluated.
      */
     void notifyKeyguardFlagsChanged() {
-        if (!isKeyguardLocked()) {
-            // If keyguard is not locked, the change of flags won't affect activity visibility.
-            return;
+        if (isKeyguardLocked()) {
+            mRootWindowContainer.ensureActivitiesVisible();
+            // In case there is a visibility change.
+            executeAppTransition();
+        } else {
+            mRootWindowContainer.mTaskSupervisor
+                .getKeyguardController()
+                .updateVisibility();
         }
-        mRootWindowContainer.ensureActivitiesVisible();
-        // In case there is a visibility change.
-        executeAppTransition();
     }
 
     /**
@@ -7071,10 +7093,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         final KeyguardController keyguardController = mRootWindowContainer.mTaskSupervisor
                 .getKeyguardController();
         if (keyguardController.getTopOccludingActivity(mDisplayId) != null) {
-            return keyguardController.getTopOccludingActivity(mDisplayId).getRootTask();
+            return keyguardController.getTopOccludingActivity(mDisplayId).getTask();
         }
         if (keyguardController.getDismissKeyguardActivity(mDisplayId) != null) {
-            return keyguardController.getDismissKeyguardActivity(mDisplayId).getRootTask();
+            return keyguardController.getDismissKeyguardActivity(mDisplayId).getTask();
         }
         return null;
     }
@@ -7097,8 +7119,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     @Override
     boolean getIgnoreOrientationRequest() {
-        if (mHasSetIgnoreOrientationRequest
-                || !com.android.window.flags.Flags.universalResizableByDefault()) {
+        if (mHasSetIgnoreOrientationRequest) {
             return super.getIgnoreOrientationRequest();
         }
         // Large screen (sw >= 600dp) ignores orientation request by default.
@@ -7624,15 +7645,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 .reparent(mA11yOverlayLayer, null)
                 .apply();
     }
-
-    // LINT.IfChange(isTaskMoveAllowedOnDisplay)
-    boolean isTaskMoveAllowedOnDisplay() {
-        // Keep the WindowContainer's subtypes we are traversing here in sync with
-        // WindowContainer#canHoldSelfMovableTasks.
-        return forAllTaskDisplayAreas(TaskDisplayArea::getIsTaskMoveAllowed)
-                || forAllRootTasks(Task::getIsTaskMoveAllowed);
-    }
-    // LINT.ThenChange(WindowContainer.java:canHoldSelfMovableTasks)
 
     /**
      * Sets the user engagement mode for this display.

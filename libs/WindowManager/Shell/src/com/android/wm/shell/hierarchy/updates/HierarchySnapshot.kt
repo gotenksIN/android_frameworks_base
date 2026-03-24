@@ -16,8 +16,6 @@
 package com.android.wm.shell.hierarchy.updates
 
 import com.android.wm.shell.hierarchy.containers.Container
-import com.android.wm.shell.hierarchy.modes.Mode
-import com.android.wm.shell.hierarchy.utils.HierarchyUtils
 import java.util.BitSet
 
 val EMPTY_SNAPSHOT = HierarchySnapshot()
@@ -48,8 +46,10 @@ class HierarchyChangeFlags(vararg flags: Int) : BitSet() {
  */
 class HierarchySnapshot {
 
+    // Do not use containers in this list for parent relationships, use the parent token in the
+    // container snapshot
     val preUpdateContainers: List<Container>
-    val snapshots = mutableMapOf<Container, ContainerSnapshot>()
+    val snapshots = mutableMapOf<Container, SavedContainerState>()
 
     /**
      * Constructor for default initialization and testing
@@ -64,11 +64,7 @@ class HierarchySnapshot {
     constructor(containers: List<Container>) {
         preUpdateContainers = containers
         for (container in containers) {
-            snapshots[container] =
-                ContainerSnapshot(
-                    HierarchyUtils.getModes(container),
-                    SavedContainerState(container)
-                )
+            snapshots[container] = SavedContainerState(container)
         }
     }
 
@@ -78,41 +74,52 @@ class HierarchySnapshot {
     fun getChanges(container: Container): HierarchyChangeFlags {
         val chgs = HierarchyChangeFlags()
         if (container in snapshots) {
-            val snapshot = snapshots[container]!!
-            snapshot.state.diff(container, chgs)
-            val modes = HierarchyUtils.getModes(container)
-            chgs.compareAndSet(snapshot.modes, modes, CHANGED_MODES)
+            val snapshot = snapshots.getValue(container)
+            snapshot.diff(container, chgs)
         }
         return chgs
     }
 
     /**
-     * Returns whether the given container, or any of its ancestors have changed.
+     * Returns whether the given container specifically has changed.
      */
-    fun hasChangesIncludingAncestors(container: Container): Boolean {
-        var c: Container? = container
-        while (c != null) {
-            if (!getChanges(c).isEmpty) {
-                return true
-            }
-            c = c.parent
-        }
-        return false
+    fun hasChanges(container: Container): Boolean {
+        return !getChanges(container).isEmpty
     }
 
     /**
-     * The per-container snapshot data.
-     * Saved modes in ancestor-first order.
+     * Returns a list of any ancestors that have changed in a way that interesting for descendants.
+     * The returned list is in no specific order.
      */
-    data class ContainerSnapshot(
-        val modes: List<Mode>,
-        val state: SavedContainerState
-    )
+    fun getChangedAncestors(modeContainer: Container): List<Container> {
+        val ancestors = mutableListOf<Container>()
+        var c: Container? = modeContainer.parent
+        while (c != null) {
+            if (areInterestingChangesToChildren(getChanges(c))) {
+                ancestors.add(c)
+            }
+            c = c.parent
+        }
+        return ancestors
+    }
+
+    /**
+     * Returns whether specific changes are interesting to descendant container's modes.
+     *
+     * ie. When a display container changes display state, generally all modes with containers under
+     *     that display will be interested in being notified.
+     */
+    private fun areInterestingChangesToChildren(changeFlags: HierarchyChangeFlags): Boolean {
+        // Descendants should only care about changes to their direct ancestors, so ignore
+        // children-only changes
+        return changeFlags.cardinality() >= 1 && !changeFlags[CHANGED_CHILDREN]
+    }
 
     companion object {
-        // Flags describing changes to a generic container
+        // Flags describing changes to a generic container.
+        // Changes to the below should also be reflected in `HierarchyDebugUtils.flagsToStr()`.
         const val CHANGED_PARENT = 1
-        const val CHANGED_MODES = 2
+        const val CHANGED_MODE = 2
         const val CHANGED_CHILDREN = 3
         const val CHANGED_BOUNDS = 4
         const val CHANGED_ROTATION = 5
@@ -123,6 +130,15 @@ class HierarchySnapshot {
         const val ROOT_CONTAINER_OFFSET = 200
         const val CHANGED_ROOT_EXAMPLE_SHELL_PROPERTY = ROOT_CONTAINER_OFFSET + 1
         const val CHANGED_FOCUS = ROOT_CONTAINER_OFFSET + 2
+
+        // Changes to a display container
+        const val DISPLAY_CONTAINER_OFFSET = 300
+        const val CHANGED_INSETS = DISPLAY_CONTAINER_OFFSET + 1
+
+        // Changes to a task container
+        const val TASK_CONTAINER_OFFSET = 400
+        const val CHANGED_TASK_DESCRIPTION = TASK_CONTAINER_OFFSET + 1
+        const val CHANGED_PIP_PARAMS = TASK_CONTAINER_OFFSET + 2
 
         // Can be used by form factors to extend and provide their own set of change flags
         const val CUSTOM_CHANGE_OFFSET = 1000

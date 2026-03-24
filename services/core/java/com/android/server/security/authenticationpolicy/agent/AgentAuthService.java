@@ -18,11 +18,16 @@ package com.android.server.security.authenticationpolicy.agent;
 
 import android.annotation.IntRange;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.SuppressLint;
+import android.annotation.UserIdInt;
 import android.app.ActivityManager;
+import android.app.KeyguardManager;
 import android.companion.CompanionDeviceManager;
+import android.companion.DeviceId;
 import android.content.Context;
 import android.hardware.biometrics.BiometricManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -31,6 +36,8 @@ import android.util.Slog;
 import com.android.internal.os.BackgroundThread;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
+import com.android.server.locksettings.LockSettingsInternal;
+import com.android.server.security.authenticationpolicy.StrongAuthListener;
 
 import java.time.Clock;
 import java.util.Objects;
@@ -45,14 +52,20 @@ import java.util.concurrent.TimeUnit;
  *
  * This service is not meant to be exposed directly to an agent, but is an internal service
  * that higher-level Android services will use as a part of their overall orchestration.
+ *
+ * @hide
  */
+@SuppressLint("MissingPermission")
 public class AgentAuthService implements AgentAuthServiceInternal {
-
     private static final String TAG = "AgentAuthService";
 
     private final Context mContext;
     private final Handler mHandler;
+    private final StrongAuthListener mStrongAuthListener;
+
+    private LockSettingsInternal mLockSettings;
     private BiometricManager mBiometricManager;
+    private KeyguardManager mKeyguardManager;
     private CompanionDeviceManager mCompanionDeviceManager;
 
     private final Clock mClock;
@@ -61,7 +74,7 @@ public class AgentAuthService implements AgentAuthServiceInternal {
     private int mCurrentUserId = UserHandle.USER_NULL;
 
     // session list, writes must be done on the Handler
-    private AgentSessionMap<Integer> mAgentSessionList;
+    private AgentSessionMap mAgentSessionList;
 
     AgentAuthService(@NonNull Context context, @NonNull Handler handler,
             @NonNull Clock clock, @IntRange(from = 0) long lastAuthTimeIntervalMillis) {
@@ -69,29 +82,73 @@ public class AgentAuthService implements AgentAuthServiceInternal {
         mHandler = handler;
         mClock = clock;
         mLastAuthTimeIntervalMillis = lastAuthTimeIntervalMillis;
-        mAgentSessionList = new AgentSessionMap<>(mContext, ActivityManager.getCurrentUser());
+        mAgentSessionList = new AgentSessionMap(mContext, ActivityManager.getCurrentUser());
+        mStrongAuthListener = new StrongAuthListener(mHandler, this::onStrongAuthForUser);
     }
 
     @Override
-    public boolean isAgentAuthorized(int userId, int associationId) {
+    public boolean isAgentAuthorized(@UserIdInt int userId, int deviceId,
+            @Nullable DeviceId companionDeviceId) {
+        // for a local agent the device must be unlocked
+        if (companionDeviceId == null) {
+            return !mKeyguardManager.isDeviceLocked(userId, deviceId);
+        }
+
+        // check for a valid association with the given remote agent
+        final var association = mCompanionDeviceManager != null ?
+                mCompanionDeviceManager.getAssociationByDeviceId(userId, companionDeviceId) : null;
+        if (association == null) {
+            Slog.w(TAG, "No association found for companionDeviceId: " + companionDeviceId);
+            return false;
+        }
+
+        return isAgentAuthorizedByAssociationId(userId, association.getId());
+    }
+
+    @Override
+    public boolean isAgentAuthorizedByAssociationId(@UserIdInt int userId, int associationId) {
         final var info = mAgentSessionList.get(associationId);
         return info != null && (info.getUserId() == userId) && info.isAllowed();
     }
 
+    @Override
+    public boolean setOverride(@UserIdInt int userId, int associationId, boolean authorized) {
+        if (Build.IS_DEBUGGABLE) {
+            final AgentSession result = authorized ?
+                mAgentSessionList.authorizeIfPresent(userId, associationId) :
+                    mAgentSessionList.revokeIfPresent(userId, associationId);
+            return result != null && result.isAllowed();
+        }
+        return false;
+    }
+
     /** Start the service start monitoring for connected agents and init for current user. */
-    @SuppressLint("MissingPermission")
-    void start(@NonNull BiometricManager biometricManager,
+    void start(@NonNull LockSettingsInternal lockSettings,
+            @NonNull BiometricManager biometricManager,
+            @NonNull KeyguardManager keyguardManager,
             @NonNull CompanionDeviceManager companionDeviceManager) {
+        mLockSettings = lockSettings;
         mBiometricManager = biometricManager;
+        mKeyguardManager = keyguardManager;
         mCompanionDeviceManager = companionDeviceManager;
+
+        mHandler.post(() -> {
+            mLockSettings.registerLockSettingsStateListener(
+                    mStrongAuthListener.asLockSettingsStateListener());
+            mBiometricManager.registerAuthenticationStateListener(
+                    mStrongAuthListener.asAuthenticationStateListener());
+        });
 
         initInBackgroundForUser(ActivityManager.getCurrentUser());
     }
 
     /** Refresh data for the given user (call when the foreground user changes). */
     void initInBackgroundForUser(int userId) {
-        Slog.i(TAG, "Refreshing data for user: " + userId);
-        mHandler.post(() -> onUserSwitched(userId));
+        mHandler.post(() -> {
+            Slog.i(TAG, "Refreshing data for user: " + userId);
+
+            onUserSwitched(userId);
+        });
     }
 
     private void onUserSwitched(int userId) {
@@ -111,7 +168,7 @@ public class AgentAuthService implements AgentAuthServiceInternal {
         // reset list to an initial state
         mCurrentUserId = userId;
         mAgentSessionList.clear();
-        mAgentSessionList = new AgentSessionMap<>(mContext, mCurrentUserId);
+        mAgentSessionList = new AgentSessionMap(mContext, mCurrentUserId);
         mHandler.removeCallbacksAndMessages(null);
         Slog.d(TAG, "Reset sessions / dropped all pending updates");
 
@@ -122,27 +179,44 @@ public class AgentAuthService implements AgentAuthServiceInternal {
             mAgentMonitor = new CDMAgentMonitor(mHandler, userId,
                     mCompanionDeviceManager, new CDMAgentMonitor.Listener() {
                 @Override
-                public void onAgentConnectionStarted(int id) {
-                    // no custom interval yet, but this may need to become dynamic
-                    // instead of relying only on the overlay config
-                    final boolean authorized = hasRecentStrongAuth(0);
+                public void onAgentConnectionStarted(int associationId) {
+                    final boolean authorized = isAuthorizedAtConnection();
                     if (authorized) {
-                        Slog.d(TAG, "Start session (authorized): " + id);
-                        mAgentSessionList.put(id, AgentSession.authorized(userId, id));
+                        Slog.d(TAG, "Start session (authorized): " + associationId);
+
+                        mAgentSessionList.put(associationId, AgentSession.authorized(userId));
                     } else {
-                        Slog.d(TAG, "Start session (not authorized): " + id);
-                        mAgentSessionList.put(id, AgentSession.notAuthorized(userId, id));
+                        Slog.d(TAG, "Start session (not authorized): " + associationId);
+
+                        mAgentSessionList.put(associationId, AgentSession.notAuthorized(userId));
                     }
                 }
 
                 @Override
-                public void onAgentConnectionStopped(int id) {
-                    Slog.d(TAG, "End session: " + id);
-                    mAgentSessionList.remove(id);
+                public void onAgentConnectionStopped(int associationId) {
+                    Slog.d(TAG, "End session: " + associationId);
+                    mAgentSessionList.remove(associationId);
                 }
             });
             mAgentMonitor.start();
         }
+    }
+
+    private void onStrongAuthForUser(int userId) {
+        if (mCurrentUserId != userId) {
+            return;
+        }
+
+        mAgentSessionList.authorizeAll();
+    }
+
+    private boolean isAuthorizedAtConnection() {
+        if (!mKeyguardManager.isDeviceLocked(mCurrentUserId)) {
+            return true;
+        }
+
+        // no custom interval for the normal case
+        return hasRecentStrongAuth(0);
     }
 
     private boolean hasRecentStrongAuth(@IntRange(from = 0) int intervalMillis) {
@@ -150,7 +224,7 @@ public class AgentAuthService implements AgentAuthServiceInternal {
             final long now = mClock.millis();
             final long interval = intervalMillis > 0 ? Math.min(intervalMillis,
                     mLastAuthTimeIntervalMillis) : mLastAuthTimeIntervalMillis;
-            final long lastAuthTime = mBiometricManager.getLastAuthenticationTime(
+            final long lastAuthTime = mBiometricManager.getLastAuthenticationTime(mCurrentUserId,
                     BiometricManager.Authenticators.DEVICE_CREDENTIAL
                             | BiometricManager.Authenticators.BIOMETRIC_STRONG);
             return lastAuthTime > 0 && (now - lastAuthTime) < interval;
@@ -171,7 +245,7 @@ public class AgentAuthService implements AgentAuthServiceInternal {
             mService = new AgentAuthService(context,
                     new Handler(BackgroundThread.getHandler().getLooper()),
                     SystemClock.elapsedRealtimeClock(),
-                    TimeUnit.MINUTES.toMillis(30));
+                    TimeUnit.MINUTES.toMillis(10));
         }
 
         @Override
@@ -180,7 +254,10 @@ public class AgentAuthService implements AgentAuthServiceInternal {
 
             mService.start(
                     Objects.requireNonNull(
+                            LocalServices.getService(LockSettingsInternal.class)),
+                    Objects.requireNonNull(
                             mService.mContext.getSystemService(BiometricManager.class)),
+                    (KeyguardManager) mService.mContext.getSystemService(Context.KEYGUARD_SERVICE),
                     (CompanionDeviceManager) mService.mContext.getSystemService(
                             Context.COMPANION_DEVICE_SERVICE));
         }

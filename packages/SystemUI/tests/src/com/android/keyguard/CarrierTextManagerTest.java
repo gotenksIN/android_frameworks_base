@@ -448,7 +448,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
         assertFalse(mWifiRepository.isWifiConnectedWithValidSsid());
         mWifiRepository.setWifiNetwork(
                 WifiNetworkModel.Active.Companion.of(
-                        /* isValidated= */ false,
+                        /* isValidated= */ true,
                         /* level= */ 0,
                         /* ssid= */ "",
 // QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.

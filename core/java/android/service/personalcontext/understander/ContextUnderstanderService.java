@@ -16,35 +16,40 @@
 
 package android.service.personalcontext.understander;
 
+import android.Manifest;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerExecutor;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.ParcelUuid;
-import android.os.RemoteException;
-import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
-import android.service.personalcontext.PersonalContextManager;
+import android.service.personalcontext.IOpCallback;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
-import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
 import android.service.personalcontext.hint.HintFilter;
+import android.service.personalcontext.hint.PublishedContextHint;
+import android.service.personalcontext.hint.PublishedContextHintWrapper;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
 import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.service.personalcontext.refiner.IGetFilterCallback;
 import android.service.personalcontext.refiner.IRefineCallback;
 import android.service.personalcontext.refiner.IRefiner;
-import android.util.Log;
+import android.service.personalcontext.util.BinderRequestProcessor;
 
-import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 /**
  * This is the base class for understander services to implement, handling service details.
@@ -57,6 +62,31 @@ import java.util.UUID;
  * stopped if not utilized for some time. Services should start as rapidly as possible to minimize
  * latency in the Personal Context workflow.
  *
+ * <p>You must declare the service in the AndroidManifest of the app hosting the service with the
+ * {@link Manifest.permission#BIND_CONTEXT_COMPONENT_SERVICE} permission, and include an intent
+ * filter with the necessary action indicating that it is a {@link ContextUnderstanderService}
+ * (android.service.personalcontext.UnderstanderService). The application must have the {@link
+ * Manifest.permission#PERSONAL_CONTEXT_RECEIVE_HINTS} and {@link
+ * Manifest.permission#PERSONAL_CONTEXT_PUBLISH_INSIGHTS} permissions.
+ *
+ * <p>For example:
+ *
+ * <pre>
+ *     &lt;uses-permission
+ *         android:name="android.permission.PERSONAL_CONTEXT_RECEIVE_HINTS"/&gt;
+ *     &lt;uses-permission
+ *         android:name="android.permission.PERSONAL_CONTEXT_PUBLISH_INSIGHTS"/&gt;
+ *
+ *     &lt;service android:name=".ExampleContextUnderstanderService"
+ *             android:exported="true"
+ *             android:permission="android.permission.BIND_CONTEXT_COMPONENT_SERVICE"&gt;
+ *         &lt;intent-filter&gt;
+ *             &lt;action
+ *             android:name="android.service.personalcontext.UnderstanderService"
+ *             /&gt;
+ *     &lt;/service&gt;
+ * </pre>
+ *
  * @hide
  */
 @SystemApi
@@ -64,41 +94,49 @@ import java.util.UUID;
 public abstract class ContextUnderstanderService extends Service {
     private static final String TAG = "ContextUnderstanderSvc";
 
-    private PersonalContextManager mPersonalContextManager;
     private UUID mComponentId = null;
 
-    public ContextUnderstanderService() {
-    }
+    private Executor mBinderExecutor = null;
 
     private void configure(UUID componentId) {
-        mComponentId = componentId;
-        onConnected();
+        if (mComponentId == null) {
+            mComponentId = componentId;
+            onConnected();
+        }
+    }
+
+    /**
+     * Sets the executor to be used when methods are invoked on this service. By default, an
+     * Executor running on the main looper is used. This method should be called within
+     * {@link #onCreate()}.
+     *
+     * @param executor The {@link Executor} to run calls on.
+     */
+    public final void setExecutor(@androidx.annotation.NonNull Executor executor) {
+        mBinderExecutor = executor;
     }
 
     @NonNull
-    public final UUID getComponentId() {
+    private UUID getComponentId() {
         if (mComponentId == null) {
             throw new IllegalStateException("Service has not been configured yet");
         }
         return mComponentId;
     }
 
-    /** Returns a {@link ComponentIdProvider} for this component. */
-    @NonNull
-    public final ComponentIdProvider getComponentIdProvider() {
-        if (mComponentId == null) {
-            throw new IllegalStateException("Service has not been configured yet");
-        }
-        return () -> mComponentId;
-    }
-
     @Override
     @Nullable
     public final IBinder onBind(@Nullable Intent intent) {
-        return new Binder(this);
+        final Executor executor = mBinderExecutor != null
+                ? mBinderExecutor
+                : new HandlerExecutor(new Handler(Looper.getMainLooper()));
+        return new Binder(this, executor);
     }
 
-    /** Called when the understander has been configured and is ready to receive insights. */
+    /**
+     * Called when the understander has been configured and is ready to receive insights.
+     * Any actions related to this method should complete before returning.
+     */
     public void onConnected() {
         // Default implementation does nothing.
     }
@@ -120,103 +158,95 @@ public abstract class ContextUnderstanderService extends Service {
      *
      * <p>As each hint is provided to the Personal Context system it will be forwarded on to
      * understanding components. The understander can take these hints, cache them between calls,
-     * and use one or more hints together to generate {@link ContextInsight}s. These insights are
-     * then fed back into the system via {@link #understood}.
+     * and use one or more hints together to generate {@link ContextInsight}s.
      *
      * @param hints new hints that this understander has not seen before
+     * @return a list of {@link ContextInsight} that this {@link ContextUnderstanderService}
+     *         generated by processing the incoming hints.
      */
-    public abstract void onUnderstand(@NonNull List<ContextHintWithSignature> hints);
+    @NonNull
+    @RequiresPermission(Manifest.permission.PERSONAL_CONTEXT_PUBLISH_INSIGHTS)
+    public abstract List<ContextInsight> onUnderstand(@NonNull List<PublishedContextHint>
+            hints);
 
     /**
-     * Feeds a {@link ContextInsight} into the Personal Context system.
+     * Override this method to receive logging events for actions taken on the insight.
      *
-     * <p>Most understanders will want to respond to calls to {@link #onUnderstand} inline when all
-     * insights have been prepared, but this is not a requirement. Understanders may want to call
-     * {@link #understood} more than once (e.g. once early with preliminary results, and a second
-     * time with more in-depth results), not at all (e.g. no insights were generated), on a
-     * different thread (e.g. insight generation is moved to a background thread), or spontaneously
-     * (e.g. new information is available that is relevant, but not in response to new hints). All
-     * of these models are allowed.
+     * <p>Invoked when an event has been reported on a {@link ContextInsight} originally
+     * published by this {@link ContextUnderstanderService}.
      *
-     * @throws IllegalStateException when called before the system service has started. The call
-     * can be re-attempted in a few seconds, once system services have started.
+     * @param packageName the package of the application reporting the event.
+     * @param event       The reported {@link InsightEvent}.
      */
-    public final void understood(@NonNull ContextInsight insight) {
-        if (mPersonalContextManager == null) {
-            mPersonalContextManager = getSystemService(PersonalContextManager.class);
-        }
-        if (mPersonalContextManager == null) {
-            throw new IllegalStateException("Personal Context Manager service is not running");
-        }
-        mPersonalContextManager.publishInsight(List.of(insight));
-    }
-
-    /** Override this method to receive logging events for actions taken on the insight. */
     public void onHandleEvent(@NonNull String packageName, @NonNull InsightEvent event) {
         // Do nothing by default.
     }
 
     /**
-     * Override this method to revieve user feedback on an insight.
+     * Override this method to receive user feedback on an insight.
      *
-     * @see android.service.personalcontext.insight.interaction.FeedbackRequest
-     *
-     * @param insight {@link ContextInsight} that the user feedback is related to
+     * @param insight  {@link ContextInsight} that the user feedback is related to
      * @param feedback information about the requested feedback and user responses
      */
-    public void onHandleUserFeedback(@NonNull ContextInsight insight, @NonNull Bundle feedback) {
+    public void onHandleUserFeedback(@NonNull PublishedContextInsight insight,
+            @NonNull Bundle feedback) {
         // Do nothing by default.
     }
 
     private static final class Binder extends IRefiner.Stub {
-        private final WeakReference<ContextUnderstanderService> mService;
+        private final BinderRequestProcessor<ContextUnderstanderService> mRequestProcessor;
 
-        private Binder(ContextUnderstanderService service) {
-            mService = new WeakReference<>(service);
-        }
-
-        private ContextUnderstanderService getServiceOrThrow() throws RemoteException {
-            final ContextUnderstanderService service = mService.get();
-            if (service == null) {
-                Log.e(TAG, "Service is no longer available");
-                throw new RemoteException("Service is no longer available");
-            } else {
-                return service;
-            }
-        }
-
-        @Override
-        public void configure(ParcelUuid componentId) throws RemoteException {
-            getServiceOrThrow().configure(componentId.getUuid());
+        private Binder(ContextUnderstanderService service, Executor executor) {
+            mRequestProcessor = new BinderRequestProcessor.Builder<>(service, executor)
+                    .setInitializer(ContextUnderstanderService::configure)
+                    .build();
         }
 
         @Override
         public void refine(
-                List<ContextHintWithSignatureWrapper> inputHints, IRefineCallback callback)
-                throws RemoteException {
-            // Report that hints were refined right away so that the core doesn't wait around.
-            callback.onHintsRefined(Collections.emptyList());
-
-            getServiceOrThrow().onUnderstand(
-                    ContextHintWithSignatureWrapper.unwrapList(inputHints));
+                ParcelUuid componentId,
+                List<PublishedContextHintWrapper> inputHints, IRefineCallback callback,
+                IOpCallback opCallback) {
+            mRequestProcessor.execute(
+                    new BinderRequestProcessor.ExecutionParams.Builder<ContextUnderstanderService>(
+                            opCallback, serviceInstance -> {
+                        callback.onHintsRefined(Collections.emptyList());
+                        final List<ContextInsight> insights = serviceInstance.onUnderstand(
+                                PublishedContextHintWrapper.unwrapList(inputHints));
+                        callback.onUnderstood(ContextInsightWrapper.wrapList(insights));
+                    }).setComponentId(componentId).build());
         }
 
         @Override
-        public void getFilter(IGetFilterCallback callback) throws RemoteException {
-            callback.updateFilter(getServiceOrThrow().onInitializeFilter());
+        public void getFilter(
+                ParcelUuid componentId, IGetFilterCallback callback, IOpCallback opCallback) {
+            mRequestProcessor.execute(
+                    new BinderRequestProcessor.ExecutionParams.Builder<ContextUnderstanderService>(
+                            opCallback, serviceInstance -> {
+                        callback.updateFilter(serviceInstance.onInitializeFilter());
+                    }).setComponentId(componentId).build());
         }
 
         @Override
-        public void handleEvent(String packageName, InsightEvent event) throws RemoteException {
-            getServiceOrThrow().onHandleEvent(packageName, event);
+        public void handleEvent(ParcelUuid componentId, String packageName, InsightEvent event,
+                IOpCallback opCallback) {
+            mRequestProcessor.execute(
+                    new BinderRequestProcessor.ExecutionParams.Builder<ContextUnderstanderService>(
+                            opCallback, serviceInstance -> serviceInstance.onHandleEvent(
+                            packageName, event)
+                    ).setComponentId(componentId).build());
         }
 
         @Override
-        public void handleFeedback(ContextInsightWrapper insight, Bundle feedback)
-                throws RemoteException {
-            getServiceOrThrow().onHandleUserFeedback(
-                    insight.getContextInsight(),
-                    feedback);
+        public void handleFeedback(ParcelUuid componentId, PublishedContextInsightWrapper insight,
+                Bundle feedback, IOpCallback opCallback) {
+            mRequestProcessor.execute(
+                    new BinderRequestProcessor.ExecutionParams.Builder<ContextUnderstanderService>(
+                            opCallback, serviceInstance ->
+                            serviceInstance.onHandleUserFeedback(
+                                    insight.getPublishedContextInsight(),
+                                    feedback)
+                    ).setComponentId(componentId).build());
         }
     }
 }

@@ -119,6 +119,8 @@ import org.mockito.junit.MockitoRule;
 import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
 import platform.test.runner.parameterized.Parameters;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -1328,6 +1330,36 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
 
     @Test
     @EnableSceneContainer
+    public void testDispatchTouchEvent_sceneContainerEnabled_refusesTouchesWhenRootInvisible() {
+        // GIVEN NSSL would handle touches and the root view is invisible
+        mStackScroller.setIsBeingDragged(true);
+        View rootView = mock(View.class);
+        when(rootView.getVisibility()).thenReturn(View.INVISIBLE);
+        doReturn(rootView).when(mStackScroller).getRootView();
+
+        // WHEN a touch event is dispatched
+        MotionEvent moveEvent = MotionEvent.obtain(
+                SystemClock.uptimeMillis(),
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_MOVE,
+                0,
+                0,
+                0
+        );
+
+        boolean dispatchResult = mStackScroller.dispatchTouchEvent(moveEvent);
+        boolean onTouchResult = mStackScroller.onTouchEvent(moveEvent);
+        boolean onInterceptResult = mStackScroller.onInterceptTouchEvent(moveEvent);
+
+        // THEN the touch is refused
+        assertFalse(dispatchResult);
+        assertFalse(onTouchResult);
+        assertTrue(onInterceptResult); // true to prevent events from propagating to children
+        verify(mStackScrollLayoutController, never()).sendTouchToSceneFramework(any());
+    }
+
+    @Test
+    @EnableSceneContainer
     public void testDispatchTouchEvent_sceneContainerEnabled_sendLastActionUp() {
         mStackScroller.setIsBeingDragged(false);
         mStackScroller.setIsExpandingNotification(true);
@@ -2357,5 +2389,14 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are equal to minimum
         assertThat(mStackScroller.getSidePaddings()).isEqualTo(mMinimumPaddings);
+    }
+
+    @Test
+    public void dump_justCreatedNssl_noCrash() {
+        StringWriter stringWriter = new StringWriter();
+
+        mStackScroller.dump(new PrintWriter(stringWriter), new String[0]);
+
+        assertThat(stringWriter.toString()).isNotEmpty();
     }
 }

@@ -106,7 +106,6 @@ import android.os.UserHandle;
 import android.service.voice.VoiceInteractionManagerInternal;
 import android.util.Slog;
 import android.view.RemoteAnimationDefinition;
-import android.window.DesktopModeFlags;
 import android.window.SizeConfigurationBuckets;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
@@ -886,10 +885,18 @@ class ActivityClientController extends IActivityClientController.Stub {
     private static boolean canGetLaunchedFromLocked(int uid, ActivityRecord r,
             IBinder callerToken, boolean isActivityCallerCall) {
         if (CompatChanges.isChangeEnabled(ACCESS_SHARED_IDENTITY, uid)) {
+            // Implicitly share the launching app's identity if the activity was directly started
+            // for a result. If the UIDs do not match, it indicates an intermediate app forwarded
+            // the request, so fall back to checking if the intermediate app explicitly opted in.
+            boolean isDirectStartForResult = false;
+            if (android.security.Flags.implicitShareLaunchingIdentityForResult()) {
+                isDirectStartForResult =
+                        r.resultTo != null && r.resultTo.getUid() == r.launchedFromUid;
+            }
             boolean isShareIdentityEnabled = isActivityCallerCall
                     ? r.isCallerShareIdentityEnabled(callerToken) : r.mShareIdentity;
             int callerUid = isActivityCallerCall ? r.getCallerUid(callerToken) : r.launchedFromUid;
-            return isShareIdentityEnabled || callerUid == uid;
+            return isDirectStartForResult || isShareIdentityEnabled || callerUid == uid;
         }
         return false;
     }
@@ -1366,10 +1373,8 @@ class ActivityClientController extends IActivityClientController.Stub {
             }
             return RESULT_APPROVED;
         }
-        if (DesktopModeFlags.ENABLE_REQUEST_FULLSCREEN_BUGFIX.isTrue()) {
-            if (taskWindowingMode == WINDOWING_MODE_MULTI_WINDOW) {
-                return RESULT_FAILED_NOT_SUPPORTED;
-            }
+        if (taskWindowingMode == WINDOWING_MODE_MULTI_WINDOW) {
+            return RESULT_FAILED_NOT_SUPPORTED;
         }
         return RESULT_APPROVED;
     }
@@ -1489,8 +1494,7 @@ class ActivityClientController extends IActivityClientController.Stub {
                     requester.getParent().mRemoteToken.toWindowContainerToken();
         } else {
             targetWindowingMode = requester.mMultiWindowRestoreWindowingMode;
-            if (DesktopModeFlags.ENABLE_REQUEST_FULLSCREEN_BUGFIX.isTrue()
-                    && targetWindowingMode == WINDOWING_MODE_PINNED) {
+            if (targetWindowingMode == WINDOWING_MODE_PINNED) {
                 final ActivityRecord r = requester.topRunningActivity();
                 enterPictureInPictureMode(r.token, r.pictureInPictureArgs);
             } else {

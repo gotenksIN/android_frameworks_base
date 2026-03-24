@@ -36,57 +36,49 @@ import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.toAndroidRectF
 import androidx.core.graphics.toRegion
+import com.android.internal.logging.UiEventLogger
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.screencapture.record.camera.domain.interactor.ScreenCaptureCameraTransformationInteractor
 import com.android.systemui.screencapture.record.camera.domain.interactor.ScreenRecordCameraInteractor
+import com.android.systemui.screencapture.record.shared.model.ScreenRecordEvent
 import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
-import com.android.systemui.screenrecord.shared.model.ScreenRecordingStatus
 import com.android.systemui.util.isEmpty
+import com.android.systemui.util.kotlin.pairwiseBy
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import java.util.Objects
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
+private const val TAG = "ScreenCaptureCameraTransformationViewModel"
+
+@OptIn(ExperimentalCoroutinesApi::class)
 class ScreenCaptureCameraTransformationViewModel
 @AssistedInject
 constructor(
-    screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
+    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
     cameraInteractor: ScreenRecordCameraInteractor,
     private val transformationInteractor: ScreenCaptureCameraTransformationInteractor,
+    private val uiEventLogger: UiEventLogger,
 ) :
     HydratedActivatable(),
     TransformableState by transformationInteractor.createTransformableState() {
 
     val shouldShowTouchBounds: Boolean =
         Build.IS_DEBUGGABLE && SystemProperties.getBoolean(SHOW_SELFIE_TOUCH_BOUNDS_PROPERTY, false)
-    var debugTouchBounds: Region? by mutableStateOf(null)
-        private set
-
-    /**
-     * Changes in this field indicate that the output of the [fillCameraInteractableRegion] will be
-     * different from the last one
-     */
-    val fillCameraInteractableRegionIndicator: Any by derivedStateOf {
-        if (transformableByTouchAnywhere) {
-            uiBounds
-        } else {
-            Objects.hash(surfaceSubjectBoundsPath, uiBoundsRegion)
-        }
-    }
 
     val transformableByTouchAnywhere: Boolean by
         screenRecordingServiceInteractor.status.mapHydrate(
-            traceName = "ScreenCaptureCameraTransformationViewModel#transformableByTouchAnywhere"
+            traceName = "$TAG#transformableByTouchAnywhere"
         ) {
-            it.transformableByTouchAnywhere()
+            !it.isRecording
         }
     private val subjectSize by
         cameraInteractor.streamConfiguration.mapHydrate(
-            traceName = "ScreenCaptureCameraTransformationViewModel#transformableByTouchAnywhere"
+            traceName = "$TAG#transformableByTouchAnywhere"
         ) {
             it?.outputStreamSize ?: AndroidSize(0, 0)
         }
@@ -109,15 +101,11 @@ constructor(
             }
         }
     }
-    private var uiBounds: Rect by mutableStateOf(Rect.Zero)
-    private val uiBoundsRegion: Region by derivedStateOf { uiBounds.toAndroidRectF().toRegion() }
+    private var uiBounds: Region by mutableStateOf(Region())
     private val cameraSubjectBounds: Path? by
-        cameraInteractor.cameraSubjectBounds
-            .map { it?.boundaryPath?.asComposePath() }
-            .hydratedStateOf("ScreenCaptureCameraViewModel#cameraSubjectBounds", null)
-    private val surfaceSubjectBoundsPath: Path by derivedStateOf {
-        transformCameraSubjectBounds(cameraSubjectBounds)
-    }
+        cameraInteractor.cameraSubjectBounds.mapHydrate("$TAG#cameraSubjectBounds") {
+            it?.boundaryPath?.asComposePath()
+        }
 
     /**
      * Transformation matrix calculated based on the [offsetX], [offsetY], [scale] and [rotation]
@@ -138,10 +126,40 @@ constructor(
     val scale: Float by transformationInteractor::scale
     val rotation: Float by transformationInteractor::rotation
 
+    val touchableRegion: Region by derivedStateOf {
+        Region().apply {
+            if (transformableByTouchAnywhere) {
+                set(uiBounds)
+            } else {
+                val surfaceSubjectBoundsPath = Path()
+                transformCameraSubjectBounds(
+                    cameraSubjectBounds = cameraSubjectBounds ?: surfaceScreenBounds.toPath(),
+                    outputPath = surfaceSubjectBoundsPath,
+                    shouldTransformToScreenSpace = cameraSubjectBounds != null,
+                )
+                setPath(surfaceSubjectBoundsPath.asAndroidPath(), uiBounds)
+            }
+        }
+    }
+
     override suspend fun onActivated() {
         coroutineScope {
             snapshotFlow { isTransformInProgress }
                 .onEach { transformationInteractor.isTransforming = it }
+                .pairwiseBy { wasTransforming, isTransforming ->
+                    if (wasTransforming && !isTransforming) {
+                        if (screenRecordingServiceInteractor.status.value.isRecording) {
+                            uiEventLogger.log(
+                                ScreenRecordEvent.SCREEN_RECORD_SURFACE_ADJUSTED_MID_RECORDING
+                            )
+                        } else {
+                            uiEventLogger.log(
+                                ScreenRecordEvent.SCREEN_RECORD_SURFACE_ADJUSTED_PRE_RECORDING
+                            )
+                        }
+                    }
+                    false
+                }
                 .launchIn(this)
         }
     }
@@ -149,10 +167,7 @@ constructor(
     /**
      * Notifies the ViewModel that the screen bounds of the [Surface] has changed.
      *
-     * Notice that size passed to the [onSurfaceSizeUpdated] is not necessarily the same as the
-     * [bounds]#size from the [onSurfaceScreenBoundsUpdated]. The first is the size of the [Surface]
-     * (ie the drawing buffer) while the second is the size the [Surface] occupies on the screen (ie
-     * the layout size of the TextureView)
+     * This is the size the [Surface] occupies on the screen (ie the layout size of the TextureView)
      */
     fun onSurfaceScreenBoundsUpdated(bounds: Rect) {
         surfaceScreenBounds = bounds
@@ -163,24 +178,7 @@ constructor(
      * the [transformableByTouchAnywhere] is true.
      */
     fun onUiBoundsChanged(bounds: Rect) {
-        uiBounds = bounds
-    }
-
-    /**
-     * Fills the [outRegion] with the touchable bounds. Use [fillCameraInteractableRegionIndicator]
-     * to get notified about the updates.
-     */
-    fun fillCameraInteractableRegion(outRegion: Region) {
-        if (transformableByTouchAnywhere) {
-            with(uiBounds) {
-                outRegion.set(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
-            }
-        } else {
-            outRegion.setPath(surfaceSubjectBoundsPath.asAndroidPath(), uiBoundsRegion)
-        }
-        if (shouldShowTouchBounds) {
-            debugTouchBounds = Region(outRegion)
-        }
+        uiBounds = bounds.toAndroidRectF().toRegion()
     }
 
     /**
@@ -188,21 +186,26 @@ constructor(
      * positioned inside the (0, 0, outputStreamSize#width, outputStreamSize#height) rect) to a
      * transformed path in the screen space (ie in [surfaceScreenBounds])
      */
-    private fun transformCameraSubjectBounds(cameraSubjectBounds: Path?): Path {
-        // First we need translate the basis from surface to screen
-        val cameraSubjectBoundsInScreenSpace =
-            cameraSubjectBounds?.apply { transform(surfaceToScreenMatrix) }
-        // Apply screen transformation to path
-        return (cameraSubjectBoundsInScreenSpace ?: surfaceScreenBounds.toPath()).apply {
-            // Pivot around the actual center of the bounds taking into account bounds position
-            // because this applies to a figure that is positioned with an arbitrary offset
-            transform(
-                createTransformationMatrix(
-                    pivotX = surfaceScreenBounds.center.x,
-                    pivotY = surfaceScreenBounds.center.y,
-                )
-            )
+    private fun transformCameraSubjectBounds(
+        cameraSubjectBounds: Path,
+        outputPath: Path,
+        shouldTransformToScreenSpace: Boolean,
+    ) {
+        outputPath.reset()
+        outputPath.addPath(cameraSubjectBounds)
+        if (shouldTransformToScreenSpace) {
+            // First we need translate the basis from surface to screen
+            outputPath.transform(surfaceToScreenMatrix)
         }
+        // Apply screen transformation to path
+        outputPath.transform(
+            createTransformationMatrix(
+                // Pivot around the actual center of the bounds taking into account bounds position
+                // because this applies to a figure that is positioned with an arbitrary offset
+                pivotX = surfaceScreenBounds.center.x,
+                pivotY = surfaceScreenBounds.center.y,
+            )
+        )
     }
 
     /** Creates a transformation matrix pivoting around ([pivotX], [pivotY]) */
@@ -242,8 +245,5 @@ private fun ScreenCaptureCameraTransformationInteractor.createTransformableState
     offsetX += panChange.x
     offsetY += panChange.y
 }
-
-private fun ScreenRecordingStatus.transformableByTouchAnywhere(): Boolean =
-    this is ScreenRecordingStatus.Stopped
 
 private fun Rect.toPath(): Path = Path().apply { addRect(this@toPath, Path.Direction.Clockwise) }

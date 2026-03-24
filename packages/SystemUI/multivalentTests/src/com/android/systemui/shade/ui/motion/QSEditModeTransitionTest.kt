@@ -36,7 +36,7 @@ import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesShadeStateViewModelFactory
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesParentViewModelFactory
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.qs.panels.ui.viewmodel.EditModeViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.editModeViewModel
@@ -54,13 +54,13 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.notification.stack.ui.view.notificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Before
@@ -107,8 +107,8 @@ class QSEditModeTransitionTest : SysuiTestCase() {
                 kosmos.notificationsPlaceholderViewModelFactory,
             actionsViewModelFactory = kosmos.quickSettingsUserActionsViewModelFactory,
             contentViewModelFactory = kosmos.quickSettingsSceneContentViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
@@ -182,8 +182,7 @@ class QSEditModeTransitionTest : SysuiTestCase() {
                                 }
                             ) {
                                 underTest.removeTile(btTileSpec)
-                                // TODO replace with awaitIdle(b/480861333)
-                                awaitDelay(200.milliseconds)
+                                awaitIdle()
                             }
                         ) {
                             val node =
@@ -220,8 +219,7 @@ class QSEditModeTransitionTest : SysuiTestCase() {
                                 }
                             ) {
                                 underTest.addTile(btTileSpec, 0)
-                                // TODO replace with awaitIdle(b/480861333)
-                                awaitDelay(450.milliseconds)
+                                awaitIdle()
                             }
                         ) {
                             val node =
@@ -258,8 +256,7 @@ class QSEditModeTransitionTest : SysuiTestCase() {
                                 }
                             ) {
                                 underTest.addTile(btTileSpec, 0)
-                                // TODO replace with awaitIdle(b/480861333)
-                                awaitDelay(300.milliseconds)
+                                awaitIdle()
                             }
                         ) {
                             feature(
@@ -295,6 +292,7 @@ class QSEditModeTransitionTest : SysuiTestCase() {
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )

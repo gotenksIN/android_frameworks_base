@@ -29,6 +29,7 @@ import android.util.Slog;
 import com.android.internal.annotations.GuardedBy;
 
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 /**
@@ -45,6 +46,8 @@ final class SessionLifecycle {
     @GuardedBy("mLifecycle")
     private final LifecycleConfig mLifecycleConfig = new LifecycleConfig();
 
+    private final Executor mCallbackExecutor;
+
     /** Configuration args that fully determine the lifecycle state of the session. */
     static final class LifecycleConfig {
 
@@ -60,25 +63,34 @@ final class SessionLifecycle {
         @Nullable
         String mSecureWindowPackage = null;
 
+        /** Whether the session was requested to be blocked by the caller. */
+        boolean mCallerInitiatedBlock = false;
+
         @NonNull
         private LifecycleState computeState() {
             if (mClosed != null) {
                 return mClosed;
             }
-            if (mBlockingActivityPackage != null || mSecureWindowPackage != null) {
-                return mBlockingActivityPackage != null
-                        ? new Blocked(
-                                ComputerControlSession.BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH,
-                                mBlockingActivityPackage)
-                        : new Blocked(ComputerControlSession.BLOCK_REASON_SECURE_CONTENT,
-                                mSecureWindowPackage);
+            if (mCallerInitiatedBlock) {
+                return new Blocked(ComputerControlSession.BLOCK_REASON_CALLER_INITIATED,
+                        /* blockingPackage= */ null);
+            }
+            if (mBlockingActivityPackage != null) {
+                return new Blocked(ComputerControlSession.BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH,
+                        mBlockingActivityPackage);
+            }
+            if (mSecureWindowPackage != null) {
+                return new Blocked(ComputerControlSession.BLOCK_REASON_SECURE_CONTENT,
+                        mSecureWindowPackage);
             }
             return LifecycleState.ACTIVE;
         }
     }
 
-    SessionLifecycle(@NonNull ComputerControlSession.LifecycleCallback localCallback) {
-        mLifecycle.addCallback(localCallback);
+    SessionLifecycle(@NonNull Executor callbackExecutor,
+            @NonNull ComputerControlSession.LifecycleCallback localCallback) {
+        mCallbackExecutor = callbackExecutor;
+        mLifecycle.addCallback(callbackExecutor, localCallback);
     }
 
     /**
@@ -90,6 +102,26 @@ final class SessionLifecycle {
      */
     @NonNull
     LifecycleState updateLifecycleState(@NonNull Consumer<LifecycleConfig> update) {
+        return updateLifecycleState(/* exitBlockedState = */ false, update);
+    }
+
+    /**
+     * Signifies an attempted exit from the Blocked state.
+     *
+     * @return The lifecycle state after the update.
+     */
+    @NonNull
+    LifecycleState exitBlockedState() {
+        return updateLifecycleState(/* exitBlockedState = */ true,
+                (config) -> config.mCallerInitiatedBlock = false);
+    }
+
+    void monitor() {
+        synchronized (mLifecycle) { /* no-op */ }
+    }
+
+    private LifecycleState updateLifecycleState(boolean exitBlockedState,
+            Consumer<LifecycleConfig> update) {
         synchronized (mLifecycle) {
             final var previousState = mLifecycle.getCurrentState();
             update.accept(mLifecycleConfig);
@@ -97,9 +129,14 @@ final class SessionLifecycle {
             if (Objects.equals(requestedState, previousState)) {
                 return requestedState;
             }
+            // Don't update the blocked state unless explicitly requested or closed.
+            if (!exitBlockedState && previousState instanceof LifecycleState.Blocked
+                    && !(requestedState instanceof LifecycleState.Closed)) {
+                return previousState;
+            }
+
             switch (requestedState) {
-                case LifecycleState.Active ignored ->
-                        mLifecycle.onActive();
+                case LifecycleState.Active ignored -> mLifecycle.onActive();
                 case Blocked blocked ->
                         mLifecycle.onBlocked(blocked.reason, blocked.blockingPackage);
                 case LifecycleState.Closed closed -> mLifecycle.onClosed(closed.reason);
@@ -136,7 +173,8 @@ final class SessionLifecycle {
             updateLifecycleState((config) -> {});
 
             // Adding the remote callback will immediately notify it of the initial state.
-            mLifecycle.addCallback(new ComputerControlSession.LifecycleCallback() {
+            mLifecycle.addCallback(mCallbackExecutor,
+                    new ComputerControlSession.LifecycleCallback() {
                 @Override
                 public void onActive() {
                     try {

@@ -268,7 +268,7 @@
     <string name="apn_settings_not_available" msgid="1147111671403342300">"Nastavenia názvu prístupového bodu (APN) nie sú dostupné pre tohto používateľa"</string>
     <string name="enable_adb" msgid="8072776357237289039">"Ladenie cez USB"</string>
     <string name="enable_adb_summary" msgid="3711526030096574316">"Povoliť režim ladenia s pripojeným zariadením USB"</string>
-    <string name="clear_adb_keys" msgid="2696065439790970581">"Odvolať autorizácie na ladenie cez ADB"</string>
+    <string name="clear_adb_keys" msgid="2696065439790970581">"Odobrať autorizácie na ladenie cez adb"</string>
     <string name="enable_adb_wireless" msgid="6973226350963971018">"Bezdrôtové ladenie"</string>
     <string name="enable_adb_wireless_summary" msgid="7344391423657093011">"Režim ladenia pri zapnutej sieti Wi-Fi"</string>
     <string name="adb_wireless_error" msgid="721958772149779856">"Chyba"</string>
@@ -368,7 +368,7 @@
     <string name="adb_warning_message" msgid="8145270656419669221">"Ladenie cez USB je určené iba na účely vývoja. Možno ho použiť na kopírovanie dát medzi počítačom a zariadením, inštaláciu aplikácií do zariadenia bez upozornenia a čítanie dát denníka."</string>
     <string name="adbwifi_warning_title" msgid="727104571653031865">"Chcete povoliť bezdrôtové ladenie?"</string>
     <string name="adbwifi_warning_message" msgid="8005936574322702388">"Bezdrôtové ladenie je určené iba na účely vývoja. Môžete pomocou neho kopírovať dáta medzi počítačom a zariadením, inštalovať bez upozornenia aplikácie do zariadenia a čítať dáta denníkov."</string>
-    <string name="adb_keys_warning_message" msgid="7827514623080777814">"Chcete všetkým v minulosti autorizovaným počítačom a sieťam odvolať prístup k ladeniu cez adb?"</string>
+    <string name="adb_keys_warning_message" msgid="7827514623080777814">"Chcete všetkým v minulosti autorizovaným počítačom a sieťam odobrať prístup k ladeniu cez adb?"</string>
     <string name="dev_settings_warning_title" msgid="8251234890169074553">"Povoliť nastavenia pre vývojárov?"</string>
     <string name="dev_settings_warning_message" msgid="37741686486073668">"Tieto nastavenia sú určené len pre vývojárov. Môžu spôsobiť poruchu alebo nesprávne fungovanie zariadenia a nainštalovaných aplikácií."</string>
     <string name="verify_apps_over_usb_title" msgid="6031809675604442636">"Overovať aplikácie z USB"</string>
@@ -530,8 +530,8 @@
     <string name="power_charging_limited" msgid="4144004473976005214">"<xliff:g id="LEVEL">%1$s</xliff:g> – nabíjanie je pozastavené, aby sa chránila batéria"</string>
     <string name="power_charging_future_paused" msgid="1809543660923642799">"<xliff:g id="LEVEL">%1$s</xliff:g> – nabíja sa"</string>
     <string name="power_fast_charging_duration_v2" msgid="3797735998640359490">"<xliff:g id="LEVEL">%1$s</xliff:g> – <xliff:g id="STATUS">%2$s</xliff:g> – čas do nabitia: <xliff:g id="TIME">%3$s</xliff:g>"</string>
-    <string name="power_charging_duration_v2" msgid="2938998284074003248">"<xliff:g id="LEVEL">%1$s</xliff:g> – čas do úplného nabitia: <xliff:g id="TIME">%2$s</xliff:g>"</string>
-    <string name="power_remaining_charging_duration_only_v2" msgid="5358176435722950193">"Čas do úplného nabitia: <xliff:g id="TIME">%1$s</xliff:g>"</string>
+    <string name="power_charging_duration_v2" msgid="2938998284074003248">"<xliff:g id="LEVEL">%1$s</xliff:g> – čas úplného nabitia: <xliff:g id="TIME">%2$s</xliff:g>"</string>
+    <string name="power_remaining_charging_duration_only_v2" msgid="5358176435722950193">"Čas úplného nabitia: <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="power_remaining_fast_charging_duration_only_v2" msgid="6270950195810579563">"Čas do nabitia: <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="268625384868401114">"Neznáme"</string>
     <string name="battery_info_status_charging" msgid="4279958015430387405">"Nabíja sa"</string>

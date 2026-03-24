@@ -28,7 +28,7 @@ import android.os.Parcelable;
 import java.util.List;
 import java.util.Objects;
 
-/** Represents metadata about a package providing app functions. */
+/** Contains metadata about a package providing app functions. */
 @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
 public final class AppFunctionPackageMetadata implements AbstractAppFunctionMetadata, Parcelable {
 
@@ -47,19 +47,24 @@ public final class AppFunctionPackageMetadata implements AbstractAppFunctionMeta
             };
 
     /**
-     * The property name for the list of GenericDocuments comprising package-level documents in the
-     * database, excluding app functions.
+     * The schema type for the package-level metadata used by AppFunction documents.
      *
-     * <p>Used as the key to fetch the metadata list from {@link #getMetadataDocument}.
+     * @hide
+     */
+    public static final String SCHEMA_TYPE = "AppFunctionPackageData";
+
+    /**
+     * Property key within {@link #getMetadataDocument} that contains a list of top-level package
+     * documents.
      */
     public static final String PROPERTY_TOP_LEVEL_DOCUMENTS = "topLevelMetadataDocuments";
 
     /**
-     * The property name for the app function's package name.
+     * Property name for the XML tag that defines the value of {@link #getPackageName}.
      *
-     * <p>Used as the key to fetch the package name from {@link #getMetadataDocument}.
+     * @hide
      */
-    static final String PROPERTY_PACKAGE_NAME =
+    public static final String PROPERTY_PACKAGE_NAME =
             AppFunctionStaticMetadataHelper.PROPERTY_PACKAGE_NAME;
 
     @NonNull private final String mPackageName;
@@ -98,20 +103,20 @@ public final class AppFunctionPackageMetadata implements AbstractAppFunctionMeta
                         .build());
     }
 
-    /** The name of the package. */
+    /** Returns the name of the package providing app functions. */
     @NonNull
     public String getPackageName() {
         return mPackageName;
     }
 
     /**
-     * Returns the full package metadata as a {@link GenericDocument}.
+     * Returns the package's metadata as a {@link GenericDocument}.
      *
      * <p>Client-defined properties can be retrieved using the {@link GenericDocument} property
      * getters.
      *
      * <p>Properties that are not defined in this class (see {@code PROPERTY_*} constants) are not
-     * guaranteed to be available or consistent across versions.
+     * guaranteed to be available or consistent across devices and versions.
      */
     @NonNull
     @Override

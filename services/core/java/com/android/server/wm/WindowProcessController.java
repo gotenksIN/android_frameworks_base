@@ -162,7 +162,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     final int mUserId;
     // The owner of this window process controller object. Mainly for identification when we
     // communicate back to the activity manager side.
-    public final Object mOwner;
+    @NonNull
+    public final ProcessRecordInternal mOwner;
     // List of packages running in the process
     @GuardedBy("itself")
     private final ArrayList<String> mPkgList = new ArrayList<>(1);
@@ -388,8 +389,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     private boolean mAppRestartLogged;
 
     public WindowProcessController(@NonNull ActivityTaskManagerService atm,
-            @NonNull ApplicationInfo info, String name, int uid, int userId, Object owner,
-            @NonNull WindowProcessListener listener) {
+            @NonNull ApplicationInfo info, String name, int uid, int userId,
+            @NonNull ProcessRecordInternal owner, @NonNull WindowProcessListener listener) {
         mInfo = info;
         mName = name;
         mUid = uid;
@@ -447,10 +448,6 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
     @SchedGroup int getCurrentSchedulingGroup() {
         return mCurSchedGroup;
-    }
-
-    void setCurrentProcState(int curProcState) {
-        mCurProcState = curProcState;
     }
 
     int getCurrentProcState() {
@@ -838,7 +835,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mActivities.add(r);
         if (!mHasActivities) {
-            mAtm.mActivityStateUpdater.setHasActivityAsync(this, true);
+            mAtm.mActivityStateUpdater.setHasActivityAsync(mOwner, true);
         }
         mHasActivities = true;
         if (mInactiveActivities != null) {
@@ -871,7 +868,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mActivities.remove(r);
         mHasActivities = !mActivities.isEmpty();
         if (!mHasActivities) {
-            mAtm.mActivityStateUpdater.setHasActivityAsync(this, false);
+            mAtm.mActivityStateUpdater.setHasActivityAsync(mOwner, false);
         }
         updateActivityConfigurationListener();
     }
@@ -880,7 +877,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mInactiveActivities = null;
         mActivities.clear();
         mHasActivities = false;
-        mAtm.mActivityStateUpdater.setHasActivityAsync(this, false);
+        mAtm.mActivityStateUpdater.setHasActivityAsync(mOwner, false);
         updateActivityConfigurationListener();
     }
 
@@ -1385,7 +1382,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mActivityStateFlags = stateFlags;
         mPerceptibleTaskStoppedTimeMillis = perceptibleTaskStoppedTimeMillis;
-        mAtm.mActivityStateUpdater.setActivityStateAsync(this, stateFlags,
+        mAtm.mActivityStateUpdater.setActivityStateAsync(mOwner, stateFlags,
                 perceptibleTaskStoppedTimeMillis);
 
         final boolean anyVisible = (stateFlags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0;
@@ -1568,6 +1565,13 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             packageName = info.packageName;
         } else {
             packageName = null;
+        }
+        if (mAtm.getActivityStartController().isInExecution()) {
+            // This is primarily for scenarios like freeform or translucent activities, where the
+            // launch request is executed directly without a prior pause of the previous activity,
+            // causing an immediate and asynchronous process state change before logging.
+            mAtm.mTaskSupervisor.getActivityMetricsLogger().setLastLaunchingProcessState(mPid,
+                    mCurProcState, mCurAdj);
         }
         // update ActivityManagerService.PendingStartActivityUids list.
         if (topProcessState == ActivityManager.PROCESS_STATE_TOP) {
@@ -2063,7 +2067,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     void addRecentTask(Task task) {
         mRecentTasks.add(task);
         mHasRecentTasks = true;
-        mAtm.mActivityStateUpdater.setHasRecentTasksAsync(this, true);
+        mAtm.mActivityStateUpdater.setHasRecentTasksAsync(mOwner, true);
     }
 
     void removeRecentTask(Task task) {
@@ -2071,7 +2075,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         final boolean hasRecentTask = !mRecentTasks.isEmpty();
         mHasRecentTasks = hasRecentTask;
         if (!hasRecentTask) {
-            mAtm.mActivityStateUpdater.setHasRecentTasksAsync(this, false);
+            mAtm.mActivityStateUpdater.setHasRecentTasksAsync(mOwner, false);
         }
     }
 
@@ -2086,7 +2090,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
         mRecentTasks.clear();
         mHasRecentTasks = false;
-        mAtm.mActivityStateUpdater.setHasRecentTasksAsync(this, false);
+        mAtm.mActivityStateUpdater.setHasRecentTasksAsync(mOwner, false);
     }
 
     public void appEarlyNotResponding(String annotation, Runnable killAppCallback) {
@@ -2366,7 +2370,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
     @Override
     public String toString() {
-        return mOwner != null ? mOwner.toString() : null;
+        return mOwner.toString();
     }
 
     public void dump(PrintWriter pw, String prefix) {

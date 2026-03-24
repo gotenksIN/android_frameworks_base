@@ -34,6 +34,7 @@ import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 
 import static com.android.internal.app.LockedAppActivity.createLockedAppActivityUninstallIntent;
+import static com.android.internal.pm.pkg.component.ParsedAttribution.MAX_ATTRIBUTION_TAG_LEN;
 import static com.android.server.pm.PackageArchiver.isArchivingEnabled;
 import static com.android.server.pm.PackageInstallerSession.isValidVerificationPolicy;
 import static com.android.server.pm.PackageManagerService.SHELL_PACKAGE_NAME;
@@ -1084,6 +1085,12 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             throw new IllegalArgumentException(
                     "Permissions states exceeds total size limit "
                             + MAX_PERMISSION_STATES_SIZE + " in length");
+        }
+
+        if (installerAttributionTag != null
+                && installerAttributionTag.length() > MAX_ATTRIBUTION_TAG_LEN) {
+            throw new IllegalArgumentException(
+                    "Attribution tag exceeds " + MAX_ATTRIBUTION_TAG_LEN + " length limit");
         }
 
         int requestedInstallerPackageUid = INVALID_UID;
@@ -2171,6 +2178,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     @Override
     public void addDeveloperVerificationExperiment(String packageName, int verificationPolicy,
             int[] results) {
+        final int callerUid = Binder.getCallingUid();
+        if (!PackageManagerServiceUtils.isRootOrShell(callerUid)) {
+            throw new SecurityException("Not allowed to add developer verification experiment");
+        }
         List<Integer> resultsList = new ArrayList<>(results.length);
         for (int i = 0; i < results.length; i++) {
             resultsList.add(results[i]);
@@ -2180,6 +2191,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
 
     @Override
     public void clearDeveloperVerificationExperiment(String packageName) {
+        final int callerUid = Binder.getCallingUid();
+        if (!PackageManagerServiceUtils.isRootOrShell(callerUid)) {
+            throw new SecurityException("Not allowed to clear developer verification experiment");
+        }
         mDeveloperVerifierController.clearExperiment(packageName);
     }
 

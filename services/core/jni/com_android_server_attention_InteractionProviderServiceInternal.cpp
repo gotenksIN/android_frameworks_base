@@ -73,7 +73,8 @@ bool NativeInteractionProviderServiceInternal::registerInteractionProvider(
             interactionProviderObj(env,
                                    env->NewObject(gNativeInteractionProviderClassInfo.clazz,
                                                   gNativeInteractionProviderClassInfo.constructor,
-                                                  interactionProvider.get()));
+                                                  reinterpret_cast<jlong>(
+                                                          interactionProvider.get())));
     if (!interactionProviderObj.get()) {
         ALOGE("Failed to obtain interaction provider obj for registerInteractionProvider.");
         return false;
@@ -91,17 +92,19 @@ bool NativeInteractionProviderServiceInternal::registerInteractionProvider(
 
 bool NativeInteractionProviderServiceInternal::unregisterInteractionProvider(
         std::shared_ptr<attention::InteractionProvider> interactionProvider) {
-    auto providerObj = mRegisteredInteractionProviders.find(interactionProvider);
-    if (providerObj == mRegisteredInteractionProviders.end()) {
+    auto providersIt = mRegisteredInteractionProviders.find(interactionProvider);
+    if (providersIt == mRegisteredInteractionProviders.end()) {
         return false;
     }
 
     JNIEnv* env = jniEnv();
+    jobject providerGlobalRef = providersIt->second;
     const jboolean unregistered =
             env->CallBooleanMethod(mServiceObj, gServiceClassInfo.unregisterInteractionProvider,
-                                   providerObj->second);
+                                   providerGlobalRef);
     if (unregistered) {
-        // Global reference to providerObj can be safely released now.
+        // Global reference can be safely released now.
+        env->DeleteGlobalRef(providerGlobalRef);
         mRegisteredInteractionProviders.erase(interactionProvider);
     }
     return unregistered;

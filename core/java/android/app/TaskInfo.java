@@ -206,6 +206,13 @@ public class TaskInfo {
     public boolean supportsMultiWindow;
 
     /**
+     * whether this task supports multi-window based on its resize mode,
+     * ignoring appCompat overrides and minimum size constraints.
+     * @hide
+     */
+    public boolean supportsMultiWindowWithoutConstraints;
+
+    /**
      * The resize mode of the task. See {@link ActivityInfo#resizeMode}.
      * @hide
      */
@@ -330,6 +337,18 @@ public class TaskInfo {
      * @hide
      */
     public boolean isFocused;
+
+    /**
+     * Represents {@link com.android.server.wm.Task}'s state where it's activity might be resumed or
+     * would be resumed.
+     * <p>
+     * It doesn't guarantee that the topmost activity is resumed at the given point of time, but it
+     * guarantees that with current task hierarchy it would be resumed when all hierarchy operations
+     * are settled down.
+     *
+     * @hide
+     */
+    public boolean isInteractive;
 
     /**
      * Whether this task is visible.
@@ -459,6 +478,7 @@ public class TaskInfo {
                 ? new ActivityManager.TaskDescription(other.taskDescription)
                 : null;
         supportsMultiWindow = other.supportsMultiWindow;
+        supportsMultiWindowWithoutConstraints = other.supportsMultiWindowWithoutConstraints;
         resizeMode = other.resizeMode;
         configuration.setTo(other.configuration);
         token = other.token != null
@@ -516,6 +536,7 @@ public class TaskInfo {
                 ? new Rect(other.topActivityMainWindowFrame)
                 : null;
         isAppBubble = other.isAppBubble;
+        isInteractive = other.isInteractive;
     }
 
     /** @hide */
@@ -634,6 +655,8 @@ public class TaskInfo {
         return topActivityType == that.topActivityType
                 && isResizeable == that.isResizeable
                 && supportsMultiWindow == that.supportsMultiWindow
+                && supportsMultiWindowWithoutConstraints
+                == that.supportsMultiWindowWithoutConstraints
                 && displayAreaFeatureId == that.displayAreaFeatureId
                 && Objects.equals(positionInParent, that.positionInParent)
                 && Objects.equals(pictureInPictureParams, that.pictureInPictureParams)
@@ -708,6 +731,7 @@ public class TaskInfo {
         lastActiveTime = source.readLong();
         taskDescription = source.readTypedObject(ActivityManager.TaskDescription.CREATOR);
         supportsMultiWindow = source.readBoolean();
+        supportsMultiWindowWithoutConstraints = source.readBoolean();
         resizeMode = source.readInt();
         configuration.readFromParcel(source);
         token = WindowContainerToken.CREATOR.createFromParcel(source);
@@ -743,6 +767,7 @@ public class TaskInfo {
         appCompatTaskInfo = source.readTypedObject(AppCompatTaskInfo.CREATOR);
         topActivityMainWindowFrame = source.readTypedObject(Rect.CREATOR);
         isAppBubble = source.readBoolean();
+        isInteractive = source.readBoolean();
     }
 
     /**
@@ -768,6 +793,7 @@ public class TaskInfo {
 
         dest.writeTypedObject(taskDescription, flags);
         dest.writeBoolean(supportsMultiWindow);
+        dest.writeBoolean(supportsMultiWindowWithoutConstraints);
         dest.writeInt(resizeMode);
         configuration.writeToParcel(dest, flags);
         token.writeToParcel(dest, flags);
@@ -803,6 +829,7 @@ public class TaskInfo {
         dest.writeTypedObject(appCompatTaskInfo, flags);
         dest.writeTypedObject(topActivityMainWindowFrame, flags);
         dest.writeBoolean(isAppBubble);
+        dest.writeBoolean(isInteractive);
     }
 
     @Override
@@ -820,6 +847,7 @@ public class TaskInfo {
                 + " numActivities=" + numActivities
                 + " lastActiveTime=" + lastActiveTime
                 + " supportsMultiWindow=" + supportsMultiWindow
+                + " supportsMultiWindowWithoutConstraints=" + supportsMultiWindowWithoutConstraints
                 + " resizeMode=" + resizeMode
                 + " isResizeable=" + isResizeable
                 + " minWidth=" + minWidth
@@ -837,6 +865,7 @@ public class TaskInfo {
                 + " positionInParent=" + positionInParent
                 + " parentTaskId=" + parentTaskId
                 + " isFocused=" + isFocused
+                + " isInteractive=" + isInteractive
                 + " isVisible=" + isVisible
                 + " isVisibleRequested=" + isVisibleRequested
                 + " isTopActivityNoDisplay=" + isTopActivityNoDisplay

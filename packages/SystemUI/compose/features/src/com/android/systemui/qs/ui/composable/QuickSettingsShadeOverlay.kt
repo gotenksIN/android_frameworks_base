@@ -60,6 +60,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -263,6 +266,13 @@ private fun ContentScope.QuickSettingsContainer(
         if (QsDetailedView.isEnabled) containerViewModel.detailsViewModel.activeTileDetails
         else null
 
+    val accessibilityTitle =
+        when {
+            isEditing -> stringResource(R.string.accessibility_desc_quick_settings_edit)
+            (QsDetailedView.isEnabled && tileDetails != null) -> tileDetails.title
+            else -> stringResource(R.string.accessibility_desc_quick_settings)
+        }
+
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffectWithLifecycle(focusRequester) {
@@ -276,6 +286,7 @@ private fun ContentScope.QuickSettingsContainer(
         modifier =
             Modifier.focusRequester(focusRequester)
                 .focusable()
+                .semantics { paneTitle = accessibilityTitle }
                 .sysuiResTag("quick_settings_container"),
         targetState =
             when {
@@ -506,6 +517,9 @@ object QuickSettingsShade {
                     brightnessThumbWidth,
                     brightnessTrackHeight,
                     brightnessVerticalPadding,
+                    brightnessRoundedCorner,
+                    brightnessFrameWidth,
+                    brightnessFrameHeight,
                 )
 
         val HorizontalPadding: Dp
@@ -567,6 +581,21 @@ object QuickSettingsShade {
             @Composable
             @ReadOnlyComposable
             get() = dimensionResource(id = R.dimen.overlay_qs_layout_brightness_vertical_padding)
+
+        private val brightnessRoundedCorner: Dp
+            @Composable
+            @ReadOnlyComposable
+            get() = dimensionResource(id = R.dimen.overlay_qs_layout_brightness_rounded_corner)
+
+        private val brightnessFrameWidth: Dp
+            @Composable
+            @ReadOnlyComposable
+            get() = dimensionResource(id = R.dimen.overlay_qs_layout_brightness_frame_width)
+
+        private val brightnessFrameHeight: Dp
+            @Composable
+            @ReadOnlyComposable
+            get() = dimensionResource(id = R.dimen.overlay_qs_layout_brightness_frame_height)
 
         private val sliderIconSize: Dp
             @Composable

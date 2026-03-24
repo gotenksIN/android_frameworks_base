@@ -18,6 +18,9 @@ package android.service.personalcontext.embedded;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,8 +28,6 @@ import static org.mockito.Mockito.when;
 import android.content.Context;
 import android.os.RemoteException;
 import android.service.personalcontext.PersonalContextManager;
-import android.service.personalcontext.hint.BundleHint;
-import android.service.personalcontext.hint.ContextHint;
 import android.view.SurfaceControlViewHost;
 
 import androidx.test.filters.SmallTest;
@@ -37,9 +38,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.util.HashSet;
-import java.util.Set;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -84,22 +82,8 @@ public class InsightSurfaceSessionTest {
         when(mClient.getClientInfo()).thenReturn(newClientInfo);
 
         mSession.update(mUpdate, null);
-        verify(mSessionInterface).onClientUpdated(oldClientInfo, newClientInfo, null);
+        verify(mSessionInterface).onClientUpdated(eq(oldClientInfo), eq(newClientInfo), isNull(),
+                any());
         verify(mPersonalContextManager).updateEmbeddedClientInfo(oldClientInfo, newClientInfo);
-    }
-
-    @Test
-    public void testOnClientUpdated_withHints() {
-        final InsightSurfaceClientInfo oldClientInfo = mock(InsightSurfaceClientInfo.class);
-        final InsightSurfaceClientInfo newClientInfo = mock(InsightSurfaceClientInfo.class);
-        when(mClient.updateClientInfo(mUpdate)).thenReturn(oldClientInfo);
-        when(mClient.getClientInfo()).thenReturn(newClientInfo);
-
-        final Set<ContextHint> hints = new HashSet<>();
-        hints.add(new BundleHint.Builder().build());
-        when(mUpdate.getHints()).thenReturn(hints);
-
-        mSession.update(mUpdate, null);
-        verify(mPersonalContextManager).publishInsightSurfaceHints(hints, newClientInfo);
     }
 }

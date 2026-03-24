@@ -3314,10 +3314,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return;
         }
 
-        final String ownerPackage =
-                mProtectedPackages.getDeviceOwnerOrProfileOwnerPackage(targetUserId);
-        if (ownerPackage != null) {
-            final int ownerUid = snapshot.getPackageUid(ownerPackage, 0, targetUserId);
+        String dpcPackage;
+        if (android.app.admin.flags.Flags.pushDpcPackagesToSystemServices()) {
+            dpcPackage = mProtectedPackages.getDevicePolicyControllerPackage(targetUserId);
+        } else {
+            dpcPackage = mProtectedPackages.getDeviceOwnerOrProfileOwnerPackage(targetUserId);
+        }
+        if (dpcPackage != null) {
+            final int ownerUid = snapshot.getPackageUid(dpcPackage, 0, targetUserId);
             if (ownerUid == callingUid) {
                 return;
             }
@@ -5697,7 +5701,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId);
+            // Public API implementation, pass in the calling uid
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId,
+                    Binder.getCallingUid());
         }
 
         @Override
@@ -7265,10 +7271,28 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             if (deviceOwnerPackage != null) {
                 usersWithPoOrDo.add(deviceOwnerUserId);
             }
+            if (profileOwnerPackages == null) {
+                return;
+            }
             final int sz = profileOwnerPackages.size();
             for (int i = 0; i < sz; i++) {
                 if (profileOwnerPackages.valueAt(i) != null) {
                     removeAllNonSystemPackageSuspensions(profileOwnerPackages.keyAt(i));
+                }
+            }
+        }
+
+        @Override
+        public void setDevicePolicyControllerPackages(
+                @Nullable SparseArray<String> devicePolicyControllerPackages) {
+            mProtectedPackages.setDevicePolicyControllerPackages(devicePolicyControllerPackages);
+            if (devicePolicyControllerPackages == null) {
+                return;
+            }
+            final int sz = devicePolicyControllerPackages.size();
+            for (int i = 0; i < sz; i++) {
+                if (devicePolicyControllerPackages.valueAt(i) != null) {
+                    removeAllNonSystemPackageSuspensions(devicePolicyControllerPackages.keyAt(i));
                 }
             }
         }
@@ -7641,7 +7665,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
+            // Use Process.myUid here because this is the PackageManagerInternal implementation, it
+            // isn't called outside of system_server
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId,
+                    Process.myUid());
         }
 
         @Override
@@ -7684,26 +7711,36 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
         @Override
-        public void setPersonalContextMode(@NonNull String packageName, int callingUid, int userId,
+        public boolean setPersonalContextMode(
+                @NonNull String packageName,
+                int callingUid,
+                int userId,
                 @PackageManager.PersonalContextMode int mode) {
             final Computer snapshot = snapshotComputer();
-            snapshot.enforceCrossUserPermission(callingUid, userId,
-                    false /* requireFullPermission */, false /* checkShell */,
+            snapshot.enforceCrossUserPermission(
+                    callingUid,
+                    userId,
+                    false /* requireFullPermission */,
+                    false /* checkShell */,
                     "setPersonalContextMode");
 
-            final PackageStateInternal packageState = snapshot
-                    .getPackageStateForInstalledAndFiltered(packageName, callingUid, userId);
+            final PackageStateInternal packageState =
+                    snapshot.getPackageStateForInstalledAndFiltered(
+                            packageName, callingUid, userId);
             if (packageState == null) {
                 throw new ParcelableException(
                         new PackageManager.NameNotFoundException(packageName));
             }
 
             if (packageState.getUserStateOrDefault(userId).getPersonalContextMode() == mode) {
-                return;
+                return false;
             }
 
-            commitPackageStateMutation(null, packageName, state ->
-                    state.userState(userId).setPersonalContextMode(mode));
+            commitPackageStateMutation(
+                    null,
+                    packageName,
+                    state -> state.userState(userId).setPersonalContextMode(mode));
+            return true;
         }
 
         @Override

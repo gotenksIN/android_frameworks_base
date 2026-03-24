@@ -18,6 +18,8 @@ package com.android.wm.shell.pinnedlayer.phone
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.WindowConfiguration
+import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
+import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.graphics.Rect
 import android.os.IBinder
 import android.platform.test.annotations.EnableFlags
@@ -25,9 +27,13 @@ import android.testing.TestableLooper
 import android.util.DisplayMetrics
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CHANGE
+import android.view.WindowManager.TRANSIT_CLOSE
+import android.view.WindowManager.TRANSIT_OPEN
+import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.DisplayAreaInfo
 import android.window.DisplayAreaOrganizer
 import android.window.TransitionInfo
+import android.window.TransitionInfo.FLAG_IS_WALLPAPER
 import android.window.TransitionInfo.FLAG_NONE
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
@@ -62,6 +68,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.stub
@@ -94,6 +101,7 @@ class PinnedLayerControllerTest : ShellTestCase() {
     @Mock
     private lateinit var multiDisplayDragMoveIndicatorController:
         MultiDisplayDragMoveIndicatorController
+    private val windowRepositionAnimator = mock<PinnedWindowRepositionAnimator>()
 
     private lateinit var defaultDisplayToken: WindowContainerToken
     private lateinit var desktopState: FakeDesktopState
@@ -116,7 +124,7 @@ class PinnedLayerControllerTest : ShellTestCase() {
         presentationController =
             PinnedLayerPresentationController(context, displayController, desktopState)
         pinnedWindowRepositionAnimationHandler =
-            PinnedWindowRepositionAnimationHandler(transitions, { repositionTransaction })
+            PinnedWindowRepositionAnimationHandler(transitions, windowRepositionAnimator)
         pinnedLayerController =
             PinnedLayerController(
                 shellInit,
@@ -127,6 +135,7 @@ class PinnedLayerControllerTest : ShellTestCase() {
                 presentationController,
                 windowDragTransitionHandler,
                 pinnedWindowRepositionAnimationHandler,
+                windowRepositionAnimator,
                 transactionPool,
                 multiDisplayDragMoveIndicatorController,
             )
@@ -143,6 +152,27 @@ class PinnedLayerControllerTest : ShellTestCase() {
 
         assertFalse(result)
         verifyNoInteractions(transitions, transactionPool)
+    }
+
+    @Test
+    fun dragEnded_snapsBackToStartBounds_animatesWithoutTransition() {
+        val task = setupTask()
+        pinTask(task)
+
+        val dragStartBounds = Rect(DEFAULT_TASK_BOUNDS)
+        val dragEndBounds = Rect(dragStartBounds)
+        // Move the window a bit.
+        dragEndBounds.offset(-10, -10)
+
+        val result = pinnedLayerController.onDragEnded(leash, task, dragStartBounds, dragEndBounds)
+
+        // Snapshotting surfaces should be cleared by the controller itself.
+        assertTrue(result)
+        // No Transition is started.
+        verify(transitions, never()).startTransition(any(), any(), anyOrNull())
+        // Manually animate the leash snap to start.
+        verify(windowRepositionAnimator)
+            .start(any(), any(), any(), anyOrNull(), anyOrNull(), any(), any())
     }
 
     @Test
@@ -367,6 +397,127 @@ class PinnedLayerControllerTest : ShellTestCase() {
         val wct =
             pinnedLayerController.getDisplayDisconnectChanges(mock(), DISPLAY_1, DEFAULT_DISPLAY)
         assertTrue(wct == null, "wct should be null if task is on different display")
+    }
+
+    @Test
+    fun checkFullscreenTaskOpened_closesPinnedTask() {
+        val pinnedTask = setupTask(displayId = DEFAULT_DISPLAY)
+        pinTask(pinnedTask)
+
+        val fullscreenTask = setupTask(displayId = DEFAULT_DISPLAY, taskId = 100)
+        fullscreenTask.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
+
+        val change = TransitionInfo.Change(MockToken.token(), mock())
+        change.taskInfo = fullscreenTask
+        change.mode = TRANSIT_OPEN
+
+        val info = TransitionInfo(TRANSIT_OPEN, FLAG_NONE)
+        info.addChange(change)
+
+        pinnedLayerController.onTransitionReady(mock(), info, startTransaction, finishTransaction)
+
+        verify(transitions).startTransition(eq(TRANSIT_CLOSE), any(), anyOrNull())
+    }
+
+    @Test
+    fun checkFullscreenTaskToFront_closesPinnedTask() {
+        val pinnedTask = setupTask(displayId = DEFAULT_DISPLAY)
+        pinTask(pinnedTask)
+
+        val fullscreenTask = setupTask(displayId = DEFAULT_DISPLAY, taskId = 100)
+        fullscreenTask.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
+
+        val change = TransitionInfo.Change(MockToken.token(), mock())
+        change.taskInfo = fullscreenTask
+        change.mode = TRANSIT_TO_FRONT
+
+        val info = TransitionInfo(TRANSIT_TO_FRONT, FLAG_NONE)
+        info.addChange(change)
+
+        pinnedLayerController.onTransitionReady(mock(), info, startTransaction, finishTransaction)
+
+        verify(transitions).startTransition(eq(TRANSIT_CLOSE), any(), anyOrNull())
+    }
+
+    @Test
+    fun checkFullscreenTaskChanged_closesPinnedTask() {
+        val pinnedTask = setupTask(displayId = DEFAULT_DISPLAY)
+        pinTask(pinnedTask)
+
+        val fullscreenTask = setupTask(displayId = DEFAULT_DISPLAY, taskId = 100)
+        fullscreenTask.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
+
+        val change = TransitionInfo.Change(MockToken.token(), mock())
+        change.taskInfo = fullscreenTask
+        change.mode = TRANSIT_CHANGE
+
+        val info = TransitionInfo(TRANSIT_CHANGE, FLAG_NONE)
+        info.addChange(change)
+
+        pinnedLayerController.onTransitionReady(mock(), info, startTransaction, finishTransaction)
+
+        verify(transitions).startTransition(eq(TRANSIT_CLOSE), any(), anyOrNull())
+    }
+
+    @Test
+    fun checkFullscreenTaskOnDifferentDisplay_doesNotClosePinnedTask() {
+        val pinnedTask = setupTask(displayId = DEFAULT_DISPLAY)
+        pinTask(pinnedTask)
+
+        val fullscreenTask = setupTask(displayId = DISPLAY_1, taskId = 100)
+        fullscreenTask.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
+
+        val change = TransitionInfo.Change(MockToken.token(), mock())
+        change.taskInfo = fullscreenTask
+        change.mode = TRANSIT_OPEN
+
+        val info = TransitionInfo(TRANSIT_OPEN, FLAG_NONE)
+        info.addChange(change)
+
+        pinnedLayerController.onTransitionReady(mock(), info, startTransaction, finishTransaction)
+
+        verify(transitions, never()).startTransition(eq(TRANSIT_CLOSE), any(), anyOrNull())
+    }
+
+    @Test
+    fun checkNonFullscreenTaskOpened_doesNotClosePinnedTask() {
+        val pinnedTask = setupTask(displayId = DEFAULT_DISPLAY)
+        pinTask(pinnedTask)
+
+        val otherTask = setupTask(displayId = DEFAULT_DISPLAY, taskId = 100)
+        otherTask.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
+
+        val change = TransitionInfo.Change(MockToken.token(), mock())
+        change.taskInfo = otherTask
+        change.mode = TRANSIT_OPEN
+
+        val info = TransitionInfo(TRANSIT_OPEN, FLAG_NONE)
+        info.addChange(change)
+
+        pinnedLayerController.onTransitionReady(mock(), info, startTransaction, finishTransaction)
+
+        verify(transitions, never()).startTransition(eq(TRANSIT_CLOSE), any(), anyOrNull())
+    }
+
+    @Test
+    fun checkWallpaperChange_doesNotClosePinnedTask() {
+        val pinnedTask = setupTask(displayId = DEFAULT_DISPLAY)
+        pinTask(pinnedTask)
+
+        val fullscreenTask = setupTask(displayId = DEFAULT_DISPLAY, taskId = 100)
+        fullscreenTask.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
+
+        val change = TransitionInfo.Change(MockToken.token(), mock())
+        change.taskInfo = fullscreenTask
+        change.mode = TRANSIT_OPEN
+        change.flags = FLAG_IS_WALLPAPER
+
+        val info = TransitionInfo(TRANSIT_OPEN, FLAG_NONE)
+        info.addChange(change)
+
+        pinnedLayerController.onTransitionReady(mock(), info, startTransaction, finishTransaction)
+
+        verify(transitions, never()).startTransition(eq(TRANSIT_CLOSE), any(), anyOrNull())
     }
 
     private fun setupTask(

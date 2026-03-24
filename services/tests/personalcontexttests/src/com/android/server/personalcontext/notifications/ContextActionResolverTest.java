@@ -17,9 +17,9 @@
 package com.android.server.personalcontext.notifications;
 
 import static com.google.common.truth.Truth.assertThat;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,12 +37,12 @@ import android.graphics.drawable.Icon;
 import android.service.personalcontext.insight.ActionableInsight;
 import android.service.personalcontext.insight.InsightActionDetails;
 import android.service.personalcontext.insight.InsightDisplayDetails;
-import com.android.server.personalcontext.notifications.ContextActionResolver.ActionType;
-import com.android.server.personalcontext.notifications.ContextActionResolver.ResolutionResult;
-import com.android.server.personalcontext.notifications.PendingIntentFactory;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
+
+import com.android.server.personalcontext.notifications.ContextActionResolver.ActionType;
+import com.android.server.personalcontext.notifications.ContextActionResolver.ResolutionResult;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -156,100 +156,6 @@ public class ContextActionResolverTest {
     }
 
     @Test
-    public void resolveActionIntent_rawIntentResolvesToActivity_returnsCorrectResult() {
-        setUpRawIntent();
-        mockPackageManagerResolvers(List.of(mTestResolveInfo), null, null);
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertRawIntentResult(result, ActionType.ACTIVITY, mTestResolveInfo);
-    }
-
-    @Test
-    public void resolveActionIntent_rawIntentResolvesToService_returnsCorrectResult() {
-        setUpRawIntent();
-        ResolveInfo serviceResolveInfo = new ResolveInfo();
-        mockPackageManagerResolvers(null, List.of(serviceResolveInfo), null);
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertRawIntentResult(result, ActionType.SERVICE, serviceResolveInfo);
-    }
-
-    @Test
-    public void resolveActionIntent_rawIntentResolvesToBroadcast_returnsCorrectResult() {
-        setUpRawIntent();
-        ResolveInfo broadcastResolveInfo = new ResolveInfo();
-        mockPackageManagerResolvers(null, null, List.of(broadcastResolveInfo));
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertRawIntentResult(result, ActionType.BROADCAST, broadcastResolveInfo);
-    }
-
-    @Test
-    public void resolveActionIntent_rawIntentRespectsResolutionPriority_returnsActivity() {
-        setUpRawIntent();
-        mockPackageManagerResolvers(
-                List.of(mTestResolveInfo), List.of(new ResolveInfo()), List.of(new ResolveInfo()));
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertRawIntentResult(result, ActionType.ACTIVITY, mTestResolveInfo);
-    }
-
-    @Test
-    public void resolveActionIntent_multipleResolversFound_returnsFirstOne() {
-        setUpRawIntent();
-        when(mPackageManager.queryIntentActivities(any(), anyInt()))
-                .thenReturn(List.of(mTestResolveInfo, new ResolveInfo()));
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertRawIntentResult(result, ActionType.ACTIVITY, mTestResolveInfo);
-    }
-
-    @Test
-    public void resolveActionIntent_multipleServicesFound_returnsNull() {
-        setUpRawIntent();
-        mockPackageManagerResolvers(null, List.of(new ResolveInfo(), new ResolveInfo()), null);
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertThat(result).isNull();
-    }
-
-    @Test
-    public void resolveActionIntent_multipleBroadcastsFound_returnsNull() {
-        setUpRawIntent();
-        mockPackageManagerResolvers(null, null, List.of(new ResolveInfo(), new ResolveInfo()));
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertThat(result).isNull();
-    }
-
-    @Test
-    public void resolveActionIntent_rawIntentHasNoResolvers_returnsNull() {
-        setUpRawIntent();
-        mockPackageManagerResolvers(null, null, null);
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertThat(result).isNull();
-    }
-
-    @Test
-    public void resolveActionIntent_noRemoteActionAndNullIntent_returnsNull() {
-        InsightActionDetails actionDetails = new InsightActionDetails.Builder().build();
-        mActionableInsight = new ActionableInsight.Builder(actionDetails, mDisplayDetails).build();
-
-        ResolutionResult result = mUnderTest.resolveActionIntent(mActionableInsight, true);
-
-        assertThat(result).isNull();
-    }
-
-    @Test
     public void resolveActionIntent_needsComponentInfoFalse_doesNotQueryPackageManager() {
         setUpRemoteAction(ActionType.ACTIVITY, /* hasResolveInfo= */ false);
 
@@ -268,12 +174,6 @@ public class ContextActionResolverTest {
         RemoteAction remoteAction = new RemoteAction(mIcon, "Test", "Test action", pendingIntent);
         InsightActionDetails actionDetails =
                 new InsightActionDetails.Builder().setRemoteAction(remoteAction).build();
-        return new ActionableInsight.Builder(actionDetails, mDisplayDetails).build();
-    }
-
-    private ActionableInsight createInsightWithRawIntent(Intent intent) {
-        InsightActionDetails actionDetails =
-                new InsightActionDetails.Builder().setIntent(intent).build();
         return new ActionableInsight.Builder(actionDetails, mDisplayDetails).build();
     }
 
@@ -301,10 +201,6 @@ public class ContextActionResolverTest {
         }
     }
 
-    private void setUpRawIntent() {
-        mActionableInsight = createInsightWithRawIntent(mTestIntent);
-    }
-
     private void mockPackageManagerResolvers(
             List<ResolveInfo> activityInfos,
             List<ResolveInfo> serviceInfos,
@@ -321,14 +217,6 @@ public class ContextActionResolverTest {
         assertThat(result).isNotNull();
         assertThat(result.pendingIntent).isEqualTo(mPendingIntent);
         assertThat(result.resolveInfo).isEqualTo(mTestResolveInfo);
-        assertThat(result.actionType).isEqualTo(expectedType);
-    }
-
-    private void assertRawIntentResult(
-            ResolutionResult result, ActionType expectedType, ResolveInfo expectedResolveInfo) {
-        assertThat(result).isNotNull();
-        assertThat(result.pendingIntent).isEqualTo(mPendingIntent);
-        assertThat(result.resolveInfo).isEqualTo(expectedResolveInfo);
         assertThat(result.actionType).isEqualTo(expectedType);
     }
 }

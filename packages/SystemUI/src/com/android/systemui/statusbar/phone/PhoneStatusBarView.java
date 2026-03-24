@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.phone;
 
+import static com.android.systemui.Flags.edtNotAllowedOnStatusBar;
+
 import android.annotation.Nullable;
 import android.content.Context;
 import android.content.res.Configuration;
@@ -30,6 +32,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.flags.Flags;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
@@ -127,6 +130,13 @@ public class PhoneStatusBarView extends FrameLayout {
         super.onAttachedToWindow();
         if (updateDisplayParameters()) {
             updateLayoutForCutout();
+        }
+        if (edtNotAllowedOnStatusBar()) {
+            // See b/482405546: the status bar sometimes uses a light theme, e.g. when the user's
+            // wallpaper is light. The expanded dark theme feature inverts colors in light theme
+            // view hierarchies so it may incorrectly invert the status bar in this case. To avoid
+            // this we directly tell expanded dark theme to ignore this view hierarchy.
+            getViewRootImpl().setForceInvertAllowed(false);
         }
     }
 
@@ -247,10 +257,13 @@ public class PhoneStatusBarView extends FrameLayout {
             return false;
         }
 
-        if (mStatusBarLongPressGestureDetector != null) {
+        if (mStatusBarLongPressGestureDetector != null && !Flags.scrollToTop()) {
             mStatusBarLongPressGestureDetector.handleTouch(event);
         }
         if (mTouchEventHandler == null) {
+            if (Flags.scrollToTop()) {
+                return false;
+            }
             Log.w(
                     TAG,
                     String.format(

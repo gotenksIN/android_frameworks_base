@@ -311,6 +311,7 @@ java_aconfig_library {
         "com.android.wifi",
         "com.android.extservices",
         "com.android.telephonycore",
+        "com.android.bt",
     ],
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
@@ -372,6 +373,11 @@ cc_aconfig_library {
     name: "com.android.window.flags.window-aconfig_flags_c_lib",
     aconfig_declarations: "com.android.window.flags.window-aconfig",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // DeviceStateManager
@@ -454,7 +460,13 @@ java_aconfig_library {
 
 cc_aconfig_library {
     name: "aconfig_text_flags_c_lib",
+    host_supported: true,
     aconfig_declarations: "com.android.text.flags-aconfig",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 rust_aconfig_library {
@@ -674,6 +686,11 @@ cc_aconfig_library {
     name: "android.os.flags-aconfig-cc-host",
     aconfig_declarations: "android.os.flags-aconfig",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // OS Internal
@@ -694,6 +711,11 @@ cc_aconfig_library {
     name: "com.android.internal.os_flags_c_lib",
     aconfig_declarations: "com.android.internal.os.flags-aconfig",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // VirtualDeviceManager
@@ -702,6 +724,11 @@ cc_aconfig_library {
     aconfig_declarations: "android.companion.virtualdevice.flags-aconfig",
     host_supported: true,
     mode: "test",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 java_aconfig_library {
@@ -800,6 +827,11 @@ cc_aconfig_library {
     aconfig_declarations: "android.os.vibrator.flags-aconfig",
     host_supported: true,
     vendor_available: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 java_aconfig_library {
@@ -859,7 +891,13 @@ java_aconfig_library {
 
 cc_aconfig_library {
     name: "aconfig_view_accessibility_flags_c_lib",
+    host_supported: true,
     aconfig_declarations: "android.view.accessibility.flags-aconfig",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Hardware
@@ -881,6 +919,11 @@ cc_aconfig_library {
     name: "aconfig_hardware_flags_c_lib",
     host_supported: true,
     aconfig_declarations: "android.hardware.flags-aconfig",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Widget
@@ -980,6 +1023,11 @@ cc_aconfig_library {
     name: "android.content.res.flags-aconfig-cc-host",
     aconfig_declarations: "android.content.res.flags-aconfig",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 cc_aconfig_library {
@@ -1164,6 +1212,11 @@ cc_aconfig_library {
     name: "android.permission.flags-aconfig-cc",
     aconfig_declarations: "android.permission.flags-aconfig",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // SQLite
@@ -1184,6 +1237,11 @@ cc_aconfig_library {
     name: "android.database.sqlite-aconfig-cc",
     aconfig_declarations: "android.database.sqlite-aconfig",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Biometrics
@@ -1258,6 +1316,11 @@ cc_aconfig_library {
     name: "android.server.display.flags-aconfig-cc",
     host_supported: true,
     aconfig_declarations: "display_flags",
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 // Platform Compat

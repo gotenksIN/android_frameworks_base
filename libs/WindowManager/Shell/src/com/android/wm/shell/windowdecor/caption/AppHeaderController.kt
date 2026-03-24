@@ -18,9 +18,6 @@ package com.android.wm.shell.windowdecor.caption
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.content.Context
-import android.content.pm.ActivityInfo.CONFIG_FONT_SCALE
-import android.content.pm.ActivityInfo.CONFIG_LOCALE
-import android.content.pm.ActivityInfo.CONFIG_UI_MODE
 import android.graphics.Point
 import android.graphics.Rect
 import android.os.Handler
@@ -31,7 +28,6 @@ import android.view.SurfaceControl
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.WindowInsets
-import android.window.DesktopExperienceFlags
 import android.window.TaskSnapshot
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
@@ -120,7 +116,7 @@ class AppHeaderController(
     private val desktopState: DesktopState,
     private val windowDecorationActions: WindowDecorationActions,
     private val decorWindowContext: Context,
-    private val onCaptionTouchListener: View.OnTouchListener,
+    private val gestureInterceptor: WindowDecorLinearLayout.GestureInterceptor,
     private val onLongClickListener: OnLongClickListener,
     private val onCaptionGenericMotionListener: View.OnGenericMotionListener,
     private val appToWebRepository: AppToWebRepository,
@@ -178,12 +174,7 @@ class AppHeaderController(
     private val taskPositionInParent
         get() = taskInfo.positionInParent
 
-    private val closeMaximizeWindowRunnable = Runnable { closeLayoutMenu() }
-    private val isEducationOrHandleReportingEnabled =
-        Flags.enableDesktopWindowingAppHandleEducation() ||
-            DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
-                .isTrue ||
-            DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
+    private val closeLayoutMenuRunnable = Runnable { closeLayoutMenu() }
     private val dimensions = LargeHeaderDimensions(decorWindowContext.resources)
 
     private var isLayoutMenuHovered = false
@@ -214,17 +205,15 @@ class AppHeaderController(
             // the task has lost focus, explicitly cancel the hover (since we don't get a HOVER_EXIT
             // signal in this case).
             if (!isTaskFocused && isAppHeaderMaximizeButtonHovered) {
-                setAppHeaderMaximizeButtonHovered(hovered = false)
+                setHeaderMaximizeButtonHovered(hovered = false)
                 onLayoutButtonHoverExit()
             }
 
-            // Check for relevant configuration changes
-            val oldConfig = this.taskInfo.configuration
-            val newConfig = params.runningTaskInfo.configuration
-            val diff = newConfig.diff(oldConfig)
-            // Check for UI mode (dark/light), locale, or font scale changes
-            val configChanged =
-                (diff and (CONFIG_UI_MODE or CONFIG_LOCALE or CONFIG_FONT_SCALE)) != 0
+            if (hasGlobalFocus && !params.hasGlobalFocus) {
+                closeHandleMenu()
+                closeManageWindowsMenu()
+                closeLayoutMenu()
+            }
 
             val captionLayout =
                 super.relayout(
@@ -246,25 +235,9 @@ class AppHeaderController(
                 captionLayout.captionY + captionLayout.captionTopPadding,
             )
 
-            if (configChanged && isOpenByDefaultDialogActive) {
-                // Config changed, so destroy the old dialog and create a new one.
-                // The new one will inflate with the correct resources.
-                openByDefaultDialog?.dismiss() // Triggers onDialogDismissed, setting it to null
-                createOpenByDefaultDialog()
-            } else {
-                // No config change, just relayout the existing dialog for size/position changes.
-                openByDefaultDialog?.relayout(taskInfo)
-            }
-
             updateLayoutMenu(startT)
 
             updateViewHolder(params.hasGlobalFocus)
-
-            if (!params.hasGlobalFocus) {
-                closeHandleMenu()
-                closeManageWindowsMenu()
-                closeLayoutMenu()
-            }
 
             notifyCaptionStateChanged()
             return captionLayout
@@ -288,9 +261,6 @@ class AppHeaderController(
     }
 
     private fun notifyCaptionStateChanged() {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) {
-            return
-        }
         if (!isCaptionVisible || !hasGlobalFocus) {
             notifyNoCaption()
             return
@@ -299,7 +269,6 @@ class AppHeaderController(
     }
 
     private fun notifyNoCaption() {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) return
         windowDecorCaptionRepository.notifyCaptionChanged(CaptionState.NoCaption(taskInfo.taskId))
     }
 
@@ -401,26 +370,26 @@ class AppHeaderController(
                 }
     }
 
-    /** Set whether the app header's maximize button is hovered. */
-    override fun setAppHeaderMaximizeButtonHovered(hovered: Boolean) {
+    /** Set whether the header's maximize button is hovered. */
+    override fun setHeaderMaximizeButtonHovered(hovered: Boolean) {
         isAppHeaderMaximizeButtonHovered = hovered
         onLayoutButtonHoverStateChanged()
     }
 
     /**
-     * Called when either one of the maximize button in the app header or the layout menu has
-     * changed its hover state.
+     * Called when either one of the maximize button in the header or the layout menu has changed
+     * its hover state.
      */
     override fun onLayoutButtonHoverStateChanged() {
         if (!isLayoutMenuHovered && !isAppHeaderMaximizeButtonHovered) {
             // Neither is hovered, close the menu.
             if (isLayoutMenuActive) {
-                mainHandler.postDelayed(closeMaximizeWindowRunnable, CLOSE_MAXIMIZE_MENU_DELAY_MS)
+                mainHandler.postDelayed(closeLayoutMenuRunnable, CLOSE_LAYOUT_MENU_DELAY_MS)
             }
             return
         }
         // At least one of the two is hovered, cancel the close if needed.
-        mainHandler.removeCallbacks(closeMaximizeWindowRunnable)
+        mainHandler.removeCallbacks(closeLayoutMenuRunnable)
     }
 
     /** Close the layout menu window if open. */
@@ -531,7 +500,9 @@ class AppHeaderController(
                     // TODO(b/409648813): Have handle menus use [CaptionType]
                     layoutResId = R.layout.desktop_mode_app_header,
                     splitScreenController = splitScreenController,
-                    shouldShowWindowingPill = desktopState.canEnterDesktopModeOrShowAppHandle,
+                    shouldShowWindowingPill =
+                        !Flags.enableConsolidatedWindowOptions() &&
+                            desktopState.canEnterDesktopModeOrShowAppHandle,
                     shouldShowNewWindowButton = supportsMultiInstance,
                     shouldShowManageWindowsButton = shouldShowManageWindowsButton,
                     shouldShowChangeAspectRatioButton = shouldShowChangeAspectRatioButton,
@@ -555,13 +526,7 @@ class AppHeaderController(
                         openInAppOrBrowserClickListener = { intent ->
                             windowDecorationActions.onOpenInBrowser(taskInfo.taskId, intent)
                             appToWebRepository.onCapturedLinkUsed(taskInfo.taskId)
-                            if (
-                                DesktopExperienceFlags
-                                    .ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
-                                    .isTrue
-                            ) {
-                                windowDecorCaptionRepository.onAppToWebUsage()
-                            }
+                            windowDecorCaptionRepository.onAppToWebUsage()
                         },
                         onOpenByDefaultClickListener = { createOpenByDefaultDialog() },
                         onCloseMenuClickListener = { closeHandleMenu() },
@@ -579,9 +544,7 @@ class AppHeaderController(
         viewHolder.onHandleMenuClosed()
         handleMenu?.close()
         handleMenu = null
-        if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-            notifyCaptionStateChanged()
-        }
+        notifyCaptionStateChanged()
     }
 
     private fun isBrowserApp(): Boolean =
@@ -652,7 +615,7 @@ class AppHeaderController(
                 rootView = null,
                 context = decorWindowContext,
                 windowDecorationActions = windowDecorationActions,
-                onCaptionTouchListener = onCaptionTouchListener,
+                gestureInterceptor = gestureInterceptor,
                 onLongClickListener = onLongClickListener,
                 onCaptionGenericMotionListener = onCaptionGenericMotionListener,
                 onMaximizeHoverAnimationFinishedListener = { createLayoutMenu() },
@@ -666,9 +629,7 @@ class AppHeaderController(
                 val (name, icon) = taskResourceLoader.getNameAndHeaderIcon(taskInfo)
                 viewHolder.setAppName(name)
                 viewHolder.setAppIcon(icon)
-                if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-                    notifyCaptionStateChanged()
-                }
+                notifyCaptionStateChanged()
             }
         viewHolder = appHeaderViewHolder
         return appHeaderViewHolder
@@ -758,14 +719,13 @@ class AppHeaderController(
         closeManageWindowsMenu()
         closeLayoutMenu()
         viewHolder.close()
-        if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-            notifyNoCaption()
-        }
+        notifyNoCaption()
+        openByDefaultDialog?.dismiss()
         return super.close(wct, t)
     }
 
     private companion object {
         private const val TAG = "AppHeaderController"
-        const val CLOSE_MAXIMIZE_MENU_DELAY_MS = 150L
+        private const val CLOSE_LAYOUT_MENU_DELAY_MS = 150L
     }
 }

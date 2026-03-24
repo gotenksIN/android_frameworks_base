@@ -18,6 +18,7 @@ package android.service.personalcontext.hint;
 import static java.util.Objects.requireNonNull;
 
 import android.annotation.FlaggedApi;
+import android.annotation.SystemApi;
 import android.os.Bundle;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
@@ -28,7 +29,11 @@ import androidx.annotation.NonNull;
 
 import java.util.Objects;
 
-/** A hint that contains a text classification request from selected text */
+/**
+ * A hint that contains a text classification request from selected text.
+ * @hide
+ */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public class TextClassificationHint extends ContextHint {
     @NonNull private final TextClassification.Request mTextClassificationRequest;
@@ -100,15 +105,20 @@ public class TextClassificationHint extends ContextHint {
         return Objects.hash(mTextClassificationRequest, mTextClassificationSessionId);
     }
 
-    /** Get the {@link TextClassification.Request} contained in this hint. */
+    /** Returns the {@link TextClassification.Request} contained in this hint. */
     @NonNull
     public TextClassification.Request getTextClassificationRequest() {
         return mTextClassificationRequest;
     }
 
     /**
-     * Get the TextClassification sessionId. Used to trace back to the session the {@link
-     * TextClassification.Request} originated from.
+     * Returns the TextClassification sessionId. This is used by {@link
+     * TextClassificationManagerService} and {@link PersonalContextManagerService} to trace the session
+     * that the {@link TextClassification.Request} originated from.
+     *
+     * <p>If the session is destroyed by {@link TextClassificationService} before this hint is
+     * processed, {@link TextClassificationManagerService} will ignore any insights generated from
+     * this hint.
      */
     @NonNull
     public String getSessionId() {

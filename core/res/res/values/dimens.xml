@@ -475,6 +475,9 @@
     <!-- The maximum size of the image in the expanded media notification -->
     <dimen name="media_notification_expanded_image_margin_bottom">20dp</dimen>
 
+    <!-- The vertical padding for cast to other button in the MediaRouteChooserDialog -->
+    <dimen name="media_route_cast_to_other_vertical_padding">8dp</dimen>
+
     <!-- The padding at the end of actions when the snooze and bubble buttons are gone-->
     <dimen name="snooze_and_bubble_gone_padding_end">12dp</dimen>
 
@@ -1185,6 +1188,9 @@
     <!-- Default height of desktop view's large header for desktop tasks on launch. -->
     <dimen name="desktop_view_default_large_header_height">48dp</dimen>
 
+    <!-- The cascading offset in desktop mode. -->
+    <dimen name="desktop_mode_cascading_offset">60dp</dimen>
+
     <!-- Default height of taskbar for Launcher.   -->
     <dimen name="taskbar_stashed_size">24dp</dimen>
 
@@ -1194,6 +1200,7 @@
     <dimen name="app_lock_icon_size_small">24dp</dimen>
     <dimen name="app_lock_item_icon_size">42dp</dimen>
     <dimen name="app_lock_item_margin">12dp</dimen>
+    <dimen name="app_lock_line_height_small">20dp</dimen>
     <dimen name="app_lock_margin">16dp</dimen>
     <dimen name="app_lock_padding_extra_small">8dp</dimen>
     <dimen name="app_lock_padding_small">16dp</dimen>

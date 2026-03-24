@@ -21,8 +21,8 @@ import android.content.pm.ServiceInfo;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
 import android.util.Slog;
 
 import java.util.UUID;
@@ -33,17 +33,21 @@ import java.util.UUID;
  * @hide
  */
 public class ServiceClientUnderstander extends ServiceClientRefiner {
+    private static final String TAG = "ServiceClientUnderstander";
+
     public ServiceClientUnderstander(Context context, UUID componentId, ServiceInfo serviceInfo,
             UserHandle userHandle) {
         super(context, componentId, serviceInfo, userHandle);
     }
 
-
     @Override
-    public void handleFeedback(ContextInsight insight, Bundle feedback) {
-        runWithBinder(binder -> {
+    public void handleFeedback(PublishedContextInsight insight, Bundle feedback) {
+        runWithScopedBinder((binder, opCallback) -> {
             try {
-                binder.handleFeedback(new ContextInsightWrapper(insight), feedback);
+                binder.handleFeedback(getParcelComponentId(),
+                        new PublishedContextInsightWrapper(insight),
+                        feedback,
+                        opCallback);
             } catch (RemoteException e) {
                 Slog.w(TAG, this + " handleFeedback() failed", e);
             }

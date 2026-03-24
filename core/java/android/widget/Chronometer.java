@@ -22,6 +22,7 @@ import static java.util.Objects.requireNonNull;
 
 import android.annotation.ElapsedRealtimeLong;
 import android.annotation.NonNull;
+import android.app.Flags;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.TypedArray;
@@ -48,6 +49,7 @@ import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.IllegalFormatException;
+import java.util.List;
 import java.util.Locale;
 import java.util.function.LongSupplier;
 
@@ -384,6 +386,91 @@ public class Chronometer extends TextView {
     }
 
     private synchronized void updateText(long now) {
+        if (!Flags.metricValueAlternativeStrings()) {
+            updateTextLegacy(now);
+            return;
+        }
+
+        updateBaseTimeIfSystemClockChanged();
+        mNow = now;
+
+        // LINT.IfChange
+        // Use 499 to ensure countdown chronometers round down. (e.g. 999ms shows 00:00).
+        long seconds = Math.round((mCountDown ? mBase - now - 499 : now - mBase) / 1000f);
+        // LINT.ThenChange(/packages/SystemUI/src/com/android/systemui/statusbar/chips/ui/viewmodel/ChronometerState.kt)
+
+        ArrayList<String> texts = secondsToString(seconds);
+        if (mFormat != null) {
+            texts.replaceAll(this::applyFormat);
+        }
+
+        setChronometerText(texts);
+    }
+
+    private ArrayList<String> secondsToString(long seconds) {
+        boolean negative = false;
+        if (seconds < 0) {
+            seconds = -seconds;
+            negative = true;
+        }
+
+        ArrayList<String> texts = new ArrayList<>();
+        if (mLowFrequency) {
+            if (mUseAdaptiveFormat && negative && seconds < 60) {
+                texts.add(ChronometerLowFrequencyFormat.formatAdaptiveNegativeLessThanOneMinute());
+            } else {
+                Duration duration = Duration.ofSeconds(seconds);
+                texts.addAll(
+                        ChronometerLowFrequencyFormat.formatVariants(duration, mUseAdaptiveFormat));
+                if (negative) {
+                    texts.replaceAll(t -> getResources().getString(R.string.negative_duration, t));
+                }
+            }
+        } else {
+            if (mUseAdaptiveFormat) {
+                Duration duration = Duration.ofSeconds(seconds);
+                texts.addAll(ChronometerAdaptiveFormat.formatVariants(duration));
+            } else {
+                texts.add(DateUtils.formatElapsedTime(mRecycle, seconds));
+            }
+            if (negative) {
+                texts.replaceAll(t -> getResources().getString(R.string.negative_duration, t));
+            }
+        }
+        return texts;
+    }
+
+    private synchronized String applyFormat(String timeString) {
+        if (mFormat == null) {
+            return timeString;
+        }
+
+        Locale loc = Locale.getDefault();
+        if (mFormatter == null || !loc.equals(mFormatterLocale)) {
+            mFormatterLocale = loc;
+            mFormatter = new Formatter(mFormatBuilder, loc);
+        }
+        mFormatBuilder.setLength(0);
+        mFormatterArgs[0] = timeString;
+        try {
+            mFormatter.format(mFormat, mFormatterArgs);
+            return mFormatBuilder.toString();
+        } catch (IllegalFormatException ex) {
+            if (!mLogged) {
+                Log.w(TAG, "Illegal format string: " + mFormat);
+                mLogged = true;
+            }
+            return timeString;
+        }
+    }
+
+    /** @hide */
+    protected void setChronometerText(List<String> textVariants) {
+        setText(textVariants.get(0));
+    }
+
+    // TODO: b/465178366 - Delete when inlining metric_value_alternative_strings
+    private synchronized void updateTextLegacy(long now) {
         updateBaseTimeIfSystemClockChanged();
         mNow = now;
 
@@ -417,7 +504,6 @@ public class Chronometer extends TextView {
                 text = getResources().getString(R.string.negative_duration, text);
             }
         }
-
 
         if (mFormat != null) {
             Locale loc = Locale.getDefault();
@@ -487,7 +573,14 @@ public class Chronometer extends TextView {
 
         long periodInMillis;
         if (mLowFrequency) {
-            periodInMillis = ChronometerLowFrequencyFormat.getTickPeriod();
+            // Even though this formatter only produces "1 string per minute", we need to "tick"
+            // much more often than that. "Low-frequency mode" is used exclusively by SystemUI on
+            // AOD, where the device is often dozing. Handler.postDelayed() uses *uptimeMillis*
+            // as its reference time, which does NOT advance during doze. Thus, if we delay the
+            // next update for a minute, it will effectively occur MUCH later than that (depending
+            // on the ratio between the duration of the maintenance windows and the time between
+            // them), on the worst case making the displayed time refresh only once every N minutes.
+            periodInMillis = SECOND_IN_MILLIS;
         } else if (mUseAdaptiveFormat) {
             // In adaptive format, ticks are every 1 minute instead of 1 second, if the time elapsed
             // or remaining is >= 3 minutes. Thus for time > 3 minutes the tick will be "on

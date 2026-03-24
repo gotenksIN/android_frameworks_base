@@ -18,6 +18,8 @@ package com.android.settingslib.metadata.preferencesapi
 
 import android.Manifest
 import android.content.Context
+import android.os.UserHandle
+import android.os.UserManager
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,10 +32,12 @@ import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.INVALID_PREFERENCE
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.MISSING_PERMISSION
 import com.android.settingslib.metadata.preferencesapi.Utils.EXCEPTION_MESSAGE_NO_PARAMETER_DEFINED
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageAlreadyDefined
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleDefines
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleParametersDefined
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageWrongOrder
 import com.android.settingslib.metadata.preferencesapi.category.Category
+import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget.PROFILE_GROUP
 import com.android.settingslib.metadata.preferencesapi.preconditions.Allowed
 import com.android.settingslib.metadata.preferencesapi.preconditions.Custom
 import com.android.settingslib.metadata.preferencesapi.preconditions.EnterpriseRestriction
@@ -220,6 +224,53 @@ class PreferencesApiScreenTest {
     }
 
     @Test
+    fun createPreferencesApiScreenWithGetter_preferencePreconditionCheckWithCurrentUserId_isDisallowed() {
+        val preferenceKey = "ApiPreference"
+
+        val preferenceScreen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    preference(
+                        key = preferenceKey,
+                        purpose = R.string.preference_purpose1,
+                        type = AnyInt,
+                        appliesTo = PROFILE_GROUP
+                    ) {
+                        preconditions("Preference is available only if the user has profiles.") {
+                            val userManager = context.getSystemService(UserManager::class.java)
+                            val numProfiles = userManager?.getProfiles(userId)?.size ?: 0
+
+                            if (numProfiles > 1) {
+                                Allowed
+                            } else {
+                                EnterpriseRestriction("No profiles on user $userId")
+                            }
+                        }
+                        get { execute { userHandle.hashCode() } }
+                    }
+                }
+            }
+
+        // Check we only have 1 preference in the list
+        assertThat(preferenceScreen.preferences.size).isEqualTo(1)
+
+        val apiOperationContext =
+            ApiOperationContext(context = context, parameters = ValidatedKeyParameters.EMPTY)
+
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Int>
+        assertThat(preference.key).isEqualTo("ApiPreference")
+        runBlocking {
+            assertThat(preference.preconditions?.check?.invoke(apiOperationContext) is EnterpriseRestriction).isTrue()
+        }
+    }
+
+    @Test
     fun createPreferencesApiScreenWithGetters_succeeds() {
         val preferenceValue1 = false
         val preferenceKey1 = "ApiPreference1"
@@ -385,7 +436,7 @@ class PreferencesApiScreenTest {
             .isEqualTo(context.getString(R.string.preconditions_description1))
 
         // Create the API operation context to be used in ApiPreference calls
-        val apiOperationContext = ApiOperationContext(context, ValidatedKeyParameters.EMPTY)
+        val apiOperationContext = ApiOperationContext(context = context, parameters = ValidatedKeyParameters.EMPTY)
 
         // Evaluate each preconditions case
         for (case in ApiPreconditionsMapper.entries) {
@@ -517,7 +568,7 @@ class PreferencesApiScreenTest {
             .isEqualTo(preconditionDescription)
 
         // Create the API operation context to be used in ApiPreference calls
-        val apiOperationContext = ApiOperationContext(context, ValidatedKeyParameters.EMPTY)
+        val apiOperationContext = ApiOperationContext(context = context, parameters = ValidatedKeyParameters.EMPTY)
 
         // Evaluate each preconditions case
         for (case in ApiPreconditionsMapper.entries) {
@@ -1389,6 +1440,127 @@ class PreferencesApiScreenTest {
     }
 
     @Test
+    fun createPreferencesApiScreenPreferenceWithSetter_withNoPreconditionsInWarning_succeeds() {
+        var preferenceValue = false
+        val preferenceKey = "ApiPreference"
+
+        val preferenceScreen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    preference(
+                        key = preferenceKey,
+                        purpose = R.string.preference_purpose1,
+                        type = AnyBoolean,
+                    ) {
+                        get {
+                            execute { preferenceValue }
+                        }
+                        set {
+                            warning {
+                                warn(R.string.warning_message1)
+                            }
+
+                            execute { value -> preferenceValue = value }
+                        }
+                    }
+                }
+            }
+
+        // Check we only have 1 preference in the list
+        assertThat(preferenceScreen.preferences.size).isEqualTo(1)
+
+        // Check preference's set operation has the correct warning message
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
+        assertThat(preference.set?.warning?.getWarning(context)).isEqualTo(context.getString(R.string.warning_message1))
+    }
+
+    @Test
+    fun createPreferencesApiScreenPreferenceWithSetter_withNoWarnInWarning_fails() {
+        var preferenceValue = false
+        val preferenceKey = "ApiPreference"
+
+        val exception =
+            assertThrows(IllegalStateException::class.java) {
+                object :
+                    PreferencesApiScreen(
+                        key = SCREEN_KEY,
+                        topLevelSettingsCategory = Category.SYSTEM,
+                        fragment = PreferenceFragment::class,
+                        purpose = R.string.preference_screen_purpose,
+                    ) {
+                    init {
+                        preference(
+                            key = preferenceKey,
+                            purpose = R.string.preference_purpose1,
+                            type = AnyBoolean,
+                        ) {
+                            set {
+                                warning {
+                                    preconditions(R.string.warning_preconditions_description1) {
+                                        Custom(R.string.preconditions_custom_message)
+                                    }
+                                }
+
+                                execute { value -> preferenceValue = value }
+                            }
+                        }
+                    }
+                }
+            }
+
+        assertThat(exception.message)
+            .isEqualTo("warning 'warn' block is required")
+    }
+
+    @Test
+    fun createPreferencesApiScreenPreferenceWithSetter_withMultiplePreconditionsInWarning_fails() {
+        var preferenceValue = false
+        val preferenceKey = "ApiPreference"
+
+        val exception =
+            assertThrows(IllegalStateException::class.java) {
+                object :
+                    PreferencesApiScreen(
+                        key = SCREEN_KEY,
+                        topLevelSettingsCategory = Category.SYSTEM,
+                        fragment = PreferenceFragment::class,
+                        purpose = R.string.preference_screen_purpose,
+                    ) {
+                    init {
+                        preference(
+                            key = preferenceKey,
+                            purpose = R.string.preference_purpose1,
+                            type = AnyBoolean,
+                        ) {
+                            set {
+                                warning {
+                                    preconditions(R.string.warning_preconditions_description1) {
+                                        Custom(R.string.preconditions_custom_message)
+                                    }
+                                    valuePreconditions(R.string.warning_preconditions_description1) { value ->
+                                        Allowed
+                                    }
+                                    warn(R.string.warning_message1)
+                                }
+
+                                execute { value -> preferenceValue = value }
+                            }
+                        }
+                    }
+                }
+            }
+
+        assertThat(exception.message)
+            .isEqualTo(getExceptionMessageAlreadyDefined("preconditions or valuePreconditions"))
+    }
+
+    @Test
     fun createPreferencesApiScreenPreferenceWithSetter_wrongOrderExecuteBeforeValuePreconditions_fails() {
         var preferenceValue = false
         val preferenceKey = "ApiPreference"
@@ -1430,6 +1602,52 @@ class PreferencesApiScreenTest {
             }
 
         assertThat(exception.message).isEqualTo(getExceptionMessageWrongOrder("valuePreconditions"))
+    }
+
+    @Test
+    fun createPreferencesApiScreenPreferenceWithSetter_wrongOrderExecuteBeforeWarning_fails() {
+        var preferenceValue = false
+        val preferenceKey = "ApiPreference"
+
+        val exception =
+            assertThrows(IllegalStateException::class.java) {
+                object :
+                    PreferencesApiScreen(
+                        key = SCREEN_KEY,
+                        topLevelSettingsCategory = Category.SYSTEM,
+                        fragment = PreferenceFragment::class,
+                        purpose = R.string.preference_screen_purpose,
+                    ) {
+                    init {
+                        preference(
+                            key = preferenceKey,
+                            purpose = R.string.preference_purpose1,
+                            type = AnyBoolean,
+                        ) {
+                            set {
+                                permissions(Manifest.permission.ACCESS_FINE_LOCATION)
+
+                                preconditions(R.string.preconditions_description1) {
+                                    HardwareUnsupported(
+                                        R.string.preconditions_hardware_unsupported_message
+                                    )
+                                }
+
+                                execute { value -> preferenceValue = value }
+
+                                warning {
+                                    preconditions(R.string.warning_preconditions_description1) {
+                                        Custom(R.string.preconditions_custom_message)
+                                    }
+                                    warn(R.string.warning_message1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        assertThat(exception.message).isEqualTo(getExceptionMessageWrongOrder("warning"))
     }
 
     @Test
@@ -1547,6 +1765,52 @@ class PreferencesApiScreenTest {
 
         assertThat(exception.message)
             .isEqualTo(getExceptionMessageMultipleDefines("valuePreconditions"))
+    }
+
+    @Test
+    fun createPreferencesApiScreenPreferenceWithSetter_withMultipleWarnings_fails() {
+        var preferenceValue = false
+        val preferenceKey = "ApiPreference"
+
+        val exception =
+            assertThrows(IllegalStateException::class.java) {
+                object :
+                    PreferencesApiScreen(
+                        key = SCREEN_KEY,
+                        topLevelSettingsCategory = Category.SYSTEM,
+                        fragment = PreferenceFragment::class,
+                        purpose = R.string.preference_screen_purpose,
+                    ) {
+                    init {
+                        preference(
+                            key = preferenceKey,
+                            purpose = R.string.preference_purpose1,
+                            type = AnyBoolean,
+                        ) {
+                            set {
+                                warning {
+                                    preconditions(R.string.warning_preconditions_description1) {
+                                        Custom(R.string.preconditions_custom_message)
+                                    }
+                                    warn(R.string.warning_message1)
+                                }
+
+                                warning {
+                                    valuePreconditions(R.string.warning_preconditions_description1) { value ->
+                                        Allowed
+                                    }
+                                    warn(R.string.warning_message1)
+                                }
+
+                                execute { value -> preferenceValue = value }
+                            }
+                        }
+                    }
+                }
+            }
+
+        assertThat(exception.message)
+            .isEqualTo(getExceptionMessageMultipleDefines("warning"))
     }
 
     @Test
@@ -1759,6 +2023,57 @@ class PreferencesApiScreenTest {
                 }
             }
         }
+    }
+
+        @Test
+    fun createPreferencesApiScreen_withoutTags_returnsApiFirstAndUncategorizedDeviceState() {
+        val screen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+            }
+
+        assertThat(screen.tags(context)).asList().containsExactly("api-first", "getUncategorizedDeviceState")
+    }
+
+    @Test
+    fun createPreferencesApiScreen_withTags_returnsTagsWithApiFirstAndUncategorizedDeviceState() {
+        val screen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    tags("tag1", "tag2")
+                }
+            }
+
+        assertThat(screen.tags(context)).asList().containsExactly("tag1", "tag2", "api-first", "getUncategorizedDeviceState")
+    }
+
+        @Test
+    fun createPreferencesApiScreen_withAppFunctionTag_returnsTagsWithApiFirstWithoutUncategorizedDeviceState() {
+        val screen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    tags("tag1", "tag2", PreferencesApiScreen.APP_FUNCTION_BATTERY)
+                }
+            }
+
+        assertThat(screen.tags(context)).asList().containsExactly("tag1", "tag2", PreferencesApiScreen.APP_FUNCTION_BATTERY, "api-first")
     }
 
     @Test

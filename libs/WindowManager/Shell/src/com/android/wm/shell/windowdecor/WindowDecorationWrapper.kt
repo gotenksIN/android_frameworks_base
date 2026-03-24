@@ -29,7 +29,6 @@ import android.view.SurfaceControl
 import android.view.View.OnClickListener
 import android.view.View.OnGenericMotionListener
 import android.view.View.OnLongClickListener
-import android.view.View.OnTouchListener
 import android.window.DesktopExperienceFlags
 import android.window.WindowContainerTransaction
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
@@ -284,20 +283,6 @@ private constructor(
             }
 
             else -> error("Expected Non-null window decoration")
-        }
-
-    /** Declares whether a Recents transition is currently active. */
-    fun setIsRecentsTransitionRunning(isRecentsRunning: Boolean) =
-        when {
-            defaultWindowDecor != null -> {
-                requireDefaultWindowDecor().isRecentsTransitionRunning = isRecentsRunning
-            }
-
-            desktopWindowDecor != null -> {
-                requireDesktopWindowDecor().setIsRecentsTransitionRunning(isRecentsRunning)
-            }
-
-            else -> error("Expected Non-null default or desktop window decoration")
         }
 
     /** Closes the window decoration. */
@@ -633,7 +618,7 @@ private constructor(
     /** Set the listeners for the decorations. */
     fun setCaptionListeners(
         onClickListener: OnClickListener,
-        onTouchListener: OnTouchListener,
+        gestureInterceptor: WindowDecorLinearLayout.GestureInterceptor,
         onLongClickListener: OnLongClickListener?,
         onGenericMotionListener: OnGenericMotionListener?,
     ) =
@@ -641,7 +626,7 @@ private constructor(
             defaultWindowDecor != null -> {
                 requireDefaultWindowDecor()
                     .setListeners(
-                        onTouchListener,
+                        gestureInterceptor,
                         checkNotNull(onLongClickListener) {
                             "Expected non-null long click listener"
                         },
@@ -654,7 +639,7 @@ private constructor(
             desktopWindowDecor != null -> {
                 requireDesktopWindowDecor()
                     .setCaptionListeners(
-                        onTouchListener,
+                        gestureInterceptor,
                         checkNotNull(onLongClickListener) {
                             "Expected non-null long click listener"
                         },
@@ -665,7 +650,7 @@ private constructor(
             }
 
             captionWindowDecoration != null -> {
-                requireCaptionWindowDecor().setCaptionListeners(onClickListener, onTouchListener)
+                requireCaptionWindowDecor().setCaptionListeners(onClickListener, gestureInterceptor)
             }
 
             else -> error("Expected Non-null window decoration")

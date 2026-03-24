@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -107,7 +108,7 @@ import com.android.internal.jank.Cuj.CUJ_NOTIFICATION_SHADE_SCROLL_FLING
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadius
 import com.android.systemui.notifications.intelligence.rules.shared.NmContextualDisplayLaunch
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesShadeStateViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesParentViewModel
 import com.android.systemui.notifications.ui.YSpace
 import com.android.systemui.res.R
 import com.android.systemui.scene.session.ui.composable.SaveableSession
@@ -215,7 +216,7 @@ fun ContentScope.ScrollingNotificationPanel(
     shadeSession: SaveableSession,
     stackScrollView: NotificationScrollView,
     viewModel: NotificationsPlaceholderViewModel,
-    notificationRulesShadeStateViewModel: NotificationRulesShadeStateViewModel?,
+    notificationRulesParentViewModel: NotificationRulesParentViewModel?,
     jankMonitor: InteractionJankMonitor,
     shouldPunchHoleBehindScrim: Boolean,
     isTransparencyEnabled: Boolean,
@@ -275,7 +276,7 @@ fun ContentScope.ScrollingNotificationPanel(
         shadeSession = shadeSession,
         stackScrollView = stackScrollView,
         viewModel = viewModel,
-        notificationRulesShadeStateViewModel = notificationRulesShadeStateViewModel,
+        notificationRulesParentViewModel = notificationRulesParentViewModel,
         modifier = modifier,
         shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
         isTransparencyEnabled = isTransparencyEnabled,
@@ -302,7 +303,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
     shadeSession: SaveableSession,
     stackScrollView: NotificationScrollView,
     viewModel: NotificationsPlaceholderViewModel,
-    notificationRulesShadeStateViewModel: NotificationRulesShadeStateViewModel?,
+    notificationRulesParentViewModel: NotificationRulesParentViewModel?,
     shouldPunchHoleBehindScrim: Boolean,
     isTransparencyEnabled: Boolean,
     stackTopPadding: Dp,
@@ -339,9 +340,6 @@ fun ContentScope.NestedScrollingNotificationPanel(
     // this is to remove these side effects when the content is not visible.
     if (isActivated && isAlwaysComposedContentVisible()) {
         val coroutineScope = shadeSession.sessionCoroutineScope(key = "NotificationScrollingStack")
-
-        // set the bounds to null when the scrim disappears
-        DisposableEffect(Unit) { onDispose { viewModel.onScrimBoundsChanged(null) } }
 
         val isRemoteInputActive by viewModel.isRemoteInputActive.collectAsStateWithLifecycle(false)
 
@@ -492,7 +490,9 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         .overscroll(scrollingContentOverscrollEffect) // Content scrolling
                         .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
                 }
-                .onGloballyPositioned { coordinates ->
+                // Use onPlaced/onUnplaced instead of onGloballyPositioned to avoid
+                // receiving 0x0 bounds when the element is detached/unplaced but still composed.
+                .onPlaced { coordinates ->
                     val boundsInWindow = coordinates.boundsInWindow()
                     debugLog(viewModel) {
                         "$tag.SCRIM onGloballyPositioned:" +
@@ -507,6 +507,9 @@ fun ContentScope.NestedScrollingNotificationPanel(
                             bottom = boundsInWindow.bottom,
                         )
                     )
+                }
+                .onUnplaced {
+                    viewModel.onScrimBoundsChanged(null)
                 }
                 .thenIf(onEmptySpaceClick != null) {
                     Modifier.clickable(
@@ -663,7 +666,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                 {
                     // Entry point for the notifications rules page (UX not final)
                     NotificationRulesEntryPoint(
-                        notificationRulesShadeStateViewModel = notificationRulesShadeStateViewModel,
+                        notificationRulesParentViewModel = notificationRulesParentViewModel,
                         modifier = Modifier.fillMaxSize(),
                     )
                 },
@@ -753,18 +756,20 @@ fun ContentScope.NestedScrollingNotificationPanel(
 /** Composable showing an entry point into the notification rules page. */
 @Composable
 private fun NotificationRulesEntryPoint(
-    notificationRulesShadeStateViewModel: NotificationRulesShadeStateViewModel?,
+    notificationRulesParentViewModel: NotificationRulesParentViewModel?,
     modifier: Modifier = Modifier,
 ) {
-    if (!NmContextualDisplayLaunch.isEnabled || notificationRulesShadeStateViewModel == null) {
+    val context = LocalContext.current
+    if (!NmContextualDisplayLaunch.isEnabled || notificationRulesParentViewModel == null) {
         return
     }
     Box(modifier = modifier, contentAlignment = Alignment.BottomStart) {
-        Button(onClick = { notificationRulesShadeStateViewModel.setShowing(true) }) {
+        Button(
+            onClick = { notificationRulesParentViewModel.launchNotificationRulesActivity(context) }
+        ) {
             Icon(
                 imageVector = Icons.Filled.FilterList,
-                // TODO: b/478225883 - Translate the content description.
-                contentDescription = "Notification rules",
+                contentDescription = stringResource(R.string.notification_rules_activity_title),
                 modifier = Modifier.size(18.dp),
             )
         }

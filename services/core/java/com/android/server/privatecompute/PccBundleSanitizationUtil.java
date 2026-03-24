@@ -16,14 +16,18 @@
 
 package com.android.server.privatecompute;
 
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_INPUT_SANITIZATION_REPORTED__RESULT__FAILED;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_INPUT_SANITIZATION_REPORTED__RESULT__PERFORMED;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_INPUT_SANITIZATION_REPORTED__RESULT__SKIPPED;
+
 import android.graphics.Bitmap;
 import android.os.BadParcelableException;
 import android.os.BaseBundle;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
-import android.os.PersistableBundle;
 import android.os.SharedMemory;
+import android.os.SystemClock;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
@@ -45,19 +49,32 @@ class PccBundleSanitizationUtil {
      * @throws IllegalArgumentException if the bundle contains data types not in the allowlist
      * or exceeds a recursive depth of 100.
      */
-     public static void sanitizeBundle(BaseBundle baseBundle) throws IllegalArgumentException {
-        if (baseBundle == null) {
-            return;
-        }
-
-        if (baseBundle instanceof Bundle) {
-            Bundle bundle = (Bundle) baseBundle;
-            if (bundle.hasBinders() != Bundle.STATUS_BINDERS_NOT_PRESENT) {
-                throw new IllegalArgumentException("Binders not permitted in the bundle.");
+    public static void sanitizeBundle(BaseBundle baseBundle) throws IllegalArgumentException {
+        long startTimeNanos = SystemClock.elapsedRealtimeNanos();
+        int sanitizationResult = PCC_INPUT_SANITIZATION_REPORTED__RESULT__SKIPPED;
+        try {
+            if (baseBundle == null) {
+                return;
             }
-        }
 
-        sanitizeBundleInternal(baseBundle, 0);
+            if (baseBundle instanceof Bundle) {
+                Bundle bundle = (Bundle) baseBundle;
+                if (bundle.hasBinders() != Bundle.STATUS_BINDERS_NOT_PRESENT) {
+                    throw new IllegalArgumentException("Binders not permitted in the bundle.");
+                }
+            }
+
+            sanitizationResult = PCC_INPUT_SANITIZATION_REPORTED__RESULT__PERFORMED;
+            sanitizeBundleInternal(baseBundle, 0);
+        } catch (IllegalArgumentException e) {
+            sanitizationResult = PCC_INPUT_SANITIZATION_REPORTED__RESULT__FAILED;
+            throw e;
+        } finally {
+            long elapsedTimeMillis =
+                    (SystemClock.elapsedRealtimeNanos() - startTimeNanos) / 1_000_000;
+            PrivateComputeStatsLogUtil.logPccBundleInputSanitizationLatency(elapsedTimeMillis,
+                    sanitizationResult);
+        }
     }
 
     private static void sanitizeBundleInternal(BaseBundle bundle, int depth) {
@@ -86,8 +103,12 @@ class PccBundleSanitizationUtil {
                 case BaseBundle subBundle -> sanitizeBundleInternal(subBundle, depth + 1);
                 case ParcelFileDescriptor pfd -> validatePfdIsReadOnly(pfd);
                 case SharedMemory sm -> {
-                    if (!sm.isRegionReadOnly()) {
-                        throw new IllegalArgumentException("SharedMemory must be read-only.");
+                    if (com.android.libcore.Flags.enablePccFrameworkSupport()) {
+                        if (!sm.isRegionReadOnly()) {
+                            throw new IllegalArgumentException("SharedMemory must be read-only.");
+                        }
+                    } else {
+                        sm.setProtect(OsConstants.PROT_READ);
                     }
                 }
                 // Bitmaps are considered safe to send across IPC. When a Bitmap is parceled, it
@@ -135,8 +156,12 @@ class PccBundleSanitizationUtil {
                 case ParcelFileDescriptor parcelFileDescriptor -> validatePfdIsReadOnly(
                         parcelFileDescriptor);
                 case SharedMemory sharedMemory -> {
-                    if (!sharedMemory.isRegionReadOnly()) {
-                        throw new IllegalArgumentException("SharedMemory must be read-only.");
+                    if (com.android.libcore.Flags.enablePccFrameworkSupport()) {
+                        if (!sharedMemory.isRegionReadOnly()) {
+                            throw new IllegalArgumentException("SharedMemory must be read-only.");
+                        }
+                    } else {
+                        sharedMemory.setProtect(OsConstants.PROT_READ);
                     }
                 }
                 case Bitmap ignored -> {

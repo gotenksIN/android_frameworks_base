@@ -47,7 +47,7 @@ import android.util.Xml;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.pm.RoSystemFeatures;
-import com.android.internal.pm.pkg.parsing.ParsingPackageUtils;
+import com.android.internal.pm.pkg.component.AconfigFlags;
 import com.android.internal.util.XmlUtils;
 import com.android.modules.utils.build.UnboundedSdkLevel;
 import com.android.server.pm.permission.PermissionAllowlist;
@@ -1194,7 +1194,7 @@ public class SystemConfig {
     private void readAssignPermission(XmlPullParser parser, File permFile)
             throws IOException, XmlPullParserException {
         // If trunkstable feature flag disabled for this permission, skip this tag.
-        if (ParsingPackageUtils.getAconfigFlags()
+        if (AconfigFlags.getInstance()
                 .skipCurrentElement(/* pkg= */ null, parser, /* allowNoNamespace= */ true)) {
             XmlUtils.skipCurrentTag(parser);
             return;
@@ -2403,7 +2403,7 @@ public class SystemConfig {
     private void readSplitPermission(XmlPullParser parser, File permFile)
             throws IOException, XmlPullParserException {
         // If trunkstable feature flag disabled for this split permission, skip this tag.
-        if (ParsingPackageUtils.getAconfigFlags()
+        if (AconfigFlags.getInstance()
             .skipCurrentElement(/* pkg= */ null, parser, /* allowNoNamespace= */ true)) {
             XmlUtils.skipCurrentTag(parser);
             return;

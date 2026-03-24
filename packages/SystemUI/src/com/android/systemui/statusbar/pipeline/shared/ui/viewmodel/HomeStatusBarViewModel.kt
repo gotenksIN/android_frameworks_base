@@ -61,6 +61,7 @@ import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppCh
 import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModel
 import com.android.systemui.statusbar.chips.uievents.StatusBarChipsUiEventLogger
+import com.android.systemui.statusbar.domain.interactor.ScrollToTopInteractor
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.events.shared.model.SystemEventAnimationState.Idle
 import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
@@ -81,7 +82,7 @@ import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
 import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipsViewModel
-import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
+import com.android.systemui.statusbar.quickactions.shared.model.QuickActionChipModel
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
 import com.android.systemui.user.domain.interactor.UserLogoutInteractor
 import dagger.assisted.AssistedFactory
@@ -160,6 +161,12 @@ interface HomeStatusBarViewModel : Activatable {
      */
     fun onChipBoundsChanged(key: String, bounds: RectF)
 
+    /** Notifies that the status bar was tapped. */
+    fun onStatusBarTap(eventX: Float)
+
+    /** Notifies that there was a long press on the status bar. */
+    fun onStatusBarLongPressed()
+
     /** Notifies that the system icons container was clicked. */
     fun onQuickSettingsChipClicked()
 
@@ -179,7 +186,7 @@ interface HomeStatusBarViewModel : Activatable {
     val operatorNameViewModel: StatusBarOperatorNameViewModel
 
     /** The popup chips that should be shown on the right-hand side of the status bar. */
-    val popupChips: List<QuickActionChipUiState.PopupChip>
+    val popupChips: List<QuickActionChipModel>
 
     /**
      * True if the status bar should be visible.
@@ -290,6 +297,7 @@ constructor(
     private val uiEventLogger: StatusBarChipsUiEventLogger,
     deviceProvisioningInteractor: DeviceProvisioningInteractor,
     private val userLogoutInteractor: UserLogoutInteractor,
+    private val scrollToTopInteractor: ScrollToTopInteractor,
 ) : HomeStatusBarViewModel, HydratedActivatable(enableEnqueuedActivations = true) {
 
     val logger = loggerFactory.getOrCreate(logBufferName(thisDisplayId), 60)
@@ -623,6 +631,17 @@ constructor(
 
     override fun onChipBoundsChanged(key: String, bounds: RectF) {
         ongoingActivityChipsViewModel.onChipBoundsChanged(key, bounds)
+    }
+
+    override fun onStatusBarTap(eventX: Float) {
+        logger.d({ double1 = eventX.toDouble() }, { "Statusbar Tap at x=$double1" })
+        scrollToTopInteractor.onScrollToTop(thisDisplayId, eventX.toInt())
+    }
+
+    override fun onStatusBarLongPressed() {
+        shadeInteractor.expandQuickSettingsShade(
+            loggingReason = "HomeStatusBarViewModel.onStatusBarLongPressed"
+        )
     }
 
     override fun onQuickSettingsChipClicked() {

@@ -32,7 +32,7 @@ import static java.util.Collections.emptySet;
 import android.service.personalcontext.hint.BundleHint;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintTestUtils;
-import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.hint.PublishedContextHint;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
@@ -68,10 +68,10 @@ public class RefinerWorkflowTest {
         Refiner refiner = mock(Refiner.class);
 
         doAnswer(invocation -> {
-            final Set<ContextHintWithSignature> hints = invocation.getArgument(0, Set.class);
+            final Set<PublishedContextHint> hints = invocation.getArgument(0, Set.class);
             final Set<UUID> seenIds = invocation.getArgument(1, Set.class);
-            final Set<Set<ContextHintWithSignature>> result = new HashSet<>();
-            for (ContextHintWithSignature hint : hints) {
+            final Set<Set<PublishedContextHint>> result = new HashSet<>();
+            for (PublishedContextHint hint : hints) {
                 if (!seenIds.contains(hint.getContextHint().getHintId())) {
                     result.add(Set.of(hint));
                 }
@@ -87,10 +87,10 @@ public class RefinerWorkflowTest {
         Refiner refiner = mock(Refiner.class);
 
         doAnswer(invocation -> {
-            final Set<ContextHintWithSignature> hints = invocation.getArgument(0, Set.class);
+            final Set<PublishedContextHint> hints = invocation.getArgument(0, Set.class);
             final Set<UUID> seenIds = invocation.getArgument(1, Set.class);
-            final Set<ContextHintWithSignature> result = new HashSet<>();
-            for (ContextHintWithSignature hint : hints) {
+            final Set<PublishedContextHint> result = new HashSet<>();
+            for (PublishedContextHint hint : hints) {
                 if (!seenIds.contains(hint.getContextHint().getHintId())) {
                     result.add(hint);
                 }
@@ -118,14 +118,15 @@ public class RefinerWorkflowTest {
         RefinerWorkflow.start(
                 provider,
                 Set.of(
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build(),
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build()),
                 /* renderToken= */ emptySet(),
                 key,
                 listener,
-                INLINE_EXECUTOR);
+                INLINE_EXECUTOR,
+                mock(RefinerWorkflow.InsightConsumer.class));
 
         verify(listener).onRefinerWorkflowStarted(anyLong(), any());
         verify(listener).onRefinerWorkflowFinished(anyLong());
@@ -145,19 +146,20 @@ public class RefinerWorkflowTest {
             invocation.getArgument(1, Consumer.class).accept(emptySet());
             return null;
         })
-                .when(refiner).refine(any(), any());
+                .when(refiner).refine(any(), any(), any());
 
         RefinerWorkflow.start(
                 provider,
                 Set.of(
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build(),
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build()),
                 /* renderToken= */ emptySet(),
                 key,
                 listener,
-                INLINE_EXECUTOR);
+                INLINE_EXECUTOR,
+                mock(RefinerWorkflow.InsightConsumer.class));
 
         verify(listener).onRefinerWorkflowStarted(anyLong(), any());
         verify(listener).onHintsSentToRefiner(anyLong(), any(), eq(refiner));
@@ -178,19 +180,20 @@ public class RefinerWorkflowTest {
             invocation.getArgument(1, Consumer.class).accept(emptySet());
             return null;
         })
-                .when(refiner).refine(any(), any());
+                .when(refiner).refine(any(), any(), any());
 
         RefinerWorkflow.start(
                 provider,
                 Set.of(
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build(),
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build()),
                 /* renderToken= */ emptySet(),
                 key,
                 listener,
-                INLINE_EXECUTOR);
+                INLINE_EXECUTOR,
+                mock(RefinerWorkflow.InsightConsumer.class));
 
         verify(listener).onRefinerWorkflowStarted(anyLong(), any());
         verify(listener, times(2)).onHintsSentToRefiner(anyLong(), any(), eq(refiner));
@@ -212,7 +215,7 @@ public class RefinerWorkflowTest {
         final Refiner refiner2 = mock(Refiner.class);
 
         doAnswer(invocation -> {
-            final Set<ContextHint> hints = ContextHintWithSignature.unwrapInto(
+            final Set<ContextHint> hints = PublishedContextHint.unwrapInto(
                     invocation.getArgument(0, Set.class), new HashSet<>());
             final Consumer<Set<ContextHint>> callback = invocation.getArgument(1, Consumer.class);
             if (hints.contains(hint2)) {
@@ -224,10 +227,10 @@ public class RefinerWorkflowTest {
             }
             return null;
         })
-                .when(refiner1).refine(any(), any());
+                .when(refiner1).refine(any(), any(), any());
 
         doAnswer(invocation -> {
-            final Set<ContextHintWithSignature> hints = invocation.getArgument(0, Set.class);
+            final Set<PublishedContextHint> hints = invocation.getArgument(0, Set.class);
             final Set<UUID> seenIds = invocation.getArgument(1, Set.class);
             if (hints.size() == 2 && seenIds.isEmpty()) {
                 return Set.of(hints);
@@ -242,17 +245,18 @@ public class RefinerWorkflowTest {
             callback.accept(emptySet());
             return null;
         })
-                .when(refiner2).refine(any(), any());
+                .when(refiner2).refine(any(), any(), any());
 
         doReturn(Set.of(refiner1, refiner2)).when(provider).getRefiners();
 
         RefinerWorkflow.start(
                 provider,
-                Set.of(new ContextHintWithSignature.Builder(hint1, key).build()),
+                Set.of(new PublishedContextHint.Builder(hint1, key).build()),
                 /* renderToken= */ emptySet(),
                 ContextHintTestUtils.generateSignedHintKey(),
                 listener,
-                INLINE_EXECUTOR);
+                INLINE_EXECUTOR,
+                mock(RefinerWorkflow.InsightConsumer.class));
 
         verify(listener).onRefinerWorkflowStarted(anyLong(), any());
         verify(listener).onHintsSentToRefiner(anyLong(), any(), eq(refiner1));
@@ -277,14 +281,15 @@ public class RefinerWorkflowTest {
         final RefinerWorkflow workflow = RefinerWorkflow.start(
                 provider,
                 Set.of(
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build(),
-                        new ContextHintWithSignature.Builder(new BundleHint.Builder().build(), key)
+                        new PublishedContextHint.Builder(new BundleHint.Builder().build(), key)
                                 .build()),
                 /* renderToken= */ emptySet(),
                 key,
                 listener,
-                INLINE_EXECUTOR);
+                INLINE_EXECUTOR,
+                mock(RefinerWorkflow.InsightConsumer.class));
 
         verify(listener).onRefinerWorkflowStarted(anyLong(), any());
         verify(listener).onHintsSentToRefiner(anyLong(), any(), eq(refiner));

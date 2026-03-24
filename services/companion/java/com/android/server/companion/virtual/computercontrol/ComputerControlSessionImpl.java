@@ -69,6 +69,7 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.view.DisplayInfo;
@@ -89,6 +90,7 @@ import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
+import com.android.server.wm.ActivityAssistInfo;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
@@ -182,6 +184,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final int mVirtualDisplayId;
     private final int mVirtualDeviceId;
     private final int mMainDisplayId;
+    @Nullable
+    private final String mReferenceDisplayAddress;
     private final VirtualTouchscreen mVirtualTouchscreen;
     private final VirtualDpad mVirtualDpad;
     private final ComputerControlAudioCapture mAudioCapture;
@@ -205,8 +209,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         fout.print("\n");
     }
 
-    private final ScheduledExecutorService mScheduler =
-            Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService mScheduler;
+
     /** Executor for the shared FgThread. */
     private final Executor mFgThreadExecutor;
 
@@ -228,12 +232,20 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @GuardedBy("mAllowlistedPackages")
     private final Set<String> mAllowlistedPackages = new ArraySet<>();
 
+    /** Task IDs that are authorized for content visibility. */
+    @GuardedBy("mAllowedTaskIds")
+    private final Set<Integer> mAllowedTaskIds = new ArraySet<>();
+
+    /** Whether screenshot is allowed depending on if the top activity is allowlisted. */
+    @GuardedBy("mAllowedTaskIds")
+    private boolean mIsTopActivityScreenshotAllowed = false;
+
     // Handle state transitions for the session lifecycle.
-    // NOTE: Do not make lifecycle transitions from these callbacks.
     private final ComputerControlSession.LifecycleCallback mStateTransitions =
             new ComputerControlSession.LifecycleCallback() {
                 @Override
                 public void onActive() {
+                    handleStateTransition();
                     mStatsController.onSessionActive();
                 }
 
@@ -241,7 +253,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 public void onBlocked(@ComputerControlSession.SessionBlockReason int reason,
                         @Nullable String blockingPackage) {
                     cancelOngoingInteractions();
+                    handleStateTransition();
                     mStatsController.onSessionBlocked(reason);
+                }
+
+                // Shared configuration updates when transitioning between non-closed states.
+                private void handleStateTransition() {
+                    updatePowerState();
+                    updateMirrorInteractivity();
                 }
 
                 @Override
@@ -253,7 +272,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             };
 
     // Keeps track of the current lifecycle state. Thread safe.
-    private final SessionLifecycle mLifecycle = new SessionLifecycle(mStateTransitions);
+    private final SessionLifecycle mLifecycle;
 
     private final Object mNotificationLock = new Object();
     @GuardedBy("mNotificationLock")
@@ -268,6 +287,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     // A list of active interactive mirrors. The presence of mirrors indicates foreground
     // automation, which enables touch visualization.
     private final List<InteractiveMirrorImpl> mInteractiveMirrors = new ArrayList<>();
+    @GuardedBy("mInteractiveMirrors")
+    private boolean mIsVirtualDeviceAsleep = false;
 
     @Nullable
     private ScheduledFuture<?> mSwipeFuture;
@@ -288,16 +309,44 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @GuardedBy("mWindowDrawLock")
     private boolean mIsWaitingForWindowDraw = false;
 
+    private final InteractiveMirrorImpl.InteractiveMirrorImplCallback mInteractiveMirrorCallback =
+            new InteractiveMirrorImpl.InteractiveMirrorImplCallback() {
+                @Override
+                public void onInteractiveChanged(boolean isInteractive) {
+                    synchronized (mInteractiveMirrors) {
+                        if (areAnyMirrorsInteractive()) {
+                            // If any mirror is interactive, allow it to steal top focus to allow
+                            // key event and IME interactions from the user.
+                            mWindowManagerInternal.setCanStealTopFocusForDisplay(
+                                    mVirtualDisplayId, /* canStealTopFocus= */ true);
+                        } else {
+                            // If all mirrors are non-interactive, disable top focus stealing for
+                            // the virtual display by clearing the override.
+                            mWindowManagerInternal.setCanStealTopFocusForDisplay(
+                                    mVirtualDisplayId, /* canStealTopFocus= */ false);
+                        }
+                    }
+                    mStatsController.onMirrorViewInteractive(isInteractive);
+                }
+
+                @Override
+                public void onClose(InteractiveMirrorImpl mirror) {
+                    removeInteractiveMirror(mirror);
+                }
+            };
+
     ComputerControlSessionImpl(Context context,
             ComputerControlAllowlistController allowlistController, IBinder appToken,
             ComputerControlSessionParams params, IApplicationThread appThread,
             AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
-            Consumer<ComputerControlSessionImpl> onClosedListener) {
+            Consumer<ComputerControlSessionImpl> onClosedListener,
+            @Nullable String referenceDisplayAddress) {
         this(context, DisplayManagerGlobal.getInstance(), allowlistController,
                 ViewConfiguration.get(context), DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS,
                 SurfaceControl.Transaction::new, appToken, params, appThread, attributionSource,
-                virtualDeviceFactory, onClosedListener, FgThread.getExecutor());
+                virtualDeviceFactory, onClosedListener, FgThread.getExecutor(),
+                referenceDisplayAddress, Executors.newSingleThreadScheduledExecutor());
     }
 
     @VisibleForTesting
@@ -308,7 +357,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             ComputerControlSessionParams params, IApplicationThread appThread,
             AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
-            Consumer<ComputerControlSessionImpl> onClosedListener, Executor fgThreadExecutor) {
+            Consumer<ComputerControlSessionImpl> onClosedListener, Executor fgThreadExecutor,
+            @Nullable String referenceDisplayAddress, ScheduledExecutorService scheduler) {
         Trace.asyncTraceForTrackBegin(mTraceTrack, "Session", TRACE_COOKIE_SESSION);
         mFgThreadExecutor = fgThreadExecutor;
         mViewConfiguration = viewConfiguration;
@@ -320,6 +370,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mPreviewIntent = params.getPreviewIntent();
         mAppThread = appThread;
         mAttributionTag = attributionSource.getAttributionTag();
+        mReferenceDisplayAddress = referenceDisplayAddress;
+        mScheduler = scheduler;
+        mLifecycle = new SessionLifecycle(mScheduler, mStateTransitions);
 
         mOwnerUser = UserHandle.getUserHandleForUid(attributionSource.getUid());
         mOwnerContext = context.createContextAsUser(mOwnerUser, /* flags = */ 0);
@@ -367,8 +420,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final VirtualDeviceParams virtualDeviceParams = virtualDeviceParamsBuilder.build();
 
         final VirtualDisplayConfig virtualDisplayConfig = createSessionDisplayConfig(
-                mParams.getName() + "-display",
-                mDisplayManagerGlobal.getDisplayInfo(mMainDisplayId));
+                mParams.getName() + "-display", getTargetDisplayInfo());
         final int displayWidth = virtualDisplayConfig.getWidth();
         final int displayHeight = virtualDisplayConfig.getHeight();
 
@@ -388,6 +440,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mWindowManagerInternal.enablePowerOptimizations(mVirtualDisplayId, /* enable = */ true);
             mWindowManagerInternal.enableClientRenderingLimitationsOnDisplay(
                     mVirtualDisplayId, /* enable = */true);
+            mWindowManagerInternal.setCanStealTopFocusForDisplay(
+                    mVirtualDisplayId, /* canStealTopFocus= */ false);
 
             mVirtualDevice.setDisplayImePolicy(
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
@@ -434,30 +488,53 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 this);
     }
 
+    private DisplayInfo getTargetDisplayInfo() {
+        if (TextUtils.isEmpty(mReferenceDisplayAddress)) {
+            Slog.i(TAG, "No configured reference display, using main display " + mMainDisplayId
+                    + " for Computer Control virtual display dimensions");
+            return mDisplayManagerGlobal.getDisplayInfo(mMainDisplayId);
+        }
+        long configAddress = Long.parseLong(mReferenceDisplayAddress);
+        int[] displayIds = mDisplayManagerGlobal.getDisplayIds(/* includeDisabled= */ true);
+        for (int i = 0; i < displayIds.length; i++) {
+            DisplayInfo info = mDisplayManagerGlobal.getDisplayInfo(displayIds[i]);
+            if (info != null && info.address != null) {
+                long physicalId = info.address.getPhysicalDisplayId();
+                if (physicalId == configAddress) {
+                    Slog.i(TAG,
+                            "Using configured reference display " + displayIds[i]
+                                    + " (physical address: " + mReferenceDisplayAddress
+                                    + ") for Computer Control virtual display dimensions");
+                    return info;
+                }
+            }
+        }
+        return mDisplayManagerGlobal.getDisplayInfo(mMainDisplayId);
+    }
+
     /**
-     * Create the session's display to have the same size and density as that of the main display
-     * when it is in its natural orientation.
+     * Create the session's display to have the same size and density as that of the
+     * {@code refDisplayInfo} when it is in its natural orientation.
      */
     private static VirtualDisplayConfig createSessionDisplayConfig(String name,
-            DisplayInfo mainDisplayInfo) {
+            DisplayInfo refDisplayInfo) {
         final int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
-                | DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED
-                | DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED;
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
 
         final int displayWidth;
         final int displayHeight;
-        if (mainDisplayInfo.rotation == Surface.ROTATION_90
-                || mainDisplayInfo.rotation == Surface.ROTATION_270) {
-            displayWidth = mainDisplayInfo.logicalHeight;
-            displayHeight = mainDisplayInfo.logicalWidth;
+        if (refDisplayInfo.rotation == Surface.ROTATION_90
+                || refDisplayInfo.rotation == Surface.ROTATION_270) {
+            displayWidth = refDisplayInfo.logicalHeight;
+            displayHeight = refDisplayInfo.logicalWidth;
         } else {
-            displayWidth = mainDisplayInfo.logicalWidth;
-            displayHeight = mainDisplayInfo.logicalHeight;
+            displayWidth = refDisplayInfo.logicalWidth;
+            displayHeight = refDisplayInfo.logicalHeight;
         }
 
         return new VirtualDisplayConfig.Builder(
                 name, displayWidth, displayHeight,
-                mainDisplayInfo.logicalDensityDpi)
+                refDisplayInfo.logicalDensityDpi)
                 .setFlags(displayFlags)
                 .setIgnoreActivitySizeRestrictions(true)
                 .build();
@@ -498,6 +575,21 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         return mIsTestSession;
     }
 
+    void monitor() {
+        synchronized (mAllowlistedPackages) { /* no-op */ }
+        synchronized (mAllowedTaskIds) { /* no-op */ }
+        synchronized (mNotificationLock) { /* no-op */ }
+        synchronized (mPreviewIntentLock) { /* no-op */ }
+        synchronized (mWindowDrawLock) { /* no-op */ }
+        synchronized (mInteractiveMirrors) {
+            for (int i = 0; i < mInteractiveMirrors.size(); i++) {
+                mInteractiveMirrors.get(i).monitor();
+            }
+        }
+        mLifecycle.monitor();
+        mStatsController.monitor();
+    }
+
     @Override
     public void initialize(IComputerControlLifecycleCallback callback, Surface clientSurface) {
         if (mClientSurface != null) {
@@ -523,6 +615,15 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     "Trying to launch " + packageName + " which is not allowlisted");
         }
 
+        synchronized (mAllowlistedPackages) {
+            if (!mAllowlistedPackages.contains(packageName)) {
+                throw new IllegalArgumentException(
+                        "Trying to launch "
+                                + packageName
+                                + " which is not a target package for the current session");
+            }
+        }
+
         // TODO(b/444600407): Remove this once the consent model is per-target app. While the
         // consent is general, the caller can extend the list of target packages dynamically.
         if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
@@ -530,9 +631,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             return;
         }
         cancelOngoingInteractions();
-        synchronized (mAllowlistedPackages) {
-            mAllowlistedPackages.add(packageName);
-        }
         // If we block input and screenshots in the blocked state, we simply allow all
         // activities to launch. We detect blocked state automatically when an activity
         // launch request comes in for a package that's not allowed to launch.
@@ -622,18 +720,21 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final boolean foregroundMirroringStarted;
         synchronized (mInteractiveMirrors) {
             foregroundMirroringStarted = mInteractiveMirrors.isEmpty();
+            mInteractiveMirrors.add(mirror);
             if (foregroundMirroringStarted) {
+                updatePowerState();
                 // Automation is no longer running in the background. Show touches.
                 mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
                         true /* enabled */);
                 // Automation is happening in the foreground, so enable rendering.
                 mWindowManagerInternal.enableClientRenderingLimitationsOnDisplay(
                         mVirtualDisplayId, /* enable = */false);
+                mWindowManagerInternal.enablePowerOptimizations(
+                        mVirtualDisplayId, /* enable = */false);
                 mWindowManagerInternal.requestHardwareRendererOutputEnabled(mVirtualDisplayId,
                         0 /* timeoutMs */, (success) -> {
                         }, mScheduler);
             }
-            mInteractiveMirrors.add(mirror);
         }
         outMirrorSurface.copyFrom(mirror.getMirrorLeash(),
                 "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
@@ -679,7 +780,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
         return new InteractiveMirrorImpl(mirror, mTransactionSupplier,
                 mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal,
-                mStatsController::onMirrorViewInteractive, this::removeInteractiveMirror);
+                isMirrorInteractionAllowed(), mInteractiveMirrorCallback);
     }
 
     private void removeInteractiveMirror(InteractiveMirrorImpl interactiveMirror) {
@@ -690,12 +791,15 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             }
             foregroundMirroringStopped = mInteractiveMirrors.isEmpty();
             if (foregroundMirroringStopped) {
+                updatePowerState();
                 // Automation is fully running in the background. No need to show touches.
                 mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
                         false /* enabled */);
                 // Disable rendering during background automation, where windows will only draw
                 // when the client requests a screenshot.
                 mWindowManagerInternal.enableClientRenderingLimitationsOnDisplay(
+                        mVirtualDisplayId, /* enable = */true);
+                mWindowManagerInternal.enablePowerOptimizations(
                         mVirtualDisplayId, /* enable = */true);
                 synchronized (mWindowDrawLock) {
                     if (!mIsWaitingForWindowDraw) {
@@ -731,6 +835,57 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
                     false /* enabled */);
         }
+    }
+
+    private void updatePowerState() {
+        synchronized (mInteractiveMirrors) {
+            final var state = mLifecycle.getCurrentState();
+            if (state instanceof LifecycleState.Closed) {
+                return;
+            }
+            final boolean shouldSleep =
+                    state instanceof LifecycleState.Blocked && mInteractiveMirrors.isEmpty();
+            if (mIsVirtualDeviceAsleep == shouldSleep) {
+                return;
+            }
+            mIsVirtualDeviceAsleep = shouldSleep;
+            Slog.i(TAG, "updatePowerState: " + (shouldSleep ? "sleeping" : "waking up"));
+            if (shouldSleep) {
+                mVirtualDevice.goToSleep();
+            } else {
+                mVirtualDevice.wakeUp();
+            }
+        }
+    }
+
+    private void updateMirrorInteractivity() {
+        try (var transaction = mTransactionSupplier.get()) {
+            synchronized (mInteractiveMirrors) {
+                for (int i = 0; i < mInteractiveMirrors.size(); i++) {
+                    mInteractiveMirrors.get(i).updateInteractivity(isMirrorInteractionAllowed(),
+                            transaction);
+                }
+            }
+            transaction.apply();
+        }
+    }
+
+    // Policy method for when any mirror is allowed to be interacted with by the user. The user
+    // currently must only interact when the client is blocked, to avoid interfering with client
+    // interactions.
+    private boolean isMirrorInteractionAllowed() {
+        return mLifecycle.getCurrentState() instanceof LifecycleState.Blocked;
+    }
+
+    private boolean areAnyMirrorsInteractive() {
+        synchronized (mInteractiveMirrors) {
+            for (int i = 0; i < mInteractiveMirrors.size(); i++) {
+                if (mInteractiveMirrors.get(i).isInteractive()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @SuppressLint("WrongConstant")
@@ -820,6 +975,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             Slog.e(TAG, "Cannot request screenshot: Session is closed");
             return false;
         }
+
+        // Limit screenshots to the task of allowlisted packages of the automated apps.
+        // In the Blocked state, this check ensures the agent only sees authorized content.
+        synchronized (mAllowedTaskIds) {
+            if (!mIsTopActivityScreenshotAllowed) {
+                Slog.w(TAG, "Screenshot blocked: Top task not part of the initial automated set.");
+                return false;
+            }
+        }
+
         synchronized (mWindowDrawLock) {
             if (mIsWaitingForWindowDraw) {
                 Slog.w(TAG, "Cannot request screenshot: Window draw is already in progress");
@@ -836,6 +1001,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
     }
 
+    /** Retrieves the Task ID for the top activity on a given display. */
+    private int getTopTaskId(int displayId) {
+        List<ActivityAssistInfo> topActivities =
+                mActivityTaskManagerInternal.getTopVisibleActivities(displayId);
+        if (topActivities != null && !topActivities.isEmpty()) {
+            return topActivities.get(0).getTaskId();
+        }
+        return -1;
+    }
+
     private void onWindowsDrawnCallback(boolean success) {
         if (!success) {
             Slog.w(TAG, "Timed out waiting for windows to be drawn!");
@@ -850,6 +1025,18 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 Trace.asyncTraceForTrackEnd(mTraceTrack, TRACE_COOKIE_WINDOW_DRAW);
             }
         }
+    }
+
+    @Override
+    public void notifyBlocked() {
+        mLifecycle.updateLifecycleState((config) -> {
+            config.mCallerInitiatedBlock = true;
+        });
+    }
+
+    @Override
+    public void requestUnblock() {
+        mLifecycle.exitBlockedState();
     }
 
     @Override
@@ -1063,6 +1250,20 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             Slog.v(TAG, "Top activity changed to " + topActivity + " for user " + userId);
             cancelDisplayEmptyScheduledAction();
 
+            // If this new activity belongs to a package the session is authorized to control,
+            // we should trust it, even if it's a secondary task (like a new Chrome window).
+            synchronized (mAllowedTaskIds) {
+                boolean isPackageAllowed = mParams.getTargetPackageNames()
+                        .contains(topActivity.getPackageName());
+                int taskId = isPackageAllowed ? getTopTaskId(mVirtualDisplayId) : -1;
+                if (taskId != -1) {
+                    mAllowedTaskIds.add(taskId);
+                }
+
+                // Screenshots are only allowed if the package is valid AND we have a valid Task ID
+                mIsTopActivityScreenshotAllowed = (taskId != -1);
+            }
+
             // If we have a new top activity which is allowed, then attempt a transition to the
             // active state.
             if (isActivityLaunchAllowed(topActivity, userId)) {
@@ -1085,6 +1286,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     () -> close(CLOSE_REASON_SESSION_EMPTY),
                     CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS,
                     TimeUnit.MILLISECONDS);
+            synchronized (mAllowedTaskIds) {
+                mAllowedTaskIds.clear();
+                mIsTopActivityScreenshotAllowed = false;
+            }
         }
 
         @Override

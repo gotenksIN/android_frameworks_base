@@ -10,6 +10,8 @@ package com.android.settingslib;
 
 import static android.app.admin.DevicePolicyResources.Strings.Settings.WORK_PROFILE_USER_LABEL;
 
+import static com.android.settingslib.Utils.fetchUserIconInfo;
+
 import android.annotation.ColorInt;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
@@ -79,6 +81,7 @@ import com.android.launcher3.util.UserIconInfo;
 import com.android.settingslib.drawable.UserIconDrawable;
 import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.settingslib.fuelgauge.BatteryUtils;
+import com.android.users.UserType;
 
 import java.util.List;
 
@@ -88,6 +91,8 @@ public class Utils {
 
     public static final String INCOMPATIBLE_CHARGER_WARNING_DISABLED =
             "incompatible_charger_warning_disabled";
+    public static final String KEY_WIRELESS_INCOMPATIBLE_CHARGING_STATE =
+            "wireless_incompatible_charging_state";
 
     @VisibleForTesting
     static final String STORAGE_MANAGER_ENABLED_PROPERTY = "ro.storage_manager.enabled";
@@ -802,17 +807,21 @@ public class Utils {
     @NonNull
     public static UserIconInfo fetchUserIconInfo(@NonNull Context context,
             @NonNull UserHandle user) {
-        int userType = UserIconInfo.TYPE_MAIN;
+        UserType userType = UserType.MAIN;
         try {
             UserInfo ui =
                     context.getSystemService(UserManager.class).getUserInfo(user.getIdentifier());
             if (ui != null) {
                 if (ui.isCloneProfile()) {
-                    userType = UserIconInfo.TYPE_CLONED;
+                    userType = UserType.CLONED;
                 } else if (ui.isManagedProfile()) {
-                    userType = UserIconInfo.TYPE_WORK;
+                    userType = UserType.WORK;
                 } else if (ui.isPrivateProfile()) {
-                    userType = UserIconInfo.TYPE_PRIVATE;
+                    userType = UserType.PRIVATE;
+                } else if (android.multiuser.Flags.hsuAppManagement()
+                        && UserManager.isHeadlessSystemUserMode()
+                        && user.getIdentifier() == UserHandle.USER_SYSTEM) {
+                    userType = UserType.SYSTEM_HEADLESS;
                 }
             }
         } catch (Exception e) {
@@ -934,5 +943,27 @@ public class Utils {
             }
         }
         return false;
+    }
+
+    /** Whether it is wireless incompatible charging or not? */
+    public static boolean isWirelessIncompatibleCharging(Context context) {
+        return Settings.Global.getInt(
+                        context.getContentResolver(),
+                        KEY_WIRELESS_INCOMPATIBLE_CHARGING_STATE,
+                        /* defaultValue= */ 0)
+                == 1;
+    }
+
+    /** Set wireless incompatible charging enabled. */
+    public static void setWirelessIncompatibleChargingEnabled(
+            Context context, boolean enabled) {
+        final boolean oldEnabledValue = isWirelessIncompatibleCharging(context);
+        if (oldEnabledValue == enabled) {
+            return;
+        }
+        Settings.Global.putInt(
+                context.getContentResolver(),
+                KEY_WIRELESS_INCOMPATIBLE_CHARGING_STATE,
+                enabled ? 1 : 0);
     }
 }

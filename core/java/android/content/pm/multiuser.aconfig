@@ -46,12 +46,6 @@ flag {
     bug: "285426179"
 }
 
-flag {
-    name: "use_all_cpus_during_user_switch"
-    namespace: "multiuser"
-    description: "Allow using all cpu cores during a user switch."
-    bug: "308105403"
-}
 
 flag {
     name: "upgrade_user_summary_behaviour"
@@ -62,35 +56,6 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
-
-# Begin Multiuser Widget flags #
-
-flag {
-    name: "multiuser_widget"
-    namespace: "multiuser"
-    description: "Implement the Multiuser Widget"
-    bug: "365748524"
-}
-
-flag {
-    name: "widget_current_user_view"
-    namespace: "multiuser"
-    description: "When flag is enabled, widget shows the current user only"
-    bug: "409327566"
-}
-
-flag {
-    name: "widget_scaling_bugfix"
-    namespace: "multiuser"
-    description: "When flag is enabled, scaling fixes are applied to the widget"
-    bug: "430040190"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-
-# End Multiuser Widget flags #
 
 flag {
     name: "enable_biometrics_to_unlock_private_space"
@@ -138,23 +103,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-    name: "show_policy_transparency_for_system_restrictions"
-    namespace: "multiuser"
-    description: "Show policy transparency dialog when \"Add user\" actions are restricted in COPE."
-    bug: "338226475"
-}
-
-flag {
-    name: "show_confirmation_toast_on_user_deletion"
-    namespace: "multiuser"
-    description: "Show a toast to confirm that user deletion has been successful"
-    bug: "438126997"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -220,19 +168,6 @@ flag {
     bug: "321988638"
 }
 
-flag {
-    name: "reorder_wallpaper_during_user_switch"
-    namespace: "multiuser"
-    description: "Reorder loading home and lock screen wallpapers during a user switch."
-    bug: "324911115"
-}
-
-flag {
-    name: "set_power_mode_during_user_switch"
-    namespace: "multiuser"
-    description: "Set power mode during a user switch."
-    bug: "325249845"
-}
 
 flag {
     name: "stop_previous_user_apps"
@@ -246,13 +181,6 @@ flag {
     namespace: "profile_experiences"
     description: "Disables adding items belonging to Private Space on Home Screen manually as well as automatically"
     bug: "287975131"
-}
-
-flag {
-    name: "enable_private_space_intent_redirection"
-    namespace: "profile_experiences"
-    description: "Enable Private Space telephony and SMS intent redirection to the main user"
-    bug: "325576602"
 }
 
 flag {
@@ -407,6 +335,13 @@ flag {
     namespace: "multiuser"
     description: "Adds logging for which notifications are shown when the current user is the headless system user. Implementation will use a separate flag."
     bug: "412176703"
+}
+
+flag {
+    name: "enable_explicit_static_overlay_allowlisting"
+    namespace: "multiuser"
+    description: "Allow explicit allowlisting for static overlays."
+    bug: "487778300"
 }
 
 flag {

@@ -142,6 +142,9 @@
     <dimen name="status_bar_bottom_aligned_margin_rotation_180">-1px</dimen>
     <dimen name="status_bar_bottom_aligned_margin_rotation_270">-1px</dimen>
 
+     <!-- Height for shrink-wrapped icons displayed in composables in the status bar -->
+    <dimen name="status_bar_composable_icon_height_sp">13sp</dimen>
+
     <!-- Height of the icon container views in the status bar -->
     <dimen name="status_bar_icon_container_height">@dimen/status_bar_icon_size_sp</dimen>
 
@@ -697,6 +700,9 @@
     <dimen name="qs_tile_margin_horizontal">8dp</dimen>
     <dimen name="qs_tile_margin_vertical">@dimen/qs_tile_margin_horizontal</dimen>
     <dimen name="qs_brightness_margin_top">8dp</dimen>
+    <dimen name="brightness_dialog_expanded_width">364dp</dimen>
+    <dimen name="brightness_dialog_margin_end">24dp</dimen>
+    <dimen name="brightness_dialog_margin_top">0dp</dimen>
     <dimen name="qqs_layout_margin_top">16dp</dimen>
     <dimen name="qqs_layout_padding_bottom">24dp</dimen>
     <item name="qqs_expand_clock_scale" format="float" type="dimen">2.57</item>
@@ -1546,7 +1552,7 @@
 
     <!-- Connected display dialog -->
     <dimen name="connected_display_dialog_logo_size">48dp</dimen>
-    <dimen name="connected_display_dialog_landscape_width">412dp</dimen>
+    <dimen name="connected_display_dialog_fixed_width">412dp</dimen>
 
     <!-- Keyguard user switcher -->
     <dimen name="kg_user_switcher_text_size">16sp</dimen>
@@ -1771,6 +1777,7 @@
     <dimen name="rounded_slider_icon_size">20dp</dimen>
 
     <dimen name="rounded_slider_background_padding">8dp</dimen>
+    <dimen name="rounded_slider_horizontal_padding">4dp</dimen>
     <!-- rounded_slider_corner_radius + rounded_slider_background_padding -->
     <dimen name="rounded_slider_background_rounded_corner">32dp</dimen>
     <dimen name="rounded_slider_boundary_offset">16dp</dimen>
@@ -2045,6 +2052,8 @@
     <dimen name="dream_overlay_entry_y_offset">40dp</dimen>
     <dimen name="dream_overlay_exit_y_offset">40dp</dimen>
 
+    <dimen name="dream_switcher_swipe_edge_width_default">30dp</dimen>
+
     <!-- Media output broadcast dialog QR code picture size -->
     <dimen name="media_output_qrcode_size">216dp</dimen>
     <dimen name="media_output_broadcast_info">21dp</dimen>
@@ -2179,14 +2188,22 @@
     <dimen name="volume_dialog_button_size">48dp</dimen>
     <dimen name="volume_dialog_slider_width">52dp</dimen>
     <dimen name="volume_dialog_slider_height">254dp</dimen>
+
+    <dimen name="volume_dialog_horizontal_height">56dp</dimen>
+    <dimen name="volume_dialog_horizontal_background_corner_radius">28dp</dimen>
+    <dimen name="volume_dialog_horizontal_background_margin_negative">-4dp</dimen>
+    <dimen name="volume_dialog_horizontal_background_top_margin">-12dp</dimen>
+    <dimen name="volume_dialog_horizontal_slider_container_height">32dp</dimen>
+    <dimen name="volume_dialog_horizontal_slider_width">296dp</dimen>
+    <dimen name="volume_dialog_horizontal_slider_width_with_captions">252dp</dimen>
     <!--
         A primary goal of this margin is to vertically constraint slider height in the landscape
         orientation when the vertical space is limited
     -->
     <dimen name="volume_dialog_slider_vertical_margin">124dp</dimen>
     <dimen name="volume_dialog_slider_vertical_margin_with_captions_toggle">130dp</dimen>
-    <dimen name="volume_dialog_slider_horizontal_margin">82dp</dimen>
-    <dimen name="volume_dialog_slider_horizontal_margin_with_captions_toggle">130dp</dimen>
+    <dimen name="volume_dialog_slider_horizontal_margin">81dp</dimen>
+    <dimen name="volume_dialog_slider_horizontal_margin_with_captions_toggle">124dp</dimen>
     <dimen name="volume_dialog_half_opened_offset">-128dp</dimen>
     <dimen name="volume_dialog_slider_max_deviation">56dp</dimen>
     <dimen name="volume_dialog_floating_slider_background_corner_radius">20dp</dimen>
@@ -2199,6 +2216,8 @@
 
     <dimen name="volume_panel_slice_vertical_padding">8dp</dimen>
     <dimen name="volume_panel_slice_horizontal_padding">24dp</dimen>
+    <!-- The min height on the row of media input/output. -->
+    <dimen name="volume_panel_audio_tile_height">56dp</dimen>
     <!-- Volume end -->
 
     <!-- Gradient color wallpaper start -->
@@ -2254,11 +2273,11 @@
     <!-- Tile Details entry end -->
 
     <!-- Bouncer containerization on large screens -->
-    <dimen name="bouncer_container_min_width">1280dp</dimen>
-    <dimen name="bouncer_container_max_width">1440dp</dimen>
-    <dimen name="bouncer_container_min_height">720dp</dimen>
-    <dimen name="bouncer_container_max_height">810dp</dimen>
-    <item name="bouncer_container_size_percentage" format="float" type="dimen">0.72</item>
+    <dimen name="bouncer_container_min_long_edge">1280dp</dimen>
+    <dimen name="bouncer_container_max_long_edge">1440dp</dimen>
+    <dimen name="bouncer_container_min_short_edge">720dp</dimen>
+    <dimen name="bouncer_container_max_short_edge">810dp</dimen>
+    <item name="bouncer_container_size_fraction" format="float" type="dimen">0.72</item>
     <!-- Bouncer containerization on large screens end -->
 
     <!-- Lockscreen blur values -->
@@ -2275,7 +2294,6 @@
     <dimen name="usb_device_dialog_button_padding_vertical">10dp</dimen>
     <dimen name="usb_device_dialog_always_use_checkbox_corners_radius">20dp</dimen>
     <dimen name="usb_device_dialog_always_use_checkbox_padding_vertical">12dp</dimen>
-    <dimen name="usb_device_dialog_always_use_checkbox_margin_horizontal">16dp</dimen>
     <dimen name="usb_device_dialog_icon_size">32dp</dimen>
     <dimen name="usb_device_dialog_button_height">40dp</dimen>
 

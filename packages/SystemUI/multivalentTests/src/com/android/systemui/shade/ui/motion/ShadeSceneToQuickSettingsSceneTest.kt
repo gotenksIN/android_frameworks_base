@@ -29,7 +29,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.swipe
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
-import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.snapshot.ObserveReadsRoot
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.Flags
@@ -39,15 +38,13 @@ import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
-import com.android.systemui.notifications.intelligence.rules.ui.composable.notificationRulesScreen
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesScreenViewModelFactory
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesShadeStateViewModelFactory
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesParentViewModelFactory
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.qs.shared.ui.QuickSettings.Elements
 import com.android.systemui.qs.ui.composable.QuickSettingsScene
 import com.android.systemui.qs.ui.viewmodel.quickSettingsSceneContentViewModelFactory
 import com.android.systemui.qs.ui.viewmodel.quickSettingsUserActionsViewModelFactory
-import com.android.systemui.scene.domain.interactor.sceneInteractor
+import com.android.systemui.scene.domain.interactor.awaitTransitionIdle
 import com.android.systemui.scene.sceneContainerTransitions
 import com.android.systemui.scene.sceneContainerViewModelFactory
 import com.android.systemui.scene.session.shared.SessionStorage
@@ -57,6 +54,7 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.ui.composable.ShadeScene
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
@@ -67,7 +65,6 @@ import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificati
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -111,11 +108,8 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
             contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
             notificationsPlaceholderViewModelFactory =
                 kosmos.notificationsPlaceholderViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
-            notificationRulesScreenViewModelFactory =
-                kosmos.notificationRulesScreenViewModelFactory,
-            notificationRulesScreen = kosmos.notificationRulesScreen,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
@@ -127,8 +121,8 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                 kosmos.notificationsPlaceholderViewModelFactory,
             actionsViewModelFactory = kosmos.quickSettingsUserActionsViewModelFactory,
             contentViewModelFactory = kosmos.quickSettingsSceneContentViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
@@ -145,11 +139,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                     recordingSpec =
                         ComposeRecordingSpec(
                             MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
+                                delayReadyToPlay = { awaitTransitionIdle(kosmos, Scenes.Shade) }
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
@@ -157,9 +147,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                         end = Offset(x = centerX, y = bottom),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -188,11 +175,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                     recordingSpec =
                         ComposeRecordingSpec(
                             MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
+                                delayReadyToPlay = { awaitTransitionIdle(kosmos, Scenes.Shade) }
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
@@ -201,9 +184,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                         durationMillis = 500,
                                     )
                                 }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                }
+                                awaitTransitionIdle(kosmos)
                             }
                         ) {
                             val qsPanelYCoordinate =
@@ -232,11 +213,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                     recordingSpec =
                         ComposeRecordingSpec(
                             MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
+                                delayReadyToPlay = { awaitTransitionIdle(kosmos, Scenes.Shade) }
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
@@ -244,9 +221,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                         end = Offset(x = centerX, y = bottom),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -275,11 +249,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                     recordingSpec =
                         ComposeRecordingSpec(
                             MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
+                                delayReadyToPlay = { awaitTransitionIdle(kosmos, Scenes.Shade) }
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
@@ -287,9 +257,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                         end = Offset(x = centerX, y = bottom),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -318,11 +285,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                     recordingSpec =
                         ComposeRecordingSpec(
                             MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
+                                delayReadyToPlay = { awaitTransitionIdle(kosmos, Scenes.Shade) }
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
@@ -330,9 +293,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                         end = Offset(x = centerX, y = bottom),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -361,11 +321,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                     recordingSpec =
                         ComposeRecordingSpec(
                             MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
+                                delayReadyToPlay = { awaitTransitionIdle(kosmos, Scenes.Shade) }
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
@@ -373,9 +329,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                         end = Offset(x = centerX, y = bottom),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -392,18 +345,11 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
 
     @Composable
     private fun ShadeSceneToQSSceneContainer() {
-        val transitionState =
-            MutableStateFlow<ObservableTransitionState>(
-                ObservableTransitionState.Idle(Scenes.Shade)
-            )
-
         PlatformTheme {
             WithStatusIconContext(kosmos.tintedIconManagerFactory) {
                 val vm =
                     rememberViewModel("HomeScreenShadeTest") {
-                        kosmos.sceneContainerViewModelFactory
-                            .create() {}
-                            .apply { setTransitionState(transitionState = transitionState) }
+                        kosmos.sceneContainerViewModelFactory.create() {}
                     }
                 ObserveReadsRoot {
                     SceneContainer(
@@ -418,6 +364,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )

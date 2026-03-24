@@ -16,33 +16,27 @@
 
 package com.android.server.wm;
 
-import static android.Manifest.permission.REPOSITION_SELF_WINDOWS;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_UNRESIZEABLE;
-import static android.content.pm.PackageManager.PERMISSION_DENIED;
-import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
+import static android.service.dreams.Flags.FLAG_DREAMS_QUERY_APPLICATION_INFO;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.server.display.feature.flags.Flags.FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT;
 import static com.android.server.wm.ActivityInterceptorCallback.MAINLINE_FIRST_ORDERED_ID;
 import static com.android.server.wm.ActivityInterceptorCallback.SYSTEM_FIRST_ORDERED_ID;
-import static android.service.dreams.Flags.FLAG_DREAMS_QUERY_APPLICATION_INFO;
-
 import static com.android.server.wm.ActivityInterceptorCallback.SYSTEM_LAST_ORDERED_ID;
 import static com.android.server.wm.ActivityRecord.State.PAUSED;
 import static com.android.server.wm.ActivityRecord.State.PAUSING;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityRecord.State.STOPPING;
-import static com.android.window.flags.Flags.FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API;
 import static com.android.window.flags.Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM;
 
 import static org.junit.Assert.assertEquals;
@@ -74,8 +68,8 @@ import android.app.ApplicationExitInfo;
 import android.app.HandoffActivityData;
 import android.app.HandoffActivityParams;
 import android.app.HandoffFailureCode;
-import android.app.IApplicationThread;
 import android.app.IAppTask;
+import android.app.IApplicationThread;
 import android.app.IHandoffTaskDataReceiver;
 import android.app.PictureInPictureParams;
 import android.app.PictureInPictureUiState;
@@ -107,6 +101,7 @@ import android.view.WindowManager;
 import androidx.test.filters.MediumTest;
 
 import com.android.server.LocalServices;
+import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.wm.utils.StubOrganizer;
 
 import org.junit.Before;
@@ -114,7 +109,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
-import org.mockito.MockitoSession;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -1750,10 +1744,11 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
     private WindowProcessController createWindowProcessController(String packageName,
             int userId) {
         WindowProcessListener mMockListener = Mockito.mock(WindowProcessListener.class);
+        ProcessRecordInternal owner = mock(ProcessRecordInternal.class);
         ApplicationInfo info = mock(ApplicationInfo.class);
         info.packageName = packageName;
         WindowProcessController wpc = new WindowProcessController(
-                mAtm, info, packageName, 0, userId, null, mMockListener);
+                mAtm, info, packageName, 0, userId, owner, mMockListener);
         mAtm.mInternal.preBindApplication(wpc, info);
         mAtm.mInternal.onProcessAdded(wpc);
         wpc.setThread(mock(IApplicationThread.class));
@@ -1949,54 +1944,6 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
 
         assertFalse(mAtm.mActivityClientController.enterPictureInPictureMode(record.token, params));
         assertFalse(record.inPinnedWindowingMode());
-    }
-
-    @EnableFlags(FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
-    @Test
-    public void testIsTaskMoveAllowedOnDisplay_permissionGranted() {
-        final int displayId = Display.DEFAULT_DISPLAY;
-        final DisplayContent dc = mRootWindowContainer.getDisplayContent(displayId);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(PERMISSION_GRANTED).when(() -> {
-                return ActivityTaskManagerService.checkPermission(
-                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-            });
-
-            doReturn(true).when(dc).isTaskMoveAllowedOnDisplay();
-            assertTrue(mAtm.isTaskMoveAllowedOnDisplay(displayId));
-
-            doReturn(false).when(dc).isTaskMoveAllowedOnDisplay();
-            assertFalse(mAtm.isTaskMoveAllowedOnDisplay(displayId));
-        } finally {
-            session.finishMocking();
-        }
-    }
-
-    @EnableFlags(FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
-    @Test
-    public void testIsTaskMoveAllowedOnDisplay_permissionDenied() {
-        final int displayId = Display.DEFAULT_DISPLAY;
-        final DisplayContent dc = mRootWindowContainer.getDisplayContent(displayId);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(PERMISSION_DENIED).when(() -> {
-                return ActivityTaskManagerService.checkPermission(
-                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-            });
-
-            doReturn(true).when(dc).isTaskMoveAllowedOnDisplay();
-            assertFalse(mAtm.isTaskMoveAllowedOnDisplay(displayId));
-
-            doReturn(false).when(dc).isTaskMoveAllowedOnDisplay();
-            assertFalse(mAtm.isTaskMoveAllowedOnDisplay(displayId));
-        } finally {
-            session.finishMocking();
-        }
     }
 
     @Test
@@ -2236,7 +2183,8 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
         final int userId = UserHandle.getUserId(uid);
 
         final WindowProcessController wpc = new WindowProcessController(mAtm, appInfo,
-                packageName, uid, userId, null /* owner */, mock(WindowProcessListener.class));
+                packageName, uid, userId, mock(ProcessRecordInternal.class) /* owner */,
+                mock(WindowProcessListener.class));
         wpc.setPid(pid);
         wpc.setThread(mock(IApplicationThread.class));
 

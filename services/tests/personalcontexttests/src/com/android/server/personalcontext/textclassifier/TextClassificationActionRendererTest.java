@@ -16,11 +16,14 @@
 
 package com.android.server.personalcontext.textclassifier;
 
+import static com.android.server.personalcontext.util.InsightUtils.fakePublishInsight;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -30,7 +33,7 @@ import android.app.RemoteAction;
 import android.content.Intent;
 import android.graphics.drawable.Icon;
 import android.service.personalcontext.hint.ContextHintTestUtils;
-import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.hint.PublishedContextHint;
 import android.service.personalcontext.hint.TextClassificationHint;
 import android.service.personalcontext.insight.ActionableInsight;
 import android.service.personalcontext.insight.BundleInsight;
@@ -67,7 +70,7 @@ public class TextClassificationActionRendererTest {
     @Test
     public void testRender_notActionableInsight_noMerge() {
         ContextInsight insight = new BundleInsight.Builder().build();
-        mRenderer.render(insight, null);
+        mRenderer.render(fakePublishInsight(insight), null);
 
         verify(mPersonalContextBridge, never()).merge(anyString(), any());
     }
@@ -75,12 +78,13 @@ public class TextClassificationActionRendererTest {
     @Test
     public void testRender_actionableInsightWithNoTextClassificationHint_noMerge() {
         InsightActionDetails actionDetails =
-                new InsightActionDetails.Builder().setIntent(new Intent()).build();
+                new InsightActionDetails.Builder()
+                        .setPendingIntent(mock(PendingIntent.class)).build();
         InsightDisplayDetails displayDetails =
                 new InsightDisplayDetails.Builder("title", TEST_ICON).build();
         ActionableInsight insight =
                 new ActionableInsight.Builder(actionDetails, displayDetails).build();
-        mRenderer.render(insight, null);
+        mRenderer.render(fakePublishInsight(insight), null);
 
         verify(mPersonalContextBridge, never()).merge(anyString(), any());
     }
@@ -89,7 +93,7 @@ public class TextClassificationActionRendererTest {
     public void testRender_actionableInsight_merge() throws Exception {
         ActionableInsight insight = buildActionableInsight("title", "sessionId");
 
-        mRenderer.render(insight, null);
+        mRenderer.render(fakePublishInsight(insight), null);
 
         ArgumentCaptor<TextClassification> captor =
                 ArgumentCaptor.forClass(TextClassification.class);
@@ -107,7 +111,7 @@ public class TextClassificationActionRendererTest {
         InsightCollection insightCollection =
                 new InsightCollection.Builder().addInsight(insight).build();
 
-        mRenderer.render(insightCollection, null);
+        mRenderer.render(fakePublishInsight(insightCollection), null);
 
         ArgumentCaptor<TextClassification> captor =
                 ArgumentCaptor.forClass(TextClassification.class);
@@ -144,7 +148,7 @@ public class TextClassificationActionRendererTest {
         ActionableInsight insight =
                 new ActionableInsight.Builder(actionDetails, displayDetails)
                         .addOriginHint(
-                                new ContextHintWithSignature.Builder(
+                                new PublishedContextHint.Builder(
                                                 hint, ContextHintTestUtils.generateSignedHintKey())
                                         .build())
                         .build();

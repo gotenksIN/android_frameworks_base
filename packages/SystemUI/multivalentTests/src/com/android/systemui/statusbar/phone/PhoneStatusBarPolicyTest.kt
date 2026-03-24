@@ -48,6 +48,7 @@ import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.policy.BluetoothController
 import com.android.systemui.statusbar.policy.DataSaverController
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
+import com.android.systemui.statusbar.policy.FiveGServiceClient
 import com.android.systemui.statusbar.policy.HotspotController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.policy.LocationController
@@ -67,6 +68,7 @@ import com.android.systemui.util.time.DateFormatUtil
 import com.android.systemui.util.time.FakeSystemClock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -128,6 +130,7 @@ class PhoneStatusBarPolicyTest : SysuiTestCase() {
     private lateinit var ringerModeTracker: RingerModeTracker
     @Mock private lateinit var privacyItemController: PrivacyItemController
     @Mock private lateinit var privacyLogger: PrivacyLogger
+    @Mock private lateinit var fiveGServiceClient: FiveGServiceClient
     @Captor
     private lateinit var alarmCallbackCaptor:
         ArgumentCaptor<NextAlarmController.NextAlarmChangeCallback>
@@ -397,6 +400,7 @@ class PhoneStatusBarPolicyTest : SysuiTestCase() {
             fakeConnectedDisplayStateProvider,
             kosmos.zenModeInteractor,
             kosmos.javaAdapter,
+            fiveGServiceClient,
         )
     }
 
@@ -407,7 +411,7 @@ class PhoneStatusBarPolicyTest : SysuiTestCase() {
             flow.value = value
         }
 
-        override val connectedDisplayState: Flow<State>
+        override val connectedDisplayState: StateFlow<State>
             get() = flow
 
         override val connectedDisplayAddition: Flow<Unit>

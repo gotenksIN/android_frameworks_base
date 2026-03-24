@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wm;
@@ -364,6 +368,7 @@ import com.android.server.DisplayThread;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
 import com.android.server.LockGuard;
+import com.android.server.StorageManagerInternal;
 import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.am.UserState;
@@ -375,9 +380,7 @@ import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.theming.ThemeManagerInternal;
 import com.android.server.utils.PriorityDump;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+import com.android.server.am.QtiBackgroundManager;
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -405,9 +408,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -1248,10 +1249,6 @@ public class WindowManagerService extends IWindowManager.Stub
     /** Listener to notify activity manager about app transitions. */
     final WindowManagerInternal.AppTransitionListener mActivityManagerAppTransitionNotifier
             = new WindowManagerInternal.AppTransitionListener() {
-
-        @Override
-        public void onAppTransitionCancelledLocked(boolean keyguardGoingAwayCancelled) {
-        }
 
         @Override
         public void onAppTransitionFinishedLocked(IBinder token) {
@@ -2104,7 +2101,9 @@ public class WindowManagerService extends IWindowManager.Stub
 
         if (imMayMove) {
             displayContent.computeImeLayeringTarget(true /* update */);
-            if (WindowManager.useClientSurface() && displayContent.getImeLayeringTarget() == win) {
+            final WindowState imeWindow = displayContent.getImeWindow();
+            if (WindowManager.useClientSurface() && displayContent.getImeLayeringTarget() == win
+                    && imeWindow != null && imeWindow.isVisible()) {
                 // Since WindowState#showSurfaceOnCreation is false, explicitly show the surface if
                 // it is the IME layering target.
                 displayContent.getPendingTransaction().show(win.mSurfaceControl);
@@ -3064,15 +3063,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-        //unfreeze process if the first frame appeared
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-        if (freezer != null && freezer.useFreezerManager()) {
-            freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
-        }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+        QtiBackgroundManager.getInstance().unfreezeProcessLevel(
+                session.mPackageName, QtiBackgroundManager.COMPLETE_LAUNCH_UNFREEZE);
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());
@@ -4322,6 +4314,15 @@ public class WindowManagerService extends IWindowManager.Stub
 
             if (!mShowingBootMessages && !mPolicy.canDismissBootAnimation()) {
                 return;
+            }
+
+            if (Flags.syncBeforeEnablingScreen()) {
+                final StorageManagerInternal smi =
+                        LocalServices.getService(StorageManagerInternal.class);
+                if (smi != null && smi.waitForCheckpointReady(this::enableScreenIfNeeded)) {
+                    ProtoLog.i(WM_DEBUG_BOOT, "Need to wait for the checkpoint to be ready");
+                    return;
+                }
             }
 
             // Don't enable the screen until all existing windows have been drawn.
@@ -8872,6 +8873,9 @@ public class WindowManagerService extends IWindowManager.Stub
                         "requestHardwareRendererOutputEnabled", false /* parallel */);
                 dc.forAllWindows(win -> {
                     if (win.isVisibleNow()) {
+                        // Reset the draw state to accurately know when the window has fully redrawn
+                        // following the re-enabling of hardware renderer output.
+                        win.mWinAnimator.resetDrawState();
                         mSyncEngine.addToSyncSet(syncId, win);
                     }
                 }, true /* traverseTopToBottom */);
@@ -8910,6 +8914,20 @@ public class WindowManagerService extends IWindowManager.Stub
                     return;
                 }
                 dc.enableClientRenderingLimitations(enable);
+            }
+        }
+
+        @Override
+        public void setCanStealTopFocusForDisplay(int displayId, boolean canStealTopFocus) {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null) {
+                    Slog.e(TAG, "Failed to change can-steal-top-focus override"
+                            + " for display: " + displayId
+                            + " - DisplayContent not found.");
+                    return;
+                }
+                mDisplayWindowSettings.setCanStealTopFocus(dc, canStealTopFocus);
             }
         }
 
@@ -11200,9 +11218,6 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     @Override
     public boolean isCallerVirtualDeviceOwner(int displayId, int callingUid) {
-        if (!android.companion.virtualdevice.flags.Flags.statusBarAndInsets()) {
-            return false;
-        }
         final long identity = Binder.clearCallingIdentity();
         try {
             return mAtmService.mTaskSupervisor.isDeviceOwnerUid(displayId, callingUid);

@@ -683,15 +683,27 @@ class DesktopRepository(
 
     fun isClosingTask(taskId: Int) = desksSequence().any { taskId in it.closingTasks }
 
+    /** Returns whether the given task is in the closing task list of the given desk. */
+    fun isClosingTaskInDesk(taskId: Int, deskId: Int): Boolean {
+        val desk = desktopData.getDesk(deskId) ?: return false
+        return taskId in desk.closingTasks
+    }
+
     fun isVisibleTask(taskId: Int) = desksSequence().any { taskId in it.visibleTasks }
 
-    @VisibleForTesting
+    /** Returns whether the given task is visible in the given desk. */
     fun isVisibleTaskInDesk(taskId: Int, deskId: Int): Boolean {
         val desk = desktopData.getDesk(deskId) ?: return false
         return taskId in desk.visibleTasks
     }
 
     fun isMinimizedTask(taskId: Int) = desksSequence().any { taskId in it.minimizedTasks }
+
+    /** Returns whether the given task is minimized in the given desk. */
+    fun isMinimizedTaskInDesk(taskId: Int, deskId: Int): Boolean {
+        val desk = desktopData.getDesk(deskId) ?: return false
+        return taskId in desk.minimizedTasks
+    }
 
     /**
      * Checks if a task is the only visible, non-closing, non-minimized task on the active desk of
@@ -735,6 +747,11 @@ class DesktopRepository(
     fun isOnlyTaskInDesk(taskId: Int, deskId: Int): Boolean {
         val desk = desktopData.getDesk(deskId) ?: return false
         return desk.activeTasks.size == 1 && desk.activeTasks.single() == taskId
+    }
+
+    /** Whether the provided set of taskIds contains all tasks in a given desk. */
+    fun containsAllDeskTasks(taskIds: Set<Int>, deskId: Int): Boolean {
+        return desktopData.getDesk(deskId)?.activeTasks?.let { taskIds.containsAll(it) } == true
     }
 
     /** Whether the task is the only visible desktop task in the display. */
@@ -986,7 +1003,7 @@ class DesktopRepository(
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             val desk = desktopData.getDefaultDesk(displayId)
             if (desk == null) {
-                logE("Could not find default desk for display: $displayId")
+                logE("Could not find default desk for display: %d", displayId)
                 return false
             }
             val hasVisibleTasks = desk.visibleTasks.isNotEmpty()
@@ -1022,9 +1039,13 @@ class DesktopRepository(
     private fun addOrMoveTaskToTopOfDesk(displayId: Int, deskId: Int, taskId: Int) {
         val desk = desktopData.getDesk(deskId) ?: error("Could not find desk: $deskId")
         val bounds = Rect()
-        desktopData.forAllDesks { _, desk1 ->
-            desk1.freeformTasksInZOrder.remove(taskId)
-            desk1.boundsByTaskId[taskId]?.let { bounds.set(it) }
+        // If the desk is transient, don't remove from a nontransient desk as this
+        // functionally won't be a duplicate; the transient desk will be removed once finished.
+        if (!desk.transientDesk) {
+            desktopData.forAllDesks { _, desk1 ->
+                desk1.freeformTasksInZOrder.remove(taskId)
+                desk1.boundsByTaskId[taskId]?.let { bounds.set(it) }
+            }
         }
         desk.freeformTasksInZOrder.add(0, taskId)
         if (!bounds.isEmpty) desk.boundsByTaskId[taskId] = bounds
@@ -1296,10 +1317,11 @@ class DesktopRepository(
         if (!Flags.enableRememberedBounds()) {
             return
         }
-        rememberedBoundsRatioByPackageName.remove(packageName)
-        // The display ID doesn't matter actually because only [rememberedBoundsRatioByPackageName]
-        // needs to be updated.
-        updatePersistentRepository(DEFAULT_DISPLAY)
+        rememberedBoundsRatioByPackageName.remove(packageName)?.let {
+            // The display ID doesn't matter actually because only
+            // [rememberedBoundsRatioByPackageName] needs to be updated.
+            updatePersistentRepository(DEFAULT_DISPLAY)
+        }
     }
 
     /** Clears the remembered bounds ratio for all package. */
@@ -1327,16 +1349,19 @@ class DesktopRepository(
             logD("updatePersistentRepository: displayId=%d", displayId)
             if (displayId == INVALID_DISPLAY) return
 
-            val desks = desktopData.desksSequence(displayId).map { it.deepCopy() }.toList()
+            val desks = desktopData.desksSequence().map { it.deepCopy() }.toList()
             if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
                 persistentUpdateQueue.post {
                     Trace.beginSection("DesktopRepository#UpdateRepoWork")
-                    logD("updatePersistentRepository user=%d display=%d", userId, displayId)
+                    logD("updatePersistentRepository user=%d", userId)
                     try {
                         persistentRepository.addOrUpdateRepository(
                             userId,
                             desks,
-                            getActiveDeskId(displayId),
+                            desktopData
+                                .getAllActiveDesks()
+                                .map { desk -> desk.uniqueDisplayId to desk.deskId }
+                                .toMap(),
                             preservedDisplaysByUniqueId,
                             rememberedBoundsRatioByPackageName,
                         )
@@ -1819,19 +1844,19 @@ class DesktopRepository(
     // TODO(b/478792808): Remove suppression
     @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logD(msg: String, vararg arguments: Any?) {
-        ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+        ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s(%d): $msg", TAG, userId, *arguments)
     }
 
     // TODO(b/478792808): Remove suppression
     @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logW(msg: String, vararg arguments: Any?) {
-        ProtoLog.w(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+        ProtoLog.w(WM_SHELL_DESKTOP_MODE, "%s(%d): $msg", TAG, userId, *arguments)
     }
 
     // TODO(b/478792808): Remove suppression
     @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logE(msg: String, vararg arguments: Any?) {
-        ProtoLog.e(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+        ProtoLog.e(WM_SHELL_DESKTOP_MODE, "%s(%d): $msg", TAG, userId, *arguments)
     }
 
     companion object {

@@ -18,7 +18,11 @@ package android.service.personalcontext.embedded;
 
 import static android.annotation.SystemApi.Client.PRIVILEGED_APPS;
 
+import android.Manifest;
 import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
+import android.annotation.RequiresPermission;
+import android.annotation.StyleRes;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.content.Context;
@@ -38,7 +42,10 @@ import androidx.annotation.Nullable;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.Preconditions;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -140,6 +147,21 @@ public class InsightSurfaceClient implements AutoCloseable {
         }
     }
 
+    /** @hide */
+    @IntDef(
+            prefix = {"REGISTRATION_STATE_"},
+            value = {
+                    REGISTRATION_STATE_NOT_REGISTERED,
+                    REGISTRATION_STATE_REGISTERING,
+                    REGISTRATION_STATE_REGISTERED,
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface RegistrationState {}
+
+    private static final int REGISTRATION_STATE_NOT_REGISTERED = 0;
+    private static final int REGISTRATION_STATE_REGISTERING = 1;
+    private static final int REGISTRATION_STATE_REGISTERED = 2;
+
     private InsightSurfaceClientInfo mClientInfo;
     private InsightSurfaceSession mSession;
 
@@ -148,9 +170,10 @@ public class InsightSurfaceClient implements AutoCloseable {
     private final List<InsightReceiver> mInsightReceivers;
     @Nullable
     private CallbackWrapper mCallbacks;
-    @NonNull
-    private final List<ContextHint> mHints;
-    private boolean mIsRegistered;
+    @RegistrationState
+    private int mRegistrationState = REGISTRATION_STATE_NOT_REGISTERED;
+    private Set<ContextHint> mPendingHints;
+    private final Object mRegistrationLock = new Object();
 
     private record CallbackWrapper(
             @NonNull Executor executor,
@@ -186,7 +209,8 @@ public class InsightSurfaceClient implements AutoCloseable {
                     executeWithCallbacks(clientCallback -> {
                         if (mSession != null) {
                             Preconditions.checkState(
-                                    mSession.getSurfacePackage() == surfacePackage);
+                                    mSession.getSurfacePackage().getSurfaceControl()
+                                            .isSameSurface(surfacePackage.getSurfaceControl()));
                             clientCallback.onSessionDestroyed(mSession);
                             mSession.close();
                             mSession = null;
@@ -201,7 +225,8 @@ public class InsightSurfaceClient implements AutoCloseable {
                     }
                     executeWithCallbacks(clientCallback -> {
                         Preconditions.checkState(
-                                mSession != null && mSession.getSurfacePackage() == surfacePackage);
+                                mSession != null && mSession.getSurfacePackage().getSurfaceControl()
+                                        .isSameSurface(surfacePackage.getSurfaceControl()));
                         clientCallback.onSessionUpdated(mSession);
                     });
                 }
@@ -224,6 +249,36 @@ public class InsightSurfaceClient implements AutoCloseable {
                     executeWithCallbacks(clientCallback ->
                             clientCallback.onSizeChanged(width, height));
                 }
+
+                @Override
+                public void onVisualizationError(
+                        @InsightSurfaceSessionException.ClientError int errorCode) {
+                    if (DEBUG) {
+                        Log.d(TAG, "onVisualizationError: errorCode=" + errorCode);
+                    }
+                    executeWithCallbacks(clientCallback ->
+                            clientCallback.onError(
+                                    new InsightSurfaceSessionException(
+                                            errorCode, "failed to create a visualization")));
+                }
+
+                public void onRegistered() {
+                    if (DEBUG) {
+                        Log.d(TAG, "onRegistered");
+                    }
+
+                    synchronized (mRegistrationLock) {
+                        mRegistrationState = REGISTRATION_STATE_REGISTERED;
+
+                        if (mPendingHints != null) {
+                            if (DEBUG) {
+                                Log.d(TAG, "Sending " + mPendingHints.size() + " pending hints.");
+                            }
+                            publishHints(mPendingHints);
+                            mPendingHints = null;
+                        }
+                    }
+                }
             };
 
     private InsightSurfaceClient(
@@ -234,11 +289,9 @@ public class InsightSurfaceClient implements AutoCloseable {
             int nestedScrollAxes,
             boolean nestedScrollAxisLocked,
             boolean shouldBlur,
-            @Nullable String themeResourceName,
-            @NonNull List<ContextHint> hints,
+            @StyleRes int themeResourceId,
             @NonNull List<InsightReceiver> receivers) {
         mContext = context;
-        mHints = List.copyOf(hints);
         mInsightReceivers = List.copyOf(receivers);
 
         mClientInfo = new InsightSurfaceClientInfo(
@@ -250,7 +303,7 @@ public class InsightSurfaceClient implements AutoCloseable {
                 nestedScrollAxes,
                 nestedScrollAxisLocked,
                 shouldBlur,
-                themeResourceName,
+                themeResourceId,
                 mContext.getPackageName(),
                 mContext.getResources().getConfiguration(),
                 mClient);
@@ -260,28 +313,29 @@ public class InsightSurfaceClient implements AutoCloseable {
      * Publish new hints to the context engine. This method can be called any time after the client
      * has been created to send new hints to the context engine. Hints published through this method
      * will cause any resulting {@link ContextInsight} to be delivered to this surface client.
+     * <p>
+     * If the client is not yet registered with the context engine, then the hints won't be
+     * published to the context engine until the client is successfully registered. Note that
+     * calling this method multiple times before the client is registered will result in only the
+     * last published hints being sent after client registration has finished. Hints across
+     * multiple calls will not be queued or combined.
+     *
+     * </p>
      *
      * @param hints a list of {@link ContextHint}s
-     *
-     * @hide
      */
-    @VisibleForTesting
     public void publishHints(@NonNull Set<ContextHint> hints) {
         Objects.requireNonNull(hints);
-        final PersonalContextManager personalContextManager =
-                mContext.getSystemService(PersonalContextManager.class);
-        personalContextManager.publishInsightSurfaceHints(hints, mClientInfo);
-    }
 
-    /**
-     * Return the context hints this client was originally created with (using the
-     * {@link Builder#addHint} method).
-     *
-     * @return the {@link ContextHint}s
-     */
-    @NonNull
-    public List<ContextHint> getHints() {
-        return mHints;
+        synchronized (mRegistrationLock) {
+            if (mRegistrationState == REGISTRATION_STATE_REGISTERED) {
+                final PersonalContextManager personalContextManager =
+                        mContext.getSystemService(PersonalContextManager.class);
+                personalContextManager.publishInsightSurfaceHints(hints, mClientInfo);
+            } else {
+                mPendingHints = new HashSet<>(hints);
+            }
+        }
     }
 
     /**
@@ -342,7 +396,8 @@ public class InsightSurfaceClient implements AutoCloseable {
     }
 
     /**
-     * Return whether the embedded surface should apply a blur to match the client.
+     * Return whether the embedded surface should apply a blur. This should be {@code true} when the
+     * client view is blurred so that the embedded surface can also apply a blur to match it.
      */
     public boolean shouldBlur() {
         return mClientInfo.shouldBlur();
@@ -351,12 +406,12 @@ public class InsightSurfaceClient implements AutoCloseable {
     /**
      * Get the name of a theme resource to be passed to the connected visualizer. A visualizer
      * can use this name to look up the theme, which can then be used when creating an embedded
-     * surface for the client. See {@link InsightSurfaceClientInfo#getThemeResourceName()} for more
+     * surface for the client. See {@link InsightSurfaceClientInfo#getThemeResourceId()} for more
      * information.
      */
-    @Nullable
-    public String getThemeResourceName() {
-        return mClientInfo.getThemeResourceName();
+    @StyleRes
+    public int getThemeResourceId() {
+        return mClientInfo.getThemeResourceId();
     }
 
     /**
@@ -367,6 +422,7 @@ public class InsightSurfaceClient implements AutoCloseable {
      * @param callbacksExecutor an optional {@link Executor} with which to execute callback methods
      * @param callbacks {@link ClientCallback} to be notified of connection events
      */
+    @RequiresPermission(Manifest.permission.PERSONAL_CONTEXT_HOST_INSIGHT_SURFACE)
     public void register(
             @Nullable Executor callbacksExecutor,
             @NonNull ClientCallback callbacks) {
@@ -374,20 +430,23 @@ public class InsightSurfaceClient implements AutoCloseable {
             Log.d(TAG, "registering client...");
         }
 
-        if (mIsRegistered) {
-            // Already registered.
-            Log.w(TAG, "client is already registered");
-            return;
+        synchronized (mRegistrationLock) {
+            if (mRegistrationState != REGISTRATION_STATE_NOT_REGISTERED) {
+                // Already registered or in the process of registering.
+                Log.w(TAG, "client is already registered or is registering");
+                return;
+            }
+
+            mRegistrationState = REGISTRATION_STATE_REGISTERING;
+
+            final PersonalContextManager personalContextManager =
+                    mContext.getSystemService(PersonalContextManager.class);
+            personalContextManager.registerInsightSurfaceClient(mClientInfo);
+
+            mCallbacks = new CallbackWrapper(
+                    callbacksExecutor != null ? callbacksExecutor : mContext.getMainExecutor(),
+                    callbacks);
         }
-
-        final PersonalContextManager personalContextManager =
-                mContext.getSystemService(PersonalContextManager.class);
-        personalContextManager.registerInsightSurfaceClient(mClientInfo, mHints);
-
-        mCallbacks = new CallbackWrapper(
-                callbacksExecutor != null ? callbacksExecutor : mContext.getMainExecutor(),
-                callbacks);
-        mIsRegistered = true;
     }
 
     /**
@@ -401,29 +460,34 @@ public class InsightSurfaceClient implements AutoCloseable {
             Log.d(TAG, "unregistering client...");
         }
 
-        if (!mIsRegistered) {
-            Log.w(TAG, "client not registered");
-            return;
+        synchronized (mRegistrationLock) {
+            if (mRegistrationState == REGISTRATION_STATE_NOT_REGISTERED) {
+                Log.w(TAG, "client not registered");
+                return;
+            }
+
+            final PersonalContextManager personalContextManager =
+                    mContext.getSystemService(PersonalContextManager.class);
+            personalContextManager.unregisterInsightSurfaceClient(mClientInfo);
+
+            if (mSession != null) {
+                // Closing the session releases the SurfacePackage it wraps.
+                mSession.close();
+                mSession = null;
+            }
+
+            mCallbacks = null;
+            mRegistrationState = REGISTRATION_STATE_NOT_REGISTERED;
+            mPendingHints = null;
         }
-
-        final PersonalContextManager personalContextManager =
-                mContext.getSystemService(PersonalContextManager.class);
-        personalContextManager.unregisterInsightSurfaceClient(mClientInfo);
-
-        if (mSession != null) {
-            // Closing the session releases the SurfacePackage it wraps.
-            mSession.close();
-            mSession = null;
-        }
-
-        mCallbacks = null;
-        mIsRegistered = false;
     }
 
     @Override
     public void close() {
-        if (mIsRegistered) {
-            unregister();
+        synchronized (mRegistrationLock) {
+            if (mRegistrationState != REGISTRATION_STATE_NOT_REGISTERED) {
+                unregister();
+            }
         }
     }
 
@@ -452,14 +516,19 @@ public class InsightSurfaceClient implements AutoCloseable {
         if (mCallbacks == null) {
             return;
         }
-        mCallbacks.executor().execute(() -> action.accept(mCallbacks.callbacks()));
+        mCallbacks.executor().execute(() -> {
+            // The client could have been unregistered by the time this executes, so check that
+            // mCallbacks isn't null here as well.
+            if (mCallbacks != null) {
+                action.accept(mCallbacks.callbacks());
+            }
+        });
     }
 
     /** Builder used to build a new {@link InsightSurfaceClient}. */
     public static final class Builder {
         private final Context mContext;
         private final List<InsightReceiver> mReceivers = new ArrayList<>();
-        private final List<ContextHint> mHints = new ArrayList<>();
         private int mWidthMeasureSpec =
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         private int mHeightMeasureSpec =
@@ -468,7 +537,7 @@ public class InsightSurfaceClient implements AutoCloseable {
         private int mNestedScrollAxes = View.SCROLL_AXIS_NONE;
         private boolean mNestedScrollAxisLocked = false;
         private boolean mShouldBlur = false;
-        private String mThemeResourceName;
+        private int mThemeResourceId;
 
         /**
          * Construct a new builder.
@@ -488,18 +557,6 @@ public class InsightSurfaceClient implements AutoCloseable {
         @NonNull
         public Builder addReceiver(@NonNull InsightReceiver receiver) {
             mReceivers.add(receiver);
-            return this;
-        }
-
-        /**
-         * Add a context hint to be sent to the context engine from the client app.
-         *
-         * @param hint the {@link ContextHint} to add
-         * @return the {@link Builder}
-         */
-        @NonNull
-        public Builder addHint(@NonNull ContextHint hint) {
-            mHints.add(hint);
             return this;
         }
 
@@ -552,7 +609,9 @@ public class InsightSurfaceClient implements AutoCloseable {
         }
 
         /**
-         * Set whether the embedded surface should apply a blur to match the client.
+         * Set whether the embedded surface should apply a blur. Clients would set this to
+         * {@code true} when the client view is blurred so that the embedded surface can also apply
+         * a blur to match it.
          * @param shouldBlur whether to apply a blur
          */
         @NonNull
@@ -562,23 +621,16 @@ public class InsightSurfaceClient implements AutoCloseable {
         }
 
         /**
-         * Set the name of a custom {@link android.R.styleable#PersonalContextTheme} to be passed to
-         * a connected visualizer. A visualizer can use this name to look up the theme resource in
-         * the client's resources, which can then be used when creating an embedded surface for the
-         * client. The custom theme should be declared in the client app's xml resources as follows:
-         * <p/>
-         * <pre>
-         * &lt;style name="CustomTheme" parent="android:PersonalContextTheme">
-         *     ...
-         * &lt;style/>
-         * </pre>
-         * <p/>
-         * See {@link InsightSurfaceClientInfo#getThemeResourceName()} for
-         * more information.
+         * Set the id of a custom style to be passed to a connected visualizer. A visualizer
+         * will use this id to look up the theme resource in the client's resources. Attributes
+         * defined in {@link android.R.styleable#PersonalContextTheme} will be read when
+         * creating an embedded surface for the client. The custom theme should be declared in
+         * the client app's xml resources. See
+         * {@link InsightSurfaceClientInfo#getThemeResourceId()} for more information.
          */
         @NonNull
-        public Builder setThemeResourceName(@Nullable String themeResourceName) {
-            mThemeResourceName = themeResourceName;
+        public Builder setThemeResourceId(@StyleRes int themeResourceId) {
+            mThemeResourceId = themeResourceId;
             return this;
         }
 
@@ -614,8 +666,7 @@ public class InsightSurfaceClient implements AutoCloseable {
                     mNestedScrollAxes,
                     mNestedScrollAxisLocked,
                     mShouldBlur,
-                    mThemeResourceName,
-                    mHints,
+                    mThemeResourceId,
                     mReceivers);
         }
     }

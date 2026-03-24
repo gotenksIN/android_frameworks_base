@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Rect
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.keyguard.ui.transitions.BlurConfig
@@ -49,6 +50,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOf
@@ -74,7 +76,7 @@ constructor(
     private val mediaCarouselInteractor: MediaCarouselInteractor,
     val mediaViewModelFactory: MediaViewModel.Factory,
     private val blurConfig: BlurConfig,
-    windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
+    private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     shadeStatusBarComponentsInteractor: ShadeStatusBarComponentsInteractor,
 ) : ExclusiveActivatable() {
 
@@ -117,9 +119,13 @@ constructor(
      */
     val isTransparencyEnabled: Boolean by
         hydrator.hydratedStateOf(
-            traceName = "transparencyEnabled",
-            initialValue = windowRootViewBlurInteractor.isBlurCurrentlySupported.value,
-            source = windowRootViewBlurInteractor.isBlurCurrentlySupported,
+            traceName = "isTransparencyEnabled",
+            source =
+                if (Flags.notificationShadeBlur()) {
+                    windowRootViewBlurInteractor.isBlurCurrentlySupported
+                } else {
+                    MutableStateFlow(false)
+                },
         )
 
     /**
@@ -141,7 +147,7 @@ constructor(
      */
     fun calculateTargetBlurRadius(transitionState: TransitionState): Float {
         return when {
-            !isTransparencyEnabled -> 0f
+            !windowRootViewBlurInteractor.isBlurCurrentlySupported.value -> 0f
             Overlays.NotificationsShade !in transitionState.currentOverlays -> 0f
             Overlays.Bouncer in transitionState.currentOverlays -> blurConfig.maxBlurRadiusPx
             else -> 0f

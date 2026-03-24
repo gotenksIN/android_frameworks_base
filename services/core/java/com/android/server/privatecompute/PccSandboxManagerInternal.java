@@ -16,10 +16,18 @@
 
 package com.android.server.privatecompute;
 
+import static android.app.role.RoleManager.ROLE_ASSISTANT;
+
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__INCORRECT_PACKAGE_NAME;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__REMOTE_SERVICE_TERMINATED;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__REMOTE_SERVICE_UNREACHABLE;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__UNSAFE_PARCEL;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
 import android.annotation.SuppressLint;
+import android.app.AppGlobals;
 import android.app.privatecompute.IPccService;
 import android.app.privatecompute.IResultCallback;
 import android.app.role.OnRoleHoldersChangedListener;
@@ -31,6 +39,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ProviderInfo;
+import android.content.pm.ResolveInfo;
 import android.os.BadParcelableException;
 import android.os.Binder;
 import android.os.Bundle;
@@ -62,6 +71,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+
 /**
  * Local interface for the PccSandboxManager that is used by other system services to interact with
  * the PCC sandbox.
@@ -87,7 +97,7 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
     final Set<String> mPccAllowedPackagesForTesting = new ArraySet<>();
 
     @VisibleForTesting
-    static final int[] TRUSTED_UIDS = new int[] {
+    static final int[] TRUSTED_UIDS = new int[]{
             Process.BLUETOOTH_UID,
             Process.SYSTEM_UID,
             Process.PHONE_UID
@@ -150,6 +160,15 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
                 com.android.internal.R.string.config_systemSettingsIntelligence);
         String systemUiPackage = mContext.getString(
                 com.android.internal.R.string.config_systemUi);
+        String recentsUiComponent = mContext.getString(
+                com.android.internal.R.string.config_recentsComponentName);
+        String recentsUiPackage = null;
+        if (recentsUiComponent != null && !recentsUiComponent.isEmpty()) {
+            ComponentName cn = ComponentName.unflattenFromString(recentsUiComponent);
+            if (cn != null) {
+                recentsUiPackage = cn.getPackageName();
+            }
+        }
 
         String mediaStorePackage = resolveProviderPackageName(
                 android.provider.MediaStore.AUTHORITY);
@@ -167,6 +186,13 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
         String blockedNumberPackage = resolveProviderPackageName(
                 android.provider.BlockedNumberContract.AUTHORITY);
 
+        Intent setupWizardIntent = new Intent(Intent.ACTION_MAIN);
+        setupWizardIntent.addCategory(Intent.CATEGORY_SETUP_WIZARD);
+        List<ResolveInfo> setupMatches = mContext.getPackageManager().queryIntentActivities(
+                setupWizardIntent,
+                PackageManager.MATCH_SYSTEM_ONLY | PackageManager.MATCH_DIRECT_BOOT_AWARE
+                        | PackageManager.MATCH_DIRECT_BOOT_UNAWARE);
+
         synchronized (mLock) {
             if (settingsIntelligencePackage != null && !settingsIntelligencePackage.isEmpty()) {
                 mPccTrustedPackages.add(settingsIntelligencePackage);
@@ -175,6 +201,11 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
             if (systemUiPackage != null && !systemUiPackage.isEmpty()) {
                 mPccTrustedPackages.add(systemUiPackage);
             }
+
+            if (recentsUiPackage != null && !recentsUiPackage.isEmpty()) {
+                mPccTrustedPackages.add(recentsUiPackage);
+            }
+
             if (mediaStorePackage != null) {
                 mPccTrustedPackages.add(mediaStorePackage);
             }
@@ -199,6 +230,12 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
             if (blockedNumberPackage != null) {
                 mPccTrustedPackages.add(blockedNumberPackage);
             }
+            for (ResolveInfo info : setupMatches) {
+                if (info.activityInfo != null && info.activityInfo.packageName != null) {
+                    mPccTrustedPackages.add(info.activityInfo.packageName);
+                }
+            }
+
             Slog.d(TAG, "Trusted PCC Packages: " + mPccTrustedPackages);
         }
     }
@@ -237,7 +274,24 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
                 try {
                     List<String> holders = roleManager.getRoleHoldersAsUser(role, user);
                     if (holders != null) {
-                        rolePackages.addAll(holders);
+                        if (ROLE_ASSISTANT.equals(role)) {
+                            // Assistants must hold MANAGE_HOTWORD_DETECTION permission to be
+                            // allowed to use PCC.
+                            for (String holder : holders) {
+                                int permissionStatus = checkPermission(
+                                        android.Manifest.permission.MANAGE_HOTWORD_DETECTION,
+                                        holder,
+                                        userId);
+                                if (permissionStatus == PackageManager.PERMISSION_GRANTED) {
+                                    rolePackages.add(holder);
+                                } else {
+                                    Slog.d(TAG, "Package " + holder + " is not qualified for"
+                                            + " hotword detection and can't start a PCC Process");
+                                }
+                            }
+                        } else {
+                            rolePackages.addAll(holders);
+                        }
                     }
                 } catch (Exception e) {
                     Slog.e(TAG, "Error fetching role holders for role: " + role + " user: "
@@ -253,6 +307,17 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
         synchronized (mLock) {
             mPccAllowedPackages.put(userId, rolePackages);
             Slog.d(TAG, "Updated allowed PCC Packages for user " + userId + ": " + rolePackages);
+        }
+    }
+
+    @VisibleForTesting
+    int checkPermission(String permission, String packageName, int userId) {
+        try {
+            return AppGlobals.getPackageManager().checkPermission(permission, packageName, userId);
+        } catch (RemoteException e) {
+            Slog.d(TAG, "Received RemoteException while validating permission " + permission
+                        + " for package " + packageName + " and user: " + userId);
+            return PackageManager.PERMISSION_DENIED;
         }
     }
 
@@ -276,7 +341,7 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
      *     <li>Explicitly allowlisted system packages</li>
      * </ul>
      *
-     * @param appUid The UID of the application.
+     * @param appUid     The UID of the application.
      * @param appPackage The package name of the application.
      */
     public boolean isPccTrustedSystemComponent(int appUid, String appPackage) {
@@ -501,8 +566,6 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
             @ActivityManagerService.AssociationType int associationType, @Nullable Bundle extras) {
         Trace.traceBegin(Trace.TRACE_TAG_SYSTEM_SERVER,
                 "PccSandboxManagerInternal#validateAssociationAllowed");
-        Slog.d(TAG, "AllowAssociation validation for callerUid :" + callerUid
-                + " and callerPackage :" + callerPackage);
         try {
             // Self-association is allowed.
             if (callerUid == targetUid) {
@@ -608,6 +671,8 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
                 if (mRealBinder == null) {
                     callback.onFailure(new ParcelableException(
                             new IllegalStateException("PCC service is already closed.")));
+                    PrivateComputeStatsLogUtil.logPccBinderProxyTransactionFailure(
+                            PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__REMOTE_SERVICE_TERMINATED);
                     return;
                 }
 
@@ -630,10 +695,19 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
                                 "PccSandboxManagerInternal.realService#sendData()");
                         try {
                             realService.sendData(data, packageName, null);
+
+                            PrivateComputeStatsLogUtil.logPccBinderProxyTransactionSuccess();
                         } finally {
                             Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
                         }
                     } catch (RemoteException | IllegalArgumentException e) {
+                        if (e instanceof RemoteException) {
+                            PrivateComputeStatsLogUtil.logPccBinderProxyTransactionFailure(
+                                    PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__REMOTE_SERVICE_UNREACHABLE);
+                        } else {
+                            PrivateComputeStatsLogUtil.logPccBinderProxyTransactionFailure(
+                                    PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__UNSAFE_PARCEL);
+                        }
                         callback.onFailure(new ParcelableException(e));
                         return;
                     } finally {
@@ -642,6 +716,8 @@ public final class PccSandboxManagerInternal implements OnRoleHoldersChangedList
 
                     callback.onSuccess();
                 } else {
+                    PrivateComputeStatsLogUtil.logPccBinderProxyTransactionFailure(
+                            PCC_BINDER_PROXY_TRANSACTION_REPORTED__FAILURE_REASON__INCORRECT_PACKAGE_NAME);
                     callback.onFailure(new ParcelableException(new SecurityException(
                             "Calling UID: " + callingUid + " is not associated with package: "
                                     + packageName)));

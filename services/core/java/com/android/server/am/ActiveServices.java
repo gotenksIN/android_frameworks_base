@@ -1206,10 +1206,11 @@ public final class ActiveServices {
             boolean isBgFgsRestrictionEnabledForService =  isBgFgsRestrictionEnabled(r, callingUid);
             logFgsBackgroundStart(r, isBgFgsRestrictionEnabledForService);
             if (!r.isFgsAllowedStart() && isBgFgsRestrictionEnabledForService) {
-                String msg = "startForegroundService() not allowed due to "
-                        + "mAllowStartForeground false: service "
+                final String msg = "startForegroundService() not allowed: "
+                        + "service "
                         + r.shortInstanceName;
-                Slog.w(TAG, msg);
+                Slog.w(TAG, msg + (r.mInfoAllowStartForeground != null
+                        ? "; " + r.mInfoAllowStartForeground : ""));
                 showFgsBgRestrictedNotificationLocked(r);
                 logFGSStateChangeLocked(r,
                         FOREGROUND_SERVICE_STATE_CHANGED__STATE__DENIED,
@@ -1304,7 +1305,7 @@ public final class ActiveServices {
                 ? callingApp.processName : callingPackage;
         final int callingProcessState =
                 callingApp != null && callingApp.getThread() != null && !callingApp.isKilled()
-                ? callingApp.getCurProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
+                ? callingApp.getProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
         r.updateProcessStateOnRequest();
 
         // The package could be frozen (meaning it's doing surgery), defer the actual
@@ -1412,7 +1413,7 @@ public final class ActiveServices {
         if (!callerFg && !fgRequired && r.getHostProcess() == null
                 && mAm.mUserController.hasStartedUserState(r.userId)) {
             ProcessRecord proc = mAm.getProcessRecordLocked(r.processName, getServiceUid(r));
-            if (proc == null || proc.getCurProcState() > PROCESS_STATE_RECEIVER) {
+            if (proc == null || proc.getProcState() > PROCESS_STATE_RECEIVER) {
                 // If this is not coming from a foreground caller, then we may want
                 // to delay the start if there are already other background services
                 // that are starting.  This is to avoid process start spam when lots
@@ -1440,7 +1441,7 @@ public final class ActiveServices {
                 }
                 if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE, "Not delaying: " + r);
                 addToStarting = true;
-            } else if (proc.getCurProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
+            } else if (proc.getProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
                 // We slightly loosen when we will enqueue this new service as a background
                 // starting service we are waiting for, to also include processes that are
                 // currently running other services or receivers.
@@ -1449,7 +1450,7 @@ public final class ActiveServices {
                         "Not delaying, but counting as bg: " + r);
             } else if (DEBUG_DELAYED_STARTS) {
                 StringBuilder sb = new StringBuilder(128);
-                sb.append("Not potential delay (state=").append(proc.getCurProcState())
+                sb.append("Not potential delay (state=").append(proc.getProcState())
                         .append(' ').append(proc.getAdjType());
                 String reason = proc.makeAdjReason();
                 if (reason != null) {
@@ -2657,7 +2658,7 @@ public final class ActiveServices {
                                             SystemClock.elapsedRealtime() - (24 * 60 * 60 * 1000));
                                 final long lastTimeOutAt = fgsTypeInfo.getTimeLimitExceededAt();
                                 if (fgsTypeInfo.getFirstFgsStartRealtime() < before24Hr
-                                        || r.getHostProcess().getCurProcState() <= PROCESS_STATE_TOP
+                                        || r.getHostProcess().getProcState() <= PROCESS_STATE_TOP
                                         || (lastTimeOutAt != Long.MIN_VALUE
                                             && r.getHostProcess().getLastTopTime()
                                         > lastTimeOutAt)) {
@@ -2759,11 +2760,12 @@ public final class ActiveServices {
                         logFgsBackgroundStart(r, isBgFgsRestrictionEnabledForService);
                         if (!r.isFgsAllowedStart()
                                 && isBgFgsRestrictionEnabledForService) {
-                            final String msg = "Service.startForeground() not allowed due to "
-                                    + "mAllowStartForeground false: service "
+                            final String msg = "Service.startForeground() not allowed: "
+                                    + "service "
                                     + r.shortInstanceName
                                     + (isOldTypeShortFgs ? " (Called on SHORT_SERVICE)" : "");
-                            Slog.w(TAG, msg);
+                            Slog.w(TAG, msg + (r.mInfoAllowStartForeground != null
+                                    ? "; " + r.mInfoAllowStartForeground : ""));
                             showFgsBgRestrictedNotificationLocked(r);
                             updateServiceForegroundLocked(psr, true);
                             ignoreForeground = true;
@@ -3648,7 +3650,7 @@ public final class ActiveServices {
         }
 
         private boolean isNotTop() {
-            return mProcessRecord.getCurProcState() != PROCESS_STATE_TOP;
+            return mProcessRecord.getProcState() != PROCESS_STATE_TOP;
         }
 
         private void incrementOpCount(int op, boolean allowed) {
@@ -4119,7 +4121,7 @@ public final class ActiveServices {
                 return;
             }
 
-            final boolean currentlyTop = sr.getHostProcess().getCurProcState() <= PROCESS_STATE_TOP;
+            final boolean currentlyTop = sr.getHostProcess().getProcState() <= PROCESS_STATE_TOP;
             final long nowUptime = SystemClock.uptimeMillis();
             final long lastTopTime = currentlyTop
                     ? nowUptime : sr.getHostProcess().getLastTopTime();
@@ -4515,7 +4517,7 @@ public final class ActiveServices {
                 ? callingApp.processName : callingPackage;
         final int callingProcessState =
                 callingApp != null && callingApp.getThread() != null && !callingApp.isKilled()
-                ? callingApp.getCurProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
+                ? callingApp.getProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
         s.updateProcessStateOnRequest();
 
         // The package could be frozen (meaning it's doing surgery), defer the actual
@@ -4563,7 +4565,7 @@ public final class ActiveServices {
             final boolean wasStartRequested = s.isStartRequested();
             final boolean hadConnections = !s.getConnections().isEmpty();
             mAm.startAssociationLocked(callerApp.uid, callerApp.processName,
-                    callerApp.getCurProcState(), getServiceUid(s), s.appInfo.longVersionCode,
+                    callerApp.getProcState(), getServiceUid(s), s.appInfo.longVersionCode,
                     s.instanceName, s.processName);
             // Once the apps have become associated, if one of them is caller is ephemeral
             // the target app should now be able to see the calling app
@@ -4582,11 +4584,6 @@ public final class ActiveServices {
             }
             mAm.mProcessStateController.addConnection(clientPsr, c);
             c.startAssociationIfNeeded();
-            // Don't set hasAboveClient if binding to self to prevent modifyRawOomAdj() from
-            // dropping the process' adjustment level.
-            if (b.client != s.getHostProcess() && c.hasFlag(Context.BIND_ABOVE_CLIENT)) {
-                mAm.mProcessStateController.setHasAboveClient(clientPsr, true);
-            }
             if (c.hasFlag(BIND_ALLOW_WHITELIST_MANAGEMENT)) {
                 s.allowlistManager = true;
             }
@@ -4599,7 +4596,7 @@ public final class ActiveServices {
             }
 
             if (s.getHostProcess() != null
-                    && s.getHostProcess().getCurProcState() <= PROCESS_STATE_TOP
+                    && s.getHostProcess().getProcState() <= PROCESS_STATE_TOP
                     && c.hasFlag(Context.BIND_ALMOST_PERCEPTIBLE)) {
                 mAm.mProcessStateController.setLastTopAlmostPerceptibleBindRequest(s,
                         SystemClock.uptimeMillis());
@@ -4711,7 +4708,7 @@ public final class ActiveServices {
                 mAm.updateLruProcessLocked(s.getHostProcess(),
                         (callerApp.hasActivitiesOrRecentTasks()
                             && servicePsr.hasClientActivities())
-                        || (callerApp.getCurProcState() <= PROCESS_STATE_TOP
+                        || (callerApp.getProcState() <= PROCESS_STATE_TOP
                             && c.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)),
                         b.client);
                 if (!s.wasOomAdjUpdated() && (serviceBindingOomAdjPolicy
@@ -4750,7 +4747,7 @@ public final class ActiveServices {
                     packageState,
                     s.packageName,
                     callerApp.info.packageName,
-                    callerApp.getCurProcState(),
+                    callerApp.getProcState(),
                     s.mProcessStateOnRequest,
                     firstLaunch,
                     0L /* TODO */);
@@ -5782,8 +5779,7 @@ public final class ActiveServices {
                 }
             }
             if (r.getHostProcess() != null
-                    && r.getHostProcess().getCurProcState()
-                    > ActivityManager.PROCESS_STATE_SERVICE) {
+                    && r.getHostProcess().getProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
                 // Enqueue the oom adj target anyway for opportunistic oom adj updates.
                 mAm.enqueueOomAdjTargetLocked(r.getHostProcess());
                 r.updateOomAdjSeq();
@@ -6523,8 +6519,14 @@ public final class ActiveServices {
         final boolean isolated = (r.serviceInfo.flags&ServiceInfo.FLAG_ISOLATED_PROCESS) != 0;
         final String procName = r.processName;
         final boolean isPcc = (r.serviceInfo.flags & ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX) != 0;
+        final String hostingType;
+        if (r.isStartRequested()) {
+            hostingType = HostingRecord.HOSTING_TYPE_STARTED_SERVICE;
+        } else {
+            hostingType = HostingRecord.HOSTING_TYPE_BOUND_SERVICE;
+        }
         HostingRecord hostingRecord = new HostingRecord(
-                HostingRecord.HOSTING_TYPE_SERVICE, r.instanceName,
+                hostingType, r.instanceName,
                 r.definingPackageName, r.definingUid, r.serviceInfo.processName,
                 getHostingRecordTriggerType(r), isPcc, r.mRecentCallingUid,
                 r.getRecentCallerProcessName());
@@ -6604,7 +6606,7 @@ public final class ActiveServices {
                 app = r.isolationHostProc;
                 if (WebViewZygote.isMultiprocessEnabled()
                         && r.serviceInfo.packageName.equals(WebViewZygote.getPackageName())) {
-                    hostingRecord = HostingRecord.byWebviewZygote(r.instanceName,
+                    hostingRecord = HostingRecord.byWebviewZygote(hostingType, r.instanceName,
                             r.definingPackageName,
                             r.definingUid, r.serviceInfo.processName,
                             r.mRecentCallingUid, r.getRecentCallerProcessName());
@@ -6612,7 +6614,8 @@ public final class ActiveServices {
                 if ((r.serviceInfo.flags & ServiceInfo.FLAG_USE_APP_ZYGOTE) != 0) {
                     boolean isNativeService =
                             android.os.Flags.nativeAppZygote() && r.mIsNativeIsolated;
-                    hostingRecord = HostingRecord.byAppZygote(r.instanceName, r.definingPackageName,
+                    hostingRecord = HostingRecord.byAppZygote(hostingType, r.instanceName,
+                            r.definingPackageName,
                             r.definingUid, r.serviceInfo.processName, isNativeService,
                             r.mRecentCallingUid, r.getRecentCallerProcessName());
                 }
@@ -7447,9 +7450,6 @@ public final class ActiveServices {
         if (b.client != skipApp) {
             final ProcessServiceRecord psr = b.client.mServices;
             mAm.mProcessStateController.removeConnection(psr, c);
-            if (c.hasFlag(Context.BIND_ABOVE_CLIENT)) {
-                mAm.mProcessStateController.updateHasAboveClientLocked(psr);
-            }
             // If this connection requested allowlist management, see if we should
             // now clear that state.
             if (c.hasFlag(BIND_ALLOW_WHITELIST_MANAGEMENT)) {
@@ -9847,6 +9847,7 @@ public final class ActiveServices {
                         + "; callingUid: " + callingUid
                         + "; uidState: " + ProcessList.makeProcStateString(uidState)
                         + "; uidBFSL: " + (uidBfsl ? "[BFSL]" : "n/a")
+                        + "; BFGS denied: " + (ret == REASON_DENIED)
                         + "; intent: " + intent
                         + "; code:" + reasonCodeToString(ret)
                         + "; tempAllowListReason:<"
@@ -9862,7 +9863,7 @@ public final class ActiveServices {
                         + "; callerTargetSdkVersion:" + callerTargetSdkVersion
                         + "; startForegroundCount:" + r.mStartForegroundCount
                         + "; bindFromPackage:" + bindFromPackage
-                        + ": isBindService:" + isBindService
+                        + "; isBindService:" + isBindService
                         + "]";
         if (!debugInfo.equals(r.mInfoAllowStartForeground)) {
             r.mLoggedInfoAllowStartForeground = false;
@@ -9890,7 +9891,7 @@ public final class ActiveServices {
                     (mAm.getUidProcessCapabilityLocked(callingUid) & PROCESS_CAPABILITY_BFSL) != 0;
             final Integer allowedType = mAm.mProcessList.searchEachLruProcessesLOSP(false, app -> {
                 if (app.uid == callingUid) {
-                    final int procstate = app.getCurProcState();
+                    final int procstate = app.getProcState();
                     if ((procstate <= PROCESS_STATE_BOUND_TOP)
                             || (uidBfsl && (procstate <= PROCESS_STATE_BOUND_FOREGROUND_SERVICE))) {
                         return getReasonCodeFromProcState(procstate);

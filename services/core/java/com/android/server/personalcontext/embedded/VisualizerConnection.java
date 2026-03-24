@@ -16,20 +16,25 @@
 
 package com.android.server.personalcontext.embedded;
 
+import android.Manifest;
 import android.annotation.RequiresNoPermission;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.UserHandle;
+import android.permission.PermissionManager;
+import android.service.personalcontext.IOpCallback;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.embedded.IInsightSurfaceVisualizer;
 import android.service.personalcontext.embedded.IVisualizationResult;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 import android.service.personalcontext.embedded.InsightSurfaceVisualizerService;
-import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
 import android.util.Log;
 import android.util.Slog;
 
@@ -55,6 +60,7 @@ public class VisualizerConnection {
 
     private final Injector mInjector;
     private final ComponentName mComponentName;
+    private final Context mContext;
     private IInsightSurfaceVisualizer mVisualizer;
     // A queue of actions that have been deferred until a visualizer has connected.
     private final List<Runnable> mDeferredActions = new ArrayList<>();
@@ -93,6 +99,11 @@ public class VisualizerConnection {
     @VisibleForTesting
     public interface Injector {
         /**
+         * Returns the context to use for this {@link VisualizerConnection}.
+         */
+        Context getContext();
+
+        /**
          * Connect to the visualizer service specified by the given intent.
          *
          * @param intent the {@link Intent} specifying the visualizer service.
@@ -121,6 +132,11 @@ public class VisualizerConnection {
         DefaultInjector(Context context, Executor executor) {
             mContext = context;
             mExecutor = executor;
+        }
+
+        @Override
+        public Context getContext() {
+            return mContext;
         }
 
         @Override
@@ -155,6 +171,7 @@ public class VisualizerConnection {
             Injector injector) {
         mComponentName = componentName;
         mInjector = injector;
+        mContext = injector.getContext();
     }
 
     /** Return the {@link ComponentName} of the service this connection manages. */
@@ -164,7 +181,7 @@ public class VisualizerConnection {
 
     /** Create a visualization for the given client using the given insights. */
     public void createVisualizationForClient(
-            ContextInsight insight,
+            PublishedContextInsight publishedContextInsight,
             InsightSurfaceClientInfo client,
             RenderToken renderToken,
             Consumer<Boolean> callback) {
@@ -175,9 +192,24 @@ public class VisualizerConnection {
                 callback.accept(false);
                 return;
             }
+            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()
+                    && !checkPermission(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS)) {
+                Slog.e(TAG, "Visualizer missing PERSONAL_CONTEXT_RECEIVE_INSIGHTS permission");
+                callback.accept(false);
+                return;
+            }
             try {
+                // TODO(b/485403335): Track connection lifetime.
+                final IOpCallback opCallback = new IOpCallback.Stub() {
+
+                    @RequiresNoPermission
+                    @Override
+                    public void signalCompletion() {
+                    }
+                };
+
                 mVisualizer.createVisualizationForClient(
-                        new ContextInsightWrapper(insight),
+                        new PublishedContextInsightWrapper(publishedContextInsight),
                         client,
                         renderToken,
                         new IVisualizationResult.Stub() {
@@ -192,7 +224,8 @@ public class VisualizerConnection {
                                             mComponentName, "no visualization for client");
                                 }
                             }
-                        });
+                        },
+                        opCallback);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -203,9 +236,18 @@ public class VisualizerConnection {
     public void onClientDisconnected(InsightSurfaceClientInfo client) {
         mInjector.executeAction(() -> {
             try {
+                // TODO(b/485403335): Track connection lifetime.
+                final IOpCallback opCallback = new IOpCallback.Stub() {
+
+                    @RequiresNoPermission
+                    @Override
+                    public void signalCompletion() {
+                    }
+                };
+
                 // Don't bother trying to disconnect if the visualizer is null.
                 if (mVisualizer != null) {
-                    mVisualizer.onClientDisconnected(client);
+                    mVisualizer.onClientDisconnected(client, opCallback);
                 }
 
                 // Tear the visualizer down if there are no more connected clients.
@@ -225,6 +267,18 @@ public class VisualizerConnection {
     public void onUnregistered() {
         mInjector.executeAction(
                 () -> teardownVisualizer(mComponentName, "unregistered from visualizer"));
+    }
+
+    /** Returns true if this service client has the given permission. */
+    protected boolean checkPermission(String permission) {
+        // TODO(b/489183723): use proper UserHandle when visualizers are per-user.
+        return mContext.getSystemService(PermissionManager.class)
+                .checkPackageNamePermission(
+                        permission,
+                        getComponentName().getPackageName(),
+                        Context.DEVICE_ID_DEFAULT,
+                        UserHandle.CURRENT.getIdentifier())
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     /**

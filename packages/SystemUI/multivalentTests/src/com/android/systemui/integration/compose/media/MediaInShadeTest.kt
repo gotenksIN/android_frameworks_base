@@ -19,11 +19,16 @@ package com.android.systemui.media
 import android.platform.test.annotations.DisableFlags
 import android.testing.TestableLooper
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -38,13 +43,14 @@ import com.android.systemui.integration.SystemUiIntegrationTest
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
+import com.android.systemui.media.controls.shared.model.MediaButton
 import com.android.systemui.media.remedia.data.repository.fakeActiveMedia
 import com.android.systemui.media.remedia.data.repository.fakePausedMediaWithCustomActions
+import com.android.systemui.media.remedia.data.repository.mediaPlayActionButton
 import com.android.systemui.media.remedia.data.repository.setFakeCurrentMedia
 import com.android.systemui.media.remedia.data.repository.setHasMedia
-import com.android.systemui.notifications.intelligence.rules.ui.composable.notificationRulesScreen
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesScreenViewModelFactory
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesShadeStateViewModelFactory
+import com.android.systemui.media.remedia.shared.model.MediaSessionState
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesParentViewModelFactory
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.scene.session.shared.SessionStorage
 import com.android.systemui.scene.session.ui.composable.SaveableSession
@@ -93,11 +99,8 @@ class MediaInShadeTest : SysuiTestCase() {
             contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
             notificationsPlaceholderViewModelFactory =
                 kosmos.notificationsPlaceholderViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
-            notificationRulesScreenViewModelFactory =
-                kosmos.notificationRulesScreenViewModelFactory,
-            notificationRulesScreen = kosmos.notificationRulesScreen,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
         )
 
@@ -201,9 +204,144 @@ class MediaInShadeTest : SysuiTestCase() {
                 .assertExists()
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun testUpdateMedia() =
+        kosmos.runTest {
+            // Add a media object to current media list.
+            setFakeCurrentMedia(mutableStateListOf(fakeActiveMedia))
+            usingMediaInComposeFragment = true
+            enableSingleShade()
+            setHasMedia(true)
+
+            // Set the shade content.
+            composeTestRule.setContent {
+                PlatformTheme {
+                    WithStatusIconContext(tintedIconManagerFactory) {
+                        with(scene) {
+                            TestContentScope(currentScene = Scenes.Shade) { Content(Modifier) }
+                        }
+                    }
+                }
+            }
+            runCurrent()
+            composeTestRule.waitForIdle()
+
+            // Verify that the UMO exists.
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_UMO_CONTENT_DESC, substring = true)
+                .assertExists()
+            // Verify that the pause button is displayed.
+            composeTestRule
+                .onNodeWithContentDescription(PAUSE_BUTTON_CONTENT_DESC)
+                .assertIsDisplayed()
+
+            val updatedFakeMedia =
+                fakeActiveMedia.copy(
+                    playbackStateActions = MediaButton(playOrPause = mediaPlayActionButton),
+                    state = MediaSessionState.Paused,
+                )
+
+            // Update media.
+            setFakeCurrentMedia(mutableStateListOf(updatedFakeMedia))
+
+            runCurrent()
+            composeTestRule.waitForIdle()
+
+            // Verify that the play button is now displayed.
+            composeTestRule
+                .onNodeWithContentDescription(PLAY_BUTTON_CONTENT_DESC)
+                .assertIsDisplayed()
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun openGutsOnNonDismissibleMedia() =
+        kosmos.runTest {
+            setFakeCurrentMedia(listOf(fakeActiveMedia))
+            usingMediaInComposeFragment = true
+            enableSingleShade()
+            setHasMedia(true)
+
+            // Set the shade content.
+            composeTestRule.setContent {
+                PlatformTheme {
+                    WithStatusIconContext(tintedIconManagerFactory) {
+                        with(scene) {
+                            TestContentScope(currentScene = Scenes.Shade) { Content(Modifier) }
+                        }
+                    }
+                }
+            }
+            runCurrent()
+            composeTestRule.waitForIdle()
+
+            // Verify that the UMO exists.
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_UMO_CONTENT_DESC, substring = true)
+                .assertExists()
+
+            // Long press to trigger Guts.
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_UMO_CONTENT_DESC, substring = true)
+                .performTouchInput { longClick() }
+            composeTestRule.waitForIdle()
+
+            // Verify that the Hide button doesn't exist.
+            composeTestRule.onNodeWithText(HIDE_BUTTON_TEXT).assertDoesNotExist()
+
+            // Click the Cancel button.
+            composeTestRule.onNodeWithText(CANCEL_BUTTON_TEXT).performTouchInput { click() }
+            composeTestRule.waitForIdle()
+
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_UMO_CONTENT_DESC, substring = true)
+                .assertExists()
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun openGutsOnDismissibleMedia() =
+        kosmos.runTest {
+            setFakeCurrentMedia(listOf(fakePausedMediaWithCustomActions))
+            usingMediaInComposeFragment = true
+            enableSingleShade()
+            setHasMedia(true)
+
+            // Set the shade content.
+            composeTestRule.setContent {
+                PlatformTheme {
+                    WithStatusIconContext(tintedIconManagerFactory) {
+                        with(scene) {
+                            TestContentScope(currentScene = Scenes.Shade) { Content(Modifier) }
+                        }
+                    }
+                }
+            }
+            runCurrent()
+            composeTestRule.waitForIdle()
+
+            // Verify that the UMO exists.
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_SECOND_MEDIA_CONTENT_DESC, substring = true)
+                .assertExists()
+
+            // Long press to trigger Guts.
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_SECOND_MEDIA_CONTENT_DESC, substring = true)
+                .performTouchInput { longClick() }
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onNodeWithText(HIDE_BUTTON_TEXT).assertIsDisplayed()
+        }
+
     private companion object {
         const val SPLIT_SHADE_QS_TAG = "element:SplitShadeQuickSettings"
         const val EXPECTED_UMO_CONTENT_DESC = "Fake_Music_Player"
         const val EXPECTED_SECOND_MEDIA_CONTENT_DESC = "Fake_Audio_Player"
+        const val PLAY_BUTTON_CONTENT_DESC = "Play"
+        const val PAUSE_BUTTON_CONTENT_DESC = "Pause"
+        const val HIDE_BUTTON_TEXT = "Hide"
+        const val CANCEL_BUTTON_TEXT = "Cancel"
     }
 }

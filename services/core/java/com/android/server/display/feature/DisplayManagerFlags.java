@@ -86,11 +86,6 @@ public class DisplayManagerFlags {
             Flags::enableHasArrSupport
     );
 
-    private final FlagState mAutoBrightnessModeBedtimeWearFlagState = new FlagState(
-            Flags.FLAG_AUTO_BRIGHTNESS_MODE_BEDTIME_WEAR,
-            Flags::autoBrightnessModeBedtimeWear
-    );
-
     private final FlagState mGetSupportedRefreshRatesFlagState = new FlagState(
             Flags.FLAG_ENABLE_GET_SUPPORTED_REFRESH_RATES,
             Flags::enableGetSupportedRefreshRates
@@ -139,11 +134,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_DELAY_IMPLICIT_RR_REGISTRATION_UNTIL_RR_ACCESSED,
             Flags::delayImplicitRrRegistrationUntilRrAccessed
     );
-
-    private final FlagState mEnableDefaultDisplayInTopologySwitch = new FlagState(
-            Flags.FLAG_ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH,
-            DesktopExperienceFlags.ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH::isTrue
-    );
     private final FlagState mEnsureColorFadeWhenTurningOn = new FlagState(
             Flags.FLAG_ENSURE_COLOR_FADE_WHEN_TURNING_ON,
             Flags::ensureColorFadeWhenTurningOn
@@ -157,11 +147,6 @@ public class DisplayManagerFlags {
     private final FlagState mIsMinmodeCapBrightnessEnabled = new FlagState(
             Flags.FLAG_MINMODE_CAP_BRIGHTNESS_ENABLED,
             Flags::minmodeCapBrightnessEnabled
-    );
-
-    private final FlagState mIsDisplayMirrorInLockTaskModeEnabled = new FlagState(
-            Flags.FLAG_ENABLE_DISPLAY_MIRROR_IN_LOCK_TASK_MODE,
-            DesktopExperienceFlags.ENABLE_DISPLAY_MIRROR_IN_LOCK_TASK_MODE::isTrue
     );
 
     /** Returns whether power throttling clamper is enabled on not. */
@@ -217,14 +202,6 @@ public class DisplayManagerFlags {
      */
     public boolean hasArrSupportFlag() {
         return mHasArrSupport.isEnabled();
-    }
-
-    /**
-     * @return {@code true} if bedtime mode specific auto-brightness curve should be loaded and be
-     * applied when bedtime mode is enabled.
-     */
-    public boolean isAutoBrightnessModeBedtimeWearEnabled() {
-        return mAutoBrightnessModeBedtimeWearFlagState.isEnabled();
     }
 
     /**
@@ -295,10 +272,6 @@ public class DisplayManagerFlags {
         return mDelayImplicitRrRegistrationUntilRrAccessed.isEnabled();
     }
 
-    public boolean isDefaultDisplayInTopologySwitchEnabled() {
-        return mEnableDefaultDisplayInTopologySwitch.isEnabled();
-    }
-
     /**
      * @return {@code true} if the flag for ensure color fad when turning screen on is enabled
      */
@@ -312,10 +285,6 @@ public class DisplayManagerFlags {
 
     public boolean isMinmodeCapBrightnessEnabled() {
         return mIsMinmodeCapBrightnessEnabled.isEnabled();
-    }
-
-    public boolean isDisplayMirrorInLockTaskModeEnabled() {
-        return mIsDisplayMirrorInLockTaskModeEnabled.isEnabled();
     }
 
     /**
@@ -335,7 +304,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mEnableBatteryStatsForAllDisplays);
         pw.println(" " + mBlockAutobrightnessChangesOnStylusUsage);
         pw.println(" " + mHasArrSupport);
-        pw.println(" " + mAutoBrightnessModeBedtimeWearFlagState);
         pw.println(" " + mGetSupportedRefreshRatesFlagState);
         pw.println(" " + mDisplayListenerPerformanceImprovementsFlagState);
         pw.println(" " + mSubscribeGranularDisplayEvents);
@@ -345,11 +313,9 @@ public class DisplayManagerFlags {
         pw.println(" " + mCommittedStateSeparateEvent);
         pw.println(" " + mSeparateTimeouts);
         pw.println(" " + mDelayImplicitRrRegistrationUntilRrAccessed);
-        pw.println(" " + mEnableDefaultDisplayInTopologySwitch);
         pw.println(" " + mEnsureColorFadeWhenTurningOn);
         pw.println(" " + mIsLoggingForDisplayEventsEnabled);
         pw.println(" " + mIsMinmodeCapBrightnessEnabled);
-        pw.println(" " + mIsDisplayMirrorInLockTaskModeEnabled);
     }
 
     private static class FlagState {

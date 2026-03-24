@@ -17,6 +17,7 @@
 #include "RenderThread.h"
 
 #include <android-base/properties.h>
+#include <com_android_graphics_hwui_flags.h>
 #include <dlfcn.h>
 #include <gui/TraceUtils.h>
 #include <include/gpu/ganesh/GrContextOptions.h>
@@ -47,10 +48,7 @@
 #include "renderstate/RenderState.h"
 #include "utils/TimeUtils.h"
 
-#ifdef __linux__
-#include <com_android_graphics_hwui_flags.h>
 namespace hwui_flags = com::android::graphics::hwui::flags;
-#endif  // __linux__
 
 namespace android {
 namespace uirenderer {
@@ -421,14 +419,6 @@ std::chrono::nanoseconds RenderThread::estimateCallbacksExpectedDuration() const
 
 bool RenderThread::threadLoop() {
     setpriority(PRIO_PROCESS, 0, PRIORITY_DISPLAY);
-
-    // Signal that the RenderThread has finished setting the priority.
-    {
-        std::lock_guard<std::mutex> lock(mPriorityInitializedMutex);
-        mPriorityInitialized = true;
-        mPriorityInitializedCondition.notify_all();
-    }
-
     Looper::setForThread(mLooper);
     if (gOnStartHook) {
         gOnStartHook("RenderThread");
@@ -477,13 +467,6 @@ void RenderThread::pushBackFrameCallback(IFrameCallback* callback) {
         mPendingRegistrationFrameCallbacks.insert(callback);
     }
 }
-
-#ifdef __ANDROID__
-void RenderThread::waitForRenderThreadPriorityInitialized() {
-    std::unique_lock<std::mutex> lock(mPriorityInitializedMutex);
-    mPriorityInitializedCondition.wait(lock, [this] { return mPriorityInitialized; });
-}
-#endif
 
 sk_sp<Bitmap> RenderThread::allocateHardwareBitmap(SkBitmap& skBitmap) {
     auto renderType = Properties::getRenderPipelineType();

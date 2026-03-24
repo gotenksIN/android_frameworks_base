@@ -35,6 +35,9 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
@@ -49,7 +52,7 @@ import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.media.remedia.ui.compose.Media
 import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
 import com.android.systemui.notifications.intelligence.rules.shared.NmContextualDisplayLaunch
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesShadeStateViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesParentViewModel
 import com.android.systemui.notifications.ui.viewmodel.NotificationsShadeOverlayActionsViewModel
 import com.android.systemui.notifications.ui.viewmodel.NotificationsShadeOverlayContentViewModel
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
@@ -72,8 +75,7 @@ class NotificationsShadeOverlay
 constructor(
     private val actionsViewModelFactory: NotificationsShadeOverlayActionsViewModel.Factory,
     private val contentViewModelFactory: NotificationsShadeOverlayContentViewModel.Factory,
-    private val notificationRulesShadeStateViewModelFactory:
-        NotificationRulesShadeStateViewModel.Factory,
+    private val notificationRulesParentViewModelFactory: NotificationRulesParentViewModel.Factory,
     private val lockscreenElements: LockscreenElements,
     private val shadeSession: SaveableSession,
     private val stackScrollView: Lazy<NotificationScrollView>,
@@ -107,10 +109,10 @@ constructor(
                     Overlays.NotificationsShade
                 )
             }
-        val notificationRulesShadeStateViewModel =
+        val notificationRulesParentViewModel =
             if (NmContextualDisplayLaunch.isEnabled) {
-                rememberViewModel("NotificationsShadeOverlay-notifRulesShateStateViewModel") {
-                    notificationRulesShadeStateViewModelFactory.create()
+                rememberViewModel("NotificationsShadeOverlay-notifRulesParentViewModel") {
+                    notificationRulesParentViewModelFactory.create()
                 }
             } else {
                 null
@@ -161,7 +163,14 @@ constructor(
                 focusRequester.requestFocus()
             }
 
-            Column(modifier = Modifier.focusRequester(focusRequester).focusable()) {
+            val accessibilityTitle = stringResource(R.string.accessibility_desc_notification_shade)
+
+            Column(
+                modifier =
+                    Modifier.focusRequester(focusRequester).focusable().semantics {
+                        paneTitle = accessibilityTitle
+                    }
+            ) {
                 if (isFullWidth) {
                     Box(
                         Modifier.padding(
@@ -181,7 +190,7 @@ constructor(
 
                 if (viewModel.showMedia) {
                     Element(
-                        key = Media.Elements.mediaCarousel,
+                        key = Media.Elements.MediaCarousel,
                         modifier =
                             Modifier.padding(
                                 top = notificationStackPadding,
@@ -205,7 +214,7 @@ constructor(
                     shadeSession = shadeSession,
                     stackScrollView = stackScrollView,
                     viewModel = placeholderViewModel,
-                    notificationRulesShadeStateViewModel = notificationRulesShadeStateViewModel,
+                    notificationRulesParentViewModel = notificationRulesParentViewModel,
                     jankMonitor = jankMonitor,
                     shouldPunchHoleBehindScrim = false,
                     isTransparencyEnabled = viewModel.isTransparencyEnabled,

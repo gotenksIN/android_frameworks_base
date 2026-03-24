@@ -16,11 +16,23 @@
 
 package com.android.systemui.notifications.intelligence.rules.shared.model
 
+import android.net.Uri
+
 /** A model for a contact entry. */
 public data class ContactModel(
+    /** A URI associated with this contact. Can be used as a unique identifier. */
+    val lookupUri: Uri,
     /** The display name for the contact. */
-    val name: String
-)
+    val name: String,
+    /** The URI for fetching the photo of the contact. */
+    val photoUri: Uri?,
+) {
+    /** The display label for the contact. */
+    public val displayLabel: String = name
+
+    /** A unique identifier for the contact. */
+    public val id: String = lookupUri.toString()
+}
 
 /**
  * Represents the list of contacts inside a rule filter.

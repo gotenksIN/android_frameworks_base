@@ -21,9 +21,10 @@ import android.os.ParcelUuid;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
-import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
+import android.service.personalcontext.hint.PublishedContextHintWrapper;
 import android.service.personalcontext.hint.ContextHintWrapper;
 import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
 import android.service.personalcontext.insight.interaction.InsightEvent;
 
 /**
@@ -32,20 +33,23 @@ import android.service.personalcontext.insight.interaction.InsightEvent;
  * @hide
  */
 interface IPersonalContextManager {
+    @EnforcePermission("PERSONAL_CONTEXT_PUBLISH_HINTS")
     oneway void publishTriggeringHint(
             in List<ContextHintWrapper> hints,
             in List<RenderToken> renderTokens,
             in List<ContextHintWrapper> attributionHints,
             int userId);
 
-    oneway void publishInsight(in List<ContextInsightWrapper> insights, int userId);
+    @EnforcePermission("PERSONAL_CONTEXT_PUBLISH_INSIGHTS")
+    oneway void publishInsight(in List<ContextInsightWrapper> insights, in ParcelUuid componentId,
+            int userId);
 
-    ContextHintWithSignatureWrapper signHint(
+    PublishedContextHintWrapper signHint(
             in ContextHintWrapper hint,
             in List<ContextHintWrapper> attributionHints);
 
+    @EnforcePermission("PERSONAL_CONTEXT_HOST_INSIGHT_SURFACE")
     oneway void registerInsightSurfaceClient(
-            in List<ContextHintWrapper> clientHints,
             in InsightSurfaceClientInfo clientInfo,
             int userId);
 
@@ -60,14 +64,18 @@ interface IPersonalContextManager {
 
     oneway void reportEvent(in InsightEvent event, int userId);
 
-    oneway void reportFeedback(
-        in ContextInsightWrapper insight, in Bundle partialFeedback, int userId);
-
     boolean isPersonalContextModeEnabled(in String packageName, int userId);
 
     // Avoiding oneway so that get and set have a consistent ordering.
     @EnforcePermission("CHANGE_PERSONAL_CONTEXT_MODE")
     void setPersonalContextModeEnabled(in String packageName, int userId, boolean enabled);
+
+    // Used to enable/disable the entire service.
+    @EnforcePermission("PERSONAL_CONTEXT_WRITE_SETTINGS")
+    void setEnabled(int userId, boolean enabled);
+
+    @EnforcePermission("PERSONAL_CONTEXT_READ_SETTINGS")
+    boolean isEnabled(int userId);
 
     oneway void updateEmbeddedClientInfo(
         in InsightSurfaceClientInfo oldClientInfo,

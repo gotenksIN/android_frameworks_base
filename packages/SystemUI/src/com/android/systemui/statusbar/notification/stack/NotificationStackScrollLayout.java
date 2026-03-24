@@ -240,7 +240,7 @@ public class NotificationStackScrollLayout
     int mImeInset = 0;
     private float mQsExpansionFraction;
     private final int mSplitShadeMinContentHeight;
-    private Supplier<String> mLastUpdateSidePaddingDumpStringSupplier;
+    private Supplier<String> mLastUpdateSidePaddingDumpStringSupplier = () -> "(Not yet measured)";
 
     private final HeadsUpAnimator mHeadsUpAnimator;
     /**
@@ -1271,7 +1271,8 @@ public class NotificationStackScrollLayout
 
     @Override
     public void setPlaceholderAlpha(float alpha) {
-        mController.setMaxAlphaFromPlaceholder(alpha);
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        mAmbientState.setPlaceholderAlpha(alpha);
     }
 
     @Override
@@ -3966,6 +3967,10 @@ public class NotificationStackScrollLayout
         if (!SceneContainerFlag.isEnabled()) {
             return false;
         }
+        if (!isRootViewVisible()) {
+            debugShadeLog("NSSL's root view is not visible. Refusing touch event");
+            return true;
+        }
         boolean interactive = mScrollViewFields.interactive;
         boolean isOutBounds = isOutBoundsDownEvent(ev);
         boolean result = !interactive || isOutBounds;
@@ -3974,6 +3979,10 @@ public class NotificationStackScrollLayout
                     isOutBounds);
         }
         return result;
+    }
+
+    private boolean isRootViewVisible() {
+        return getRootView().getVisibility() == View.VISIBLE;
     }
 
     /**
@@ -4030,6 +4039,10 @@ public class NotificationStackScrollLayout
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         if (SceneContainerFlag.isEnabled()) {
+            if (!isRootViewVisible()) {
+                debugShadeLog("NSSL's root view is not visible. Touch not dispatched.");
+                return false;
+            }
             int action = ev.getActionMasked();
             boolean isTouchInGuts = mController.isTouchInGutsView(ev);
             if (action == ACTION_DOWN && !isTouchInGuts) {
@@ -5785,10 +5798,18 @@ public class NotificationStackScrollLayout
     }
 
     @Override
+    public void setCurrentSceneLockscreen(boolean isCurrentLockscreen) {
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        mAmbientState.setCurrentSceneLockscreen(isCurrentLockscreen);
+        if (isCurrentLockscreen) {
+            requestChildrenUpdate();
+        }
+    }
+
+    @Override
     public void setAlphaForLockscreenFadeIn(float alphaForLockscreenFadeIn) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
         mAmbientState.setLockscreenStackFadeInProgress(alphaForLockscreenFadeIn);
-        requestChildrenUpdate();
     }
 
     void onStatePostChange(boolean fromShadeLocked) {
@@ -5905,8 +5926,17 @@ public class NotificationStackScrollLayout
             println(pw, "shouldUseSplitNotificationShade", mShouldUseSplitNotificationShade);
             println(pw, "isAnimating", isCurrentlyAnimating());
             mNotificationStackSizeCalculator.dump(pw, args);
-            mScrollViewFields.dump(pw);
-            if (!SceneContainerFlag.isEnabled()) {
+            if (SceneContainerFlag.isEnabled()) {
+                mScrollViewFields.dump(pw);
+                pw.println("Touch states:");
+                DumpUtilsKt.withIncreasedIndent(pw, () -> {
+                            println(pw, "sendingTouchesToSceneFramework",
+                                    mSendingTouchesToSceneFramework);
+                            println(pw, "isBeingDragged", mIsBeingDragged);
+                            println(pw, "activePointerId", mActivePointerId);
+                        }
+                );
+            } else {
                 // fields which will be removed with SceneContainer
                 println(pw, "intrinsicContentHeight", getIntrinsicContentHeight());
                 println(pw, "contentHeight", getContentHeight());
@@ -6943,11 +6973,17 @@ public class NotificationStackScrollLayout
                                 .hasDelays(),
 
                 // ANIMATION_TYPE_TOP_PADDING_CHANGED
-                new AnimationFilter()
-                        .animateHeight()
-                        .animateTopInset()
-                        .animateY()
-                        .animateZ(),
+                SceneContainerFlag.isEnabled()
+                        ? new AnimationFilter()
+                                .animateHeight()
+                                .animateTopInset()
+                                .animateAlpha()
+                                .animateZ()
+                        : new AnimationFilter()
+                                .animateHeight()
+                                .animateTopInset()
+                                .animateY()
+                                .animateZ(),
 
                 // ANIMATION_TYPE_ACTIVATED_CHILD
                 new AnimationFilter()

@@ -59,7 +59,7 @@ public interface OnDeviceModel {
                 MODEL_STATUS_UNAVAILABLE,
                 MODEL_STATUS_DOWNLOADABLE,
                 MODEL_STATUS_DOWNLOADING,
-                MODEL_STATUS_AVAILABLE
+                MODEL_STATUS_AVAILABLE,
             })
     @Retention(RetentionPolicy.SOURCE)
     @Target({ElementType.TYPE_USE, ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD})

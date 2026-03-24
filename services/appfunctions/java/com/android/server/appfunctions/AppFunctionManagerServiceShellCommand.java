@@ -26,6 +26,7 @@ import static com.android.server.appfunctions.AppSearchDataJsonConverter.searchR
 import static com.android.server.appfunctions.AppSearchDataYamlConverter.convertGenericDocumentToYaml;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
 import android.app.ActivityManager;
 import android.app.appfunctions.AppFunctionException;
@@ -39,6 +40,11 @@ import android.app.appfunctions.ISetAppFunctionEnabledCallback;
 import android.app.appsearch.GenericDocument;
 import android.app.appsearch.SearchResult;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.SignedPackage;
+import android.content.res.Resources;
+import android.content.res.XmlResourceParser;
 import android.os.Binder;
 import android.os.ICancellationSignal;
 import android.os.Process;
@@ -56,13 +62,13 @@ import org.json.JSONObject;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.xmlpull.v1.XmlPullParser;
 
 /** Shell command implementation for the {@link AppFunctionManagerService}. */
 public class AppFunctionManagerServiceShellCommand extends ShellCommand {
@@ -265,6 +271,9 @@ public class AppFunctionManagerServiceShellCommand extends ShellCommand {
                         return -1;
                     }
                     return disableAllowlist();
+                case "read-app-description":
+                    // Not added to help, because it is not a platform feature yet.
+                    return readAppDescription();
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -272,6 +281,67 @@ public class AppFunctionManagerServiceShellCommand extends ShellCommand {
             getOutPrintWriter().println("Exception: " + e);
         }
         return -1;
+    }
+
+    private int readAppDescription() throws Exception {
+        final PrintWriter pw = getOutPrintWriter();
+        final PrintWriter errPw = getErrPrintWriter();
+        String packageName = null;
+        int userId = 0;
+        String opt;
+
+        while ((opt = getNextOption()) != null) {
+            switch (opt) {
+                case "--package":
+                    packageName = getNextArgRequired();
+                    break;
+                case "--user":
+                    userId = UserHandle.parseUserArg(getNextArgRequired());
+                    break;
+                default:
+                    errPw.println("Unknown option: " + opt);
+                    return -1;
+            }
+        }
+        Context userContext = mContext.createContextAsUser(UserHandle.of(userId), /* flags= */ 0);
+        PackageManager pm = userContext.getPackageManager();
+        int appMetadataXmlRes =
+                pm.getProperty(
+                                /* propertyName= */ "android.app.appfunctions.app_metadata",
+                                packageName)
+                        .getResourceId();
+        if (appMetadataXmlRes == Resources.ID_NULL) {
+            errPw.println("No app metadata found for package: " + packageName);
+            return -1;
+        }
+        ApplicationInfo targetAppInfo = pm.getApplicationInfo(packageName, /* flags= */ 0);
+        Resources targetAppResources =
+                pm.getResourcesForApplication(
+                        targetAppInfo, userContext.getResources().getConfiguration());
+        var xmlParser = targetAppResources.getXml(appMetadataXmlRes);
+
+        while (xmlParser.getEventType() != XmlPullParser.START_TAG) {
+            xmlParser.next();
+
+            if (xmlParser.getEventType() == XmlPullParser.END_DOCUMENT) {
+                errPw.println("No app description found for package: " + packageName);
+                return -1;
+            }
+        }
+        String description = getXmlAttributeValue(xmlParser, "description");
+        pw.println(description);
+        return 0;
+    }
+
+    private String getXmlAttributeValue(XmlResourceParser xmlParser, String attributeName) {
+        var value =
+                xmlParser.getAttributeValue(
+                        "http://schemas.android.com/apk/res-auto", attributeName);
+
+        return value == null
+                ? xmlParser.getAttributeValue(
+                        "http://schemas.android.com/apk/androidx.appfunctions", attributeName)
+                : value;
     }
 
     private int runListAppFunctions() throws Exception {
@@ -737,19 +807,28 @@ public class AppFunctionManagerServiceShellCommand extends ShellCommand {
 
     private int setTestAllowlistEntry() {
         final PrintWriter pw = getOutPrintWriter();
-        String agentPackage = null;
-        List<String> appPackages = null;
+        SignedPackage agentPackage = null;
+        List<SignedPackage> appPackages = null;
 
         String opt;
         while ((opt = getNextOption()) != null) {
             if (opt.equals("--agent-package")) {
-                agentPackage = getNextArgRequired();
+                agentPackage = parseSignedPackage(getNextArgRequired());
             } else if (opt.equals("--app-packages")) {
-                String rawAppPackages = getNextArgRequired();
+                String rawAppPackagesInput = getNextArgRequired();
                 try {
-                    appPackages = Arrays.asList(rawAppPackages.split(","));
+                    String[] rawAppPackages = rawAppPackagesInput.split(",");
+                    appPackages = new ArrayList<>();
+                    for (String rawAppPackage : rawAppPackages) {
+                        SignedPackage appPackage = parseSignedPackage(rawAppPackage);
+                        if (appPackage != null) {
+                            appPackages.add(appPackage);
+                        } else {
+                            throw new IllegalArgumentException("Unable to parse " + rawAppPackage);
+                        }
+                    }
                 } catch (Exception e) {
-                    pw.println("Unable to parse " + rawAppPackages);
+                    pw.println("Unable to parse " + rawAppPackagesInput);
                 }
             } else {
                 pw.println("Unknown option: " + opt);
@@ -771,6 +850,11 @@ public class AppFunctionManagerServiceShellCommand extends ShellCommand {
 
         pw.println("Set test allowlist entry");
         return 0;
+    }
+
+    @Nullable
+    private SignedPackage parseSignedPackage(@NonNull String rawString) {
+        return SignedPackageParser.parse(rawString);
     }
 
     private int clearTestAllowlist() {

@@ -21,7 +21,11 @@ import android.graphics.Rect
 import android.os.IBinder
 import android.platform.test.annotations.EnableFlags
 import android.view.Display.DEFAULT_DISPLAY
+import android.view.InsetsSource
+import android.view.InsetsState
+import android.view.Surface
 import android.view.SurfaceControl
+import android.view.WindowInsets.Type.navigationBars
 import android.view.WindowManager.TRANSIT_CLOSE
 import android.view.WindowManager.TRANSIT_OPEN
 import android.view.WindowManager.TRANSIT_TO_BACK
@@ -33,33 +37,37 @@ import android.window.TransitionInfo
 import android.window.TransitionInfo.FLAG_IS_DISPLAY
 import android.window.TransitionInfo.FLAG_IS_WALLPAPER
 import android.window.WindowContainerToken
+import android.window.WindowContainerTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.wm.shell.Flags.FLAG_ENABLE_SHELL_MODES
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
+import com.android.wm.shell.common.DisplayInsetsController
+import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.hierarchy.ContainerHierarchy
 import com.android.wm.shell.hierarchy.containers.Container
 import com.android.wm.shell.hierarchy.containers.StubContainer
 import com.android.wm.shell.hierarchy.modes.FormFactorModes
 import com.android.wm.shell.hierarchy.modes.Mode
 import com.android.wm.shell.hierarchy.modes.StubMode
-import com.android.wm.shell.hierarchy.properties.ActivityContainerProperties
 import com.android.wm.shell.hierarchy.properties.DisplayAreaContainerProperties
 import com.android.wm.shell.hierarchy.properties.DisplayContainerProperties
-import com.android.wm.shell.hierarchy.properties.RootContainerProperties
 import com.android.wm.shell.hierarchy.properties.TaskContainerProperties
-import com.android.wm.shell.hierarchy.properties.WallpaperContainerProperties
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.eq
-import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.reset
 import org.mockito.kotlin.spy
+import org.mockito.kotlin.stub
+import org.mockito.kotlin.verify
 
 /**
  * Tests for [HierarchyUpdater].
@@ -74,29 +82,56 @@ class HierarchyUpdaterTest : ShellTestCase() {
 
     private val shellTaskOrganizer = mock<ShellTaskOrganizer>()
     private val transitions = mock<Transitions>()
+    private val displayInsetsController = mock<DisplayInsetsController>()
     private val formFactorModes = mock<FormFactorModes>()
     private val shellInit = mock<ShellInit>()
+
+    // Create a test hierarchy
+    private val display =
+        Container(
+            WindowContainerToken.createProxy("Display"),
+            DisplayContainerProperties(DEFAULT_DISPLAY)
+        ).apply {
+            leash = mock<SurfaceControl>()
+        }
+    private val displayArea =
+        Container(
+            WindowContainerToken.createProxy("DisplayArea"),
+            DisplayAreaContainerProperties(FEATURE_DEFAULT_TASK_CONTAINER)
+        ).apply {
+            leash = mock<SurfaceControl>()
+        }
+    private val child1 =
+        Container(
+            WindowContainerToken.createProxy("Child1"),
+            TaskContainerProperties(ActivityManager.RunningTaskInfo().apply {
+                taskId = 1
+            })
+        )
+    private val child1Mode = spy(StubMode("Child1Mode"))
+    private val child2 =
+        Container(
+            WindowContainerToken.createProxy("Child2"),
+            TaskContainerProperties(ActivityManager.RunningTaskInfo().apply {
+                taskId = 2
+            })
+        )
+    private val child2Mode = spy(StubMode("Child2Mode"))
     private val hierarchy = ContainerHierarchy().apply {
-        // Create a hierarchy with two nested container
-        val info1 = ActivityManager.RunningTaskInfo().apply {
-            taskId = 1
-        }
-        val child1 =
-            Container(WindowContainerToken.createProxy("test"), TaskContainerProperties(info1))
-        child1.parent = root
-        child1.mode = spy(StubMode())
-        val info2 = ActivityManager.RunningTaskInfo().apply {
-            taskId = 2
-        }
-        val child2 =
-            Container(WindowContainerToken.createProxy("test"), TaskContainerProperties(info2))
+        root.mode = StubMode("RootMode")
+        display.parent = root
+        displayArea.parent = display
+        child1.parent = displayArea
+        child1.mode = child1Mode
         child2.parent = child1
-        child2.mode = spy(StubMode())
+        child2.mode = child2Mode
     }
+
     private val updater =
         HierarchyUpdater(
             shellTaskOrganizer,
             transitions,
+            displayInsetsController,
             hierarchy,
             formFactorModes,
             shellInit
@@ -119,7 +154,6 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
         // Ensure that a container was added
@@ -146,7 +180,6 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
         // Ensure that a container was removed
@@ -178,7 +211,6 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
         // Verify 1 moved to top
@@ -213,7 +245,6 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
         // Verify 2 moved to back
@@ -225,15 +256,81 @@ class HierarchyUpdaterTest : ShellTestCase() {
     }
 
     @Test
-    fun testNotifyAncestorModesInOrder_onAddContainer() {
-        // Create an open transition
+    fun testNotifyMode_onChildAdded() {
+        // Create a new child
+        val newChild =
+            Container(
+                WindowContainerToken.createProxy("new child"),
+                TaskContainerProperties(ActivityManager.RunningTaskInfo().apply {
+                    taskId = 1234
+                })
+            )
+
+        // Add it to the hierarchy and notify
+        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
+        newChild.parent = child2
+        updater.notifyModes(Mode.UpdateContext(), snapshot)
+
+        // Verify the container was attached to the associated ancestor mode
+        verify(child2Mode).containersChanged(any(), eq(child2), any(), any(), any())
+        assertThat(child2Mode.addedContainers).contains(newChild)
+        verify(child1Mode, never()).containersChanged(any(), any(), any(), any(), any())
+    }
+
+    @Test
+    fun testNotifyMode_onChildRemoved() {
+        // Create a new child
+        val newChild =
+            Container(
+                WindowContainerToken.createProxy("new child"),
+                TaskContainerProperties(ActivityManager.RunningTaskInfo().apply {
+                    taskId = 1234
+                })
+            )
+
+        // Add it to the hierarchy and notify
+        val snapshot1 = HierarchySnapshot(hierarchy.toContainerList())
+        newChild.parent = child2
+        updater.notifyModes(Mode.UpdateContext(), snapshot1)
+
+        reset(child1Mode)
+        reset(child2Mode)
+
+        // Remove it from the hierarchy and notify
+        val snapshot2 = HierarchySnapshot(hierarchy.toContainerList())
+        newChild.parent = null
+        updater.notifyModes(Mode.UpdateContext(), snapshot2)
+
+        // Verify the container was detached from the associated ancestor mode
+        verify(child2Mode).containersRemoved(any(), any(), any(), any())
+        assertThat(child2Mode.removedContainers).contains(newChild)
+        verify(child1Mode, never()).containersRemoved(any(), any(), any(), any())
+    }
+
+    @Test
+    fun testNotifyMode_onAncestorContainerChange() {
+        // Create containers
+        val wct1 = WindowContainerToken.createProxy("test")
+        val child1 = StubContainer(wct1)
+        child1.parent = hierarchy.root
+
+        val wct2 = WindowContainerToken.createProxy("test")
+        val child2 = StubContainer(wct2)
+        val mode2 = StubMode()
+        child2.parent = child1
+        child2.mode = mode2
+
+        // Create a transition that updates focus (by starting a new task)
+        val taskId = 10
+        val taskInfo = ActivityManager.RunningTaskInfo().apply {
+            this.taskId = taskId
+            this.isFocused = true
+            this.displayId = DEFAULT_DISPLAY
+        }
         val wct = WindowContainerToken.createProxy("test")
         val change = TransitionInfo.Change(wct, mock<SurfaceControl>()).apply {
             mode = TRANSIT_OPEN
-            taskInfo = ActivityManager.RunningTaskInfo().apply {
-                // Parented to the nested container
-                parentTaskId = 2
-            }
+            this.taskInfo = taskInfo
         }
         val info = TransitionInfo(TRANSIT_OPEN, 0).apply {
             addChange(change)
@@ -244,67 +341,54 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
-        // Verify the container was attached to the associated ancestor modes in order
-        val newChild = hierarchy.getContainer(wct)!!
-        val child1Mode = hierarchy.root.children[0].mode!!
-        val child2Mode = hierarchy.root.children[0].children[0].mode!!
-        val inOrder = inOrder(child1Mode, child2Mode)
-        inOrder.verify(child1Mode).attachToContainer(any(), eq(newChild), eq(false))
-        inOrder.verify(child2Mode).attachToContainer(any(), eq(newChild), eq(false))
+        // Verify that child2 mode is updated (because ancestor changed)
+        assertThat(mode2.ancestorsChangedContainers).isNotEmpty()
     }
 
     @Test
-    fun testNotifyAncestorModesInOrder_onRemoveContainer() {
-        // Create an close transition for a container that has some modes already applied
-        val child1 = hierarchy.root.children[0]
-        val child2 = hierarchy.root.children[0].children[0]
-        val wct = WindowContainerToken.createProxy("test")
-        val container = StubContainer(wct)
-        container.parent = child2
-        val change = TransitionInfo.Change(wct, mock<SurfaceControl>()).apply {
-            mode = TRANSIT_CLOSE
-        }
-        val info = TransitionInfo(TRANSIT_CLOSE, 0).apply {
-            addChange(change)
-        }
+    fun testNotifyMode_onModeContainerChange() {
+        // Create containers
+        val wct1 = WindowContainerToken.createProxy("test")
+        val child1 = StubContainer(wct1)
+        val mode1 = StubMode()
+        child1.parent = hierarchy.root
+        child1.mode = mode1
 
-        // Notify the transition
-        updater.handleTransition(
-            mock<IBinder>(),
-            info,
-            mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
-        )
+        // Trigger a change on child1
+        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
+        child1.setBounds(Rect(0, 0, 50, 50))
+        updater.notifyModes(Mode.UpdateContext(), snapshot)
 
-        // Verify the container was detached from the associated ancestor modes in order
-        val child1Mode = child1.mode!!
-        val child2Mode = child2.mode!!
-        val inOrder = inOrder(child2Mode, child1Mode)
-        inOrder.verify(child2Mode).detachFromContainer(any(), eq(container))
-        inOrder.verify(child1Mode).detachFromContainer(any(), eq(container))
+        // Verify that child1 mode is updated (because an ancestor changed)
+        assertThat(mode1.changedContainers).contains(child1)
+    }
+
+    @Test
+    fun testNotifyMode_onDescendantContainerChange() {
+        // Create containers
+        val wct1 = WindowContainerToken.createProxy("test")
+        val child1 = StubContainer(wct1)
+        val mode1 = StubMode()
+        child1.parent = hierarchy.root
+        child1.mode = mode1
+
+        val wct2 = WindowContainerToken.createProxy("test")
+        val child2 = StubContainer(wct2)
+        child2.parent = child1
+
+        // Trigger a change on child2
+        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
+        child2.setBounds(Rect(0, 0, 50, 50))
+        updater.notifyModes(Mode.UpdateContext(), snapshot)
+
+        // Verify that child1 mode is updated (because a descendant changed)
+        assertThat(mode1.changedContainers).contains(child2)
     }
 
     @Test
     fun testHandleCreateRootTask() {
-        // Create a display container
-        val display =
-            Container(
-                WindowContainerToken.createProxy("test"),
-                DisplayContainerProperties(DEFAULT_DISPLAY)
-            )
-        display.parent = hierarchy.root
-        display.leash = mock<SurfaceControl>()
-        val displayArea =
-            Container(
-                WindowContainerToken.createProxy("test"),
-                DisplayAreaContainerProperties(FEATURE_DEFAULT_TASK_CONTAINER)
-            )
-        displayArea.parent = display
-        displayArea.leash = mock<SurfaceControl>()
-
         // Create a new root task
         val wct = WindowContainerToken.createProxy("test")
         val taskInfo = ActivityManager.RunningTaskInfo().apply {
@@ -336,13 +420,6 @@ class HierarchyUpdaterTest : ShellTestCase() {
 
     @Test
     fun testCreateTransientContainersInHierarchy() {
-        // Create a display container
-        val display =
-            Container(
-                WindowContainerToken.createProxy("test"),
-                DisplayContainerProperties(DEFAULT_DISPLAY)
-            )
-        display.parent = hierarchy.root
         val taskInfo = ActivityManager.RunningTaskInfo().apply {
             taskId = 1234
         }
@@ -354,7 +431,7 @@ class HierarchyUpdaterTest : ShellTestCase() {
         task.parent = display
 
         // Create a transition with a wallpaper and activity change
-        val displayId = display.props<DisplayContainerProperties>().displayId
+        val displayId = display.displayProps().displayId
         val wallpaperToken = WindowContainerToken.createProxy("test")
         val wallpaperChange = TransitionInfo.Change(wallpaperToken, mock<SurfaceControl>()).apply {
             mode = TRANSIT_OPEN
@@ -367,7 +444,7 @@ class HierarchyUpdaterTest : ShellTestCase() {
             activityTransitionInfo =
                 ActivityTransitionInfo(
                     mock<ComponentName>(),
-                    task.props<TaskContainerProperties>().taskId
+                    task.taskProps().taskId
                 )
             parent = task.token
         }
@@ -379,14 +456,24 @@ class HierarchyUpdaterTest : ShellTestCase() {
         var hookCalled = false
         updater.updaterTestHook = object : HierarchyUpdater.UpdaterTestHook {
             override fun onHierarchyUpdated() {
+                // Reset once hit
+                updater.updaterTestHook = null
                 hookCalled = true
                 // Verify transient containers exist
                 val wallpaper = hierarchy.getContainer(wallpaperToken)
                 assertThat(wallpaper).isNotNull()
-                assertThat(wallpaper!!.props).isInstanceOf(WallpaperContainerProperties::class.java)
+                assertThat(wallpaper!!.isWallpaper()).isTrue()
                 val activity = hierarchy.getContainer(activityToken)
                 assertThat(activity).isNotNull()
-                assertThat(activity!!.props).isInstanceOf(ActivityContainerProperties::class.java)
+                assertThat(activity!!.isActivity()).isTrue()
+            }
+        }
+
+        // Have the transition complete immediately after the update
+        transitions.stub {
+            on { runOnIdle(any()) } doAnswer {
+                val callback = it.getArgument<Runnable>(0)
+                callback.run()
             }
         }
 
@@ -395,7 +482,6 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
         // Verify the hook above was called and the transitions ran
@@ -429,123 +515,77 @@ class HierarchyUpdaterTest : ShellTestCase() {
             mock<IBinder>(),
             info,
             mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
         )
 
         // Verify the root container's focus state is updated
-        val rootProps = hierarchy.root.props<RootContainerProperties>()
+        val rootProps = hierarchy.root.rootProps()
         assertThat(rootProps.focusState.globallyFocusedTaskId).isEqualTo(taskId)
     }
 
     @Test
-    fun testUpdateMode_onAncestorContainerChange() {
-        // Create containers
-        val wct1 = WindowContainerToken.createProxy("test")
-        val child1 = StubContainer(wct1)
-        child1.parent = hierarchy.root
+    fun testUpdateDisplay() {
+        // Create two displays in the hierarchy with children that have modes
+        val otherDisplay =
+            Container(
+                WindowContainerToken.createProxy("Display2"),
+                DisplayContainerProperties(12345)
+            )
+        otherDisplay.parent = hierarchy.root
+        val otherDisplayChild = StubContainer(WindowContainerToken.createProxy("OtherDispChild"))
+        val otherDisplayChildMode = StubMode()
+        otherDisplayChild.parent = otherDisplay
+        otherDisplayChild.mode = otherDisplayChildMode
 
-        val wct2 = WindowContainerToken.createProxy("test")
-        val child2 = StubContainer(wct2)
-        val mode2 = StubMode()
-        child2.parent = child1
-        child2.mode = mode2
+        // Trigger a default display change
+        val wct = WindowContainerTransaction()
+        val displayLayout = DisplayLayout().apply {
+            rotateTo(mContext.resources, Surface.ROTATION_90)
+        }
+        updater.updateDisplay(DEFAULT_DISPLAY, displayLayout, wct)
 
-        // Create a transition that updates focus (by starting a new task)
-        val taskId = 10
+        // Verify that the root & default display modes are notified, but not others
+        assertThat((hierarchy.root.mode as StubMode).displayChanges).isNotEmpty()
+        assertThat(child1Mode.displayChanges).isNotEmpty()
+        assertThat(otherDisplayChildMode.displayChanges).isEmpty()
+    }
+
+    @Test
+    fun testUpdateFromTaskInfoChange() {
+        // Trigger a task info change
         val taskInfo = ActivityManager.RunningTaskInfo().apply {
-            this.taskId = taskId
-            this.isFocused = true
-            this.displayId = DEFAULT_DISPLAY
-        }
-        val wct = WindowContainerToken.createProxy("test")
-        val change = TransitionInfo.Change(wct, mock<SurfaceControl>()).apply {
-            mode = TRANSIT_OPEN
-            this.taskInfo = taskInfo
-        }
-        val info = TransitionInfo(TRANSIT_OPEN, 0).apply {
-            addChange(change)
-        }
-
-        // Notify the transition
-        updater.handleTransition(
-            mock<IBinder>(),
-            info,
-            mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>()
-        )
-
-        // Verify that child2 mode is updated (because ancestor changed)
-        assertThat(mode2.updates).isNotEmpty()
-    }
-
-    @Test
-    fun testUpdateMode_onModeContainerChange() {
-        // Create containers
-        val wct1 = WindowContainerToken.createProxy("test")
-        val child1 = StubContainer(wct1)
-        val mode1 = StubMode()
-        child1.parent = hierarchy.root
-        child1.mode = mode1
-
-        // Trigger a change on child1
-        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
-        child1.setBounds(Rect(0, 0, 50, 50))
-        updater.notifyModes(Mode.UpdateContext(), snapshot)
-
-        // Verify that child1 mode is updated (because an ancestor changed)
-        assertThat(mode1.updates).isNotEmpty()
-    }
-
-    @Test
-    fun testUpdateMode_onDescendantContainerChange() {
-        // Create containers
-        val wct1 = WindowContainerToken.createProxy("test")
-        val child1 = StubContainer(wct1)
-        val mode1 = StubMode()
-        child1.parent = hierarchy.root
-        child1.mode = mode1
-
-        val wct2 = WindowContainerToken.createProxy("test")
-        val child2 = StubContainer(wct2)
-        child2.parent = child1
-
-        // Trigger a change on child2
-        val snapshot = HierarchySnapshot(hierarchy.toContainerList())
-        child2.setBounds(Rect(0, 0, 50, 50))
-        updater.notifyModes(Mode.UpdateContext(), snapshot)
-
-        // Verify that child1 mode is updated (because a descendant changed)
-        assertThat(mode1.updates).isNotEmpty()
-    }
-
-    @Test
-    fun testUpdateMode_manipulateHierarchyOnAttach() {
-        // Create containers
-        val wct1 = WindowContainerToken.createProxy("test")
-        val child1 = StubContainer(wct1)
-        val child2 = StubContainer(WindowContainerToken.createProxy("test2"))
-        val mode1 = object : StubMode() {
-            override fun attachToContainer(
-                updateContext: Mode.UpdateContext,
-                container: Container,
-                isTopAncestor: Boolean
-            ) {
-                super.attachToContainer(updateContext, container, isTopAncestor)
-                // If we are handling the "root" of the mode, then add a child
-                if (isTopAncestor) {
-                    child2.parent = container
-                }
+            token = child1.token
+            taskDescription = ActivityManager.TaskDescription().apply {
+                label = "test"
             }
         }
+        updater.handleTaskInfoChanged(taskInfo)
 
-        // Trigger a change
-        val snapshot = HierarchySnapshot(listOf(child1, child2))
-        child1.parent = hierarchy.root
-        child1.mode = mode1
-        updater.notifyModes(Mode.UpdateContext(), snapshot)
+        // Verify that child1 mode is updated
+        assertThat(child1Mode.changedContainers).contains(child1)
+    }
 
-        // Verify that the mode is notified of child2 even though it was added mid-update
-        assertThat(mode1.attachedRoots).contains(child1)
-        assertThat(mode1.attachedContainers).contains(child2)
+    @Test
+    fun testUpdateFromInsetsChange() {
+        // Create new insets
+        val newInsets = InsetsState().apply {
+            val id = InsetsSource.createId(null, 1, navigationBars())
+            val source = InsetsSource(id, navigationBars()).apply {
+                isVisible = true
+            }
+            this.addSource(source)
+        }
+
+        // Trigger the update
+        updater.handleDisplayInsetsChanged(DEFAULT_DISPLAY, newInsets)
+
+        // Verify that the display container props have the latest insets
+        assertThat(display.displayProps().insetsState.insetsState).isEqualTo(
+            newInsets
+        )
+        // Verify that the children modes are updated when the display changes
+        assertThat(child1Mode.ancestorsChangedContainers).isNotEmpty()
+        assertThat(child1Mode.changedContainers).isEmpty()
+        assertThat(child2Mode.ancestorsChangedContainers).isNotEmpty()
+        assertThat(child2Mode.changedContainers).isEmpty()
     }
 }

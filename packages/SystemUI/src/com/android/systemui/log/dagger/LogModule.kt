@@ -549,10 +549,10 @@ abstract class LogModule {
         @SceneFrameworkLog
         fun provideSceneFrameworkLogBuffer(factory: LogBufferFactory): LogBuffer {
             return factory.create(
-                "SceneFramework",
-                100, /* systrace */
-                true, /* alwaysLogToLogcat */
-                true,
+                name = "SceneFramework",
+                maxSize = 100,
+                systrace = true,
+                alwaysLogToLogcat = true,
             )
         }
 
@@ -658,6 +658,14 @@ abstract class LogModule {
         @MultiDisplayStatusBarLog
         fun providesMultiDisplayStatusBarLog(factory: LogBufferFactory): LogBuffer {
             return factory.create(name = "MultiDisplayStatusBarLog", maxSize = 50)
+        }
+
+        /** Provides a [LogBuffer] for Camera related events. */
+        @Provides
+        @SysUISingleton
+        @CameraLog
+        fun providesCameraLog(factory: LogBufferFactory): LogBuffer {
+            return factory.create(name = "CameraLog", maxSize = 50)
         }
     }
 }

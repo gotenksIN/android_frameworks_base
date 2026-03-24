@@ -29,7 +29,6 @@ import static android.service.autofill.FillRequest.FLAG_VIEW_NOT_FOCUSED;
 import static android.service.autofill.FillRequest.FLAG_VIEW_REQUESTS_CREDMAN_SERVICE;
 import static android.service.autofill.Flags.FLAG_FILL_DIALOG_IMPROVEMENTS;
 import static android.service.autofill.Flags.FLAG_STRING_REBUILD_API;
-import static android.service.autofill.Flags.getViewCoordinatesInUiThread;
 import static android.service.autofill.Flags.improveFillDialogAconfig;
 import static android.service.autofill.Flags.relayoutFix;
 import static android.view.ContentInfo.SOURCE_AUTOFILL;
@@ -379,9 +378,10 @@ public final class AutofillManager {
     /** @hide */ public static final int RECEIVER_FLAG_SESSION_FOR_AUGMENTED_AUTOFILL_ONLY = 0x1;
 
     /** @hide */
-    public static final int DEFAULT_LOGGING_LEVEL = Build.IS_DEBUGGABLE
-            ? AutofillManager.FLAG_ADD_CLIENT_DEBUG
-            : AutofillManager.NO_LOGGING;
+    public static final int DEFAULT_LOGGING_LEVEL =
+            Build.IS_DEBUGGABLE
+                    ? AutofillManager.FLAG_ADD_CLIENT_VERBOSE
+                    : AutofillManager.NO_LOGGING;
 
     /** @hide */
     public static final int DEFAULT_MAX_PARTITIONS_SIZE = 10;
@@ -5175,10 +5175,6 @@ public final class AutofillManager {
         public Rect getViewCoordinates(@NonNull AutofillId id) {
             final AutofillManager afm = mAfm.get();
             if (afm == null) return null;
-
-            if (!getViewCoordinatesInUiThread()) {
-                return getViewCoordinates(afm, id);
-            }
 
             final AtomicReference<Rect> result = new AtomicReference<>();
             final CountDownLatch latch = new CountDownLatch(1);

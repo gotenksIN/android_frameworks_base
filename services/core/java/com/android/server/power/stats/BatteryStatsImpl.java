@@ -138,6 +138,8 @@ import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 import com.android.server.LocalServices;
 import com.android.server.power.optimization.Flags;
+import com.android.server.power.stats.counters.TimeBase;
+import com.android.server.power.stats.counters.TimeBaseObs;
 import com.android.server.power.stats.format.MobileRadioPowerStatsLayout;
 
 import libcore.util.EmptyArray;
@@ -157,16 +159,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
@@ -589,158 +587,6 @@ public class BatteryStatsImpl extends BatteryStats {
         @VisibleForTesting
         public boolean exists(int userId) {
             return userIds != null ? ArrayUtils.contains(userIds, userId) : true;
-        }
-    }
-
-    /** Provide BatteryStatsImpl configuration choices */
-    public static class BatteryStatsConfig {
-        static final int RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG = 1 << 0;
-        static final int RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG = 1 << 1;
-
-        private final int mFlags;
-        private final Long mDefaultPowerStatsThrottlePeriod;
-        private final Map<String, Long> mPowerStatsThrottlePeriods;
-        private final int mMaxHistorySizeBytes;
-        private final int mHighBatteryLevelAfterCharge;
-
-        private BatteryStatsConfig(Builder builder) {
-            int flags = 0;
-            if (builder.mResetOnUnplugHighBatteryLevel) {
-                flags |= RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG;
-            }
-            if (builder.mResetOnUnplugAfterSignificantCharge) {
-                flags |= RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG;
-            }
-            mFlags = flags;
-            mDefaultPowerStatsThrottlePeriod = builder.mDefaultPowerStatsThrottlePeriod;
-            mPowerStatsThrottlePeriods = builder.mPowerStatsThrottlePeriods;
-            mMaxHistorySizeBytes = builder.mMaxHistorySizeBytes;
-            mHighBatteryLevelAfterCharge = builder.mHighBatteryLevelAfterCharge;
-        }
-
-        /**
-         * Returns whether a BatteryStats reset should occur on unplug when the battery level is
-         * high.
-         */
-        public boolean shouldResetOnUnplugHighBatteryLevel() {
-            return (mFlags & RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG)
-                    == RESET_ON_UNPLUG_HIGH_BATTERY_LEVEL_FLAG;
-        }
-
-        /** Returns battery level (as percent of battery) to consider as "high enough" to trigger
-         *  a battery session reset.
-         *  Only has an effect if {@link #shouldResetOnUnplugHighBatteryLevel} is true */
-        public int getHighBatteryLevelAfterCharge() {
-            return mHighBatteryLevelAfterCharge;
-        }
-
-        /**
-         * Returns whether a BatteryStats reset should occur on unplug if the battery charge a
-         * significant amount since it has been plugged in.
-         */
-        public boolean shouldResetOnUnplugAfterSignificantCharge() {
-            return (mFlags & RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG)
-                    == RESET_ON_UNPLUG_AFTER_SIGNIFICANT_CHARGE_FLAG;
-        }
-
-        /**
-         * Returns  the minimum amount of time (in millis) to wait between passes
-         * of power stats collection for the specified power component.
-         */
-        public long getPowerStatsThrottlePeriod(String powerComponentName) {
-            return mPowerStatsThrottlePeriods.getOrDefault(powerComponentName,
-                    mDefaultPowerStatsThrottlePeriod);
-        }
-
-        public int getMaxHistorySizeBytes() {
-            return mMaxHistorySizeBytes;
-        }
-
-        /**
-         * Builder for BatteryStatsConfig
-         */
-        public static class Builder {
-            private static final long DEFAULT_POWER_STATS_THROTTLE_PERIOD =
-                    TimeUnit.HOURS.toMillis(1);
-            private static final long DEFAULT_POWER_STATS_THROTTLE_PERIOD_CPU =
-                    TimeUnit.MINUTES.toMillis(1);
-            private static final int DEFAULT_MAX_HISTORY_SIZE = 4 * 1024 * 1024;
-            private static final int DEFAULT_HIGH_BATTERY_LEVEL_AFTER_CHARGE = 90;
-
-            private boolean mResetOnUnplugHighBatteryLevel;
-            private boolean mResetOnUnplugAfterSignificantCharge;
-            private long mDefaultPowerStatsThrottlePeriod = DEFAULT_POWER_STATS_THROTTLE_PERIOD;
-            private final Map<String, Long> mPowerStatsThrottlePeriods = new HashMap<>();
-            private int mMaxHistorySizeBytes = DEFAULT_MAX_HISTORY_SIZE;
-            private int mHighBatteryLevelAfterCharge = DEFAULT_HIGH_BATTERY_LEVEL_AFTER_CHARGE;
-
-            public Builder() {
-                mResetOnUnplugHighBatteryLevel = true;
-                mResetOnUnplugAfterSignificantCharge = true;
-                setPowerStatsThrottlePeriodMillis(BatteryConsumer.powerComponentIdToString(
-                                BatteryConsumer.POWER_COMPONENT_CPU),
-                        DEFAULT_POWER_STATS_THROTTLE_PERIOD_CPU);
-            }
-
-            /**
-             * Build the BatteryStatsConfig.
-             */
-            public BatteryStatsConfig build() {
-                return new BatteryStatsConfig(this);
-            }
-
-            /**
-             * Set whether a BatteryStats reset should occur on unplug when the battery level is
-             * high.
-             */
-            public Builder setResetOnUnplugHighBatteryLevel(boolean reset) {
-                mResetOnUnplugHighBatteryLevel = reset;
-                return this;
-            }
-
-            /**
-             * Set whether a BatteryStats reset should occur on unplug if the battery charge a
-             * significant amount since it has been plugged in.
-             */
-            public Builder setResetOnUnplugAfterSignificantCharge(boolean reset) {
-                mResetOnUnplugAfterSignificantCharge = reset;
-                return this;
-            }
-
-            /**
-             * Sets the minimum amount of time (in millis) to wait between passes
-             * of power stats collection for the specified power component.
-             */
-            public Builder setPowerStatsThrottlePeriodMillis(String powerComponentName,
-                    long periodMs) {
-                mPowerStatsThrottlePeriods.put(powerComponentName, periodMs);
-                return this;
-            }
-
-            /**
-             * Sets the minimum amount of time (in millis) to wait between passes
-             * of power stats collection for any components not configured explicitly.
-             */
-            public Builder setDefaultPowerStatsThrottlePeriodMillis(long periodMs) {
-                mDefaultPowerStatsThrottlePeriod = periodMs;
-                return this;
-            }
-
-            /**
-             * Sets the maximum amount of disk space, in bytes, that battery history can
-             * utilize. As this space fills up, the oldest history chunks must be expunged.
-             */
-            public Builder setMaxHistorySizeBytes(int maxHistorySizeBytes) {
-                mMaxHistorySizeBytes = maxHistorySizeBytes;
-                return this;
-            }
-
-            /** Sets battery level (as percent of battery) to consider as "high enough" to
-             * trigger a battery session reset.*/
-            public Builder setHighBatteryLevelAfterCharge(int highBatteryLevelAfterCharge) {
-                mHighBatteryLevelAfterCharge = highBatteryLevelAfterCharge;
-                return this;
-            }
         }
     }
 
@@ -2060,7 +1906,8 @@ public class BatteryStatsImpl extends BatteryStats {
     final class PowerStatsCollectorInjector implements CpuTimeInStateCollector.Injector,
             ScreenPowerStatsCollector.Injector, MobileRadioPowerStatsCollector.Injector,
             WifiPowerStatsCollector.Injector, BluetoothPowerStatsCollector.Injector,
-            EnergyConsumerPowerStatsCollector.Injector, WakelockPowerStatsCollector.Injector {
+            EnergyConsumerPowerStatsCollector.Injector, WakelockPowerStatsCollector.Injector,
+            CpuCyclePerUidCollector.Injector {
         private PackageManager mPackageManager;
         private NetworkStatsManager mNetworkStatsManager;
         private TelephonyManager mTelephonyManager;
@@ -2190,6 +2037,10 @@ public class BatteryStatsImpl extends BatteryStats {
         public NetworkStats networkStatsDelta(NetworkStats stats, NetworkStats oldStats) {
             return BatteryStatsImpl.this.networkStatsDelta(stats, oldStats);
         }
+
+        public CpuCyclePerUidCollector.KernelCpuCycleReader getKernelCpuCycleReader() {
+            return new CpuCyclePerUidCollector.KernelCpuCycleReader();
+        }
     }
 
     @VisibleForTesting
@@ -2198,244 +2049,6 @@ public class BatteryStatsImpl extends BatteryStats {
     @VisibleForTesting
     protected final PowerStatsCollectorInjector mPowerStatsCollectorInjector =
             new PowerStatsCollectorInjector();
-
-    /**
-     * TimeBase observer.
-     */
-    public interface TimeBaseObs {
-        void onTimeStarted(long elapsedRealtimeUs, long baseUptimeUs, long baseRealtimeUs);
-        void onTimeStopped(long elapsedRealtimeUs, long baseUptimeUs, long baseRealtimeUs);
-
-        /**
-         * Reset the observer's state, returns true if the timer/counter is inactive
-         * so it can be destroyed.
-         * @param detachIfReset detach if true, no-op if false.
-         * @return Returns true if the timer/counter is inactive and can be destroyed.
-         */
-        default boolean reset(boolean detachIfReset) {
-            return reset(detachIfReset, SystemClock.elapsedRealtime() * 1000);
-        }
-
-        /**
-         * @see #reset(boolean)
-         * @param detachIfReset detach if true, no-op if false.
-         * @param elapsedRealtimeUs the timestamp when this reset is actually reequested
-         * @return Returns true if the timer/counter is inactive and can be destroyed.
-         */
-        boolean reset(boolean detachIfReset, long elapsedRealtimeUs);
-
-        /**
-         * Detach the observer from TimeBase.
-         */
-        void detach();
-    }
-
-    // methods are protected not private to be VisibleForTesting
-    public static class TimeBase {
-        protected final Collection<TimeBaseObs> mObservers;
-
-        // All below time metrics are in microseconds.
-        protected long mUptimeUs;
-        protected long mRealtimeUs;
-
-        protected boolean mRunning;
-
-        protected long mPastUptimeUs;
-        protected long mUptimeStartUs;
-        protected long mPastRealtimeUs;
-        protected long mRealtimeStartUs;
-        protected long mUnpluggedUptimeUs;
-        protected long mUnpluggedRealtimeUs;
-
-        public void dump(PrintWriter pw, String prefix) {
-            StringBuilder sb = new StringBuilder(128);
-            pw.print(prefix); pw.print("mRunning="); pw.println(mRunning);
-            sb.setLength(0);
-            sb.append(prefix);
-                    sb.append("mUptime=");
-                    formatTimeMs(sb, mUptimeUs / 1000);
-            pw.println(sb.toString());
-            sb.setLength(0);
-            sb.append(prefix);
-                    sb.append("mRealtime=");
-                    formatTimeMs(sb, mRealtimeUs / 1000);
-            pw.println(sb.toString());
-            sb.setLength(0);
-            sb.append(prefix);
-                    sb.append("mPastUptime=");
-                    formatTimeMs(sb, mPastUptimeUs / 1000); sb.append("mUptimeStart=");
-                    formatTimeMs(sb, mUptimeStartUs / 1000);
-                    sb.append("mUnpluggedUptime="); formatTimeMs(sb, mUnpluggedUptimeUs / 1000);
-            pw.println(sb.toString());
-            sb.setLength(0);
-            sb.append(prefix);
-                    sb.append("mPastRealtime=");
-                    formatTimeMs(sb, mPastRealtimeUs / 1000); sb.append("mRealtimeStart=");
-                    formatTimeMs(sb, mRealtimeStartUs / 1000);
-                    sb.append("mUnpluggedRealtime="); formatTimeMs(sb, mUnpluggedRealtimeUs / 1000);
-            pw.println(sb.toString());
-        }
-        /**
-         * The mObservers of TimeBase in BatteryStatsImpl object can contain up to 20k entries.
-         * The mObservers of TimeBase in BatteryStatsImpl.Uid object only contains a few or tens of
-         * entries.
-         * mObservers must have good performance on add(), remove(), also be memory efficient.
-         * This is why we provide isLongList parameter for long and short list user cases.
-         * @param isLongList If true, use HashSet for mObservers list.
-         *                   If false, use ArrayList for mObservers list.
-        */
-        public TimeBase(boolean isLongList) {
-            mObservers = isLongList ? new HashSet<>() : new ArrayList<>();
-        }
-
-        public TimeBase() {
-            this(false);
-        }
-
-        public void add(TimeBaseObs observer) {
-            mObservers.add(observer);
-        }
-
-        public void remove(TimeBaseObs observer) {
-            mObservers.remove(observer);
-        }
-
-        public boolean hasObserver(TimeBaseObs observer) {
-            return mObservers.contains(observer);
-        }
-
-        public void init(long uptimeUs, long elapsedRealtimeUs) {
-            mRealtimeUs = 0;
-            mUptimeUs = 0;
-            mPastUptimeUs = 0;
-            mPastRealtimeUs = 0;
-            mUptimeStartUs = uptimeUs;
-            mRealtimeStartUs = elapsedRealtimeUs;
-            mUnpluggedUptimeUs = getUptime(mUptimeStartUs);
-            mUnpluggedRealtimeUs = getRealtime(mRealtimeStartUs);
-        }
-
-        public void reset(long uptimeUs, long elapsedRealtimeUs) {
-            if (!mRunning) {
-                mPastUptimeUs = 0;
-                mPastRealtimeUs = 0;
-            } else {
-                mUptimeStartUs = uptimeUs;
-                mRealtimeStartUs = elapsedRealtimeUs;
-                // TODO: Since mUptimeStartUs was just reset and we are running, getUptime will
-                // just return mPastUptimeUs. Also, are we sure we don't want to reset that?
-                mUnpluggedUptimeUs = getUptime(uptimeUs);
-                // TODO: likewise.
-                mUnpluggedRealtimeUs = getRealtime(elapsedRealtimeUs);
-            }
-        }
-
-        public long computeUptime(long curTimeUs, int which) {
-            return mUptimeUs + getUptime(curTimeUs);
-        }
-
-        public long computeRealtime(long curTimeUs, int which) {
-            return mRealtimeUs + getRealtime(curTimeUs);
-        }
-
-        public long getUptime(long curTimeUs) {
-            long time = mPastUptimeUs;
-            if (mRunning) {
-                time += curTimeUs - mUptimeStartUs;
-            }
-            return time;
-        }
-
-        public long getRealtime(long curTimeUs) {
-            long time = mPastRealtimeUs;
-            if (mRunning) {
-                time += curTimeUs - mRealtimeStartUs;
-            }
-            return time;
-        }
-
-        public long getUptimeStart() {
-            return mUptimeStartUs;
-        }
-
-        public long getRealtimeStart() {
-            return mRealtimeStartUs;
-        }
-
-        public boolean isRunning() {
-            return mRunning;
-        }
-
-        public boolean setRunning(boolean running, long uptimeUs, long elapsedRealtimeUs) {
-            if (mRunning != running) {
-                mRunning = running;
-                if (running) {
-                    mUptimeStartUs = uptimeUs;
-                    mRealtimeStartUs = elapsedRealtimeUs;
-                    long batteryUptimeUs = mUnpluggedUptimeUs = getUptime(uptimeUs);
-                    long batteryRealtimeUs = mUnpluggedRealtimeUs = getRealtime(elapsedRealtimeUs);
-                    // Normally we do not use Iterator in framework code to avoid alloc/dealloc
-                    // Iterator object, here is an exception because mObservers' type is Collection
-                    // instead of list.
-                    final Iterator<TimeBaseObs> iter = mObservers.iterator();
-                    while (iter.hasNext()) {
-                        iter.next().onTimeStarted(
-                                elapsedRealtimeUs, batteryUptimeUs, batteryRealtimeUs);
-                    }
-                } else {
-                    mPastUptimeUs += uptimeUs - mUptimeStartUs;
-                    mPastRealtimeUs += elapsedRealtimeUs - mRealtimeStartUs;
-                    long batteryUptimeUs = getUptime(uptimeUs);
-                    long batteryRealtimeUs = getRealtime(elapsedRealtimeUs);
-                    // Normally we do not use Iterator in framework code to avoid alloc/dealloc
-                    // Iterator object, here is an exception because mObservers' type is Collection
-                    // instead of list.
-                    final Iterator<TimeBaseObs> iter = mObservers.iterator();
-                    while (iter.hasNext()) {
-                        iter.next().onTimeStopped(
-                                elapsedRealtimeUs, batteryUptimeUs, batteryRealtimeUs);
-                    }
-                }
-                return true;
-            }
-            return false;
-        }
-
-        public void readSummaryFromParcel(Parcel in) {
-            mUptimeUs = in.readLong();
-            mRealtimeUs = in.readLong();
-        }
-
-        public void writeSummaryToParcel(Parcel out, long uptimeUs, long elapsedRealtimeUs) {
-            out.writeLong(computeUptime(uptimeUs, STATS_SINCE_CHARGED));
-            out.writeLong(computeRealtime(elapsedRealtimeUs, STATS_SINCE_CHARGED));
-        }
-
-        public void readFromParcel(Parcel in) {
-            mRunning = false;
-            mUptimeUs = in.readLong();
-            mPastUptimeUs = in.readLong();
-            mUptimeStartUs = in.readLong();
-            mRealtimeUs = in.readLong();
-            mPastRealtimeUs = in.readLong();
-            mRealtimeStartUs = in.readLong();
-            mUnpluggedUptimeUs = in.readLong();
-            mUnpluggedRealtimeUs = in.readLong();
-        }
-
-        public void writeToParcel(Parcel out, long uptimeUs, long elapsedRealtimeUs) {
-            final long runningUptime = getUptime(uptimeUs);
-            final long runningRealtime = getRealtime(elapsedRealtimeUs);
-            out.writeLong(mUptimeUs);
-            out.writeLong(runningUptime);
-            out.writeLong(mUptimeStartUs);
-            out.writeLong(mRealtimeUs);
-            out.writeLong(runningRealtime);
-            out.writeLong(mRealtimeStartUs);
-            out.writeLong(mUnpluggedUptimeUs);
-            out.writeLong(mUnpluggedRealtimeUs);
-        }
-    }
 
     /**
      * State for keeping track of counting information.
@@ -10767,7 +10380,11 @@ public class BatteryStatsImpl extends BatteryStats {
         mHistory = new BatteryStatsHistory(null /* historyBuffer */, mConstants.MAX_HISTORY_BUFFER,
                 mBatteryHistoryDirectory, mClock, mMonotonicClock, traceDelegate, eventLogger);
 
-        mCpuPowerStatsCollector = new CpuTimeInStateCollector(mPowerStatsCollectorInjector);
+        if (Flags.x86CpuEnergyAttribution() && !KernelCpuThreadReader.isTimeInStateSupported()) {
+            mCpuPowerStatsCollector = new CpuCyclePerUidCollector(mPowerStatsCollectorInjector);
+        } else {
+            mCpuPowerStatsCollector = new CpuTimeInStateCollector(mPowerStatsCollectorInjector);
+        }
         mCpuPowerStatsCollector.addConsumer(this::recordPowerStats);
 
         mWakelockPowerStatsCollector = new WakelockPowerStatsCollector(
@@ -16157,6 +15774,9 @@ public class BatteryStatsImpl extends BatteryStats {
 
             pw.println();
             mCpuPowerStatsCollector.dumpLocked(pw);
+
+            pw.print("x86_cpu_energy_attribution enabled: ");
+            pw.println(Flags.x86CpuEnergyAttribution());
         }
     }
 }

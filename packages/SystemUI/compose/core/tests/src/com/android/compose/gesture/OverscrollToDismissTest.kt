@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -52,7 +51,7 @@ import org.junit.runner.RunWith
 import platform.test.motion.compose.ComposeRecordingSpec
 import platform.test.motion.compose.MotionControl
 import platform.test.motion.compose.asDataPoint
-import platform.test.motion.compose.createFixedConfigurationComposeMotionTestRuleV2
+import platform.test.motion.compose.createFixedConfigurationComposeMotionTestRule
 import platform.test.motion.compose.feature
 import platform.test.motion.compose.recordMotion
 import platform.test.motion.compose.runTest
@@ -65,8 +64,7 @@ class OverscrollToDismissTest {
     private val goldenPathManager =
         createGoldenPathManager("frameworks/base/packages/SystemUI/compose/core/tests/goldens")
 
-    @get:Rule
-    val motionTestRule = createFixedConfigurationComposeMotionTestRuleV2(goldenPathManager)
+    @get:Rule val motionTestRule = createFixedConfigurationComposeMotionTestRule(goldenPathManager)
 
     @Test
     fun detachGesture_onFirstPage_swipeRightDismisses() =
@@ -203,7 +201,7 @@ class OverscrollToDismissTest {
         val debugInspector = debugger.observed.single().debugInspector()
         try {
             performTouchInputAsync(onNodeWithTag("DismissContainer")) { gestureControl() }
-            awaitCondition { !debugInspector.isAnimating && !pagerState.isScrollInProgress }
+            awaitIdle()
         } finally {
             debugInspector.dispose()
         }
@@ -211,7 +209,6 @@ class OverscrollToDismissTest {
 
     private var isDismissed = false
     private val debugger = MotionValueDebugController()
-    private lateinit var pagerState: PagerState
 
     @Composable
     fun UnderTest(
@@ -220,7 +217,6 @@ class OverscrollToDismissTest {
         pageCount: Int = 2,
         isSwipingEnabled: Boolean = true,
     ) {
-        pagerState = rememberPagerState(initialPage) { pageCount }
         CompositionLocalProvider(LocalMotionValueDebugController provides debugger) {
             Box(
                 modifier =
@@ -233,7 +229,7 @@ class OverscrollToDismissTest {
                         )
             ) {
                 HorizontalPager(
-                    state = pagerState,
+                    state = rememberPagerState(initialPage) { pageCount },
                     userScrollEnabled = isSwipingEnabled,
                     pageSpacing = 8.dp,
                     key = { it },

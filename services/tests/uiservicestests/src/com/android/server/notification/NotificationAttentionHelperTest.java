@@ -99,6 +99,8 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
+import android.testing.TestWithLooperRule;
+import android.testing.TestableLooper;
 import android.util.Pair;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
@@ -139,16 +141,17 @@ import java.util.Set;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 @SuppressLint("GuardedBy")
+@TestableLooper.RunWithLooper
 public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Rule
     public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+    @Rule(order = Integer.MAX_VALUE)
+    public TestWithLooperRule mLooperRule = new TestWithLooperRule();
 
     @Mock AudioManager mAudioManager;
     @Mock Vibrator mVibrator;
     @Mock android.media.IRingtonePlayer mRingtonePlayer;
     @Mock LogicalLight mLight;
-    @Mock
-    NotificationManagerService.WorkerHandler mHandler;
     @Mock
     NotificationUsageStats mUsageStats;
     @Mock
@@ -161,13 +164,10 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     private PackageManager mPackageManager;
     @Mock
     private VibrationStatsWriter mVibrationStatsWriter;
-    NotificationRecordLoggerFake mNotificationRecordLogger = new NotificationRecordLoggerFake();
-    private InstanceIdSequence mNotificationInstanceIdSequence = new InstanceIdSequenceFake(
-        1 << 30);
     @Mock
     private ActivityTaskManager mActivityTaskManager;
 
-    private NotificationManagerService mService;
+    private TestableNotificationManagerService mService;
     private String mPkg = "com.android.server.notification";
     private int mId = 1001;
     private int mOtherId = 1002;
@@ -254,12 +254,12 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
         // TODO (b/291907312): remove feature flag
         // Disable feature flags by default. Tests should enable as needed.
         mSetFlagsRule.disableFlags(Flags.FLAG_POLITE_NOTIFICATIONS,
-                Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS,
                 Flags.FLAG_VIBRATE_WHILE_UNLOCKED,
                 Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
 
-        mService = spy(new NotificationManagerService(getContext(), mNotificationRecordLogger,
-            mNotificationInstanceIdSequence));
+        mService = spy(new TestableNotificationManagerService(getContext(), 
+                TestableLooper.get(this)));
+        mService.init();
 
         initAttentionHelper(mTestFlagResolver);
 
@@ -282,28 +282,26 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
         mAttentionHelper.setScreenOn(false);
         mAttentionHelper.setInCallStateOffHook(false);
 
-        if (Flags.crossAppPoliteNotifications()) {
-            // Capture BroadcastReceiver for avalanche triggers
-            ArgumentCaptor<BroadcastReceiver> broadcastReceiverCaptor =
-                    ArgumentCaptor.forClass(BroadcastReceiver.class);
-            ArgumentCaptor<IntentFilter> intentFilterCaptor =
-                    ArgumentCaptor.forClass(IntentFilter.class);
-            verify(getContext(), atLeastOnce()).registerReceiverAsUser(
-                    broadcastReceiverCaptor.capture(),
-                    any(), intentFilterCaptor.capture(), any(), any());
-            List<BroadcastReceiver> broadcastReceivers = broadcastReceiverCaptor.getAllValues();
-            List<IntentFilter> intentFilters = intentFilterCaptor.getAllValues();
+        // Capture BroadcastReceiver for avalanche triggers
+        ArgumentCaptor<BroadcastReceiver> broadcastReceiverCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        ArgumentCaptor<IntentFilter> intentFilterCaptor =
+                ArgumentCaptor.forClass(IntentFilter.class);
+        verify(getContext(), atLeastOnce()).registerReceiverAsUser(
+                broadcastReceiverCaptor.capture(),
+                any(), intentFilterCaptor.capture(), any(), any());
+        List<BroadcastReceiver> broadcastReceivers = broadcastReceiverCaptor.getAllValues();
+        List<IntentFilter> intentFilters = intentFilterCaptor.getAllValues();
 
-            assertThat(broadcastReceivers.size()).isAtLeast(1);
-            assertThat(intentFilters.size()).isAtLeast(1);
-            for (int i = 0; i < intentFilters.size(); i++) {
-                final IntentFilter filter = intentFilters.get(i);
-                if (filter.hasAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
-                    mAvalancheBroadcastReceiver = broadcastReceivers.get(i);
-                }
+        assertThat(broadcastReceivers.size()).isAtLeast(1);
+        assertThat(intentFilters.size()).isAtLeast(1);
+        for (int i = 0; i < intentFilters.size(); i++) {
+            final IntentFilter filter = intentFilters.get(i);
+            if (filter.hasAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
+                mAvalancheBroadcastReceiver = broadcastReceivers.get(i);
             }
-            assertThat(mAvalancheBroadcastReceiver).isNotNull();
         }
+        assertThat(mAvalancheBroadcastReceiver).isNotNull();
     }
 
     //
@@ -2318,7 +2316,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_AvalancheStrategy() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -2362,7 +2359,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     public void testBeepVolume_politeNotif_AvalancheStrategy_ChannelHasUserSound()
             throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -2399,7 +2395,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_AvalancheStrategy_AttnUpdate() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2445,7 +2440,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     public void testBeepVolume_politeNotif_AvalancheStrategy_exempt_AttnUpdate()
             throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2518,7 +2512,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_AvalancheStrategy_mixedNotif() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2585,7 +2578,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_Avalanche_exemptEmergency() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2610,7 +2602,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_Avalanche_exemptCategories() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2651,7 +2642,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_AvalancheStrategy_exempt_msgCategory() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2715,7 +2705,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_exemptEmergency() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2753,7 +2742,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_exemptCategories() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS_ATTN_UPDATE);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
@@ -2820,7 +2808,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_justSummaries() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -2858,7 +2845,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_autogroupSummary() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -2894,7 +2880,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_applyPerApp() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -2942,7 +2927,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_applyPerApp_ChannelHasUserSound() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -2991,7 +2975,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_groupAlertSummary() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -3035,7 +3018,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testBeepVolume_politeNotif_groupAlertChildren() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.disableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME1, 50);
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_VOLUME2, 0);
@@ -3243,7 +3225,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testAvalancheStrategyTriggers() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         final int avalancheTimeoutMs = 100;
         flagResolver.setFlagOverride(NotificationFlags.NOTIF_AVALANCHE_TIMEOUT, avalancheTimeoutMs);
@@ -3274,7 +3255,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testAvalancheStrategyTriggers_disabledExtras() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         initAttentionHelper(flagResolver);
 
@@ -3298,7 +3278,6 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
     @Test
     public void testAvalancheStrategyTriggers_nonAvalancheIntents() throws Exception {
         mSetFlagsRule.enableFlags(Flags.FLAG_POLITE_NOTIFICATIONS);
-        mSetFlagsRule.enableFlags(Flags.FLAG_CROSS_APP_POLITE_NOTIFICATIONS);
         TestableFlagResolver flagResolver = new TestableFlagResolver();
         initAttentionHelper(flagResolver);
 

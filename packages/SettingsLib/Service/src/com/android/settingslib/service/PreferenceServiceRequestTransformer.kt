@@ -33,6 +33,7 @@ import com.android.settingslib.graph.PreferenceGetterRequest
 import com.android.settingslib.graph.PreferenceGetterResponse
 import com.android.settingslib.graph.PreferenceSetterRequest
 import com.android.settingslib.graph.PreferenceSetterResult
+import com.android.settingslib.graph.PreferenceGraphCompressor
 import com.android.settingslib.graph.getAllPermissions
 import com.android.settingslib.graph.getText
 import com.android.settingslib.graph.preferenceValueProto
@@ -53,6 +54,7 @@ fun transformCatalystGetMetadataResponse(
     context: Context,
     graph: PreferenceGraphProto
 ): MetadataResult {
+    val graph = PreferenceGraphCompressor.expand(graph)
     val preferences = mutableSetOf<PreferenceWithScreen>()
     // recursive function to visit all nodes in preference group
     fun traverseGroupOrPref(
@@ -230,10 +232,10 @@ private fun PreferenceProto.toMetadata(
 ): SettingsPreferenceMetadata {
     val sensitivity = when (sensitivityLevel) {
         SensitivityLevel.NO_SENSITIVITY -> SettingsPreferenceMetadata.NO_SENSITIVITY
-        SensitivityLevel.LOW_SENSITIVITY -> SettingsPreferenceMetadata.EXPECT_POST_CONFIRMATION
-        SensitivityLevel.MEDIUM_SENSITIVITY -> SettingsPreferenceMetadata.DEEPLINK_ONLY
-        SensitivityLevel.HIGH_SENSITIVITY -> SettingsPreferenceMetadata.DEEPLINK_ONLY
-        SensitivityLevel.UNKNOWN_SENSITIVITY -> {
+        SensitivityLevel.MUST_PROVIDE_UNDO -> SettingsPreferenceMetadata.EXPECT_POST_CONFIRMATION
+        SensitivityLevel.REQUIRES_CONFIRMATION -> SettingsPreferenceMetadata.DEEPLINK_ONLY
+        SensitivityLevel.DEEP_LINK_ONLY -> SettingsPreferenceMetadata.DEEPLINK_ONLY
+        SensitivityLevel.DO_NOT_EXPOSE -> {
             // If it's unknown sensitivity on debug builds, report it as NO_SENSITIVITY
             if (AppUtils.isDebuggable()) {
                 SettingsPreferenceMetadata.NO_SENSITIVITY

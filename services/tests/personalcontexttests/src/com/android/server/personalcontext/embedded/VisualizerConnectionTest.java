@@ -16,21 +16,30 @@
 
 package com.android.server.personalcontext.embedded;
 
+import static com.android.server.personalcontext.util.InsightUtils.fakePublishInsight;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.permission.PermissionManager;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.embedded.IInsightSurfaceVisualizer;
 import android.service.personalcontext.embedded.IVisualizationResult;
@@ -43,6 +52,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -50,10 +60,14 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class VisualizerConnectionTest {
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+
     @Mock
     private ComponentName mComponentName;
     @Mock
@@ -62,6 +76,10 @@ public class VisualizerConnectionTest {
     private IBinder mBinder;
     @Mock
     private Context mContext;
+    @Mock
+    private PermissionManager mPermissionManager;
+    @Mock
+    private Consumer<Boolean> mCallback;
 
     private final TestInjector mTestInjector = new TestInjector();
     private VisualizerConnection mVisualizerConnection;
@@ -72,6 +90,11 @@ public class VisualizerConnectionTest {
 
         public ServiceConnection getServiceConnection() {
             return mServiceConnection;
+        }
+
+        @Override
+        public Context getContext() {
+            return mContext;
         }
 
         @Override
@@ -96,6 +119,14 @@ public class VisualizerConnectionTest {
     public void setUp() {
         MockitoAnnotations.openMocks(this);
 
+        when(mContext.getSystemService(PermissionManager.class)).thenReturn(mPermissionManager);
+        when(mPermissionManager.checkPackageNamePermission(
+                        eq(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS),
+                        any(),
+                        anyInt(),
+                        anyInt()))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+
         mVisualizerConnection = new VisualizerConnection(mComponentName, mTestInjector);
         when(IInsightSurfaceVisualizer.Stub.asInterface(mBinder)).thenReturn(mVisualizer);
     }
@@ -119,12 +150,36 @@ public class VisualizerConnectionTest {
         final InsightSurfaceClientInfo client = createClient();
         createVisualizationForClient(client, true);
         mVisualizerConnection.onClientDisconnected(client);
-        verify(mVisualizer).onClientDisconnected(client);
+        verify(mVisualizer).onClientDisconnected(eq(client), any());
     }
 
     @Test
     public void testCreateVisualizationForClient() throws RemoteException {
         createVisualizationForClient(createClient(), true);
+    }
+
+    @EnableFlags(android.service.personalcontext.Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
+    @Test
+    public void testCreateVisualizationForClient_noPermissions_throwsSecurityException() {
+        when(mPermissionManager.checkPackageNamePermission(
+                        eq(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS),
+                        any(),
+                        anyInt(),
+                        anyInt()))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+
+        final ContextInsight insight = new BundleInsight.Builder().build();
+        final RenderToken renderToken = new RenderToken(UUID.randomUUID(), null);
+
+        mVisualizerConnection.createVisualizationForClient(
+                fakePublishInsight(insight),
+                createClient(),
+                renderToken,
+                mCallback);
+
+        // Callback fails immediately due to lack of permissions, visualizer is not called.
+        verifyNoInteractions(mVisualizer);
+        verify(mCallback).accept(false);
     }
 
     @Test
@@ -133,7 +188,7 @@ public class VisualizerConnectionTest {
         createVisualizationForClient(client, true);
         assertThat(mTestInjector.getServiceConnection()).isNotNull();
         mVisualizerConnection.onClientDisconnected(client);
-        verify(mVisualizer).onClientDisconnected(client);
+        verify(mVisualizer).onClientDisconnected(eq(client), any());
         assertThat(mTestInjector.getServiceConnection()).isNull();
     }
 
@@ -163,11 +218,11 @@ public class VisualizerConnectionTest {
         final VisualizerConnection connection = new VisualizerConnection(
                 mComponentName, mContext, Runnable::run);
         final ContextInsight insight = new BundleInsight.Builder().build();
-        final RenderToken renderToken = new RenderToken(UUID.randomUUID());
+        final RenderToken renderToken = new RenderToken(UUID.randomUUID(), null);
 
         // Trigger the service binding.
         connection.createVisualizationForClient(
-                insight, createClient(), renderToken, (success) -> {});
+                fakePublishInsight(insight), createClient(), renderToken, (success) -> {});
 
         // Capture the arguments passed to context.bindService to verify the flags.
         final ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
@@ -197,17 +252,19 @@ public class VisualizerConnectionTest {
             InsightSurfaceClientInfo client,
             boolean shouldSucceed) throws RemoteException {
         final ContextInsight insight = new BundleInsight.Builder().build();
-        final RenderToken renderToken = new RenderToken(UUID.randomUUID());
+        final RenderToken renderToken = new RenderToken(UUID.randomUUID(), null);
         ArgumentCaptor<IVisualizationResult> resultCaptor =
                 ArgumentCaptor.forClass(IVisualizationResult.class);
 
         mVisualizerConnection.createVisualizationForClient(
-                insight, client, renderToken, (success) -> {});
+                fakePublishInsight(insight), client, renderToken, (success) -> {});
         verify(mVisualizer).createVisualizationForClient(
-                argThat(wrapper -> wrapper.getContextInsight() == insight),
+                argThat(wrapper ->
+                        wrapper.getPublishedContextInsight().getInsight() == insight),
                 any(),
                 eq(renderToken),
-                resultCaptor.capture());
+                resultCaptor.capture(),
+                any());
         resultCaptor.getValue().onResult(shouldSucceed);
     }
 }

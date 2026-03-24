@@ -20,9 +20,13 @@ import android.app.TaskInfo
 import android.content.res.Resources
 import android.graphics.Point
 import android.graphics.Rect
+import android.util.Size
 import android.view.Gravity
 import com.android.internal.annotations.VisibleForTesting
 import com.android.internal.policy.DesktopModeCompatUtils.applyLayoutGravity
+import com.android.internal.policy.DesktopModeLaunchBoundsUtils
+import com.android.internal.policy.DesktopModeLaunchBoundsUtils.WINDOW_HEIGHT_PROPORTION
+import com.android.internal.policy.DesktopModeLaunchBoundsUtils.centerInScreen
 import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.desktopmode.DesktopTaskPosition.BottomLeft
@@ -33,15 +37,13 @@ import com.android.wm.shell.desktopmode.DesktopTaskPosition.Maximized
 import com.android.wm.shell.desktopmode.DesktopTaskPosition.RightSnapped
 import com.android.wm.shell.desktopmode.DesktopTaskPosition.TopLeft
 import com.android.wm.shell.desktopmode.DesktopTaskPosition.TopRight
-import kotlin.math.abs
 
 /** The position of a task window in desktop mode. */
 sealed class DesktopTaskPosition {
     data object Center : DesktopTaskPosition() {
-        private const val WINDOW_HEIGHT_PROPORTION = 0.375
 
         override fun getTopLeftCoordinates(frame: Rect, window: Rect): Point {
-            val x = (frame.width() - window.width()) / 2
+            val x = (frame.width() - window.width()) / 2 + frame.left
             // Position with more margin at the bottom.
             val y = (frame.height() - window.height()) * WINDOW_HEIGHT_PROPORTION + frame.top
             return Point(x, y.toInt())
@@ -168,21 +170,23 @@ internal fun cascadeWindow(
 }
 
 fun cascadeWindowStepped(
-    res: Resources,
     frame: Rect,
-    prev: Rect,
     dest: Rect,
+    prevBoundsList: List<Rect>,
     isRememberedBounds: Boolean,
+    res: Resources,
 ) {
-    val offset = res.getDimensionPixelSize(R.dimen.desktop_mode_cascading_offset)
-    if (haveSameBoundsWithThreshold(offset, prev, dest)) {
-        // TODO(b/410787173): Implement multi-step cascading and screen wrapping.
-        cascadeOneStep(offset, dest)
-    } else {
-        // Default to center
-        val centerPos = Center.getTopLeftCoordinates(frame, dest)
-        dest.offsetTo(centerPos.x, centerPos.y)
+    if (DesktopModeLaunchBoundsUtils.isMaximizedOrSnapped(frame, dest)) {
+        return
     }
+    val boundsToCascade =
+        if (isRememberedBounds) {
+            dest
+        } else {
+            centerInScreen(Size(dest.width(), dest.height()), frame)
+        }
+    DesktopModeLaunchBoundsUtils.cascadeWindowStepped(frame, boundsToCascade, prevBoundsList, res)
+    dest.set(boundsToCascade)
 }
 
 fun cascadeWindowForRememberedBounds(res: Resources, frame: Rect, prev: Rect, dest: Rect) {
@@ -211,20 +215,4 @@ internal fun prevBoundsMovedAboveThreshold(res: Resources, prev: Rect, newBounds
     val bottomFar = prev.bottom - newBounds.bottom > moveThresholdPx
 
     return leftFar || topFar || rightFar || bottomFar
-}
-
-private fun haveSameBoundsWithThreshold(cascadingOffset: Int, a: Rect, b: Rect): Boolean {
-    // The threshold is set this way as this is especially useful for checking whether the bounds of
-    // the new window is closer to the bounds of the previous window or the cascaded bounds.
-    val thresholdPx = cascadingOffset / 2
-    val leftClose = abs(b.left - a.left) < thresholdPx
-    val topClose = abs(b.top - a.top) < thresholdPx
-    val rightClose = abs(b.right - a.right) < thresholdPx
-    val bottomClose = abs(b.bottom - a.bottom) < thresholdPx
-
-    return leftClose && topClose && rightClose && bottomClose
-}
-
-private fun cascadeOneStep(offset: Int, bounds: Rect) {
-    bounds.offset(offset, offset)
 }

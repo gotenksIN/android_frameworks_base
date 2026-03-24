@@ -26,6 +26,7 @@ import static android.provider.Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MODE_
 import static android.provider.Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MODE_WINDOW;
 import static android.provider.Settings.Secure.NAVIGATION_MODE;
 import static android.security.advancedprotection.AdvancedProtectionManager.ADVANCED_PROTECTION_SYSTEM_ENTITY;
+import static android.security.advancedprotection.AdvancedProtectionManager.FEATURE_ID_RESTRICT_NON_TOOL_A11Y_SERVICES;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
 import static android.view.accessibility.Flags.FLAG_ALLOW_A11Y_BUTTON_ON_LARGE_SCREEN;
@@ -117,6 +118,7 @@ import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
+import android.security.advancedprotection.AdvancedProtectionFeature;
 import android.security.advancedprotection.AdvancedProtectionManager;
 import android.security.advancedprotection.IAdvancedProtectionService;
 import android.testing.AndroidTestingRunner;
@@ -2846,7 +2848,11 @@ public class AccessibilityManagerServiceTest {
         AccessibilityManagerService spyAms = spy(mA11yms);
         doNothing().when(spyAms).onUserStateChangedLocked(any(AccessibilityUserState.class));
 
-        spyAms.handleAdvancedProtectionModeStateChanged(false);
+        List<AdvancedProtectionFeature> features = new ArrayList<>();
+        features.add(new AdvancedProtectionFeature(
+                FEATURE_ID_RESTRICT_NON_TOOL_A11Y_SERVICES, false,
+                AdvancedProtectionFeature.PROVISIONING_MODE_PROVISIONED_BY_DEFAULT));
+        spyAms.handleAdvancedProtectionModeStateChanged(features);
 
         verify(mDevicePolicyManager).clearUserRestrictionGlobally(
                 eq(ADVANCED_PROTECTION_SYSTEM_ENTITY),
@@ -2861,7 +2867,11 @@ public class AccessibilityManagerServiceTest {
         AccessibilityManagerService spyAms = spy(mA11yms);
         doNothing().when(spyAms).onUserStateChangedLocked(any(AccessibilityUserState.class));
 
-        spyAms.handleAdvancedProtectionModeStateChanged(true);
+        List<AdvancedProtectionFeature> features = new ArrayList<>();
+        features.add(new AdvancedProtectionFeature(
+                FEATURE_ID_RESTRICT_NON_TOOL_A11Y_SERVICES, true,
+                AdvancedProtectionFeature.PROVISIONING_MODE_PROVISIONED_BY_DEFAULT));
+        spyAms.handleAdvancedProtectionModeStateChanged(features);
         mTestableLooper.processAllMessages();
 
         verify(mDevicePolicyManager).addUserRestrictionGlobally(
@@ -2929,7 +2939,7 @@ public class AccessibilityManagerServiceTest {
 
     @Test
     @EnableFlags(android.security.Flags.FLAG_EXTEND_AAPM_TO_A11Y_SERVICES)
-    public void testGetPermittedA11yServices_withPolicy_apmOn_systemAppOrTool() {
+    public void testGetPermittedA11yServices_withPolicy_apmOn_adminOverridesApm() {
         final int userId = mA11yms.mCurrentUserId;
         setupApmUserRestriction(userId, true);
         List<String> adminPermittedServices = Arrays.asList(
@@ -2958,8 +2968,10 @@ public class AccessibilityManagerServiceTest {
         Set<String> permitted = mA11yms.getPermittedAccessibilityServicePackages(
                 adminPermittedServices, userId);
 
-        // Expected: Intersection of admin policy and APM rules
-        assertThat(permitted).containsExactly("com.system.tool", "com.user.tool");
+        // Expected: Admin policy overrides APM. APM logic is skipped, legacy logic applies.
+        // Legacy logic keeps the admin allowlist AND appends any installed system apps.
+        assertThat(permitted).containsExactly("com.system.tool", "com.user.tool", "com.user.test",
+                "com.system.nontool");
     }
 
     @Test
@@ -3086,9 +3098,10 @@ public class AccessibilityManagerServiceTest {
         doReturn(false).when(spyUserState).isShortcutTargetPermittedLocked(
                 eq(nonToolShortcutComp.flattenToString()), any());
 
-        // 3. Mock DPM to return only Tool when APM is ON
+        // 3. Mock DPM to return null so we calculate AAPM-specific restricted counts.
+        // (If DPM returned a list, AAPM would be ignored).
         when(mDevicePolicyManager.getPermittedAccessibilityServices(anyInt()))
-                .thenReturn(Arrays.asList("com.pkg.tool"));
+                .thenReturn(null);
 
         // 4. Verify Stats (calculate counts as if APM were enabled)
         AccessibilityFeatureRestrictedCounts counts =
@@ -3107,7 +3120,11 @@ public class AccessibilityManagerServiceTest {
         final int userId = mA11yms.getCurrentUserIdLocked();
 
         // 2. Trigger APM (ensure it's off)
-        mA11yms.handleAdvancedProtectionModeStateChanged(false);
+        List<AdvancedProtectionFeature> features = new ArrayList<>();
+        features.add(new AdvancedProtectionFeature(
+                FEATURE_ID_RESTRICT_NON_TOOL_A11Y_SERVICES, false,
+                AdvancedProtectionFeature.PROVISIONING_MODE_PROVISIONED_BY_DEFAULT));
+        mA11yms.handleAdvancedProtectionModeStateChanged(features);
 
         // 3. Verify Stats
         AccessibilityFeatureRestrictedCounts counts =

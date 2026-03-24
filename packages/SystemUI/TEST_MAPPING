@@ -158,9 +158,6 @@
   "desktop-presubmit": [
     {
       "name": "SystemUIGoogleScreenshotTests_desktop"
-    },
-    {
-      "name": "SystemUITests_desktop"
     }
   ],
 
@@ -169,7 +166,7 @@
       "name": "SystemUITests_presubmit"
     }
   ],
-  "ravenwood-postsubmit": [
+  "ravenwood-presubmit": [
     {
       "name": "SystemUiRavenTests",
       "host": true,

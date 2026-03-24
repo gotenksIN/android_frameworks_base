@@ -23,6 +23,7 @@ import android.security.Flags.FLAG_SECURE_LOCK_DEVICE
 import android.telephony.TelephonyManager
 import android.testing.TestableLooper.RunWithLooper
 import android.testing.TestableResources
+import android.uilatencystats.UiLatencyStatsManager
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -70,6 +71,8 @@ import com.android.systemui.log.SessionTracker
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
+import com.android.systemui.scene.data.repository.lockDevice
+import com.android.systemui.scene.data.repository.unlockDevice
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
@@ -102,6 +105,7 @@ import com.android.systemui.util.wrapper.LockPatternCheckerWrapper
 import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 import com.google.common.truth.Truth
 import com.google.common.truth.Truth.assertThat
+import java.util.Optional
 import junit.framework.Assert
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -173,6 +177,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     @Mock private lateinit var mUserActivityNotifier: UserActivityNotifier
     @Mock private lateinit var bouncerInteractor: BouncerInteractor
     @Mock private lateinit var lockPatternChecker: LockPatternCheckerWrapper
+    @Mock private lateinit var mUiLatencyStatsManager: UiLatencyStatsManager
 
     @Captor
     private lateinit var keyguardUpdateMonitorCallbackCaptor:
@@ -261,6 +266,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 null,
                 mUserActivityNotifier,
                 lockPatternChecker,
+                Optional.of(mUiLatencyStatsManager),
             )
 
         kosmos = testKosmos()
@@ -1004,6 +1010,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
             // Upon init, we have never dismisses the keyguard.
             underTest.onInit()
             runCurrent()
+            kosmos.lockDevice()
             verify(primaryBouncerInteractor, never())
                 .notifyKeyguardAuthenticatedPrimaryAuth(anyInt())
 
@@ -1067,6 +1074,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
             sceneInteractor.snapToScene(Scenes.Shade, "reason")
             runCurrent()
 
+            kosmos.lockDevice()
             fakeSceneDataSource.pause()
             sceneInteractor.showOverlay(Overlays.Bouncer, "reason")
             sceneTransitionStateFlow.value =
@@ -1090,9 +1098,9 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 .notifyKeyguardAuthenticatedPrimaryAuth(anyInt())
 
             // Detaching the view stops listening, so moving from the bouncer scene to the gone
-            // scene
-            // does not dismiss the keyguard while we're not listening.
+            // scene does not dismiss the keyguard while we're not listening.
             underTest.onViewDetached()
+            kosmos.unlockDevice()
             fakeSceneDataSource.pause()
             sceneInteractor.changeScene(Scenes.Gone, "reason")
             sceneInteractor.hideOverlay(Overlays.Bouncer, "reason")

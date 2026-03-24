@@ -32,7 +32,7 @@ import java.util.Objects;
  */
 @RavenwoodKeepWholeClass
 final class ProcessEdge extends GraphEdge {
-    private final @NonNull GraphNode mNode;
+    private final @NonNull ProcessNode mNode;
 
     /**
      * The cached reasons for granting {@link ActivityManager#PROCESS_CAPABILITY_CPU_TIME} through
@@ -40,7 +40,7 @@ final class ProcessEdge extends GraphEdge {
      */
     private @CpuTimeReasons int mCpuTimeReasons = CPU_TIME_REASON_NONE;
 
-    ProcessEdge(@NonNull GraphNode node) {
+    ProcessEdge(@NonNull ProcessNode node) {
         mNode = Objects.requireNonNull(node);
     }
 
@@ -57,14 +57,16 @@ final class ProcessEdge extends GraphEdge {
         mCpuTimeReasons = CPU_TIME_REASON_NONE;
     }
 
-    /**
-     * Returns the target node of the edge.
-     *
-     * Note: The source node of a {@link ProcessEdge} is always the system (represented by
-     * {@code null}).
-     */
+    /** Returns the {@link SystemNode} singleton instance. */
+    @Override
     @NonNull
-    GraphNode getTarget() {
+    SystemNode getSource() {
+        return SystemNode.getInstance();
+    }
+
+    @Override
+    @NonNull
+    ProcessNode getTarget() {
         return mNode;
     }
 

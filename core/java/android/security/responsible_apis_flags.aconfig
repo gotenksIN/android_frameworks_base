@@ -59,6 +59,16 @@ flag {
 }
 
 flag {
+    name: "aapm_feature_usb_data_protection_error_reporting"
+    namespace: "preload_safety"
+    description: "Enable error reporting for USB data protection"
+    bug: "466329221"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "asm_ignore_grace_period_exemption"
     namespace: "responsible_apis"
     description: "Ignore grace period exemption for ASM apps"
@@ -128,6 +138,16 @@ flag {
 }
 
 flag {
+    name: "dynamic_instrumentation_app_classloader"
+    namespace: "responsible_apis"
+    description: "Use the app's classloader for dynamic instrumentation offset lookups in ActivityThread"
+    bug: "489140321"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_intent_firewall_component_class_filter"
     namespace: "responsible_apis"
     description: "Flag for enabling component-class-filter in IntentFirewall"
@@ -178,6 +198,16 @@ flag {
     namespace: "responsible_apis"
     description: "Flag for failing instead of logging in case of parcel size mismatches"
     bug: "416031865"
+}
+
+flag {
+    name: "implicit_share_launching_identity_for_result"
+    namespace: "responsible_apis"
+    description: "Implicitly shares launching app identity with startActivityForResult"
+    bug: "452941408"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

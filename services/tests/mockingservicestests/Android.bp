@@ -15,6 +15,7 @@ java_defaults {
     name: "FrameworksMockingServicesTests-jni-defaults",
     jni_libs: [
         "libmockingservicestestjni",
+        "libbpf",
     ],
 }
 
@@ -449,4 +450,14 @@ test_module_config {
         "device-tests",
     ],
     include_filters: ["com.android.server.supervision"],
+}
+
+test_module_config {
+    name: "FrameworksMockingServicesTests_service_masterClearReceiverTest",
+    base: "FrameworksMockingServicesTests",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.MasterClearReceiverTest"],
 }

@@ -16,7 +16,6 @@
 
 package com.android.systemui.communal.domain.definition
 
-import android.content.ComponentName
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
@@ -24,12 +23,13 @@ import com.android.systemui.communal.commonSetupPreconditions
 import com.android.systemui.communal.contextualSetupRepository
 import com.android.systemui.communal.data.repository.SetupState
 import com.android.systemui.communal.fake
-import com.android.systemui.communal.uprightChargingTriggerRepository
+import com.android.systemui.communal.uprightChargingInteractor
+import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.testKosmos
-import com.android.systemui.util.kotlin.SimpleFlowDumper
 import com.google.common.truth.Truth.assertThat
+import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,16 +41,26 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
     private val kosmos = testKosmos()
 
     private val commonPreconditions = kosmos.commonSetupPreconditions.fake
-    private val triggerRepository = kosmos.uprightChargingTriggerRepository.fake
+    private val uprightChargingInteractor = kosmos.uprightChargingInteractor.fake
     private val contextualSetupRepo = kosmos.contextualSetupRepository.fake
-    private val underTest =
-        UprightChargingSetupDefinition(
-            commonConditions = commonPreconditions,
-            triggerRepo = triggerRepository,
-            contextualSetupRepo = contextualSetupRepo,
-            flowDumper = SimpleFlowDumper(),
-            target = SetupTarget.Activity(ComponentName("package", "class")),
-        )
+    private val Kosmos.underTest by
+        Kosmos.Fixture {
+            context.orCreateTestableResources.addOverride(
+                com.android.systemui.res.R.string
+                    .config_communalUprightChargingSetupActivityComponent,
+                "package/class",
+            )
+            UprightChargingSetupDefinition(
+                commonConditions = commonPreconditions,
+                uprightChargingInteractor = uprightChargingInteractor,
+                contextualSetupRepo = contextualSetupRepo,
+                resources = context.resources,
+            )
+        }
+
+    private fun setTriggered(triggered: Boolean) {
+        uprightChargingInteractor.setTriggered(triggered)
+    }
 
     @Test
     fun isReady_preconditionsNotMet_isFalse() =
@@ -58,13 +68,11 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
             val isReady by collectLastValue(underTest.isReady)
 
             contextualSetupRepo.setSetupState(underTest.id, SetupState.NotStarted)
-            triggerRepository.setTriggered(true)
+            setTriggered(true)
 
-            // Start with preconditions being met.
             commonPreconditions.setAllMet(true)
             assertThat(isReady).isTrue()
 
-            // When preconditions are no longer met, isReady is false.
             commonPreconditions.setAllMet(false)
             assertThat(isReady).isFalse()
         }
@@ -77,12 +85,10 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
             contextualSetupRepo.setSetupState(underTest.id, SetupState.NotStarted)
             commonPreconditions.setAllMet(true)
 
-            // Start with the trigger fired.
-            triggerRepository.setTriggered(true)
+            setTriggered(true)
             assertThat(isReady).isTrue()
 
-            // When the trigger is no longer fired, isReady is false.
-            triggerRepository.setTriggered(false)
+            setTriggered(false)
             assertThat(isReady).isFalse()
         }
 
@@ -93,7 +99,7 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
 
             contextualSetupRepo.setSetupState(underTest.id, SetupState.NotStarted)
             commonPreconditions.setAllMet(true)
-            triggerRepository.setTriggered(true)
+            setTriggered(true)
 
             assertThat(isReady).isTrue()
         }
@@ -103,13 +109,11 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
         kosmos.runTest {
             val isReady by collectLastValue(underTest.isReady)
 
-            // Start in a ready state.
             contextualSetupRepo.setSetupState(underTest.id, SetupState.NotStarted)
             commonPreconditions.setAllMet(true)
-            triggerRepository.setTriggered(true)
+            setTriggered(true)
             assertThat(isReady).isTrue()
 
-            // When setup is completed, isReady is false.
             contextualSetupRepo.setSetupState(underTest.id, SetupState.Completed)
             assertThat(isReady).isFalse()
         }
@@ -119,13 +123,11 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
         kosmos.runTest {
             val isReady by collectLastValue(underTest.isReady)
 
-            // Start in a ready state.
             contextualSetupRepo.setSetupState(underTest.id, SetupState.NotStarted)
             commonPreconditions.setAllMet(true)
-            triggerRepository.setTriggered(true)
+            setTriggered(true)
             assertThat(isReady).isTrue()
 
-            // When setup is dismissed, isReady is false.
             contextualSetupRepo.setSetupState(underTest.id, SetupState.Dismissed)
             assertThat(isReady).isFalse()
         }
@@ -135,16 +137,14 @@ class UprightChargingSetupDefinitionTest : SysuiTestCase() {
         kosmos.runTest {
             val isReady by collectLastValue(underTest.isReady)
 
-            // Start in a ready state.
             contextualSetupRepo.setSetupState(underTest.id, SetupState.NotStarted)
             commonPreconditions.setAllMet(true)
-            triggerRepository.setTriggered(true)
+            setTriggered(true)
             assertThat(isReady).isTrue()
 
-            // When setup is snoozed, isReady is false.
             contextualSetupRepo.setSetupState(
                 underTest.id,
-                SetupState.Snoozed(expirationTimeMillis = 100L),
+                SetupState.Snoozed(expirationTime = Instant.ofEpochMilli(100L)),
             )
             assertThat(isReady).isFalse()
         }

@@ -144,13 +144,6 @@ flag {
 }
 
 flag {
-  name: "bitmap_ashmem_long_name"
-  namespace: "core_graphics"
-  description: "Whether to have more information in ashmem filenames for bitmaps"
-  bug: "369619160"
-}
-
-flag {
   name: "animated_image_drawable_filter_bitmap"
   is_exported: true
   namespace: "core_graphics"
@@ -242,6 +235,16 @@ flag {
   namespace: "core_graphics"
   description: "Use previous frame duration for calculating render rate schedule time"
   bug: "361682988"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "remove_composer_overlay_usage"
+  namespace: "core_graphics"
+  description: "Remove composer overlay usage from hardware bitmap creation"
+  bug: "182901940"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

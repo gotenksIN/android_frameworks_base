@@ -17,6 +17,7 @@
 package com.android.server.display
 
 import android.hardware.display.DisplayTopology
+import android.hardware.display.DisplayTopology.POSITION_RIGHT
 import android.hardware.display.DisplayTopologyGraph
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
@@ -27,6 +28,7 @@ import android.view.DisplayInfo
 import com.android.server.display.feature.DisplayManagerFlags
 import com.android.server.display.feature.flags.Flags
 import com.google.common.truth.Truth.assertThat
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -87,6 +89,7 @@ class DisplayTopologyCoordinatorTest {
             }
         }
         whenever(mockIsExtendedDisplayAllowed()).thenReturn(true)
+        whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(true)
         whenever(mockTopology.copy()).thenReturn(mockTopologyCopy)
         whenever(mockTopologyCopy.graph).thenReturn(mockTopologyGraph)
         coordinator = DisplayTopologyCoordinator(injector, mockIsExtendedDisplayAllowed,
@@ -254,7 +257,6 @@ class DisplayTopologyCoordinatorTest {
 
     @Test
     fun addNonDefaultDisplay_defaultDisplayInTopologySwitchDisabled() {
-        whenever(mockFlags.isDefaultDisplayInTopologySwitchEnabled).thenReturn(true)
         whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(false)
 
         // Add default display and a non-default display into the topology
@@ -279,32 +281,7 @@ class DisplayTopologyCoordinatorTest {
 
     @Test
     fun addNonDefaultDisplay_defaultDisplayInTopologySwitchEnabled() {
-        whenever(mockFlags.isDefaultDisplayInTopologySwitchEnabled).thenReturn(true)
         whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(true)
-
-        // Add default display and a non-default display into the topology
-        whenever(mockTopology.hasMultipleDisplays()).thenReturn(true)
-        displayInfos[0].displayId = Display.DEFAULT_DISPLAY
-        displayInfos[0].type = Display.TYPE_INTERNAL
-        coordinator.onDisplayAdded(displayInfos[0])
-        displayInfos[1].displayId = Display.DEFAULT_DISPLAY + 1
-        displayInfos[1].type = Display.TYPE_EXTERNAL
-        coordinator.onDisplayAdded(displayInfos[1])
-
-        verify(mockTopology, never()).removeDisplay(anyInt())
-        verify(mockTopologyChangedCallback, times(2)).invoke(
-            android.util.Pair(
-                mockTopologyCopy,
-                mockTopologyGraph
-            )
-        )
-        verify(mockTopologyStore, times(2)).restoreTopology(mockTopology)
-    }
-
-    @Test
-    fun addNonDefaultDisplay_flagDisabled() {
-        whenever(mockFlags.isDefaultDisplayInTopologySwitchEnabled).thenReturn(false)
-        whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(false)
 
         // Add default display and a non-default display into the topology
         whenever(mockTopology.hasMultipleDisplays()).thenReturn(true)
@@ -428,8 +405,6 @@ class DisplayTopologyCoordinatorTest {
 
     @Test
     fun updateDisplay_notChanged() {
-        addDisplay()
-
         for (displayInfo in displayInfos) {
             coordinator.onDisplayChanged(displayInfo)
         }
@@ -525,8 +500,6 @@ class DisplayTopologyCoordinatorTest {
 
     @Test
     fun removeDisplay() {
-        addDisplay()
-
         val displaysToRemove = listOf(0, 2, 3).map { displayInfos[it] }
         for (displayInfo in displaysToRemove) {
             whenever(mockTopology.removeDisplay(displayInfo.displayId)).thenReturn(true)
@@ -555,7 +528,6 @@ class DisplayTopologyCoordinatorTest {
 
     @Test
     fun removeNonDefaultDisplay_defaultDisplayInTopologySwitchDisabled() {
-        whenever(mockFlags.isDefaultDisplayInTopologySwitchEnabled).thenReturn(true)
         whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(false)
 
         // Set up the default display
@@ -582,33 +554,7 @@ class DisplayTopologyCoordinatorTest {
 
     @Test
     fun removeNonDefaultDisplay_defaultDisplayInTopologySwitchEnabled() {
-        whenever(mockFlags.isDefaultDisplayInTopologySwitchEnabled).thenReturn(true)
         whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(true)
-
-        // Set up the default display
-        displayInfos[0].displayId = Display.DEFAULT_DISPLAY
-        displayInfos[0].type = Display.TYPE_INTERNAL
-
-        // Remove a non-default display from the topology
-        displayInfos[1].displayId = Display.DEFAULT_DISPLAY + 1
-        displayInfos[1].type = Display.TYPE_EXTERNAL
-        whenever(mockTopology.removeDisplay(displayInfos[1].displayId)).thenReturn(true)
-        coordinator.onDisplayRemoved(displayInfos[1].displayId)
-
-        verify(mockTopology, never()).addDisplay(anyInt(), anyInt(), anyInt(), anyInt())
-        verify(mockTopologyChangedCallback).invoke(
-            android.util.Pair(
-                mockTopologyCopy,
-                mockTopologyGraph
-            )
-        )
-        verify(mockTopologyStore).restoreTopology(mockTopology)
-    }
-
-    @Test
-    fun removeNonDefaultDisplay_flagDisabled() {
-        whenever(mockFlags.isDefaultDisplayInTopologySwitchEnabled).thenReturn(false)
-        whenever(mockShouldIncludeDefaultDisplayInTopology()).thenReturn(false)
 
         // Set up the default display
         displayInfos[0].displayId = Display.DEFAULT_DISPLAY
@@ -655,5 +601,93 @@ class DisplayTopologyCoordinatorTest {
         )
         verify(mockTopologyStore).saveTopology(topology)
         verify(mockTopologySavedCallback).invoke()
+    }
+
+    @Test
+    fun setTopology_null_throwsException() {
+        assertThrows(IllegalArgumentException::class.java) {
+            coordinator.topology = null
+        }
+    }
+
+    @Test
+    fun setTopology_addDisplays_throwsException() {
+        val newTopology = mock<DisplayTopology>()
+        whenever(newTopology.allNodesIdMap()).thenReturn(mapOf(1 to mock(), 2 to mock()))
+        assertThrows(IllegalArgumentException::class.java) {
+            coordinator.topology = newTopology
+        }
+    }
+
+    @Test
+    fun setTopology_removeDisplays_throwsException() {
+        whenever(mockTopology.allNodesIdMap()).thenReturn(mapOf(1 to mock(), 2 to mock()))
+        assertThrows(IllegalArgumentException::class.java) {
+            coordinator.topology = mock()
+        }
+    }
+
+    @Test
+    fun setTopology_changeDensity_throwsException() {
+        whenever(mockTopology.allNodesIdMap()).thenReturn(
+            mapOf(
+                1 to DisplayTopology.TreeNode(
+                    /* displayId= */ 1,
+                    /* logicalWidth= */ 100,
+                    /* logicalHeight= */ 100,
+                    /* logicalDensity= */ 100,
+                    /* position= */ POSITION_RIGHT,
+                    /* offset= */ 0f
+                )
+            )
+        )
+        val newTopology = mock<DisplayTopology>()
+        whenever(newTopology.allNodesIdMap()).thenReturn(
+            mapOf(
+                1 to DisplayTopology.TreeNode(
+                    /* displayId= */ 1,
+                    /* logicalWidth= */ 100,
+                    /* logicalHeight= */ 100,
+                    /* logicalDensity= */ 150,
+                    /* position= */ POSITION_RIGHT,
+                    /* offset= */ 0f
+                )
+            )
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            coordinator.topology = newTopology
+        }
+    }
+
+    @Test
+    fun setTopology_resizeDisplay_throwsException() {
+        whenever(mockTopology.allNodesIdMap()).thenReturn(
+            mapOf(
+                1 to DisplayTopology.TreeNode(
+                    /* displayId= */ 1,
+                    /* logicalWidth= */ 100,
+                    /* logicalHeight= */ 100,
+                    /* logicalDensity= */ 100,
+                    /* position= */ POSITION_RIGHT,
+                    /* offset= */ 0f
+                )
+            )
+        )
+        val newTopology = mock<DisplayTopology>()
+        whenever(newTopology.allNodesIdMap()).thenReturn(
+            mapOf(
+                1 to DisplayTopology.TreeNode(
+                    /* displayId= */ 1,
+                    /* logicalWidth= */ 150,
+                    /* logicalHeight= */ 150,
+                    /* logicalDensity= */ 100,
+                    /* position= */ POSITION_RIGHT,
+                    /* offset= */ 0f
+                )
+            )
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            coordinator.topology = newTopology
+        }
     }
 }

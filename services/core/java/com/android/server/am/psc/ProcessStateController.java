@@ -46,10 +46,10 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
+import com.android.server.am.HostingRecord;
 import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
-import com.android.server.wm.WindowProcessController;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
@@ -91,7 +91,9 @@ public class ProcessStateController {
             Object lock, Object procLock, Consumer<ProcessRecordInternal> topChangeCallback,
             ProcessLruUpdater lruUpdater, OomAdjuster.Injector oomAdjInjector,
             OomAdjuster.Constants oomConstants, OomAdjuster.Callback callback,
-            OomAdjuster.StateGetter stateGetter) {
+            OomAdjuster.StateGetter stateGetter,
+            OomAdjuster.HostingTypeProvider hostingTypeProvider) {
+
         mLock = lock;
         mProcLock = procLock;
 
@@ -112,7 +114,7 @@ public class ProcessStateController {
         mOomConstants = oomConstants;
         mOomAdjuster = new OomAdjusterImpl(mLock, mProcLock, processList, activeUids,
                 handlerThread, mOomConstants, mGlobalState, oomAdjInjector, callback, stateGetter,
-                updateHandler);
+                updateHandler, hostingTypeProvider);
         mTopChangeCallback = topChangeCallback;
         mProcessLruUpdater = lruUpdater;
         final Handler serviceHandler = new Handler(handlerThread.getLooper());
@@ -223,6 +225,13 @@ public class ProcessStateController {
 
     public void setFollowUpOomadjUpdateWaitDuration(long value) {
         mOomConstants.mFollowUpOomadjUpdateWaitDuration = value;
+    }
+
+    /**
+     * Sets the number of frozen processes.
+     */
+    public void setFrozenProcessCount(int count) {
+        mGlobalState.mFrozenProcessCount = count;
     }
 
     /**
@@ -410,6 +419,7 @@ public class ProcessStateController {
         private static final int NONE_DEBUG_UID = -1;
         private volatile int mDebugUid = NONE_DEBUG_UID;
         private volatile long mLastUserUnlockingUptime = 0;
+        private volatile int mFrozenProcessCount = 0;
 
         private void commitStagedState() {
             mUnlocking = mUnlockingStaged;
@@ -471,6 +481,10 @@ public class ProcessStateController {
 
         public long getLastUserUnlockingUptime() {
             return mLastUserUnlockingUptime;
+        }
+
+        public int getFrozenProcessCount() {
+            return mFrozenProcessCount;
         }
     }
 
@@ -1102,17 +1116,6 @@ public class ProcessStateController {
         return cr.setOngoingCalls(ongoing);
     }
 
-    /**
-     * Note whether a process has bound to a service with
-     * {@link android.content.Context.BIND_ABOVE_CLIENT} or not.
-     */
-    @GuardedBy("mLock")
-    @RequiresEnclosingBatchSession
-    public void setHasAboveClient(@NonNull ProcessServiceRecordInternal psr,
-            boolean hasAboveClient) {
-        psr.setHasAboveClient(hasAboveClient);
-    }
-
     /** Note the last group set by a connection. */
     @GuardedBy("mLock")
     public void setConnectionGroup(@NonNull ProcessServiceRecordInternal psr, int connectionGroup) {
@@ -1124,16 +1127,6 @@ public class ProcessStateController {
     public void setConnectionImportance(@NonNull ProcessServiceRecordInternal psr,
             int connectionImportance) {
         psr.setConnectionImportance(connectionImportance);
-    }
-
-    /**
-     * Recompute whether a process has bound to a service with
-     * {@link android.content.Context.BIND_ABOVE_CLIENT} or not.
-     */
-    @GuardedBy("mLock")
-    @RequiresEnclosingBatchSession
-    public void updateHasAboveClientLocked(@NonNull ProcessServiceRecordInternal psr) {
-        psr.updateHasAboveClient();
     }
 
     /**
@@ -1369,10 +1362,8 @@ public class ProcessStateController {
         /**
          * Set the Top process, also clear the Previous process and demotion reason, if necessary.
          */
-        public void setTopProcessAsync(@Nullable WindowProcessController wpc, boolean clearPrev,
+        public void setTopProcessAsync(@Nullable ProcessRecordInternal top, boolean clearPrev,
                 boolean cancelExpandedShade) {
-            final ProcessRecordInternal top = wpc != null
-                    ? (ProcessRecordInternal) wpc.mOwner : null;
             getBatchSession().stage(() -> {
                 mPsc.setTopProcess(top);
                 if (clearPrev) {
@@ -1394,9 +1385,7 @@ public class ProcessStateController {
         /**
          * Set which process is considered the Previous process, if any.
          */
-        public void setPreviousProcessAsync(@Nullable WindowProcessController wpc) {
-            final ProcessRecordInternal prev = wpc != null
-                    ? (ProcessRecordInternal) wpc.mOwner : null;
+        public void setPreviousProcessAsync(@Nullable ProcessRecordInternal prev) {
             getBatchSession().stage(() -> mPsc.setPreviousProcess(prev));
         }
 
@@ -1404,9 +1393,7 @@ public class ProcessStateController {
         /**
          * Set which process is considered the Home process, if any.
          */
-        public void setHomeProcessAsync(@Nullable WindowProcessController wpc) {
-            final ProcessRecordInternal home = wpc != null
-                    ? (ProcessRecordInternal) wpc.mOwner : null;
+        public void setHomeProcessAsync(@Nullable ProcessRecordInternal home) {
             getBatchSession().stage(() -> mPsc.setHomeProcess(home));
         }
 
@@ -1414,47 +1401,41 @@ public class ProcessStateController {
         /**
          * Set which process is considered the Heavy Weight process, if any.
          */
-        public void setHeavyWeightProcessAsync(@Nullable WindowProcessController wpc) {
-            final ProcessRecordInternal heavy = wpc != null
-                    ? (ProcessRecordInternal) wpc.mOwner : null;
+        public void setHeavyWeightProcessAsync(@Nullable ProcessRecordInternal heavy) {
             getBatchSession().stage(() -> mPsc.setHeavyWeightProcess(heavy));
         }
 
         /**
          * Set which process is showing UI while the screen is off, if any.
          */
-        public void setVisibleDozeUiProcessAsync(@Nullable WindowProcessController wpc) {
-            final ProcessRecordInternal dozeUi = wpc != null
-                    ? (ProcessRecordInternal) wpc.mOwner : null;
+        public void setVisibleDozeUiProcessAsync(@Nullable ProcessRecordInternal dozeUi) {
             getBatchSession().stage(() -> mPsc.setVisibleDozeUiProcess(dozeUi));
         }
 
         /**
          * Note whether the process has an activity or not.
          */
-        public void setHasActivityAsync(@NonNull WindowProcessController wpc, boolean hasActivity) {
-            final ProcessRecordInternal activity = (ProcessRecordInternal) wpc.mOwner;
-            getBatchSession().stage(() -> mPsc.setHasActivity(activity, hasActivity));
+        public void setHasActivityAsync(@NonNull ProcessRecordInternal proc, boolean hasActivity) {
+            getBatchSession().stage(() -> mPsc.setHasActivity(proc, hasActivity));
         }
 
         /**
-         * Set the Activity State for a process, including the Activity state flags and when a
+         * Set the Activity State for a process, including the Activity state flags and the time
+         * when a perceptible task stopped.
          */
-        public void setActivityStateAsync(@NonNull WindowProcessController wpc, int flags,
+        public void setActivityStateAsync(@NonNull ProcessRecordInternal proc, int flags,
                 long perceptibleStopTimeMs) {
-            final ProcessRecordInternal activity = (ProcessRecordInternal) wpc.mOwner;
             getBatchSession().stage(() -> {
-                mPsc.setActivityStateFlags(activity, flags);
-                mPsc.setPerceptibleTaskStoppedTimeMillis(activity, perceptibleStopTimeMs);
+                mPsc.setActivityStateFlags(proc, flags);
+                mPsc.setPerceptibleTaskStoppedTimeMillis(proc, perceptibleStopTimeMs);
             });
         }
 
         /**
          * Set whether a process has had any recent tasks.
          */
-        public void setHasRecentTasksAsync(@NonNull WindowProcessController wpc,
+        public void setHasRecentTasksAsync(@NonNull ProcessRecordInternal proc,
                 boolean hasRecentTasks) {
-            final ProcessRecordInternal proc = (ProcessRecordInternal) wpc.mOwner;
             getBatchSession().stage(() -> mPsc.setHasRecentTasks(proc, hasRecentTasks));
         }
 
@@ -1497,6 +1478,7 @@ public class ProcessStateController {
         private Consumer<ProcessRecordInternal> mTopChangeCallback = null;
         private ProcessLruUpdater mProcessLruUpdater = null;
         private OomAdjuster.Injector mOomAdjInjector = null;
+        private OomAdjuster.HostingTypeProvider mHostingTypeProvider = null;
 
         public Builder(ProcessListInternal processList,
                 ActiveUidsInternal activeUids, OomAdjuster.Constants oomConstants,
@@ -1535,9 +1517,12 @@ public class ProcessStateController {
             if (mOomAdjInjector == null) {
                 mOomAdjInjector = new OomAdjuster.Injector();
             }
+            if (mHostingTypeProvider == null) {
+                mHostingTypeProvider = app -> HostingRecord.HOSTING_TYPE_EMPTY;
+            }
             return new ProcessStateController(mProcessList, mActiveUids, mHandlerThread,
                     mLock, mProcLock, mTopChangeCallback, mProcessLruUpdater, mOomAdjInjector,
-                    mOomConstants, mOomAdjCallback, mOomAdjStateGetter);
+                    mOomConstants, mOomAdjCallback, mOomAdjStateGetter, mHostingTypeProvider);
         }
 
         /**
@@ -1589,6 +1574,14 @@ public class ProcessStateController {
          */
         public Builder setProcessLruUpdater(ProcessLruUpdater updater) {
             mProcessLruUpdater = updater;
+            return this;
+        }
+
+        /**
+         * Set the provider for hosting type.
+         */
+        public Builder setHostingTypeProvider(OomAdjuster.HostingTypeProvider provider) {
+            mHostingTypeProvider = provider;
             return this;
         }
     }

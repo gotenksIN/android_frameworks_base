@@ -1625,6 +1625,11 @@
     <string name="permdesc_systemCamera">This privileged or system app can take pictures and record videos using a system camera at any time. Requires the android.permission.CAMERA permission to be held by the app as well</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR_LIMIT=NONE] -->
+    <string name="permlab_warmUpCamera">Allow an application or service to send a warm up signal to the camera sub-system</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR_LIMIT=NONE] -->
+    <string name="permdesc_warmUpCamera">This privileged or system app can send a signal to the camera sub system in order to warm up a camera device to help with performance amongst other benefits</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR_LIMIT=NONE] -->
     <string name="permlab_cameraOpenCloseListener">Allow an application or service to receive callbacks about camera devices being opened or closed.</string>
     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR_LIMIT=NONE] -->
     <string name="permdesc_cameraOpenCloseListener">This app can receive callbacks when any camera device is being opened (by what application) or closed.</string>
@@ -7279,4 +7284,7 @@
     <string name="supervision_blocked_app_title">Update from your parent</string>
     <string name="supervision_blocked_app_content"><xliff:g id="app_name" example="YouTube">%1$s</xliff:g> was removed for now</string>
     <string name="supervision_unblocked_app_content"><xliff:g id="app_name" example="YouTube">%1$s</xliff:g> is now available</string>
+
+    <!-- The label of cast to others button for Share Cast feature.  [CHAR LIMIT=30] -->
+    <string name="media_route_chooser_share_cast_others">Cast to others</string>
 </resources>

@@ -232,7 +232,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
         }
 
         for (int i = 0; i < mStateListeners.size(); i++) {
-            mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_REQUESTED);
+            mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_REQUESTED, displayId);
         }
         if (isSyntheticRequest) {
             transition = startSyntheticRecentsTransition(listener, displayId);
@@ -490,6 +490,9 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
         // This stores the pending finish transaction to merge with the actual finish transaction
         private SurfaceControl.Transaction mPendingFinishTransaction;
 
+        // When we have canceled the transition and are waiting for Launcher to handle & report back
+        private boolean mAwaitingCancelCompletion;
+
         RecentsController(IRecentsAnimationRunner listener, int displayId) {
             mInstanceId = System.identityHashCode(this);
             mDisplayId = displayId;
@@ -566,6 +569,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                     ProtoLog.d(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                             "[%d] RecentsController.cancel: waiting for Launcher to finish",
                             mInstanceId);
+                    mAwaitingCancelCompletion = true;
                     setupFinishOnTimeout(mTransition);
                 } else {
                     finishInner(toHome, false /* userLeave */, null /* finishCb */, "cancel");
@@ -661,6 +665,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                 mLeashMap = null;
             }
             mFinishTransaction = null;
+            mAwaitingCancelCompletion = false;
             mTaskStates.clear();
             mPausingTasks = null;
             mPausingDeskId = -1;
@@ -681,7 +686,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             mPendingFinishTransaction = null;
             mControllers.remove(this);
             for (int i = 0; i < mStateListeners.size(); i++) {
-                mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_NOT_RUNNING);
+                mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_NOT_RUNNING,
+                        mDisplayId);
             }
         }
 
@@ -717,7 +723,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                         apps.toArray(new RemoteAnimationTarget[apps.size()]),
                         new RemoteAnimationTarget[0], new Rect(), new Bundle(), null);
                 for (int i = 0; i < mStateListeners.size(); i++) {
-                    mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_ANIMATING);
+                    mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_ANIMATING,
+                            displayId);
                 }
             } catch (RemoteException e) {
                 Slog.e(TAG, "Error starting recents animation", e);
@@ -855,7 +862,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             int closingSplitTaskId = INVALID_TASK_ID;
             final ArrayList<RemoteAnimationTarget> apps = new ArrayList<>();
             final ArrayList<RemoteAnimationTarget> wallpapers = new ArrayList<>();
-            TransitionUtil.LeafTaskFilter leafTaskFilter = new TransitionUtil.LeafTaskFilter();
+            TransitionUtil.LeafTaskFilter leafTaskFilter = new TransitionUtil.LeafTaskFilter(info);
             // About layering: we divide up the "layer space" into 3 regions (each the size of
             // the change count). This lets us categorize things into above/below/between
             // while maintaining their relative ordering.
@@ -991,7 +998,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                         wallpapers.toArray(new RemoteAnimationTarget[wallpapers.size()]),
                         new Rect(), b, info);
                 for (int i = 0; i < mStateListeners.size(); i++) {
-                    mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_ANIMATING);
+                    mStateListeners.get(i).onTransitionStateChanged(TRANSITION_STATE_ANIMATING,
+                            mDisplayId);
                 }
             } catch (RemoteException e) {
                 Slog.e(TAG, "Error starting recents animation", e);
@@ -1185,7 +1193,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             boolean foundRecentsClosing = false;
             boolean hasChangingApp = false;
             final TransitionUtil.LeafTaskFilter leafTaskFilter =
-                    new TransitionUtil.LeafTaskFilter();
+                    new TransitionUtil.LeafTaskFilter(info);
             boolean hasTaskChange = false;
             for (int i = 0; i < info.getChanges().size(); ++i) {
                 final TransitionInfo.Change change = info.getChanges().get(i);
@@ -1285,8 +1293,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                                 "display change") /* action */);
                         return;
                     }
-                    // Don't consider order-only & non-leaf changes as changing apps.
-                    if (!TransitionUtil.isOrderOnly(change) && isLeafTask) {
+                    // Don't consider stationary & non-leaf changes as changing apps.
+                    if (!TransitionUtil.isStationary(change) && isLeafTask) {
                         hasChangingApp = true;
                         // Check if the changing app is moving to top and fullscreen. This handles
                         // the case where we moved from desktop to recents and launching a desktop
@@ -1650,6 +1658,25 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                 return;
             }
 
+            final SurfaceControl.Transaction t = mFinishTransactionSupplier != null
+                    ? mFinishTransactionSupplier.get()
+                    : new SurfaceControl.Transaction();
+
+            if (mAwaitingCancelCompletion) {
+                ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
+                        "[%d] RecentsController.finishInner: completing cancel", mInstanceId);
+
+                // Notify the mixers of the pending finish
+                for (int i = 0; i < mMixers.size(); ++i) {
+                    mMixers.get(i).handleFinishRecents(false, null, t);
+                }
+
+                mPendingRunnerFinishCb = runnerFinishCb;
+                mPendingFinishTransaction = t;
+                onFinishInner(null /* wct */);
+                return;
+            }
+
             if (mFinishCB == null || mPendingFinishTransition != null) {
                 Slog.e(TAG, "Duplicate call to finish");
                 if (runnerFinishCb != null) {
@@ -1677,9 +1704,6 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                     mInstanceId, toHome, sendUserLeaveHint, mWillFinishToHome, mState,
                     mPausingTasks != null, reason);
 
-            final SurfaceControl.Transaction t = mFinishTransactionSupplier != null
-                    ? mFinishTransactionSupplier.get()
-                    : new SurfaceControl.Transaction();
             final WindowContainerTransaction wct = new WindowContainerTransaction();
 
             // The following code must set this if it is changing anything in core that might affect
@@ -1834,11 +1858,10 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                             // Use mTransition IBinder token temporarily just to get PipTransition
                             // to return from its handleRequest(). The actual TRANSIT_PIP will have
                             // anew token once it arrives into PipTransition#startAnimation().
-                            Pair<Transitions.TransitionHandler, WindowContainerTransaction>
-                                    requestRes = mTransitions.dispatchRequest(mTransition,
-                                            requestInfo, null /* skip */);
-                            wct.merge(requestRes.second, true);
-                            mTransitions.startTransition(TRANSIT_PIP, wct, requestRes.first);
+                            Transitions.RequestResult requestRes = mTransitions.dispatchRequest(
+                                    mTransition, requestInfo, null /* skip */);
+                            wct.merge(requestRes.mWct, true);
+                            mTransitions.startTransition(TRANSIT_PIP, wct, requestRes.mHandler);
                             // We need to clear the WCT to send finishWCT=null for Recents.
                             wct.clear();
 

@@ -252,6 +252,8 @@ sp<SurfaceControl> CanvasContext::getSurfaceControl() const {
 
 void CanvasContext::setSurfaceControl(sp<SurfaceControl> surfaceControl) {
 #ifdef __ANDROID__
+    startHintSession();
+
     if (surfaceControl == mSurfaceControl) return;
 
     if (surfaceControl == nullptr) {
@@ -326,17 +328,20 @@ void CanvasContext::setupPipelineSurface() {
 
     mFrameNumber = 0;
 
-    if (mNativeSurface != nullptr && hasSurface) {
+    if (hasSurface) {
         mHaveNewSurface = true;
         mSwapHistory.clear();
-        // Enable frame stats after the surface has been bound to the appropriate graphics API.
-        // Order is important when new and old surfaces are the same, because old surface has
-        // its frame stats disabled automatically.
-        native_window_enable_frame_timestamps(mNativeSurface->getNativeWindow(), true);
-        native_window_set_scaling_mode(mNativeSurface->getNativeWindow(),
-                                       NATIVE_WINDOW_SCALING_MODE_FREEZE);
-        native_window_set_producer_throttling_enabled(mNativeSurface->getNativeWindow(), false);
-    } else {
+
+        if (mNativeSurface != nullptr) {
+            // Enable frame stats after the surface has been bound to the appropriate graphics API.
+            // Order is important when new and old surfaces are the same, because old surface has
+            // its frame stats disabled automatically.
+            native_window_enable_frame_timestamps(mNativeSurface->getNativeWindow(), true);
+            native_window_set_scaling_mode(mNativeSurface->getNativeWindow(),
+                                        NATIVE_WINDOW_SCALING_MODE_FREEZE);
+            native_window_set_producer_throttling_enabled(mNativeSurface->getNativeWindow(), false);
+        }
+    } else if (mNativeSurface == nullptr) {
         mRenderThread.removeFrameCallback(this);
         mGenerationID++;
     }
@@ -732,7 +737,7 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
 
     waitOnFences();
 
-    if (mNativeSurface) {
+    if (mRenderPipeline->hasRenderTarget()) {
         // TODO(b/165985262): measure performance impact
         const auto vsyncId = mCurrentFrameInfo->get(FrameInfoIndex::FrameTimelineVsyncId);
         if (vsyncId != UiFrameInfoBuilder::INVALID_VSYNC_ID) {
@@ -743,7 +748,7 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
                 frameCompleteNr, vsyncId, inputEventId);
             const auto lastDequeueDuration =
                     syncDelayDuration +
-                    ANativeWindow_getLastDequeueDuration(mNativeSurface->getNativeWindow());
+                    mRenderPipeline->getLastDequeueDuration();
             const ANativeWindowFrameTimelineInfo ftl = {
                     .frameNumber = frameCompleteNr,
                     .frameTimelineVsyncId = vsyncId,
@@ -759,7 +764,7 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
                             mCurrentFrameInfo->get(FrameInfoIndex::IntendedVsync),
                     .dequeueBufferDurationNanos = lastDequeueDuration,
             };
-            native_window_set_frame_timeline_info(mNativeSurface->getNativeWindow(), ftl);
+            mRenderPipeline->setFrameTimelineInfo(ftl);
         }
     }
 
@@ -813,7 +818,7 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
                 swap.dequeueDuration = 0;
             } else {
                 swap.dequeueDuration =
-                        ANativeWindow_getLastDequeueDuration(mNativeSurface->getNativeWindow());
+                        mRenderPipeline->getLastDequeueDuration();
             }
             swap.queueDuration =
                     ANativeWindow_getLastQueueDuration(mNativeSurface->getNativeWindow());

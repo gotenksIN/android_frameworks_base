@@ -18,6 +18,7 @@ package com.android.systemui.media.dialog
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.WallpaperColors
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -305,10 +306,7 @@ constructor(
                 // Decide whether to group devices only during the initial render.
                 // Avoid grouping broadcast devices because grouped volume control is not
                 // available for broadcast session.
-                mGroupSelectedItems =
-                    hasGroupPlayback() &&
-                        (!Flags.enableOutputSwitcherPersonalAudioSharing() ||
-                            isVolumeControlEnabledForSession())
+                mGroupSelectedItems = hasGroupPlayback() && isVolumeControlEnabledForSession()
             }
             mCallback.onDeviceListChanged()
         } else {
@@ -388,24 +386,27 @@ constructor(
         }
     }
 
+    private fun getAppName(pm: PackageManager, packageName: String, defaultName: String): String {
+        val applicationInfo =
+            try {
+                pm.getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0))
+            } catch (_: PackageManager.NameNotFoundException) {
+                null
+            }
+        return if (applicationInfo != null) pm.getApplicationLabel(applicationInfo).toString()
+        else defaultName
+    }
+
     fun getAppSourceName(): String? {
         val packageName = mPackageName
         if (packageName.isNullOrEmpty()) {
             return null
         }
-        val packageManager = mContext.getPackageManager()
-        val applicationInfo =
-            try {
-                packageManager.getApplicationInfo(
-                    packageName,
-                    PackageManager.ApplicationInfoFlags.of(0),
-                )
-            } catch (_: PackageManager.NameNotFoundException) {
-                null
-            }
-        return if (applicationInfo != null)
-            packageManager.getApplicationLabel(applicationInfo) as String
-        else mContext.getString(R.string.media_output_dialog_unknown_launch_app_name)
+        return getAppName(
+            mContext.packageManager,
+            packageName,
+            defaultName = mContext.getString(R.string.media_output_dialog_unknown_launch_app_name),
+        )
     }
 
     fun getAppLaunchIntent(): Intent? {
@@ -435,6 +436,24 @@ constructor(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             mCallback.dismissDialog()
             startActivity(this, controller)
+        }
+    }
+
+    fun tryToLaunchMissingPermissionsResolveIntent() {
+        getMissingPermissionsResolveIntent()?.apply {
+            mCallback.dismissDialog()
+            try {
+                mContext.startActivityAsUser(this, mLocalMediaManager.userHandle)
+            } catch (_: ActivityNotFoundException) {
+                // Checks for the intent to match an activity in the calling app are done at
+                // registration time, but in theory the app could be uninstalled just before this
+                // code runs.
+                Log.e(
+                    TAG,
+                    "No activity found to handle intent $this on user " +
+                        mLocalMediaManager.userHandle,
+                )
+            }
         }
     }
 
@@ -695,11 +714,7 @@ constructor(
         }
     }
 
-    /**
-     * Returns an intent to resolve missing permissions if UI should be shown to prompt the user to
-     * resolve permissions, or null if the UI should not be shown.
-     */
-    fun getMissingPermissionsResolveIntent(): Intent? {
+    private fun getMissingPermissionsInfo(): MissingPermissionsInfo? {
         if (!accessLocalNetworkPermissionEnabled()) {
             return null
         }
@@ -707,8 +722,30 @@ constructor(
         if (permissionsInfo == null || permissionsInfo.permissions.isEmpty()) {
             return null
         }
+        return permissionsInfo
+    }
+
+    /**
+     * Returns info on a warning message to resolve missing permissions if UI should be shown to
+     * prompt the user to resolve permissions, or null if the UI should not be shown.
+     */
+    fun getMissingPermissionsWarning(): MissingPermissionsWarning? {
+        val permissionsInfo = getMissingPermissionsInfo() ?: return null
+        val userHandle = mLocalMediaManager.userHandle
+        val pm = mContext.createContextAsUser(userHandle, 0).packageManager
+        val appName =
+            getAppName(
+                pm,
+                permissionsInfo.componentName.packageName,
+                defaultName = permissionsInfo.componentName.packageName,
+            )
+        return MissingPermissionsWarning(appName)
+    }
+
+    private fun getMissingPermissionsResolveIntent(): Intent? {
+        val permissionsInfo = getMissingPermissionsInfo() ?: return null
         return Intent(RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS).apply {
-            setComponent(permissionsInfo.componentName)
+            component = permissionsInfo.componentName
             putStringArrayListExtra(
                 RouteListingPreference.EXTRA_MISSING_PERMISSIONS,
                 ArrayList<String?>(permissionsInfo.permissions),
@@ -767,10 +804,7 @@ constructor(
     fun getSessionReleaseType(): Int = mLocalMediaManager.getSessionReleaseType()
 
     fun releaseSession() {
-        if (
-            Flags.enableOutputSwitcherPersonalAudioSharing() &&
-                getSessionReleaseType() == RoutingSessionInfo.RELEASE_TYPE_SHARING
-        ) {
+        if (getSessionReleaseType() == RoutingSessionInfo.RELEASE_TYPE_SHARING) {
             mMetricLogger.logInteractionStopSharing()
         } else {
             mMetricLogger.logInteractionStopCasting()
@@ -938,18 +972,13 @@ constructor(
         if (Flags.enableUseOfSessionReleaseTypeForStopButton()) {
             return when (getSessionReleaseType()) {
                 RoutingSessionInfo.RELEASE_TYPE_SHARING ->
-                    if (Flags.enableOutputSwitcherPersonalAudioSharing())
-                        R.string.media_output_dialog_button_stop_sharing
-                    else null
-
+                    R.string.media_output_dialog_button_stop_sharing
                 RoutingSessionInfo.RELEASE_TYPE_CASTING ->
                     R.string.media_output_dialog_button_stop_casting
                 else -> null
             }
         } else {
-            val inBroadcast =
-                Flags.enableOutputSwitcherPersonalAudioSharing() &&
-                    getSessionReleaseType() == RoutingSessionInfo.RELEASE_TYPE_SHARING
+            val inBroadcast = getSessionReleaseType() == RoutingSessionInfo.RELEASE_TYPE_SHARING
             if (inBroadcast) {
                 return R.string.media_output_dialog_button_stop_sharing
             } else if (isCurrentConnectedDeviceRemote()) {

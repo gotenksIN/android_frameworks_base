@@ -22,13 +22,12 @@ import android.platform.test.annotations.MotionTest
 import android.testing.TestableLooper.RunWithLooper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.Saver
-import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
-import com.android.compose.animation.scene.Key
 import com.android.compose.animation.scene.isElement
 import com.android.compose.snapshot.ObserveReadsRoot
 import com.android.compose.theme.PlatformTheme
@@ -48,39 +47,23 @@ import com.android.systemui.communal.ui.viewmodel.communalContent
 import com.android.systemui.communal.ui.viewmodel.communalUserActionsViewModel
 import com.android.systemui.communal.ui.viewmodel.communalViewModel
 import com.android.systemui.communal.util.communalColors
+import com.android.systemui.compose.modifiers.resIdToTestTag
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
-import com.android.systemui.keyguard.domain.interactor.keyguardClockInteractorWithImpl
 import com.android.systemui.keyguard.ui.composable.LockscreenContent
 import com.android.systemui.keyguard.ui.composable.LockscreenScene
-import com.android.systemui.keyguard.ui.composable.elements.LockscreenElementFactoryImpl
-import com.android.systemui.keyguard.ui.composable.elements.LockscreenElements
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.ambientIndicationAreaProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.clockRegionElementProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.defaultClockFaceLayout
+import com.android.systemui.keyguard.ui.lockscreen.content.lockscreenContent
 import com.android.systemui.keyguard.ui.lockscreen.elementproviders.keyguardStatusBarViewComponentFactory
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.lockIconElementProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.lockscreenLowerRegionElementProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.lockscreenRootElementProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.lockscreenUpperRegionElementProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.settingsMenuElementProvider
-import com.android.systemui.keyguard.ui.lockscreen.elementproviders.statusBarElementProvider
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenUserActionsViewModel
-import com.android.systemui.keyguard.ui.viewmodel.keyguardClockViewModelWithImpl
-import com.android.systemui.keyguard.ui.viewmodel.lockscreenBehindScrimViewModelFactory
-import com.android.systemui.keyguard.ui.viewmodel.lockscreenContentViewModelFactory
-import com.android.systemui.keyguard.ui.viewmodel.lockscreenFrontScrimViewModelFactory
 import com.android.systemui.keyguard.ui.viewmodel.lockscreenUserActionsViewModel
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.log.LogBuffer
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
-import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesShadeStateViewModelFactory
-import com.android.systemui.plugins.keyguard.ui.composable.elements.BaseLockscreenElement
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.notificationRulesParentViewModelFactory
 import com.android.systemui.qs.ui.composable.QuickSettingsScene
 import com.android.systemui.qs.ui.viewmodel.quickSettingsSceneContentViewModelFactory
 import com.android.systemui.qs.ui.viewmodel.quickSettingsUserActionsViewModelFactory
-import com.android.systemui.scene.domain.interactor.sceneInteractor
+import com.android.systemui.scene.domain.interactor.awaitTransitionIdle
 import com.android.systemui.scene.sceneContainerTransitions
 import com.android.systemui.scene.sceneContainerViewModelFactory
 import com.android.systemui.scene.session.shared.SessionStorage
@@ -90,8 +73,12 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.sceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
+import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.shade.domain.interactor.enableSingleShade
+import com.android.systemui.shade.ui.composable.ShadeScene
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
+import com.android.systemui.shade.ui.viewmodel.shadeSceneContentViewModelFactory
+import com.android.systemui.shade.ui.viewmodel.shadeUserActionsViewModelFactory
 import com.android.systemui.statusbar.notification.stack.ui.view.notificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
 import com.android.systemui.statusbar.phone.KeyguardStatusBarViewController
@@ -107,15 +94,13 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import platform.test.motion.compose.ComposeFeatureCaptures
+import platform.test.motion.compose.ComposeFeatureCaptures.size
 import platform.test.motion.compose.ComposeRecordingSpec
 import platform.test.motion.compose.MotionControl
 import platform.test.motion.compose.feature
 import platform.test.motion.compose.recordMotion
 import platform.test.motion.compose.runTest
-import platform.test.motion.compose.values.MotionTestValueKey
-import platform.test.motion.golden.FeatureCapture
-import platform.test.motion.golden.TimeSeriesCaptureScope
-import platform.test.motion.golden.asDataPoint
+import platform.test.motion.golden.DataPointTypes
 import platform.test.motion.golden.feature
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.Displays.Phone
@@ -156,56 +141,6 @@ class LockScreenTransitionTest : SysuiTestCase() {
         whenever(kosmos.communalSettingsRepository.getV2FlagEnabled()).thenReturn(true)
     }
 
-    private val lockScreenContent =
-        with(kosmos) {
-            LockscreenContent(
-                viewModelFactory = lockscreenContentViewModelFactory,
-                lockscreenFrontScrimViewModelFactory = lockscreenFrontScrimViewModelFactory,
-                lockscreenBehindScrimViewModelFactory = lockscreenBehindScrimViewModelFactory,
-                lockscreenElements =
-                    LockscreenElements(
-                        builder =
-                            object : LockscreenElementFactoryImpl.Builder {
-                                override fun create(
-                                    elements: Map<Key, BaseLockscreenElement>
-                                ): LockscreenElementFactoryImpl {
-                                    return LockscreenElementFactoryImpl(
-                                        elements = elements,
-                                        blueprintLog =
-                                            LogBuffer(
-                                                "Test",
-                                                10,
-                                                com.android.systemui.util.mockito.mock(),
-                                            ),
-                                    )
-                                }
-                            },
-                        keyguardClockViewModel = keyguardClockViewModelWithImpl,
-                        elementProviders = {
-                            setOf(
-                                lockscreenRootElementProvider,
-                                statusBarElementProvider,
-                                lockscreenUpperRegionElementProvider,
-                                lockIconElementProvider,
-                                ambientIndicationAreaProvider,
-                                lockscreenLowerRegionElementProvider,
-                                settingsMenuElementProvider,
-                                clockRegionElementProvider,
-                                defaultClockFaceLayout,
-                            )
-                        },
-                        blueprintLog =
-                            LogBuffer(
-                                "LockscreenBuffer",
-                                10,
-                                com.android.systemui.util.mockito.mock(),
-                            ),
-                    ),
-                clockInteractor = keyguardClockInteractorWithImpl,
-                interactionJankMonitor = interactionJankMonitor,
-            )
-        }
-
     private val shadeSession: SaveableSession =
         object : SaveableSession, Session by Session(SessionStorage()) {
             @Composable
@@ -238,15 +173,27 @@ class LockScreenTransitionTest : SysuiTestCase() {
                 kosmos.notificationsPlaceholderViewModelFactory,
             actionsViewModelFactory = kosmos.quickSettingsUserActionsViewModelFactory,
             contentViewModelFactory = kosmos.quickSettingsSceneContentViewModelFactory,
-            notificationRulesShadeStateViewModelFactory =
-                kosmos.notificationRulesShadeStateViewModelFactory,
+            notificationRulesParentViewModelFactory =
+                kosmos.notificationRulesParentViewModelFactory,
             jankMonitor = kosmos.interactionJankMonitor,
+        )
+
+    private val shadeScene =
+        ShadeScene(
+            shadeSession = shadeSession,
+            notificationStackScrollView = { kosmos.notificationScrollView },
+            actionsViewModelFactory = kosmos.shadeUserActionsViewModelFactory,
+            contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
+            notificationsPlaceholderViewModelFactory =
+                kosmos.notificationsPlaceholderViewModelFactory,
+            jankMonitor = kosmos.interactionJankMonitor,
+            notificationRulesParentViewModelFactory = kosmos.notificationRulesParentViewModelFactory,
         )
 
     private val lockscreenScene =
         LockscreenScene(
             actionsViewModelFactory = lockscreenUserActionsViewModelFactory,
-            lockscreenContent = { lockScreenContent },
+            lockscreenContent = { kosmos.lockscreenContent },
         )
 
     @Test
@@ -263,23 +210,17 @@ class LockScreenTransitionTest : SysuiTestCase() {
                     content = { SceneContainerUnderTest() },
                     recordingSpec =
                         ComposeRecordingSpec(
-                            MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.isIdle()
-                                    }
-                                }
-                            ) {
+                            MotionControl(delayRecording = { awaitTransitionIdle(kosmos) }) {
                                 performTouchInputAsync(onRoot()) { swipeLeft(startX = centerX) }
-
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                }
+                                awaitTransitionIdle(kosmos)
                             },
                             recordAfter = false,
                             recordBefore = false,
                         ) {
-                            featureFloat(LockscreenContent.LockscreenContentMotionTestKeys.Alpha)
+                            feature(
+                                LockscreenContent.LockscreenContentMotionTestKeys.Alpha,
+                                DataPointTypes.float,
+                            )
                             feature(
                                 isElement(Communal.Elements.Grid),
                                 ComposeFeatureCaptures.x,
@@ -304,13 +245,7 @@ class LockScreenTransitionTest : SysuiTestCase() {
                     content = { SceneContainerUnderTest() },
                     recordingSpec =
                         ComposeRecordingSpec(
-                            MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
-                                    }
-                                }
-                            ) {
+                            MotionControl(delayRecording = { awaitTransitionIdle(kosmos) }) {
 
                                 // perform swipe down gesture from top
                                 performTouchInputAsync(onRoot()) {
@@ -318,7 +253,42 @@ class LockScreenTransitionTest : SysuiTestCase() {
                                 }
                             }
                         ) {
-                            featureFloat(LockscreenContent.LockscreenContentMotionTestKeys.Alpha)
+                            feature(
+                                LockscreenContent.LockscreenContentMotionTestKeys.Alpha,
+                                DataPointTypes.float,
+                            )
+                        },
+                )
+            assertThat(motion).timeSeriesMatchesGolden()
+        }
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
+    @EnableFlags(FLAG_NOTIFICATION_SHADE_BLUR)
+    fun recordQQSPanelSize_duringSwipeDownToQQS() {
+        motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
+            kosmos.populateQuickSettings(14)
+            kosmos.fakeWindowRootViewBlurRepository.isBlurSupported.value = true
+
+            val motion =
+                recordMotion(
+                    content = { SceneContainerUnderTest() },
+                    recordingSpec =
+                        ComposeRecordingSpec(
+                            MotionControl(delayRecording = { awaitTransitionIdle(kosmos) }) {
+                                performTouchInputAsync(onRoot()) {
+                                    swipeDown(startY = centerY, endY = bottom, durationMillis = 500)
+                                }
+                            }
+                        ) {
+                            feature(
+                                hasTestTag(resIdToTestTag("quick_qs_panel")),
+                                size,
+                                "quick_qs_panel_size",
+                                useUnmergedTree = true,
+                            )
                         },
                 )
             assertThat(motion).timeSeriesMatchesGolden()
@@ -341,32 +311,19 @@ class LockScreenTransitionTest : SysuiTestCase() {
                                 Scenes.Lockscreen to lockscreenScene,
                                 Scenes.QuickSettings to quickSettingScene,
                                 Scenes.Communal to communalScene,
+                                Scenes.Shade to shadeScene,
                             ),
                         initialSceneKey = Scenes.Lockscreen,
                         transitionsBuilder = kosmos.sceneContainerTransitions,
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,
                         sceneJankMonitorFactory = kosmos.sceneJankMonitorFactory,
+                        sceneTransitionLatencyMonitor = kosmos.sceneTransitionLatencyMonitor,
                         onTransitionStart = { _, _ -> },
                         onSnap = {},
                     )
                 }
             }
-        }
-    }
-
-    private companion object {
-        fun TimeSeriesCaptureScope<SemanticsNodeInteractionsProvider>.featureFloat(
-            motionTestValueKey: MotionTestValueKey<Float>
-        ) {
-            feature(
-                motionTestValueKey = motionTestValueKey,
-                capture =
-                    FeatureCapture(motionTestValueKey.semanticsPropertyKey.name) {
-                        it.asDataPoint()
-                    },
-                name = motionTestValueKey.semanticsPropertyKey.name,
-            )
         }
     }
 }

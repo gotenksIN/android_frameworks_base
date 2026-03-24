@@ -24,10 +24,10 @@ import android.graphics.drawable.Icon
 import android.media.projection.StopReason
 import android.net.Uri
 import android.os.IBinder
+import android.os.RemoteException
 import android.util.Log
 import android.view.Display
 import androidx.annotation.VisibleForTesting
-import androidx.annotation.WorkerThread
 import com.android.app.tracing.coroutines.flow.stateInTraced
 import com.android.app.tracing.coroutines.launchInTraced
 import com.android.systemui.dagger.SysUISingleton
@@ -52,6 +52,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -71,18 +72,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 
 private val startingStatusUpdateInterval: Duration = 1.seconds
+private const val TAG = "ScreenRecordingServiceRepository"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
 class ScreenRecordingServiceRepository
 @VisibleForTesting
 constructor(
-    private val context: Context,
     coroutineScope: CoroutineScope,
-    private val userRepository: UserRepository,
     private val screenRecordUxController: ScreenRecordUxController,
-    private val mapServiceBinder:
-        (name: ComponentName?, service: IBinder?) -> IScreenRecordingService,
+    private val serviceFlow: Flow<IScreenRecordingService?>,
 ) : ScreenRecordingStartStopRepository, ScreenRecordRepository {
 
     @Inject
@@ -92,11 +91,9 @@ constructor(
         userRepository: UserRepository,
         screenRecordUxController: ScreenRecordUxController,
     ) : this(
-        context = context,
         coroutineScope = coroutineScope,
-        userRepository = userRepository,
         screenRecordUxController = screenRecordUxController,
-        mapServiceBinder = { _, service -> IScreenRecordingService.Stub.asInterface(service) },
+        serviceFlow = bindServiceAsAFlow(context, userRepository),
     )
 
     private val serviceCallback = ServiceCallback()
@@ -109,10 +106,10 @@ constructor(
                 }
             }
             .flatMapLatest { currentIsServiceBound ->
-                if (currentIsServiceBound) bindService() else flowOf(null)
+                if (currentIsServiceBound) serviceFlow else flowOf(null)
             }
             .pairwiseBy { old: IScreenRecordingService?, new: IScreenRecordingService? ->
-                old?.setCallback(null)
+                old?.safeBinderCall { setCallback(null) }
                 if (new == null) {
                     // The service died. Update isServiceBound to match its state
                     isServiceBound.value = false
@@ -124,7 +121,9 @@ constructor(
                         }
                     }
                 } else {
-                    new.setCallback(serviceCallback)
+                    if (!new.safeBinderCall { setCallback(serviceCallback) }) {
+                        isServiceBound.value = false
+                    }
                 }
                 new
             }
@@ -208,7 +207,7 @@ constructor(
                     }
                 }
             }
-            .catch { Log.e("ScreenRecordingServiceInteractor", "Couldn't reach the service", it) }
+            .catch { Log.e(TAG, "Couldn't reach the service", it) }
             .launchInTraced("ScreenRecordingServiceInteractor#_status", coroutineScope)
     }
 
@@ -225,23 +224,11 @@ constructor(
 
     override fun startRecording(parameters: ScreenRecordingParameters) {
         require(parameters.displayId != Display.INVALID_DISPLAY) { "Provide a valid displayId" }
-        statusUpdates.update { currentStatus ->
-            if (currentStatus is Started) {
-                currentStatus
-            } else {
-                Started(parameters)
-            }
-        }
+        statusUpdates.update { currentStatus -> currentStatus as? Started ?: Started(parameters) }
     }
 
     override fun stopRecording(@StopReason reason: Int) {
-        statusUpdates.update { currentStatus ->
-            if (currentStatus is Stopped) {
-                currentStatus
-            } else {
-                Stopped(reason)
-            }
-        }
+        statusUpdates.update { currentStatus -> currentStatus as? Stopped ?: Stopped(reason) }
     }
 
     /** Update parameters of an ongoing recording */
@@ -255,38 +242,6 @@ constructor(
         }
     }
 
-    @WorkerThread
-    private fun bindService(): Flow<IScreenRecordingService?> = conflatedCallbackFlow {
-        val userHandle = userRepository.selectedUser.value.userInfo.userHandle
-        val userContext = context.createContextAsUser(userHandle, 0)
-        val newIntent = Intent(userContext, ScreenRecordingService::class.java)
-        userContext.bindService(newIntent, Connection { trySend(it) }, Context.BIND_AUTO_CREATE)
-        awaitClose {
-            /*
-            Don't unbind the service because it stops self when done with the
-            recording. In this case null service will be received in and
-            isServiceBound updated later in the chain.
-            */
-        }
-    }
-
-    private inner class Connection(
-        private val onServiceReceived: (IScreenRecordingService?) -> Unit
-    ) : ServiceConnection {
-
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            onServiceReceived(mapServiceBinder(name, service))
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            onServiceReceived(null)
-        }
-
-        override fun onBindingDied(name: ComponentName?) {
-            onServiceReceived(null)
-        }
-    }
-
     private inner class ServiceCallback : IScreenRecordingServiceCallback.Stub() {
 
         override fun onRecordingStarted() {}
@@ -295,17 +250,56 @@ constructor(
             stopRecording(reason)
         }
 
-        override fun onSavingRecording(recordingUri: Uri) {
-            _screenRecording.value = ScreenRecording.Saving(uri = recordingUri)
-        }
-
-        override fun onRecordingSaved(recordingUri: Uri, thumbnail: Icon) {
+        override fun onSavingRecording(recordingUri: Uri, notificationId: Int) {
             _screenRecording.value =
-                ScreenRecording.Saved(uri = recordingUri, thumbnail = thumbnail)
+                ScreenRecording.Saving(uri = recordingUri, notificationId = notificationId)
         }
 
-        override fun onRecordingSaveError(recordingUri: Uri) {
-            _screenRecording.value = ScreenRecording.NotSaved(uri = recordingUri)
+        override fun onRecordingSaved(recordingUri: Uri, thumbnail: Icon, notificationId: Int) {
+            _screenRecording.value =
+                ScreenRecording.Saved(
+                    uri = recordingUri,
+                    thumbnail = thumbnail,
+                    notificationId = notificationId,
+                )
+        }
+
+        override fun onRecordingSaveError(recordingUri: Uri?, notificationId: Int) {
+            _screenRecording.value =
+                ScreenRecording.NotSaved(uri = recordingUri, notificationId = notificationId)
+        }
+    }
+
+    companion object {
+
+        /**
+         * @return a cold flow that binds to the [IScreenRecordingService] on each collection. This
+         *   flow never cancels because it's [IScreenRecordingService] responsibility.
+         */
+        @VisibleForTesting
+        fun bindServiceAsAFlow(
+            context: Context,
+            userRepository: UserRepository,
+            mapServiceBinder: (name: ComponentName?, service: IBinder?) -> IScreenRecordingService =
+                { _, service ->
+                    IScreenRecordingService.Stub.asInterface(service)
+                },
+        ): Flow<IScreenRecordingService?> = conflatedCallbackFlow {
+            val userHandle = userRepository.selectedUser.value.userInfo.userHandle
+            val userContext = context.createContextAsUser(userHandle, 0)
+            val newIntent = Intent(userContext, ScreenRecordingService::class.java)
+            userContext.bindService(
+                newIntent,
+                ProducingConnection(mapServiceBinder),
+                Context.BIND_AUTO_CREATE,
+            )
+            awaitClose {
+                /*
+                Don't unbind the service because it stops self when done with the
+                recording. In this case null service will be received in and
+                isServiceBound updated later in the chain.
+                */
+            }
         }
     }
 
@@ -356,4 +350,44 @@ private fun <T> countDownFlow(
     }
     emit(onTick(0.milliseconds))
     onFinished()
+}
+
+/**
+ * Executes an IPC call safely, catching [RemoteException]. Adding this try-catch to fix
+ * b/483091461.
+ *
+ * @return true if the call succeeded, false if a RemoteException occurred or the object was null.
+ */
+private inline fun <T> T.safeBinderCall(block: T.() -> Unit): Boolean {
+    if (this == null) return false
+    return try {
+        block()
+        true
+    } catch (e: RemoteException) {
+        Log.e(TAG, "Binder process died during call", e)
+        false
+    }
+}
+
+private fun ProducerScope<IScreenRecordingService?>.ProducingConnection(
+    mapServiceBinder: (name: ComponentName?, service: IBinder?) -> IScreenRecordingService
+) = ProducingConnection(this, mapServiceBinder)
+
+private class ProducingConnection(
+    private val scope: ProducerScope<IScreenRecordingService?>,
+    private val mapServiceBinder:
+        (name: ComponentName?, service: IBinder?) -> IScreenRecordingService,
+) : ServiceConnection {
+
+    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+        scope.trySend(mapServiceBinder(name, service))
+    }
+
+    override fun onServiceDisconnected(name: ComponentName?) {
+        scope.trySend(null)
+    }
+
+    override fun onBindingDied(name: ComponentName?) {
+        scope.trySend(null)
+    }
 }

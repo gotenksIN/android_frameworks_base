@@ -35,15 +35,17 @@ import java.util.stream.Collectors;
  * The map is backed by a {@link java.util.concurrent.ConcurrentHashMap} and offers the
  * same read/write behavior for map entries. There are no ordering guarantees about the state of
  * the values exposed via settings.
+ *
+ * @hide
  */
-public class AgentSessionMap<K> {
+public class AgentSessionMap {
 
     private static final String TAG = "AgentSessionMap";
     public static final String SETTINGS_KEY = "xdev-ai-agent-missing-session";
 
     private final Context mContext;
     private final int mUserId;
-    private final Map<K, AgentSession> mAgentSessionList = new ConcurrentHashMap<>();
+    private final Map<Integer, AgentSession> mAgentSessionList = new ConcurrentHashMap<>();
 
     /**
      * Create a new session map.
@@ -57,29 +59,74 @@ public class AgentSessionMap<K> {
         updateSetting("" /* value */);
     }
 
-    public AgentSession get(K key) {
-        return mAgentSessionList.get(key);
+    public AgentSession get(int associationId) {
+        return mAgentSessionList.get(associationId);
     }
 
-    public void put(K key, AgentSession value) {
+    /** Add a new session to the map. */
+    public void put(int associationId, AgentSession value) {
         try {
-            mAgentSessionList.put(key, value);
+            if (value.getUserId() == mUserId) {
+                mAgentSessionList.put(associationId, value);
+            } else {
+                Slog.e(TAG, "Invalid user id: " + value.getUserId() + ", ignoring session");
+            }
         } finally {
             updateSetting();
         }
     }
 
-    public AgentSession remove(K key) {
+    /** Remove an existing session from the map. */
+    public AgentSession remove(int associationId) {
         try {
-            return mAgentSessionList.remove(key);
+            return mAgentSessionList.remove(associationId);
         } finally {
             updateSetting();
         }
     }
 
+    /** Clear the map so it is empty.. */
     public void clear() {
         try {
             mAgentSessionList.clear();
+        } finally {
+            updateSetting();
+        }
+    }
+
+    /** Authorize all sessions in this map. */
+    public void authorizeAll() {
+        try {
+            mAgentSessionList.replaceAll((key, session) -> AgentSession.authorized(session));
+        } finally {
+            updateSetting();
+        }
+    }
+
+    /** Authorize a session only if it exists in the map already. */
+    public AgentSession authorizeIfPresent(int userId, int associationId) {
+        try {
+            return mAgentSessionList.computeIfPresent(associationId, (k, session) -> {
+                if (userId == mUserId && !session.isAllowed()) {
+                    return AgentSession.authorized(session);
+                } else {
+                    return session;
+                }
+            });
+        } finally {
+            updateSetting();
+        }
+    }
+
+    public AgentSession revokeIfPresent(int userId, int associationId) {
+        try {
+            return mAgentSessionList.computeIfPresent(associationId, (k, session) -> {
+                if (userId == mUserId && session.isAllowed()) {
+                    return AgentSession.notAuthorized(session);
+                } else {
+                    return session;
+                }
+            });
         } finally {
             updateSetting();
         }
@@ -90,10 +137,13 @@ public class AgentSessionMap<K> {
     }
 
     private void updateSetting(String overrideValue) {
-        final String value = overrideValue != null ? overrideValue : mAgentSessionList.values()
+        final String value = overrideValue != null ? overrideValue : mAgentSessionList.entrySet()
                 .stream()
-                .filter(s -> (s.getUserId() == mUserId) && !s.isAllowed())
-                .map(s -> String.valueOf(s.getId()))
+                .filter(e -> {
+                    final var session = e.getValue();
+                    return (session.getUserId() == mUserId) && !session.isAllowed();
+                })
+                .map(e -> String.valueOf(e.getKey()))
                 .collect(Collectors.joining(","));
         final boolean ok = Settings.Secure.putStringForUser(mContext.getContentResolver(),
                 SETTINGS_KEY, value, mUserId);

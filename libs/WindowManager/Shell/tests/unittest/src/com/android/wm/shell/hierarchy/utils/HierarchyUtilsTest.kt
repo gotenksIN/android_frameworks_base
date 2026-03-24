@@ -26,8 +26,6 @@ import com.android.wm.shell.Flags.FLAG_ENABLE_SHELL_MODES
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.hierarchy.ContainerHierarchy
 import com.android.wm.shell.hierarchy.containers.Container
-import com.android.wm.shell.hierarchy.containers.StubContainer
-import com.android.wm.shell.hierarchy.modes.StubMode
 import com.android.wm.shell.hierarchy.properties.DisplayAreaContainerProperties
 import com.android.wm.shell.hierarchy.properties.DisplayContainerProperties
 import com.android.wm.shell.hierarchy.properties.TaskContainerProperties
@@ -165,28 +163,5 @@ class HierarchyUtilsTest : ShellTestCase() {
                 DEFAULT_DISPLAY
             )
         ).isEqualTo(parentTask)
-    }
-
-    @Test
-    fun testGetModes() {
-        // Create a hierarchy of A-B-C-Container, where only A & C have modes
-        val root = hierarchy.root
-        val parentA = StubContainer()
-        val parentB = StubContainer()
-        val parentC = StubContainer()
-        val container = StubContainer()
-        parentA.parent = root
-        parentA.mode = StubMode()
-        parentB.parent = parentA
-        parentC.parent = parentB
-        parentC.mode = StubMode()
-        container.parent = parentC
-
-        assertThat(HierarchyUtils.getModes(container)).isEqualTo(
-            listOf(
-                parentA.mode!!,
-                parentC.mode!!
-            )
-        )
     }
 }

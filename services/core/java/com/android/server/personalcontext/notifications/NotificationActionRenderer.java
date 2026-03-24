@@ -24,14 +24,15 @@ import android.service.notification.Adjustment;
 import android.service.notification.StatusBarNotification;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.NotificationEvent.NotificationEnqueuedEvent;
 import android.service.personalcontext.hint.NotificationHint;
+import android.service.personalcontext.hint.PublishedContextHint;
 import android.service.personalcontext.insight.ActionableInsight;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.DisplayInsight;
 import android.service.personalcontext.insight.InsightTraverser;
 import android.service.personalcontext.insight.InsightVisitor;
+import android.service.personalcontext.insight.PublishedContextInsight;
 import android.util.Log;
 import android.util.Slog;
 
@@ -78,9 +79,14 @@ public class NotificationActionRenderer implements Renderer {
         mNotificationActionFactory = notificationActionFactory;
     }
 
+    @Override
+    public int getProperties() {
+        return Renderer.PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS;
+    }
+
     @Nullable
     private static StatusBarNotification getSbnFromInsight(ContextInsight insight) {
-        for (ContextHint hint : ContextHintWithSignature.unwrapList(insight.getOriginHints())) {
+        for (ContextHint hint : PublishedContextHint.unwrapList(insight.getOriginHints())) {
             if (hint instanceof NotificationHint notificationHint
                     && notificationHint.getNotificationEvent()
                             instanceof NotificationEnqueuedEvent enqueuedEvent) {
@@ -91,11 +97,14 @@ public class NotificationActionRenderer implements Renderer {
     }
 
     @Override
-    public void render(@NonNull ContextInsight insight, RenderToken renderToken) {
+    public void render(@NonNull PublishedContextInsight publishedContextInsight,
+            RenderToken renderToken) {
         if (mNotificationManagerInternal == null) {
             Slog.e(TAG, "NotificationManagerInternal not found.");
             return;
         }
+
+        final ContextInsight insight = publishedContextInsight.getInsight();
 
         final Map<String, AdjustmentInfo> adjustmentsInfo = new LinkedHashMap<>();
         final InsightCollector collector =
@@ -197,7 +206,7 @@ public class NotificationActionRenderer implements Renderer {
     }
 
     @Override
-    public boolean isInterestedInInsight(ContextInsight insight) {
+    public boolean isInterestedInInsight(PublishedContextInsight insight) {
         // Notifications should be rendered due to a RenderToken, which bypasses this filter.
         // We don't want any other random insights.
         return false;

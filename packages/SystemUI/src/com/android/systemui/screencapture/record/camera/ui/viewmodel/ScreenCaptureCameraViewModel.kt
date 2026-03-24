@@ -58,6 +58,18 @@ constructor(
             it?.cameraStreamSize
         }
 
+    val outputStreamSize: Size? by
+        screenRecordCameraInteractor.streamConfiguration.mapHydrate(
+            "ScreenCaptureCameraViewModel#outputStreamSize"
+        ) {
+            it?.outputStreamSize
+        }
+
+    val areTapsSupported: Boolean by
+        screenRecordCameraInteractor.isOnTapSupported.hydratedStateOf(
+            "ScreenCaptureCameraViewModel#areTapsSupported"
+        )
+
     override suspend fun onActivated() {
         super.onActivated()
         coroutineScope {

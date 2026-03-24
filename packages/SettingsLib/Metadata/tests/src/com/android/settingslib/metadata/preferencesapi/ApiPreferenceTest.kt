@@ -23,6 +23,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.settingslib.metadata.ReadWritePermit
 import com.android.settingslib.metadata.ValidatedKeyParameters
+import com.android.settingslib.metadata.preferencesapi.multiusers.ManagementScope.OWN_USER
+import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget.USER
 import com.android.settingslib.metadata.preferencesapi.preconditions.Allowed
 import com.android.settingslib.metadata.preferencesapi.preconditions.Disallowed
 import com.android.settingslib.metadata.preferencesapi.types.AnyBoolean
@@ -51,9 +53,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -75,9 +78,10 @@ class ApiPreferenceTest {
                 KEY,
                 R.string.preference_purpose1,
                 AnyBoolean,
-                Boolean::class.java,
+                USER(canManage = OWN_USER),
                 null,
                 null,
+                { null },
                 getScreenParameters
             ).apply {
                 get { execute { true } }
@@ -102,11 +106,12 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             PreconditionsConfig(
                 R.string.preconditions_description1
             ) { Allowed },
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -131,9 +136,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -158,9 +164,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -185,9 +192,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -212,9 +220,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -238,9 +247,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -264,9 +274,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -296,9 +307,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             get { execute { true } }
@@ -325,9 +337,10 @@ class ApiPreferenceTest {
             KEY,
             R.string.preference_purpose1,
             AnyBoolean,
-            Boolean::class.java,
+            USER(canManage = OWN_USER),
             null,
             null,
+            { null },
             getScreenParameters
         ).apply {
             flag { false }
@@ -373,7 +386,46 @@ class ApiPreferenceTest {
         assertThat(shouldSkipFlagCheck(context)).isFalse()
     }
 
+    @Test
+    fun tags_whenTagsAreDefined_returnsTagsWithApiFirst() {
+        val preference = ApiPreferenceConfigBuilder(
+            KEY,
+            R.string.preference_purpose1,
+            AnyBoolean,
+            USER(canManage = OWN_USER),
+            null,
+            null,
+            { null },
+            { null }
+        ).apply {
+            tags("tag1", "tag2")
+            get { execute { true } }
+        }.build()
 
+        val tags = preference.tags(context)
+
+        assertThat(tags.toList()).containsExactly("api-first", "tag1", "tag2")
+    }
+
+    @Test
+    fun tags_whenNoTagsAreDefined_returnsApiFirstOnly() {
+        val preference = ApiPreferenceConfigBuilder(
+            KEY,
+            R.string.preference_purpose1,
+            AnyBoolean,
+            USER(canManage = OWN_USER),
+            null,
+            null,
+            { null },
+            { null }
+        ).apply {
+            get { execute { true } }
+        }.build()
+
+        val tags = preference.tags(context)
+
+        assertThat(tags.toList()).containsExactly("api-first")
+    }
 
     companion object {
         const val KEY = "ApiPreferenceKey"

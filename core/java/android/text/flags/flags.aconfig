@@ -117,16 +117,6 @@ flag {
 }
 
 flag {
-  name: "clear_font_variation_settings"
-  namespace: "text"
-  description: "The font variation settings must be cleared when the new Typeface is set"
-  bug: "353609778"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "handwriting_gesture_with_transformation"
   namespace: "text"
   description: "Fix handwriting gesture is not working when view has transformation."
@@ -267,10 +257,13 @@ flag {
 }
 
 flag {
-  name: "lazy_hyphenator_init"
+  name: "lazy_hyphenator_mmap_init"
   namespace: "text"
   description: "Initialize hyphenator lazily"
   bug: "473856914"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {

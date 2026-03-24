@@ -16,19 +16,20 @@
 
 package com.android.systemui.communal.domain.interactor
 
+import android.content.ComponentName
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.communal.contextualSetupDefinitionFactory
 import com.android.systemui.communal.contextualSetupRepository
 import com.android.systemui.communal.data.repository.SetupState
+import com.android.systemui.communal.domain.definition.SetupTarget
 import com.android.systemui.communal.fake
 import com.android.systemui.dump.dumpManager
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.collectValues
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.testKosmos
-import com.android.systemui.util.kotlin.SimpleFlowDumper
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Before
@@ -55,6 +56,8 @@ class ContextualSetupInteractorTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
+        definition1.fake.target = SetupTarget.Activity(ComponentName("pkg", "cls"))
+        definition2.fake.target = SetupTarget.Activity(ComponentName("pkg", "cls"))
         underTest.init()
     }
 
@@ -73,6 +76,17 @@ class ContextualSetupInteractorTest : SysuiTestCase() {
             definition1.fake.setIsReady(true)
 
             assertThat(launchRequest).isEqualTo(definition1)
+        }
+
+    @Test
+    fun launchRequest_doesNotEmitWhenTargetIsNull() =
+        kosmos.runTest {
+            val launchRequest by collectLastValue(underTest.launchRequest)
+
+            definition1.fake.target = null
+            definition1.fake.setIsReady(true)
+
+            assertThat(launchRequest).isNull()
         }
 
     @Test
@@ -131,5 +145,39 @@ class ContextualSetupInteractorTest : SysuiTestCase() {
 
             // Assert that the flow remained silent and no new value was emitted.
             assertThat(launchRequests).containsExactly(definition1)
+        }
+
+    @Test
+    fun launchRequest_multipleReady_emitsHighestPriority() =
+        kosmos.runTest {
+            val launchRequest by collectLastValue(underTest.launchRequest)
+
+            // Setup priorities
+            definition1.fake.priority = 0
+            definition2.fake.priority = 1
+
+            // Both become ready
+            definition1.fake.setIsReady(true)
+            definition2.fake.setIsReady(true)
+
+            // Should pick definition2 (higher priority)
+            assertThat(launchRequest).isEqualTo(definition2)
+        }
+
+    @Test
+    fun launchRequest_multipleReady_samePriority_emitsLowestId() =
+        kosmos.runTest {
+            val launchRequest by collectLastValue(underTest.launchRequest)
+
+            // Setup priorities (equal)
+            definition1.fake.priority = 0
+            definition2.fake.priority = 0
+
+            // Both become ready
+            definition1.fake.setIsReady(true)
+            definition2.fake.setIsReady(true)
+
+            // Should pick definition1 (lexicographically smaller ID: "def1" < "def2")
+            assertThat(launchRequest).isEqualTo(definition1)
         }
 }

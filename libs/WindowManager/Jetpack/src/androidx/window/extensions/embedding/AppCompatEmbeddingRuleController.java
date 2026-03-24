@@ -20,6 +20,7 @@ import static android.content.pm.ActivityInfo.OVERRIDE_ENABLE_VIRTUAL_GAMEPAD;
 import static android.content.res.Configuration.TOUCHSCREEN_FINGER;
 import static android.util.TypedValue.COMPLEX_UNIT_DIP;
 import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED;
+import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE;
 
 import android.annotation.Nullable;
 import android.app.Activity;
@@ -32,6 +33,7 @@ import android.content.pm.PackageManager;
 import android.os.RemoteException;
 import android.util.ArraySet;
 import android.util.TypedValue;
+import android.window.TaskFragmentOrganizer;
 import android.window.WindowContainerTransaction;
 
 import androidx.annotation.NonNull;
@@ -46,8 +48,11 @@ public class AppCompatEmbeddingRuleController {
 
     private static boolean sIsVirtualGamepadEnabled;
 
+    private static boolean sIsVirtualGamepadAllowedByApp;
+
     /** Initializes the controller. Must be called before any other functions. */
     public static void init(@NonNull Context context) {
+        sIsVirtualGamepadAllowedByApp = isVirtualGamepadAllowedByApp(context);
         sIsVirtualGamepadEnabled =
                 isVirtualGamepadEnabled(context.getPackageName(), context.getUserId());
     }
@@ -100,7 +105,10 @@ public class AppCompatEmbeddingRuleController {
                 (androidx.window.extensions.core.util.function.Predicate<Activity>)
                         activity -> activity.getResources().getConfiguration().touchscreen
                                 == TOUCHSCREEN_FINGER
-                                && isVirtualGamepadEnabled(selfPackageName, userId),
+                                && isVirtualGamepadEnabled(selfPackageName, userId)
+                                // Do not enable the gamepad if the game is in a non-embedding
+                                // multi-window mode such as system split screen.
+                                && (!isInMultiWindowModeExcludingEmbedding(activity)),
                 intent -> true,
                 parentMetrics -> parentMetrics.getBounds().height() >= minSizePx
                         && parentMetrics.getBounds().width() >= minSizePx)
@@ -148,11 +156,26 @@ public class AppCompatEmbeddingRuleController {
     }
 
     private static boolean isVirtualGamepadEnabled(@NonNull String packageName, int userId) {
+        if (!sIsVirtualGamepadAllowedByApp) {
+            return false;
+        }
         int userOption = getVirtualGamepadUserOption(packageName, userId);
         if (userOption == PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_OPT_OUT) {
             return false;
         }
         return CompatChanges.isChangeEnabled(OVERRIDE_ENABLE_VIRTUAL_GAMEPAD);
+    }
+
+    private static boolean isVirtualGamepadAllowedByApp(@NonNull Context context) {
+        try {
+            final PackageManager.Property property = context.getPackageManager().getProperty(
+                    PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE,
+                    context.getPackageName());
+            return property.getBoolean();
+        } catch (PackageManager.NameNotFoundException e) {
+            // Default to true if the property is not specified.
+            return true;
+        }
     }
 
     @PackageManager.VirtualGamepadUserOption
@@ -163,5 +186,21 @@ public class AppCompatEmbeddingRuleController {
         } catch (RemoteException e) {
             return PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET;
         }
+    }
+
+    /**
+     * Returns {@code true} if the {@param activity} is in multi-window mode and it is not embedded.
+     *
+     * This is used to ensure that the gamepad feature is not enabled when the game is in system
+     * multi-window modes such as split screen.
+     *
+     * TODO(b/489825790) Better handling of gamepad in system split screen. Issues may happen if
+     * the game enters system split screen where the window size is large enough to not dismiss
+     * the placeholder. Practically, this doesn't happen on known devices.
+     */
+    @VisibleForTesting
+    static boolean isInMultiWindowModeExcludingEmbedding(@NonNull Activity activity) {
+        return activity.isInMultiWindowMode()
+                && !TaskFragmentOrganizer.isActivityEmbedded(activity);
     }
 }

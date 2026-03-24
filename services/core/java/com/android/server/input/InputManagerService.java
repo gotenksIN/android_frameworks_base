@@ -2016,7 +2016,7 @@ public class InputManagerService extends IInputManager.Stub
                         config.getAssociatedDisplayId()),
                 config.getLanguageTag(), config.getLayoutType(),
                 android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                        ? config.getViewBehaviorConfig() : null);
+                        ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null) : null);
     }
 
     @NonNull
@@ -2675,12 +2675,12 @@ public class InputManagerService extends IInputManager.Stub
 
     // Native callback
     @SuppressWarnings("unused")
-    private void warnNoFocusedWindowAnr(
+    private void notifyPreNoFocusedWindowAnr(
             InputApplicationHandle inputApplicationHandle,
             int eventId,
             long elapsedDurationMs,
             long timeoutDurationMs) {
-        mWindowManagerCallbacks.warnNoFocusedWindowAnr(
+        mWindowManagerCallbacks.notifyPreNoFocusedWindowAnr(
                 inputApplicationHandle, eventId, elapsedDurationMs, timeoutDurationMs);
     }
 
@@ -3605,9 +3605,8 @@ public class InputManagerService extends IInputManager.Stub
         void notifyWindowResponsive(@NonNull IBinder token, @NonNull OptionalInt pid);
 
         /**
-         * Warns the window manager that a "No Focused Window" ANR is imminent before the ANR
-         * timeout.
-         *
+         * Notify the window manager about the focused application that does not have any focused
+         * window and is about to trigger an ANR.
          * @param inputApplicationHandle The application that is being considered for the ANR.
          * @param eventId The ID of the input event that could not be dispatched.
          * @param elapsedDurationMs The time elapsed since the input event was first considered for
@@ -3615,12 +3614,11 @@ public class InputManagerService extends IInputManager.Stub
          * @param timeoutDurationMs The total time after which a "No Focused Window" ANR will be
          *     declared.
          */
-        void warnNoFocusedWindowAnr(
+        void notifyPreNoFocusedWindowAnr(
                 @NonNull InputApplicationHandle inputApplicationHandle,
                 int eventId,
                 long elapsedDurationMs,
                 long timeoutDurationMs);
-
         /**
          * This callback is invoked when an event first arrives to InputDispatcher and before it is
          * placed onto InputDispatcher's queue. If this event is intercepted, it will never be
@@ -4250,7 +4248,8 @@ public class InputManagerService extends IInputManager.Stub
                     config.getVendorId(), config.getProductId(), token,
                     config.getAssociatedDisplayId(),
                     android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfig() : null);
+                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                            : null);
         }
 
         @NonNull
@@ -4261,7 +4260,8 @@ public class InputManagerService extends IInputManager.Stub
                     config.getVendorId(), config.getProductId(), token,
                     config.getAssociatedDisplayId(), config.getHeight(), config.getWidth(),
                     android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfig() : null);
+                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                            : null);
         }
 
         @NonNull
@@ -4275,7 +4275,8 @@ public class InputManagerService extends IInputManager.Stub
                             config.getAssociatedDisplayId()),
                     config.getHeight(), config.getWidth(),
                     android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfig() : null);
+                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                            : null);
         }
 
         @NonNull
@@ -4287,7 +4288,8 @@ public class InputManagerService extends IInputManager.Stub
                     InputManagerService.this.getTargetDisplayIdForInput(
                             config.getAssociatedDisplayId()),
                     android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfig() : null);
+                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                            : null);
         }
 
         @NonNull
@@ -4298,7 +4300,8 @@ public class InputManagerService extends IInputManager.Stub
                     config.getVendorId(), config.getProductId(), token,
                     config.getAssociatedDisplayId(), config.getHeight(), config.getWidth(),
                     android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfig() : null);
+                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                            : null);
         }
 
         @NonNull
@@ -4311,7 +4314,8 @@ public class InputManagerService extends IInputManager.Stub
                     InputManagerService.this.getTargetDisplayIdForInput(
                             config.getAssociatedDisplayId()),
                     android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfig() : null);
+                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                            : null);
         }
 
         @Override

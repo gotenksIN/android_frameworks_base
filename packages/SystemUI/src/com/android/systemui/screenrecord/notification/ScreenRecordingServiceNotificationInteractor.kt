@@ -19,7 +19,6 @@ package com.android.systemui.screenrecord.notification
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
@@ -27,12 +26,15 @@ import android.media.projection.StopReason
 import android.os.Bundle
 import androidx.media3.common.MimeTypes
 import com.android.systemui.res.R
+import com.android.systemui.screencapture.ScreenCaptureUiReceiver
+import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
 import com.android.systemui.screencapture.record.domain.interactor.ScreenCaptureRecordFeaturesInteractor
 import com.android.systemui.screencapture.record.smallscreen.ui.SmallScreenPostRecordingActivity
 import com.android.systemui.screenrecord.RecordingServiceStrings
 import com.android.systemui.screenrecord.ScreenMediaRecorder.SavedRecording
 import com.android.systemui.screenrecord.ScreenRecordingAudioSource
 import com.android.systemui.screenrecord.service.ScreenRecordingService
+import javax.inject.Inject
 
 private const val REQUEST_CODE = 2
 
@@ -45,15 +47,15 @@ private const val NOTIF_GROUP_ID_SAVED = NOTIF_BASE_ID + 1
 private const val NOTIF_GROUP_ID_ERROR_SAVING = NOTIF_BASE_ID + 2
 private const val NOTIF_GROUP_ID_ERROR_STARTING = NOTIF_BASE_ID + 3
 
-class ScreenRecordingServiceNotificationInteractor(
+class ScreenRecordingServiceNotificationInteractor
+@Inject
+constructor(
     private val context: Context,
     private val notificationManager: NotificationManager,
-    private val strings: RecordingServiceStrings,
-    private val channelId: String,
-    private val tag: String,
-    private val serviceClass: Class<out Service>,
     private val screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
 ) : NotificationInteractor {
+
+    private val strings = RecordingServiceStrings(context.resources)
 
     override fun notifyProcessing(notificationId: Int, audioSource: ScreenRecordingAudioSource) {
         val notificationTitle: String =
@@ -64,7 +66,7 @@ class ScreenRecordingServiceNotificationInteractor(
             }
 
         val builder: Notification.Builder =
-            Notification.Builder(context, channelId)
+            Notification.Builder(context, CHANNEL_ID)
                 .setContentTitle(notificationTitle)
                 .setContentText(strings.backgroundProcessingLabel)
                 .setSmallIcon(R.drawable.ic_screenrecord)
@@ -74,7 +76,7 @@ class ScreenRecordingServiceNotificationInteractor(
                         putString(Notification.EXTRA_SUBSTITUTE_APP_NAME, strings.title)
                     }
                 )
-        notificationManager.notify(tag, notificationId, builder.build())
+        notificationManager.notify(null, notificationId, builder.build())
     }
 
     override fun createRecordingNotification(
@@ -94,7 +96,7 @@ class ScreenRecordingServiceNotificationInteractor(
                     PendingIntent.getService(
                         context,
                         REQUEST_CODE,
-                        Intent(context, serviceClass)
+                        Intent(context, ScreenRecordingService::class.java)
                             .setAction(ScreenRecordingService.ACTION_STOP)
                             .putExtra(
                                 ScreenRecordingService.EXTRA_STOP_REASON,
@@ -104,7 +106,7 @@ class ScreenRecordingServiceNotificationInteractor(
                     ),
                 )
                 .build()
-        return Notification.Builder(context, channelId)
+        return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_screenrecord)
             .setContentTitle(notificationTitle)
             .setUsesChronometer(true)
@@ -112,6 +114,14 @@ class ScreenRecordingServiceNotificationInteractor(
             .setColor(context.getColor(R.color.GM2_red_700))
             .setOngoing(true)
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+            .setContentIntent(
+                PendingIntent.getBroadcast(
+                    context,
+                    REQUEST_CODE,
+                    ScreenCaptureUiReceiver.showScreenCapture(ScreenCaptureUiParameters.Record()),
+                    PendingIntent.FLAG_IMMUTABLE,
+                )
+            )
             .addAction(stopAction)
             .addExtras(
                 Bundle().apply { putString(Notification.EXTRA_SUBSTITUTE_APP_NAME, strings.title) }
@@ -119,11 +129,7 @@ class ScreenRecordingServiceNotificationInteractor(
             .build()
     }
 
-    override fun notifySaved(
-        notificationId: Int,
-        audioSource: ScreenRecordingAudioSource,
-        savedRecording: SavedRecording,
-    ) {
+    override fun notifySaved(notificationId: Int, savedRecording: SavedRecording) {
         notifyGroupSummary(
             notificationContentTitle = strings.saveTitle,
             groupKey = GROUP_KEY_SAVED,
@@ -132,7 +138,11 @@ class ScreenRecordingServiceNotificationInteractor(
 
         val viewIntent =
             if (screenCaptureRecordFeaturesInteractor.isSmallScreenRecordingEnabled) {
-                SmallScreenPostRecordingActivity.showRecording(context, savedRecording.uri)
+                SmallScreenPostRecordingActivity.showRecording(
+                    context,
+                    savedRecording.uri,
+                    notificationId,
+                )
             } else {
                 Intent(Intent.ACTION_VIEW)
                     .addFlags(
@@ -161,7 +171,7 @@ class ScreenRecordingServiceNotificationInteractor(
                 .build()
 
         val builder: Notification.Builder =
-            Notification.Builder(context, channelId)
+            Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_screenrecord)
                 .setContentTitle(strings.saveTitle)
                 .setContentText(strings.saveText)
@@ -190,7 +200,7 @@ class ScreenRecordingServiceNotificationInteractor(
                     .showBigPictureWhenCollapsed(true)
             builder.setStyle(pictureStyle)
         }
-        notificationManager.notify(tag, notificationId, builder.build())
+        notificationManager.notify(null, notificationId, builder.build())
     }
 
     override fun notifyErrorSaving(notificationId: Int) {
@@ -204,7 +214,7 @@ class ScreenRecordingServiceNotificationInteractor(
                 notificationContentTitle = strings.saveError,
                 groupKey = GROUP_KEY_ERROR_SAVING,
             )
-        notificationManager.notify(tag, notificationId, notification)
+        notificationManager.notify(null, notificationId, notification)
     }
 
     override fun notifyErrorStarting(notificationId: Int) {
@@ -214,14 +224,18 @@ class ScreenRecordingServiceNotificationInteractor(
             notificationIdForGroup = NOTIF_GROUP_ID_ERROR_STARTING,
         )
         val notification = createErrorNotification(strings.startError, GROUP_KEY_ERROR_STARTING)
-        notificationManager.notify(tag, notificationId, notification)
+        notificationManager.notify(null, notificationId, notification)
+    }
+
+    override fun cancel(notificationId: Int) {
+        notificationManager.cancel(notificationId)
     }
 
     private fun createErrorNotification(
         notificationContentTitle: String,
         groupKey: String,
     ): Notification =
-        Notification.Builder(context, channelId)
+        Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_screenrecord)
             .setContentTitle(notificationContentTitle)
             .setGroup(groupKey)
@@ -244,7 +258,7 @@ class ScreenRecordingServiceNotificationInteractor(
         notificationIdForGroup: Int,
     ) {
         val builder =
-            Notification.Builder(context, channelId)
+            Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_screenrecord)
                 .setContentTitle(notificationContentTitle)
                 .setGroup(groupKey)
@@ -254,6 +268,10 @@ class ScreenRecordingServiceNotificationInteractor(
                         putString(Notification.EXTRA_SUBSTITUTE_APP_NAME, strings.title)
                     }
                 )
-        notificationManager.notify(tag, notificationIdForGroup, builder.build())
+        notificationManager.notify(null, notificationIdForGroup, builder.build())
+    }
+
+    companion object {
+        const val CHANNEL_ID = "screen_record"
     }
 }

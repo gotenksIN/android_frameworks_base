@@ -18,14 +18,18 @@ package com.android.server.theming;
 
 import static android.util.TypedValue.TYPE_INT_COLOR_ARGB8;
 
+import android.content.Context;
 import android.content.om.FabricatedOverlay;
 import android.content.om.OverlayIdentifier;
 import android.content.om.OverlayManagerTransaction;
+import android.content.res.Resources;
 import android.os.UserHandle;
 import android.util.Pair;
 import android.util.Slog;
 
+import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.LocalServices;
 import com.android.server.om.OverlayManagerInternal;
 import com.android.systemui.monet.ColorScheme;
 import com.android.systemui.monet.DynamicColors;
@@ -44,6 +48,7 @@ import java.util.concurrent.CancellationException;
  *
  * @hide
  */
+@VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
 public class ThemeOverlayHelper {
     private static final String TAG = "ThemeOverlayHelper";
     private static final String ANDROID_PACKAGE = "android";
@@ -52,8 +57,8 @@ public class ThemeOverlayHelper {
 
     private final OverlayManagerInternal mOverlayManager;
 
-    ThemeOverlayHelper(OverlayManagerInternal overlayManager) {
-        mOverlayManager = overlayManager;
+    ThemeOverlayHelper() {
+        mOverlayManager = LocalServices.getService(OverlayManagerInternal.class);
     }
 
     /**
@@ -63,13 +68,99 @@ public class ThemeOverlayHelper {
      * @param applyToSystem  Whether to apply overlays to the system user as well.
      * @param shouldRegister Whether to register the overlays (true) or just enable them (false).
      */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void applyCurrentStateOverlays(ThemeStatePair.OverlaySnapshot snapshot,
             boolean applyToSystem, boolean shouldRegister) throws CancellationException {
-        if (shouldRegister) {
+        if (shouldRegister || areOverlaysMissing(snapshot.userId())) {
             registerAndEnableOverlays(snapshot, applyToSystem);
         } else if (applyToSystem) {
             enableOverlaysOnly(snapshot);
         }
+    }
+
+    private boolean areOverlaysMissing(int userId) {
+        final OverlayIdentifier identifier = new OverlayIdentifier(ANDROID_PACKAGE,
+                OVERLAY_NAME_DYNAMIC + "_" + userId);
+        try {
+            if (mOverlayManager.getOverlayInfo(identifier, UserHandle.of(userId)) == null) {
+                return true;
+            }
+        } catch (Exception e) {
+            Slog.w(TAG, "Failed to check if overlay exists: " + identifier, e);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if the given ColorSchemes are correctly applied to the user's resources.
+     * <p>
+     * Note: This is a heuristic check and does not verify every single color. It checks a
+     * representative subset of colors to determine if the ColorScheme is generally applied.
+     *
+     * @param context     The system context.
+     * @param userId      The user ID to check.
+     * @param darkScheme  The expected dark color scheme.
+     * @param lightScheme The expected light color scheme.
+     * @return {@code true} if the colors match the expected schemes.
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
+    public boolean isColorSchemeApplied(Context context, int userId, ColorScheme darkScheme,
+            ColorScheme lightScheme) {
+        Resources res = context.createContextAsUser(UserHandle.of(userId), 0).getResources();
+
+        try {
+            return res.getColor(R.color.system_accent1_500_dark)
+                    == darkScheme.getAccent1().getS500()
+                    && res.getColor(R.color.system_accent1_500_light)
+                    == lightScheme.getAccent1().getS500()
+
+                    && res.getColor(com.android.internal.R.color.system_accent2_500_dark)
+                    == darkScheme.getAccent2().getS500()
+                    && res.getColor(R.color.system_accent2_500_light)
+                    == lightScheme.getAccent2().getS500()
+
+                    && res.getColor(com.android.internal.R.color.system_accent3_500_dark)
+                    == darkScheme.getAccent3().getS500()
+                    && res.getColor(R.color.system_accent3_500_light)
+                    == lightScheme.getAccent3().getS500()
+
+                    && res.getColor(com.android.internal.R.color.system_neutral1_500_dark)
+                    == darkScheme.getNeutral1().getS500()
+                    && res.getColor(R.color.system_neutral1_500_light)
+                    == lightScheme.getNeutral1().getS500()
+
+                    && res.getColor(com.android.internal.R.color.system_neutral2_500_dark)
+                    == darkScheme.getNeutral2().getS500()
+                    && res.getColor(R.color.system_neutral2_500_light)
+                    == lightScheme.getNeutral2().getS500()
+
+                    && res.getColor(android.R.color.system_outline_variant_dark)
+                    == darkScheme.getMaterialScheme().getOutlineVariant()
+                    && res.getColor(android.R.color.system_outline_variant_light)
+                    == lightScheme.getMaterialScheme().getOutlineVariant()
+
+                    && res.getColor(android.R.color.system_primary_container_dark)
+                    == darkScheme.getMaterialScheme().getPrimaryContainer()
+                    && res.getColor(android.R.color.system_primary_container_light)
+                    == lightScheme.getMaterialScheme().getPrimaryContainer();
+        } catch (Resources.NotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Checks if the dynamic overlay for the given user is registered.
+     *
+     * @param userId The user ID to check.
+     * @return {@code true} if the overlay is registered, {@code false} otherwise.
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
+    public boolean isOverlayRegistered(int userId) {
+        OverlayIdentifier identifier = new OverlayIdentifier(ANDROID_PACKAGE,
+                OVERLAY_NAME_DYNAMIC + "_" + userId);
+        return mOverlayManager.getOverlayInfo(identifier, UserHandle.of(userId)) != null;
     }
 
     /**
@@ -152,6 +243,7 @@ public class ThemeOverlayHelper {
      * @param legacyOverlays A list of legacy overlay identifiers in the format
      *                       "packageName:overlayName".
      */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void cleanupLegacyOverlays(List<String> legacyOverlays) {
         if (legacyOverlays == null || legacyOverlays.isEmpty()) {
             return;
@@ -203,40 +295,32 @@ public class ThemeOverlayHelper {
 
         // Neutral palette
         assignColorsToOverlay(overlay, DynamicColors.getAllNeutralPalette(),
-                false, lightColorScheme, darkColorScheme);
+                lightColorScheme, darkColorScheme);
 
         // Accent palette
         assignColorsToOverlay(overlay, DynamicColors.getAllAccentPalette(),
-                false, lightColorScheme, darkColorScheme);
+                lightColorScheme, darkColorScheme);
 
         //Themed Colors
         assignColorsToOverlay(overlay, DynamicColors.getAllDynamicColorsMapped(),
-                false, lightColorScheme, darkColorScheme);
+                lightColorScheme, darkColorScheme);
 
-        // Fixed colors intentionally use only the lightscheme, hence the "fixed" in name.
-        // However, on Wear, legacy behavior used the dark scheme. We expect the caller to pass
-        // the dark scheme as lightColorScheme if this is desired.
-        ColorScheme fixedScheme = lightColorScheme;
-        assignColorsToOverlay(overlay, DynamicColors.getFixedColorsMapped(), true,
-                fixedScheme, fixedScheme);
+        //Fixed Colors
+        assignColorsToOverlay(overlay, DynamicColors.getFixedColorsMapped(),
+                lightColorScheme, darkColorScheme);
 
         //Custom Colors
-        assignColorsToOverlay(overlay, DynamicColors.getCustomColorsMapped(), false,
+        assignColorsToOverlay(overlay, DynamicColors.getCustomColorsMapped(),
                 lightColorScheme, darkColorScheme);
 
         return overlay;
     }
 
     private void assignColorsToOverlay(FabricatedOverlay overlay,
-            List<Pair<String, DynamicColor>> colors, Boolean isFixed, ColorScheme lightColorScheme,
+            List<Pair<String, DynamicColor>> colors, ColorScheme lightColorScheme,
             ColorScheme darkColorScheme) {
         for (Pair<String, DynamicColor> p : colors) {
             String prefix = "android:color/system_" + p.first;
-            if (isFixed) {
-                overlay.setResourceValue(prefix, TYPE_INT_COLOR_ARGB8,
-                        p.second.getArgb(darkColorScheme.getMaterialScheme()), null);
-                continue;
-            }
             overlay.setResourceValue(prefix + "_light", TYPE_INT_COLOR_ARGB8,
                     p.second.getArgb(lightColorScheme.getMaterialScheme()), null);
             overlay.setResourceValue(prefix + "_dark", TYPE_INT_COLOR_ARGB8,

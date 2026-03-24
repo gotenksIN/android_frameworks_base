@@ -55,6 +55,8 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -75,8 +77,6 @@ class MediaRepositoryTest : SysuiTestCase() {
             visualStabilityProvider = mockVisualStabilityProvider
         }
     private val testScope = kosmos.testScope
-    private val mediaResumption =
-        Settings.Secure.getInt(context.contentResolver, Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
     private lateinit var session: MediaSession
 
     private val underTest: MediaRepositoryImpl = kosmos.mediaRepository
@@ -90,11 +90,6 @@ class MediaRepositoryTest : SysuiTestCase() {
     fun tearDown() {
         session.release()
         kosmos.fakeMediaControllerFactory.reset()
-        Settings.Secure.putInt(
-            context.contentResolver,
-            Settings.Secure.MEDIA_CONTROLS_RESUME,
-            mediaResumption,
-        )
     }
 
     @Test
@@ -394,6 +389,49 @@ class MediaRepositoryTest : SysuiTestCase() {
         }
 
     @Test
+    fun addNewMedia_registerCallback_updateMedia_callbackIsNotRegistered() =
+        testScope.runTest {
+            val state =
+                PlaybackState.Builder().run {
+                    setState(PlaybackState.STATE_PAUSED, 200L, 1f)
+                    setActions(PlaybackState.ACTION_SEEK_TO)
+                    build()
+                }
+            val metadata =
+                MediaMetadata.Builder().run {
+                    putLong(MediaMetadata.METADATA_KEY_DURATION, 400L)
+                    build()
+                }
+
+            val mockController = mock<MediaController>()
+            whenever(mockController.metadata).thenReturn(metadata)
+            whenever(mockController.playbackState).thenReturn(state)
+            kosmos.fakeMediaControllerFactory.setControllerForToken(
+                session.sessionToken,
+                mockController,
+            )
+
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val userMedia =
+                createMediaData(
+                        app = "TEST_APP",
+                        playing = false,
+                        playbackLocation = LOCAL,
+                        isResume = false,
+                        instanceId = instanceId,
+                    )
+                    .copy(token = session.sessionToken)
+            addCurrentUserMediaEntry(userMedia)
+
+            val callbackCaptor = argumentCaptor<MediaController.Callback>()
+            verify(mockController).registerCallback(callbackCaptor.capture())
+            reset(mockController)
+
+            addCurrentUserMediaEntry(userMedia.copy(isPlaying = true))
+            verify(mockController, never()).registerCallback(callbackCaptor.capture())
+        }
+
+    @Test
     fun metadataCannotShowSeekbar() =
         testScope.runTest {
             val state =
@@ -507,11 +545,7 @@ class MediaRepositoryTest : SysuiTestCase() {
             val instanceId = InstanceId.fakeInstanceId(123)
             val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
             // When resumption is disabled, paused media should be dismissed after being swiped away
-            Settings.Secure.putInt(
-                context.contentResolver,
-                Settings.Secure.MEDIA_CONTROLS_RESUME,
-                0,
-            )
+            kosmos.fakeSettings.putInt(Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
 
             addCurrentUserMediaEntry(mediaData)
 
@@ -532,11 +566,7 @@ class MediaRepositoryTest : SysuiTestCase() {
             val instanceId = InstanceId.fakeInstanceId(123)
             val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
             // When resumption is disabled, paused media should be dismissed after being swiped away
-            Settings.Secure.putInt(
-                context.contentResolver,
-                Settings.Secure.MEDIA_CONTROLS_RESUME,
-                0,
-            )
+            kosmos.fakeSettings.putInt(Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
 
             addCurrentUserMediaEntry(mediaData)
 
@@ -556,11 +586,7 @@ class MediaRepositoryTest : SysuiTestCase() {
             val instanceId = InstanceId.fakeInstanceId(123)
             val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
             // When resumption is disabled, paused media should be dismissed after being swiped away
-            Settings.Secure.putInt(
-                context.contentResolver,
-                Settings.Secure.MEDIA_CONTROLS_RESUME,
-                0,
-            )
+            kosmos.fakeSettings.putInt(Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
 
             addCurrentUserMediaEntry(mediaData)
 
@@ -578,6 +604,66 @@ class MediaRepositoryTest : SysuiTestCase() {
         }
     }
 
+    @Test
+    fun pausedAndResumeOff_active_orderingAllowed_noImmediateRemoval() {
+        testScope.runTest {
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(false)
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
+            kosmos.fakeSettings.putInt(Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
+
+            addCurrentUserMediaEntry(mediaData)
+
+            assertThat(
+                    underTest.currentMedia
+                        .find { it.instanceId == instanceId }
+                        ?.needsImmediateRemoval
+                )
+                .isFalse()
+
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(true)
+
+            addCurrentUserMediaEntry(mediaData)
+
+            assertThat(
+                    underTest.currentMedia
+                        .find { it.instanceId == instanceId }
+                        ?.needsImmediateRemoval
+                )
+                .isFalse()
+        }
+    }
+
+    @Test
+    fun isPlayingNullAndResumeOff_active_orderingAllowed_noImmediateRemoval() {
+        testScope.runTest {
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(false)
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val mediaData = createMediaData("app1", null, LOCAL, false, instanceId)
+            kosmos.fakeSettings.putInt(Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
+
+            addCurrentUserMediaEntry(mediaData)
+
+            assertThat(
+                    underTest.currentMedia
+                        .find { it.instanceId == instanceId }
+                        ?.needsImmediateRemoval
+                )
+                .isFalse()
+
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(true)
+
+            addCurrentUserMediaEntry(mediaData)
+
+            assertThat(
+                    underTest.currentMedia
+                        .find { it.instanceId == instanceId }
+                        ?.needsImmediateRemoval
+                )
+                .isFalse()
+        }
+    }
+
     private fun TestScope.addCurrentUserMediaEntry(data: MediaData) {
         underTest.addCurrentUserMediaEntry(data)
         runCurrent()
@@ -585,7 +671,7 @@ class MediaRepositoryTest : SysuiTestCase() {
 
     private fun createMediaData(
         app: String,
-        playing: Boolean,
+        playing: Boolean?,
         playbackLocation: Int,
         isResume: Boolean,
         instanceId: InstanceId,

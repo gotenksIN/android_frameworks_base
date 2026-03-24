@@ -2699,6 +2699,21 @@ public final class Settings {
             "android.settings.SHOW_ADMIN_SUPPORT_DETAILS";
 
     /**
+     * Activity Action: Show a dialog with disabled by policy message.
+     * <p> If a package is suspended by policy, this dialog can be triggered to let
+     * the user know about this.
+     * <p>
+     * Input: {@link Intent#EXTRA_USER_ID}: The user that the package is suspended for.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SHOW_SUSPENDED_PACKAGE_ADMIN_SUPPORT_DETAILS =
+            "android.settings.SHOW_SUSPENDED_PACKAGE_ADMIN_SUPPORT_DETAILS";
+
+    /**
      * Intent extra: The id of a setting restricted by supervisors.
      * <p>
      * Type: Integer with a value from the one of the SUPERVISOR_VERIFICATION_* constants below.
@@ -3134,6 +3149,20 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_PERSONAL_CONTEXT_SETTINGS =
             "android.settings.PERSONAL_CONTEXT_SETTINGS";
+
+    /**
+     * Activity Action: Show a dialog with a restricted content message.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @FlaggedApi("android.app.contentrestriction.flags.enable_content_restriction_api")
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SHOW_RESTRICTED_CONTENT =
+            "android.settings.SHOW_RESTRICTED_CONTENT";
 
     // End of Intent actions for Settings
 
@@ -8298,6 +8327,16 @@ public final class Settings {
         @Readable
         @SuppressLint("NoSettingsProvider")
         public static final String STYLUS_HANDWRITING_ENABLED = "stylus_handwriting_enabled";
+
+        /**
+         * Toggle for enabling the IME Switcher Button in the navigation bar. This does not
+         * automatically make it visible, but allows it to become visible when needed.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String IME_SWITCHER_BUTTON_IN_NAVBAR_ENABLED =
+                "ime_switcher_in_navbar_enabled";
 
         /**
          * Default value for {@link #STYLUS_HANDWRITING_ENABLED}.
@@ -14254,6 +14293,7 @@ public final class Settings {
          * (0 disabled, 1 - enabled)
          * @hide
          */
+        @Readable
         public static final String AIRPLANE_MODE_SYNC = "airplane_mode_sync";
 
         /**
@@ -14479,6 +14519,22 @@ public final class Settings {
          */
         public static final String TIME_ZONE_OFFSET_CHANGE_NOTIFICATIONS =
                 "time_zone_offset_change_notifications";
+
+        /**
+         * The user's home time zone ID.
+         *
+         * <p>This value can be used to display a specific "home" time zone in UI elements when the
+         * user's current time zone differs from this value.
+         *
+         * <p>This setting is independent of the system time zone; it does not affect the
+         * device's system clock or the behavior of {@link #AUTO_TIME_ZONE}.
+         *
+         * <p>The value is a standard time zone ID string (e.g. "America/Los_Angeles").
+         * It may be {@code null} if no preference is set.
+         *
+         * @hide
+         */
+        public static final String USER_HOME_TIME_ZONE_ID = "user_home_time_zone_id";
 
         /**
          * URI for the car dock "in" event sound.

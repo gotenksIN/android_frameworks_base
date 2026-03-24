@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wm;
@@ -176,9 +180,7 @@ import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.pm.SaferIntentUtils;
 import com.android.server.utils.Slogf;
 import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+import com.android.server.am.QtiBackgroundManager;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -1203,7 +1205,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         if (app != null && mService.mHomeProcess != app) {
             scheduleStartHome("homeChanged");
             mService.mHomeProcess = app;
-            mService.mActivityStateUpdater.setHomeProcessAsync(app);
+            mService.mActivityStateUpdater.setHomeProcessAsync(app.mOwner);
             mRecentTasks.invalidateIsHomeRecents();
         }
     }
@@ -1274,10 +1276,10 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         final boolean isTop = andResume && r.isTopRunningActivity();
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         if (isTop) {
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.startFreeze(r.processName, ProcessFreezerManager.COLD_LAUNCH_FREEZE);
-            }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+            QtiBackgroundManager.getInstance().freezeProcessLevel(
+                    r.processName, QtiBackgroundManager.COLD_LAUNCH_FREEZE);
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         }
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         mService.startProcessAsync(r, knownToBeDead, isTop,
@@ -1382,8 +1384,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             return false;
         }
 
-        if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()
-                && DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
+        if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
             if (!displayContent.mDisplay.canHostTasks()) {
                 Slog.w(TAG, "Launch on display check: activity launch is not allowed on a "
                         + "display that cannot host tasks");

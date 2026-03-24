@@ -58,7 +58,6 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
 import android.view.Display;
-import android.view.WindowManager;
 
 import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.server.inputmethod.InputMethodManagerInternal;
@@ -276,22 +275,13 @@ class KeyguardController {
         InputMethodManagerInternal.get().updateImeWindowStatus(false /* disableImeIcon */,
                 displayId);
 
-        boolean setReady = false;
         if (aodChanged) {
             // Ensure the new state takes effect.
             mWindowManager.mWindowPlacerLocked.performSurfacePlacement();
             if (aodShowing) {
-                setReady = true;
+                mWindowManager.mAtmService.getTransitionController().setReady(
+                        mRootWindowContainer.getDefaultDisplay());
             }
-        }
-        if (!Flags.removeSetWakeReadyImmediately()
-                && mWindowManager.mAtmService.getTransitionController()
-                        .getCollectingTransitionType() == WindowManager.TRANSIT_WAKE) {
-            setReady = true;
-        }
-        if (setReady) {
-            mWindowManager.mAtmService.getTransitionController().setReady(
-                    mRootWindowContainer.getDefaultDisplay());
         }
         mService.mChainTracker.endPartial();
     }
@@ -505,7 +495,7 @@ class KeyguardController {
         try {
             if (visibleChange && tc.isShellTransitionsEnabled()) {
                 final Task trigger = (state.mOccluded && topActivity != null)
-                        ? topActivity.getRootTask() : null;
+                        ? topActivity.getTask() : null;
                 tc.requestTransitionIfNeeded(transitType, transitFlags, trigger, dc, chain);
                 final Transition transition = chain.getTransition();
                 if ((transition.getFlags() & notFlags) != 0) {
@@ -648,15 +638,12 @@ class KeyguardController {
         // if AOD is showing, defer the wake transition until AOD state changed.
         if (waiting && isAodShowing(DEFAULT_DISPLAY)) {
             mWaitingForWakeTransition = true;
-            mWindowManager.mAtmService.getTransitionController().deferTransitionReady();
-            mWaitAodHide = new Transition.ReadyCondition("AOD hidden",
-                    !Flags.migrateBasicLegacyReady());
+            mWaitAodHide = new Transition.ReadyCondition("AOD hidden", false);
             mWindowManager.mAtmService.getTransitionController().waitFor(mWaitAodHide);
             mWindowManager.mH.postDelayed(mResetWaitTransition, DEFER_WAKE_TRANSITION_TIMEOUT_MS);
         } else if (!waiting) {
             // dismiss the deferring if the AOD state change or cancel awake.
             mWaitingForWakeTransition = false;
-            mWindowManager.mAtmService.getTransitionController().continueTransitionReady();
             mWindowManager.mH.removeCallbacks(mResetWaitTransition);
             final Transition.ReadyCondition waitAodHide = mWaitAodHide;
             mWaitAodHide = null;

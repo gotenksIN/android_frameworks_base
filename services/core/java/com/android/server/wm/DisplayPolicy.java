@@ -43,8 +43,8 @@ import static android.internal.perfetto.protos.Windowmanagerservice.DisplayPolic
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayPolicyProto.SYSTEM_BAR_VISIBILITY_OVERRIDE;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayPolicyProto.TOP_GESTURE_HOST_IDENTIFIER;
 import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.CALLER;
-import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.SHOW;
 import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.HIDE;
+import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.SHOW;
 import static android.view.InsetsFrameProvider.SOURCE_ARBITRARY_RECTANGLE;
 import static android.view.InsetsFrameProvider.SOURCE_CONTAINER_BOUNDS;
 import static android.view.InsetsFrameProvider.SOURCE_DISPLAY;
@@ -67,12 +67,12 @@ import static android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
 import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_CONSUME_IME_INSETS;
-import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_DRAW_BAR_BACKGROUNDS;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_UNRESTRICTED_GESTURE_EXCLUSION;
+import static android.view.WindowManager.LayoutParams.RENDERING_HINT_FORCE_DRAW_BAR_BACKGROUNDS;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
@@ -998,7 +998,7 @@ public class DisplayPolicy {
             }
 
             @Override
-            public int onAppTransitionStartingLocked(long statusBarAnimationStartTime,
+            public void onAppTransitionStartingLocked(long statusBarAnimationStartTime,
                     long statusBarAnimationDuration) {
                 mHandler.post(() -> {
                     StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
@@ -1007,11 +1007,10 @@ public class DisplayPolicy {
                                 statusBarAnimationStartTime, statusBarAnimationDuration);
                     }
                 });
-                return 0;
             }
 
             @Override
-            public void onAppTransitionCancelledLocked(boolean keyguardGoingAwayCancelled) {
+            public void onAppTransitionCancelledLocked() {
                 mHandler.post(mAppTransitionCancelled);
             }
 
@@ -1188,7 +1187,7 @@ public class DisplayPolicy {
                         mNotificationShade.getProcess();
                 mService.mAtmService.mVisibleDozeUiProcess = visibleDozeUiProcess;
                 mService.mAtmService.mActivityStateUpdater.setVisibleDozeUiProcessAsync(
-                        visibleDozeUiProcess);
+                        visibleDozeUiProcess.mOwner);
             }
             mService.mAtmService.mKeyguardController.updateDeferTransitionForAod(
                     mAwake /* waiting */);
@@ -1383,9 +1382,11 @@ public class DisplayPolicy {
                 break;
 
             case TYPE_BASE_APPLICATION:
-                if (attrs.isFullscreen() && win.mActivityRecord != null
+                if (attrs.isFullscreen()
+                        && win.mActivityRecord != null
                         && win.mActivityRecord.fillsParent()
-                        && (attrs.privateFlags & PRIVATE_FLAG_FORCE_DRAW_BAR_BACKGROUNDS) != 0) {
+                        && (attrs.renderingHints & RENDERING_HINT_FORCE_DRAW_BAR_BACKGROUNDS)
+                                != 0) {
                     if (attrs.getFitInsetsTypes() != 0) {
                         // A non-translucent main app window isn't allowed to fit insets,
                         // as it would create a hole on the display!
@@ -3286,7 +3287,7 @@ public class DisplayPolicy {
         final boolean drawsSystemBars =
                 (win.mAttrs.flags & FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS) != 0;
         final boolean forceDrawsSystemBars =
-                (win.mAttrs.privateFlags & PRIVATE_FLAG_FORCE_DRAW_BAR_BACKGROUNDS) != 0;
+                (win.mAttrs.renderingHints & RENDERING_HINT_FORCE_DRAW_BAR_BACKGROUNDS) != 0;
         final boolean hidesSystemBars = (win.getRequestedVisibleTypes() & types) == 0;
 
         return forceDrawsSystemBars || drawsSystemBars || hidesSystemBars;
@@ -3333,7 +3334,9 @@ public class DisplayPolicy {
                 appearance = clearNavBarOpaqueFlag(appearance);
             }
         } else if (mNavBarOpacityMode == NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED) {
-            if (multiWindowTaskVisible || freeformRootTaskVisible) {
+            if (navBackgroundWin != null && navBackgroundWin == mDisplayContent.getImeWindow()) {
+                appearance = clearNavBarOpaqueFlag(appearance);
+            } else if (multiWindowTaskVisible || freeformRootTaskVisible) {
                 if (mIsFreeformWindowOverlappingWithNavBar) {
                     appearance = clearNavBarOpaqueFlag(appearance);
                 }
@@ -3680,8 +3683,8 @@ public class DisplayPolicy {
         lp.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         if (ActivityManager.isHighEndGfx()) {
             lp.flags |= WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
-            lp.privateFlags |=
-                    WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED;
+            lp.renderingHints |=
+                    WindowManager.LayoutParams.RENDERING_HINT_FORCE_HARDWARE_ACCELERATED;
         }
         lp.format = PixelFormat.TRANSLUCENT;
         lp.setTitle("PointerLocation - display " + getDisplayId());

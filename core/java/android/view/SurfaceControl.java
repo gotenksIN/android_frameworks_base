@@ -102,6 +102,7 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
+
 /**
  * Handle to an on-screen Surface managed by the system compositor. The SurfaceControl is
  * a combination of a buffer source, and metadata about how to display the buffers.
@@ -228,7 +229,7 @@ public final class SurfaceControl implements Parcelable {
     private static native DisplayedContentSample nativeGetDisplayedContentSample(
             IBinder displayToken, long numFrames, long timestamp);
     private static native boolean nativeSetDesiredDisplayModeSpecs(
-            DesiredDisplayModeSpecs[] desiredDisplayModeSpecs);
+            IBinder applyToken, DesiredDisplayModeSpecs[] desiredDisplayModeSpecs);
     private static native DesiredDisplayModeSpecs
             nativeGetDesiredDisplayModeSpecs(IBinder displayToken);
     private static native DisplayPrimaries nativeGetDisplayNativePrimaries(
@@ -294,6 +295,12 @@ public final class SurfaceControl implements Parcelable {
             @Size(4) float[] spotColor, float lightPosY, float lightPosZ, float lightRadius);
     private static native DisplayDecorationSupport nativeGetDisplayDecorationSupport(
             IBinder displayToken);
+
+    private static native void nativeSetPostProcess(long transactionObj, long nativeObject,
+            IBinder shader, byte[] uniforms, int target);
+
+    private static native IBinder nativeRegisterShader(String debugName, String shaderString);
+    private static native void nativeUnregisterShader(IBinder shader);
 
     private static native void nativeSetFrameRate(long transactionObj, long nativeObject,
             float frameRate, int compatibility, int changeFrameRateStrategy);
@@ -442,6 +449,29 @@ public final class SurfaceControl implements Parcelable {
         }
         Log.e(TAG, "Trying to convert unknown rotation=" + rotation);
         return BUFFER_TRANSFORM_IDENTITY;
+    }
+
+    /**
+     * Registers a shader with the system.
+     *
+     * Requires having the android.permission.READ_FRAME_BUFFER permission
+     *
+     * @param shaderString The shader code.
+     * @return A handle to the registered shader.
+     * @hide
+     */
+    public static IBinder registerShader(@NonNull String debugName, @NonNull String shaderString) {
+        return nativeRegisterShader(debugName, shaderString);
+    }
+
+    /**
+     * Unregisters a shader from the system.
+     *
+     * @param shader The handle to the shader to unregister.
+     * @hide
+     */
+    public static void unregisterShader(@NonNull IBinder shader) {
+        nativeUnregisterShader(shader);
     }
 
     @Nullable
@@ -2552,7 +2582,6 @@ public final class SurfaceControl implements Parcelable {
      */
     public static final class DesiredDisplayModeSpecs {
         public IBinder displayToken;
-        public IBinder applyToken;
 
         public int defaultMode;
 
@@ -2608,13 +2637,12 @@ public final class SurfaceControl implements Parcelable {
             copyFrom(other);
         }
 
-        public DesiredDisplayModeSpecs(IBinder displayToken, IBinder applyToken,
+        public DesiredDisplayModeSpecs(IBinder displayToken,
                 int defaultMode, boolean allowGroupSwitching,
                 RefreshRateRanges primaryRanges, RefreshRateRanges appRequestRanges,
                 @Nullable IdleScreenRefreshRateConfig idleScreenRefreshRateConfig,
                 @Nullable WorkDuration workDuration) {
             this.displayToken = displayToken;
-            this.applyToken = applyToken;
             this.defaultMode = defaultMode;
             this.allowGroupSwitching = allowGroupSwitching;
             this.primaryRanges =
@@ -2637,7 +2665,6 @@ public final class SurfaceControl implements Parcelable {
          */
         public boolean equals(DesiredDisplayModeSpecs other) {
             return other != null && displayToken == other.displayToken
-                    && applyToken == other.applyToken
                     && defaultMode == other.defaultMode
                     && allowGroupSwitching == other.allowGroupSwitching
                     && primaryRanges.equals(other.primaryRanges)
@@ -2657,7 +2684,6 @@ public final class SurfaceControl implements Parcelable {
          */
         public void copyFrom(DesiredDisplayModeSpecs other) {
             displayToken = other.displayToken;
-            applyToken = other.applyToken;
             defaultMode = other.defaultMode;
             allowGroupSwitching = other.allowGroupSwitching;
             primaryRanges.copyFrom(other.primaryRanges);
@@ -2670,7 +2696,6 @@ public final class SurfaceControl implements Parcelable {
         @Override
         public String toString() {
             return "displayToken=" + displayToken
-                    + "applyToken=" + applyToken
                     + "defaultMode=" + defaultMode
                     + " allowGroupSwitching=" + allowGroupSwitching
                     + " primaryRanges=" + primaryRanges
@@ -2696,19 +2721,25 @@ public final class SurfaceControl implements Parcelable {
     /**
      * Specifies the desired display mode(s) that should be applied atomically.
      *
-     * The `applyToken` is for synchronization. To change the resolution, the client must first
-     * request the `DisplayModeSpecs#defaultMode` for the new resolution, then commit a display
-     * transaction with the same `applyToken`. The `DisplayModeSpecs` and transaction will then
-     * be applied atomically. To atomically change modes for multiple displays, the client must
-     * pass multiple `DesiredDisplayModeSpecs` and pass the same `applyToken` in the subsequent
-     * display transaction that commits all displays.
+     * The `applyToken` is for synchronization. To change modes, the client must
+     * first request the `DisplayModeSpecs#defaultMode` for the new modes, then commit a display
+     * transaction with the same `applyToken`. The `DisplayModeSpecs` and transaction will then be
+     * applied atomically. To atomically change modes for multiple displays, the client must pass
+     * multiple `DesiredDisplayModeSpecs` and pass the same `applyToken` in the subsequent display
+     * transaction that commits all displays.
      *
+     * @param applyToken The mode apply token with which the specs should apply.
+     * @param desiredDisplayModeSpecs The new desired display mode specs.
+
      * @hide
      */
     public static boolean setDesiredDisplayModeSpecs(
-            DesiredDisplayModeSpecs[] desiredDisplayModeSpecs) {
+            IBinder applyToken, DesiredDisplayModeSpecs[] desiredDisplayModeSpecs) {
         if (desiredDisplayModeSpecs == null || desiredDisplayModeSpecs.length == 0) {
             throw new IllegalArgumentException("desiredDisplayModeSpecs must not be null or empty");
+        }
+        if (applyToken == null) {
+            throw new IllegalArgumentException("applyToken must not be null");
         }
 
         for (DesiredDisplayModeSpecs specs : desiredDisplayModeSpecs) {
@@ -2725,7 +2756,7 @@ public final class SurfaceControl implements Parcelable {
             }
         }
 
-        return nativeSetDesiredDisplayModeSpecs(desiredDisplayModeSpecs);
+        return nativeSetDesiredDisplayModeSpecs(applyToken, desiredDisplayModeSpecs);
     }
 
     /**
@@ -4859,6 +4890,39 @@ public final class SurfaceControl implements Parcelable {
         public @NonNull Transaction setBuffer(@NonNull SurfaceControl sc,
                 @Nullable HardwareBuffer buffer) {
             return setBuffer(sc, buffer, null);
+        }
+
+        /**
+         * Sample from the buffer set on the SurfaceControl
+         *
+         * @hide
+         */
+        public static final int SAMPLE_SELF = 0;
+
+        /**
+         * Sample from the content behind the SurfaceControl
+         *
+         * @hide
+         */
+        public static final int SAMPLE_BEHIND = 1;
+
+        /**
+         * Sets the post-process effect for the layer.
+         *
+         * @param sc The SurfaceControl to set the effect on.
+         * @param shader The shader to use.
+         * @param uniforms The uniforms to pass to the shader.
+         * @param target The target of the effect, either {@link #SAMPLE_SELF}
+         *               or {@link #SAMPLE_BEHIND}.
+         * @return This Transaction.
+         * @hide
+         */
+        @NonNull
+        public Transaction setPostProcess(@NonNull SurfaceControl sc, @Nullable IBinder shader,
+                @Nullable byte[] uniforms, int target) {
+            checkPreconditions(sc);
+            nativeSetPostProcess(mNativeObject, sc.mNativeObject, shader, uniforms, target);
+            return this;
         }
 
         /**

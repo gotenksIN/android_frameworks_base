@@ -17,6 +17,7 @@
 package com.android.systemui.screencapture.record.largescreen.data.repository
 
 import android.content.pm.UserInfo
+import android.graphics.Rect
 import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -28,6 +29,8 @@ import com.android.systemui.screencapture.record.largescreen.shared.model.Screen
 import com.android.systemui.testKosmosNew
 import com.android.systemui.user.data.repository.fakeUserRepository
 import com.google.common.truth.Truth.assertThat
+import java.time.Duration
+import java.time.Instant
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -168,6 +171,21 @@ class LargeScreenCaptureParametersRepositoryTest : SysuiTestCase() {
         }
 
     @Test
+    fun getSelectedCaptureType_whenOutdated_returnsDefaultValue() =
+        kosmos.runTest {
+            underTest.updateSelectedCaptureTypeString(ScreenCaptureType.RECORDING)
+            assertThat(underTest.getSelectedCaptureType()).isEqualTo(ScreenCaptureType.RECORDING)
+
+            // Manually change the time of selected options.
+            val now = Instant.now()
+            val invalidDuration = Duration.ofMinutes(20)
+            val outdatedTime = now.minus(invalidDuration)
+            underTest.saveSelectedCaptureTypeRegionTime(outdatedTime)
+
+            assertThat(underTest.getSelectedCaptureType()).isEqualTo(ScreenCaptureType.SCREENSHOT)
+        }
+
+    @Test
     fun updateSelectedCaptureTypeString_setCaptureType() =
         kosmos.runTest {
             underTest.updateSelectedCaptureTypeString(ScreenCaptureType.RECORDING)
@@ -184,6 +202,22 @@ class LargeScreenCaptureParametersRepositoryTest : SysuiTestCase() {
         }
 
     @Test
+    fun getSelectedCaptureRegion_whenOutdated_returnsDefaultValue() =
+        kosmos.runTest {
+            underTest.updateSelectedCaptureRegionString(ScreenCaptureRegion.APP_WINDOW)
+            assertThat(underTest.getSelectedCaptureRegion())
+                .isEqualTo(ScreenCaptureRegion.APP_WINDOW)
+
+            // Manually change the time of selected options.
+            val now = Instant.now()
+            val invalidDuration = Duration.ofMinutes(20)
+            val outdatedTime = now.minus(invalidDuration)
+            underTest.saveSelectedCaptureTypeRegionTime(outdatedTime)
+
+            assertThat(underTest.getSelectedCaptureRegion()).isEqualTo(ScreenCaptureRegion.PARTIAL)
+        }
+
+    @Test
     fun updateSelectedCaptureRegionString_setCaptureRegion() =
         kosmos.runTest {
             underTest.updateSelectedCaptureRegionString(ScreenCaptureRegion.PARTIAL)
@@ -196,6 +230,30 @@ class LargeScreenCaptureParametersRepositoryTest : SysuiTestCase() {
             underTest.updateSelectedCaptureRegionString(ScreenCaptureRegion.FULLSCREEN)
             assertThat(underTest.getSelectedCaptureRegion())
                 .isEqualTo(ScreenCaptureRegion.FULLSCREEN)
+        }
+
+    @Test
+    fun updateSelectedCaptureRegionBoxString_setCaptureRegionBox() =
+        kosmos.runTest {
+            assertThat(underTest.getSelectedCaptureRegionBox()).isNull()
+
+            underTest.updateSelectedCaptureRegionBoxString(Rect(50, 50, 100, 100))
+            assertThat(underTest.getSelectedCaptureRegionBox()).isEqualTo(Rect(50, 50, 100, 100))
+        }
+
+    @Test
+    fun getSelectedCaptureRegionBox_whenOutdated_returnsNull() =
+        kosmos.runTest {
+            underTest.updateSelectedCaptureRegionBoxString(Rect(50, 50, 100, 100))
+            assertThat(underTest.getSelectedCaptureRegionBox()).isEqualTo(Rect(50, 50, 100, 100))
+
+            // Manually change the time of selected options.
+            val now = Instant.now()
+            val invalidDuration = Duration.ofMinutes(20)
+            val outdatedTime = now.minus(invalidDuration)
+            underTest.saveSelectedCaptureRegionBoxTime(outdatedTime)
+
+            assertThat(underTest.getSelectedCaptureRegionBox()).isNull()
         }
 
     companion object {

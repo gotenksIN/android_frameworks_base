@@ -437,6 +437,9 @@ class TransitionScopedMechanicsAdapterTest {
             waitForIdle()
             iterationCount++
         }
+        // Complete the transition; if still ongoing during test cleanup, some STL coroutines would
+        // be executed on the wrong thread and throw as a result.
+        mainClock.autoAdvance = true
         waitForIdle()
 
         return result

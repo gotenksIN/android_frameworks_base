@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wm;
@@ -48,7 +52,6 @@ import static android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED;
 import static android.content.Intent.FLAG_ACTIVITY_RETAIN_IN_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP;
 import static android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME;
-import static android.content.Intent.URI_INTENT_SCHEME;
 import static android.content.pm.ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
 import static android.content.pm.ActivityInfo.FLAG_SHOW_FOR_ALL_USERS;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
@@ -65,7 +68,6 @@ import static android.view.WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.window.TaskFragmentOperation.OP_TYPE_START_ACTIVITY_IN_TASK_FRAGMENT;
 
-import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ACTIVITY_START_INTENT;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_CONFIGURATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS;
@@ -76,7 +78,6 @@ import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_PERMISSIONS_REVIEW;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_RESULTS;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_USER_LEAVING;
-import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_USER_VISIBILITY;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_CONFIGURATION;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_FOCUS;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_RESULTS;
@@ -127,7 +128,6 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.content.res.Configuration;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.OperationCanceledException;
@@ -153,13 +153,13 @@ import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.UiThread;
 import com.android.server.am.ActivityManagerService.IntentCreatorToken;
 import com.android.server.am.PendingIntentRecord;
+import com.android.server.am.QtiBackgroundManager;
 import com.android.server.pm.InstantAppResolver;
 import com.android.server.pm.PackageArchiver;
 import com.android.server.pm.UserActivitiesAllowlist;
 import com.android.server.power.ShutdownCheckPoints;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
-import com.android.server.utils.Slogf;
 import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.server.wm.LaunchParamsController.LaunchParams;
@@ -170,6 +170,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -843,22 +844,16 @@ class ActivityStarter {
                 mRequest.intent.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
             }
 
+            final ActivityRecord caller;
+            final int callingUid;
             final LaunchingState launchingState;
-            final int originalCallerUid;
             synchronized (mService.mGlobalLock) {
-                final ActivityRecord caller = ActivityRecord.forTokenLocked(mRequest.resultTo);
-                final int callingUid = mRequest.realCallingUid == Request.DEFAULT_REAL_CALLING_UID
+                caller = ActivityRecord.forTokenLocked(mRequest.resultTo);
+                callingUid = mRequest.realCallingUid == Request.DEFAULT_REAL_CALLING_UID
                         ?  Binder.getCallingUid() : mRequest.realCallingUid;
                 launchingState = mSupervisor.getActivityMetricsLogger().notifyActivityLaunching(
                         mRequest.intent, caller, callingUid);
                 callerActivityName = caller != null ? caller.info.name : null;
-                originalCallerUid = trackLaunchOriginator() ? launchingState.tracksOriginator(
-                        callingUid) : Request.DEFAULT_REAL_CALLING_UID;
-            }
-
-            if (trackLaunchOriginator() && mService.mHomeProcess != null) {
-                mRequest.mLaunchOriginatedFromHome =
-                        (originalCallerUid == mService.mHomeProcess.mUid);
             }
 
             if (mRequest.intent != null) {
@@ -873,6 +868,17 @@ class ActivityStarter {
                 mRequest.resolveActivity(mSupervisor);
             }
 
+            if (trackLaunchOriginator()) {
+                synchronized (mService.mGlobalLock) {
+                    final IntSupplier origUidSupplier = () -> mSupervisor.getActivityMetricsLogger()
+                            .getOriginatorForConsecutiveLaunch(caller, mRequest.activityInfo,
+                                    callingUid);
+                    final int originalCallerUid = launchingState.tracksOriginator(origUidSupplier);
+                    mRequest.mLaunchOriginatedFromHome = (mService.mHomeProcess != null
+                            && mService.mHomeProcess.mUid == originalCallerUid);
+                }
+            }
+
             // Add checkpoint for this shutdown or reboot attempt, so we can record the original
             // intent action and package name.
             if (mRequest.intent != null) {
@@ -884,15 +890,6 @@ class ActivityStarter {
                                 || Intent.ACTION_REBOOT.equals(intentAction))) {
                     ShutdownCheckPoints.recordCheckPoint(intentAction, callingPackage, null);
                 }
-            }
-
-            if (com.android.window.flags.Flags.logStartActivityIntent()
-                    && mRequest.intent != null && Build.isDebuggable()) {
-                // For lab debug device usages.
-                ProtoLog.d(WM_DEBUG_ACTIVITY_START_INTENT,
-                        "Execute activity start request:\nIntent=%s\nIsExported=%s",
-                        mRequest.intent.toUri(URI_INTENT_SCHEME),
-                        mRequest.activityInfo != null && mRequest.activityInfo.exported);
             }
 
             int res = START_CANCELED;
@@ -1144,6 +1141,10 @@ class ActivityStarter {
                     && realCallingUid != Request.DEFAULT_REAL_CALLING_UID) {
                 request.logMessage.append(" (realCallingUid=").append(realCallingUid).append(")");
             }
+
+            if (aInfo != null) {
+                QtiBackgroundManager.getInstance().handleActivityStart(aInfo.applicationInfo);
+            }
         }
 
         ActivityRecord sourceRecord = null;
@@ -1200,7 +1201,8 @@ class ActivityStarter {
                             UserHandle.getUserId(callingUid));
                     // Only override callingPackage and callingFeatureId based on package UID check.
                     // This is to prevent spoofing. See b/457742426.
-                    if (UserHandle.isSameApp(packageUid, callingUid)) {
+                    if (pmInternal.isSameApp(launchedFromPackage, callingUid,
+                            UserHandle.getUserId(callingUid))) {
                         callingPackage = launchedFromPackage;
                         callingFeatureId = sourceRecord.launchedFromFeatureId;
                     }
@@ -1277,12 +1279,6 @@ class ActivityStarter {
 
         // TODO(b/412177078): remove null check once hsuAllowlistActivities() is gone
         if (err == START_SUCCESS && mUserHelper != null) {
-            int displayId = suggestedLaunchDisplayArea.getDisplayId();
-            if (DEBUG_USER_VISIBILITY) {
-                Slogf.d(TAG, "using display (%d) from request when checking visibility of user "
-                        + "%d",  displayId, userId);
-            }
-
             err = mUserHelper.checkRequest(request);
         }
 

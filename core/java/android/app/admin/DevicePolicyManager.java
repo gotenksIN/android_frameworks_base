@@ -58,6 +58,7 @@ import static android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIM
 import static android.app.admin.DeviceAdminInfo.HEADLESS_DEVICE_OWNER_MODE_UNSUPPORTED;
 import static android.app.admin.flags.Flags.FLAG_CROSS_PROFILE_WIDGET_PROVIDER_BULK_APIS;
 import static android.app.admin.flags.Flags.FLAG_DEVICE_THEFT_API_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT;
 import static android.app.admin.flags.Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING;
 import static android.app.admin.flags.Flags.FLAG_MULTI_USER_MANAGEMENT_USER_PROVISIONING;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
@@ -65,7 +66,6 @@ import static android.app.admin.flags.Flags.FLAG_REMOVE_MANAGED_PROFILE_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_SECONDARY_LOCKSCREEN_API_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_SECURE_ADB_ROLE_BYPASSING;
 import static android.app.admin.flags.Flags.FLAG_SPLIT_CREATE_MANAGED_PROFILE_ENABLED;
-import static android.app.admin.flags.Flags.FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT;
 import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.app.admin.flags.Flags.onboardingConsentlessBugreports;
 import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
@@ -566,7 +566,6 @@ public class DevicePolicyManager {
     public static final String ACTION_PROVISION_MANAGED_DEVICE
         = "android.app.action.PROVISION_MANAGED_DEVICE";
 
-
     // TODO(b/390162247): Rename this since it's no longer an intent action. It
     // can be moved out of the ACTION_PROVISION_* constant group and potentially
     // migrated to an enum with other modes. Also, consider renaming the
@@ -577,7 +576,7 @@ public class DevicePolicyManager {
      * <p> When multi-user device provisioning has completed, an intent of the type
      * {@link DeviceAdminReceiver#ACTION_PROFILE_PROVISIONING_COMPLETE} is
      * broadcast. The extra {@link #EXTRA_PROVISIONING_ACTION} will be set to
-     * {@link #ACTION_PROVISION_MULTI_USER_DEVICE}.
+     * {@link #ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE}.
      *
      * <p> This can also be passed to {@link #checkProvisioningPrecondition} to check if the
      * multi-user device provisioning is allowed.
@@ -587,8 +586,8 @@ public class DevicePolicyManager {
     @SystemApi
     @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_PROVISION_MULTI_USER_DEVICE =
-            "android.app.admin.action.PROVISION_MULTI_USER_DEVICE";
+    public static final String ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE =
+            "android.app.admin.action.PROVISION_MULTIUSER_MANAGED_DEVICE";
 
     /**
      * Activity action: Starts the provisioning flow for managed full user on a multi-user device.
@@ -601,8 +600,8 @@ public class DevicePolicyManager {
     @SystemApi
     @FlaggedApi(FLAG_MULTI_USER_MANAGEMENT_USER_PROVISIONING)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
-    public static final String ACTION_PROVISION_MULTI_USER_MANAGED_USER =
-            "android.app.admin.action.PROVISION_MULTI_USER_MANAGED_USER";
+    public static final String ACTION_PROVISION_MULTIUSER_MANAGED_USER =
+            "android.app.admin.action.PROVISION_MULTIUSER_MANAGED_USER";
 
     /**
      * Activity action: launch when user provisioning completed, i.e.
@@ -897,11 +896,26 @@ public class DevicePolicyManager {
      * #ACTION_ROLE_HOLDER_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE} intent handlers if the
      * multi-user device was provisioned.
      *
+     * <p>This will be removed soon. Please use
+     * {@link #RESULT_MULTIUSER_MANAGED_DEVICE_PROVISIONED} instead.
+     *
      * @hide
      */
     @SystemApi
     @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
     public static final int RESULT_MULTI_USER_DEVICE_PROVISIONED = 124;
+
+    /**
+     * Result code that can be returned by the {@link
+     * #ACTION_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE} or {@link
+     * #ACTION_ROLE_HOLDER_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE} intent handlers if the
+     * multi-user device was provisioned.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
+    public static final int RESULT_MULTIUSER_MANAGED_DEVICE_PROVISIONED = 124;
 
     /**
      * Activity action: starts the trusted source provisioning flow inside the device policy
@@ -920,7 +934,7 @@ public class DevicePolicyManager {
      * which the role holder returns alongside {@link #RESULT_UPDATE_ROLE_HOLDER}.
      *
      * <p>The result codes can be either {@link #RESULT_WORK_PROFILE_CREATED}, {@link
-     * #RESULT_DEVICE_OWNER_SET}, {@link #RESULT_MULTI_USER_DEVICE_PROVISIONED} or
+     * #RESULT_DEVICE_OWNER_SET}, {@link #RESULT_MULTIUSER_MANAGED_DEVICE_PROVISIONED} or
      * {@link Activity#RESULT_CANCELED} if provisioning failed.
      *
      * @see #ACTION_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE
@@ -2869,7 +2883,7 @@ public class DevicePolicyManager {
      * <p>Returned for {@link #ACTION_PROVISION_MANAGED_DEVICE} when the device already has a device
      * owner.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when the user already has a
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} when the user already has a
      * device owner.
      *
      * @hide
@@ -2883,7 +2897,7 @@ public class DevicePolicyManager {
      * <p>Returned for {@link #ACTION_PROVISION_MANAGED_DEVICE} when the user has a profile owner
      * and for {@link #ACTION_PROVISION_MANAGED_PROFILE} when the profile owner is already set.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when the user already has a
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} when the user already has a
      * profile owner.
      *
      * @hide
@@ -2907,8 +2921,8 @@ public class DevicePolicyManager {
      * <p>Returned for {@link #ACTION_PROVISION_MANAGED_DEVICE} if the device has already been setup
      * and for {@link #ACTION_PROVISION_MANAGED_USER} if the user has already been setup.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} if the user has already
-     * been setup.
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} and {@link
+     * #ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE} if the user has already been setup.
      *
      * @hide
      */
@@ -2956,7 +2970,7 @@ public class DevicePolicyManager {
      * Result code for {@link #checkProvisioningPrecondition}.
      *
      * <p>Returned for {@link #ACTION_PROVISION_MANAGED_PROFILE}, {@link
-     * #ACTION_PROVISION_MANAGED_USER} and {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} on
+     * #ACTION_PROVISION_MANAGED_USER} and {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} on
      * devices which do not support managed users.
      *
      * @see {@link PackageManager#FEATURE_MANAGED_USERS}
@@ -2972,7 +2986,7 @@ public class DevicePolicyManager {
      * {@link #ACTION_PROVISION_MANAGED_DEVICE} on devices running headless system user mode and the
      * user is a system user.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} if the user is a system
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} if the user is a system
      * user.
      *
      * @hide
@@ -3064,8 +3078,8 @@ public class DevicePolicyManager {
     /**
      * Result code for {@link #checkProvisioningPreCondition}.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_DEVICE} and
-     * {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when the device is not
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE} and
+     * {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} when the device is not
      * running in headless system user mode.
      *
      * @hide
@@ -3090,7 +3104,7 @@ public class DevicePolicyManager {
     /**
      * Result code for {@link #checkProvisioningPrecondition}.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when provisioned user is
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} when provisioned user is
      * not a full user.
      *
      * @hide
@@ -3102,7 +3116,7 @@ public class DevicePolicyManager {
     /**
      * Result code for {@link #checkProvisioningPrecondition}.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when provisioned user
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} when provisioned user
      * already has a profile.
      *
      * @hide
@@ -3128,15 +3142,15 @@ public class DevicePolicyManager {
     /**
      * Result code for {@link #checkProvisioningPreCondition}.
      *
-     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_DEVICE} and
-     * {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when the device doesn't support multi user
+     * <p>Returned for {@link #ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE} and
+     * {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER} when the device doesn't support multi user
      * management.
      *
      * @hide
      */
     @SystemApi
     @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
-    public static final int STATUS_MULTI_USER_MANAGEMENT_NOT_SUPPORTED = 23;
+    public static final int STATUS_MULTIUSER_MANAGEMENT_NOT_SUPPORTED = 23;
 
     /**
      * Result codes for {@link #checkProvisioningPrecondition} indicating all the provisioning pre
@@ -4638,6 +4652,36 @@ public class DevicePolicyManager {
             }
         }
         return APP_FUNCTIONS_NOT_CONTROLLED_BY_POLICY;
+    }
+
+    /**
+     * Returns whether an outgoing transfer is allowed for a specific subscription.
+     *
+     * A transfer is disallowed if the subscription is managed and the transfer is disallowed by
+     * policy.
+     *
+     * @param subscriptionId The ID of the subscription to check.
+     * @return {@code true} if the transfer is allowed, {@code false} otherwise.
+     * @throws SecurityException if the caller has neither
+     *         MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS nor WRITE_EMBEDDED_SUBSCRIPTIONS
+     *         and is not a device owner or a profile owner.
+     */
+    @FlaggedApi(Flags.FLAG_MANAGED_ESIM_OUTGOING_TRANSFER_POLICY)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS,
+            android.Manifest.permission.WRITE_EMBEDDED_SUBSCRIPTIONS
+    }, conditional = true)
+    public boolean isOutgoingTransferAllowedForSubscription(int subscriptionId) {
+        if (mService != null) {
+            try {
+                return mService.isOutgoingTransferAllowedForSubscription(
+                        mContext.getPackageName(), subscriptionId
+                );
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return true;
     }
 
     /**
@@ -14713,7 +14757,7 @@ public class DevicePolicyManager {
      * or device, setting itself as the device or profile owner.
      *
      * @param action One of {@link #ACTION_PROVISION_MANAGED_DEVICE}, {@link
-     *     #ACTION_PROVISION_MANAGED_PROFILE}, {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER}.
+     *     #ACTION_PROVISION_MANAGED_PROFILE}, {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER}.
      * @return whether provisioning a managed profile or device is possible.
      * @throws IllegalArgumentException if the supplied action is not valid.
      */
@@ -14732,7 +14776,8 @@ public class DevicePolicyManager {
      *
      * @param action One of {@link #ACTION_PROVISION_MANAGED_DEVICE},
      *               {@link #ACTION_PROVISION_MANAGED_PROFILE},
-     *               {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER}
+     *               {@link #ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE},
+     *               {@link #ACTION_PROVISION_MULTIUSER_MANAGED_USER}
      * @param packageName The package of the component that would be set as device, user, or profile
      *        owner.
      * @return An int constant value indicating whether provisioning is allowed.
@@ -18041,6 +18086,8 @@ public class DevicePolicyManager {
      * <p>The method {@link #checkProvisioningPrecondition} must be returning {@link #STATUS_OK}
      * before calling this method.
      *
+     * <p>This will be removed soon. Please use {@link #provisionMultiuserManagedDevice} instead.
+     *
      * @param provisioningParams Params required to provision a managed full user, see
      *                           {@link MultiUserManagedUserProvisioningParams}.
      * @throws ProvisioningException if an error occurred during provisioning.
@@ -18053,12 +18100,39 @@ public class DevicePolicyManager {
     public void provisionMultiUserManagedUser(
             @NonNull MultiUserManagedUserProvisioningParams provisioningParams)
             throws ProvisioningException {
+        MultiuserManagedUserProvisioningParams newProvisioningParams =
+                new MultiuserManagedUserProvisioningParams.Builder(
+                                provisioningParams.getProfileAdminComponentName())
+                        .setLeaveAllSystemAppsEnabled(
+                                provisioningParams.isLeaveAllSystemAppsEnabled())
+                        .build();
+        provisionMultiuserManagedUser(newProvisioningParams);
+    }
+
+    /**
+     * Provisions a managed full user on a multi-user device.
+     *
+     * <p>The method {@link #checkProvisioningPrecondition} must be returning {@link #STATUS_OK}
+     * before calling this method.
+     *
+     * @param provisioningParams Params required to provision a managed full user, see
+     *                           {@link MultiuserManagedUserProvisioningParams}.
+     * @throws ProvisioningException if an error occurred during provisioning.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_MULTI_USER_MANAGEMENT_USER_PROVISIONING)
+    @RequiresPermission(android.Manifest.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS)
+    public void provisionMultiuserManagedUser(
+            @NonNull MultiuserManagedUserProvisioningParams provisioningParams)
+            throws ProvisioningException {
         if (mService == null) {
             return;
         }
 
         try {
-            mService.provisionMultiUserManagedUser(provisioningParams.getTransportParams(),
+            mService.provisionMultiuserManagedUser(provisioningParams.getTransportParams(),
                     mContext.getPackageName());
         } catch (ServiceSpecificException e) {
             throw new ProvisioningException(e, e.errorCode, getErrorMessage(e));
@@ -19019,7 +19093,7 @@ public class DevicePolicyManager {
      *     scope.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING)
-    public <T> @Nullable T getPolicy(@NonNull PolicyIdentifier<T> id, @PolicyScope int scope) {
+    public @Nullable <T> T getPolicy(@NonNull PolicyIdentifier<T> id, @PolicyScope int scope) {
         throwIfParentInstance("getPolicy");
         if (mService == null) {
             return null;

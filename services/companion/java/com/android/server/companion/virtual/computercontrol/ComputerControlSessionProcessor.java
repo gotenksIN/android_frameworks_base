@@ -58,13 +58,19 @@ import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.security.authenticationpolicy.AuthenticationPolicyManager;
 import android.util.ArraySet;
 import android.util.Slog;
 
+import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.LocalManagerRegistry;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
+import com.android.server.Watchdog;
+import com.android.server.appop.AppOpsManagerLocal;
+import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -76,26 +82,35 @@ import java.util.Objects;
  * <p>This class enforces session creation policies, such as limiting the number of concurrent
  * sessions and preventing creation when the device is locked.
  */
-public final class ComputerControlSessionProcessor {
+public final class ComputerControlSessionProcessor implements Watchdog.Monitor {
 
     private static final String TAG = ComputerControlSessionProcessor.class.getSimpleName();
 
     // TODO(b/419548594): Make this configurable.
     @VisibleForTesting
     static final int MAXIMUM_CONCURRENT_SESSIONS = 1;
+    @VisibleForTesting
+    static final int MIN_EXTENSION_VERSION_FOR_ANDROID_17 = 5;
+
+    @Nullable
+    private final String mReferenceDisplayAddress;
 
     private final Context mContext;
     private final KeyguardManager mKeyguardManager;
+    private final AuthenticationPolicyManager mAuthenticationPolicyManager;
     private final AppOpsManager mAppOpsManager;
+    private final AppOpsManagerLocal mAppOpsManagerLocal;
     private final PackageManager mPackageManager;
     private final UserManager mUserManager;
     private final DevicePolicyManager mDevicePolicyManager;
     private final DevicePolicyManagerInternal mDevicePolicyManagerInternal;
+    private final VirtualDeviceManagerInternal mVirtualDeviceManagerInternal;
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
     private final ComputerControlAllowlistController mAllowlistController;
 
     /** The binders of all currently active sessions. */
+    @GuardedBy("mSessions")
     private final ArraySet<ComputerControlSessionImpl> mSessions = new ArraySet<>();
 
     private final Object mHandlerThreadLock = new Object();
@@ -106,26 +121,35 @@ public final class ComputerControlSessionProcessor {
     private Handler mHandler;
 
     public ComputerControlSessionProcessor(
-            Context context, VirtualDeviceFactory virtualDeviceFactory) {
-        this(context, virtualDeviceFactory, ComputerControlSessionProcessor::createPendingIntent,
+            Context context, VirtualDeviceManagerInternal virtualDeviceManagerInternal,
+            VirtualDeviceFactory virtualDeviceFactory) {
+        this(context, virtualDeviceManagerInternal, virtualDeviceFactory,
+                ComputerControlSessionProcessor::createPendingIntent,
                 new ComputerControlAllowlistController(context));
+        Watchdog.getInstance().addMonitor(this);
     }
 
     @VisibleForTesting
     ComputerControlSessionProcessor(
-            Context context, VirtualDeviceFactory virtualDeviceFactory,
+            Context context, VirtualDeviceManagerInternal virtualDeviceManagerInternal,
+            VirtualDeviceFactory virtualDeviceFactory,
             PendingIntentFactory pendingIntentFactory,
             ComputerControlAllowlistController allowlistController) {
         mContext = context;
+        mVirtualDeviceManagerInternal = virtualDeviceManagerInternal;
         mVirtualDeviceFactory = virtualDeviceFactory;
         mPendingIntentFactory = pendingIntentFactory;
         mKeyguardManager = context.getSystemService(KeyguardManager.class);
+        mAuthenticationPolicyManager = context.getSystemService(AuthenticationPolicyManager.class);
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
+        mAppOpsManagerLocal = LocalManagerRegistry.getManager(AppOpsManagerLocal.class);
         mPackageManager = context.getPackageManager();
         mUserManager = context.getSystemService(UserManager.class);
         mDevicePolicyManager = context.getSystemService(DevicePolicyManager.class);
         mDevicePolicyManagerInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
         mAllowlistController = allowlistController;
+        mReferenceDisplayAddress = context.getString(
+                R.string.config_computerControlReferenceDisplayPhysicalAddress);
     }
 
     /** Perform initialization tasks (if any). */
@@ -341,7 +365,7 @@ public final class ComputerControlSessionProcessor {
                     synchronized (mSessions) {
                         mSessions.remove(closedSession);
                     }
-                }));
+                }, mReferenceDisplayAddress));
         synchronized (mSessions) {
             mSessions.add(session);
         }
@@ -382,10 +406,7 @@ public final class ComputerControlSessionProcessor {
             @NonNull AttributionSource attributionSource,
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
-        boolean isDeviceLocked = Binder.withCleanCallingIdentity(
-                () -> mKeyguardManager.isDeviceLocked(
-                        UserHandle.getUserId(attributionSource.getUid())));
-        if (isDeviceLocked) {
+        if (isDeviceLocked(attributionSource)) {
             dispatchSessionCreationFailed(callback, attributionSource, params,
                     ComputerControlSession.ERROR_DEVICE_LOCKED);
             return false;
@@ -395,7 +416,42 @@ public final class ComputerControlSessionProcessor {
                     ComputerControlSession.ERROR_SESSION_LIMIT_REACHED);
             return false;
         }
+        if (params.getTargetExtensionVersion() >= MIN_EXTENSION_VERSION_FOR_ANDROID_17
+                && !mAppOpsManagerLocal.isUidInForeground(attributionSource.getUid())) {
+            dispatchSessionCreationFailed(callback, attributionSource, params,
+                    ComputerControlSession.ERROR_PERMISSION_DENIED);
+            return false;
+        }
         return true;
+    }
+
+    private boolean isDeviceLocked(@NonNull AttributionSource attributionSource) {
+        // If the caller claims to be running on a virtual device, make sure that this is actually
+        // the case and this is not just an explicitly created device context. If the uid is not
+        // seen on the device they claim to be running on, fallback to default.
+        final int deviceId;
+        if (attributionSource.getDeviceId() != Context.DEVICE_ID_DEFAULT
+                && isDeviceIdAssociationValid(attributionSource)) {
+            deviceId = attributionSource.getDeviceId();
+        } else {
+            deviceId = Context.DEVICE_ID_DEFAULT;
+        }
+        final int userId = UserHandle.getUserId(attributionSource.getUid());
+        return Binder.withCleanCallingIdentity(() -> {
+            if (android.companion.Flags.supportAiAgent() && mAuthenticationPolicyManager != null) {
+                // TODO(b/482988620): replace null with CDM DeviceId for xdevice scenarios
+                return !mAuthenticationPolicyManager.isAgentAuthorized(
+                        userId, deviceId, /* companionDeviceId */ null);
+            } else {
+                return mKeyguardManager.isDeviceLocked(userId, deviceId);
+            }
+        });
+    }
+
+    /** Returns true of the source's UID is seen on the device given by the source's deviceId. */
+    private boolean isDeviceIdAssociationValid(@NonNull AttributionSource attributionSource) {
+        return mVirtualDeviceManagerInternal.getDeviceIdsForUid(attributionSource.getUid())
+                .contains(attributionSource.getDeviceId());
     }
 
     /** Notifies the client that session creation failed. */
@@ -439,6 +495,17 @@ public final class ComputerControlSessionProcessor {
                 mSessions.valueAt(i).dump(fd, fout, args);
             }
         }
+    }
+
+    @Override
+    public void monitor() {
+        synchronized (mSessions) {
+            for (int i = 0; i < mSessions.size(); i++) {
+                mSessions.valueAt(i).monitor();
+            }
+        }
+        synchronized (mHandlerThreadLock) { /* no-op */ }
+        mAllowlistController.monitor();
     }
 
     private final class ConsentResultReceiver extends ResultReceiver {

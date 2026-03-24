@@ -234,9 +234,11 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         // implicitly decoder supports this size and
         // ensure recordings will be playable on device
         MediaCodec encoder = MediaCodec.createEncoderByType(videoType);
+// QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         MediaCodecInfo.VideoCapabilities vc = encoder.getCodecInfo().getCapabilitiesForType(
                         videoType)
                 .getVideoCapabilities();
+// QTI_BEGIN: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         encoder.release();
 // QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
 
@@ -370,14 +372,10 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
     }
 
     public SavedRecording save() throws IOException, IllegalStateException {
-        return save(null);
+        return save(createRecordingUri());
     }
 
-    /**
-     * Store recorded video
-     */
-    public SavedRecording save(@Nullable UriReadyCallback onUriReady)
-            throws IOException, IllegalStateException {
+    public Uri createRecordingUri() {
         String saveDate = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
         String fileName = mStartTimeMillis > 0L
                 ? String.format("screen-%s-%d.mp4", saveDate, mStartTimeMillis)
@@ -392,13 +390,17 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         ContentResolver resolver = mContext.getContentResolver();
         Uri collectionUri = MediaStore.Video.Media.getContentUri(
                 MediaStore.VOLUME_EXTERNAL_PRIMARY);
-        Uri itemUri = ContentProvider.maybeAddUserId(resolver.insert(collectionUri, values),
+        return ContentProvider.maybeAddUserId(resolver.insert(collectionUri, values),
                 mContext.getUserId());
-        if (onUriReady != null) {
-            onUriReady.onUriReady(itemUri);
-        }
+    }
 
+    /**
+     * Store recorded video
+     */
+    public SavedRecording save(Uri itemUri)
+            throws IOException, IllegalStateException {
         Log.d(TAG, itemUri.toString());
+        ContentResolver resolver = mContext.getContentResolver();
         if (mAudioSource == MIC_AND_INTERNAL || mAudioSource == INTERNAL) {
             try {
                 Log.d(TAG, "muxing recording");
@@ -473,15 +475,10 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         return Math.min(maxRate, VIDEO_FRAME_RATE);
     }
 
-    public interface UriReadyCallback {
-
-        void onUriReady(Uri uri);
-    }
-
     /**
      * Object representing the recording
      */
-    public class SavedRecording {
+    public static class SavedRecording {
 
         @NonNull
         private final Uri mUri;
@@ -489,15 +486,11 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         private final Icon mThumbnailIcon;
 
         public SavedRecording(@NonNull Uri uri, File file, Size thumbnailSize) {
+            this(uri, createThumbnail(file, thumbnailSize));
+        }
+
+        public SavedRecording(@NonNull Uri uri, @Nullable Icon thumbnailIcon) {
             mUri = uri;
-            Icon thumbnailIcon = null;
-            try {
-                Bitmap thumbnailBitmap = ThumbnailUtils.createVideoThumbnail(
-                        file, thumbnailSize, null);
-                thumbnailIcon = Icon.createWithBitmap(thumbnailBitmap);
-            } catch (IOException e) {
-                Log.e(TAG, "Error creating thumbnail", e);
-            }
             mThumbnailIcon = thumbnailIcon;
         }
 
@@ -508,6 +501,19 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
 
         public @Nullable Icon getThumbnail() {
             return mThumbnailIcon;
+        }
+
+        @Nullable
+        private static Icon createThumbnail(File file, Size thumbnailSize) {
+            Icon thumbnailIcon = null;
+            try {
+                Bitmap thumbnailBitmap = ThumbnailUtils.createVideoThumbnail(
+                        file, thumbnailSize, null);
+                thumbnailIcon = Icon.createWithBitmap(thumbnailBitmap);
+            } catch (IOException e) {
+                Log.e(TAG, "Error creating thumbnail", e);
+            }
+            return thumbnailIcon;
         }
     }
 

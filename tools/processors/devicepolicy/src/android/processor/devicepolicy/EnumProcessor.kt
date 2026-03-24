@@ -18,6 +18,9 @@ package android.processor.devicepolicy
 
 import android.processor.devicepolicy.protos.FullyQualifiedFieldName
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.EnumPolicyMetadata.EnumValue as EnumValueProto
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.EnumPolicyMetadata.ResolutionMechanism as EnumResolutionMechanismProto
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.EnumPolicyMetadata.ResolutionMechanism.MostRestrictive as MostRestrictiveProto
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.MemberSelectTree
 import com.sun.source.tree.NewArrayTree
@@ -42,6 +45,7 @@ import javax.lang.model.type.TypeMirror
  * <li> The default value. </li>
  * <li> The documentation for the enumeration. </li>
  * <li> All enumeration entries with value, name and documentation. </li>
+ * <li> The conflict resolution mechanism . </li>
  * </ul>
  *
  * We will use the following example to illustrate what we are doing: {@snippet : class ExampleClass
@@ -69,6 +73,10 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
     private companion object {
         const val SIMPLE_TYPE_INTEGER = "java.lang.Integer"
 
+        // These enum values are allowed to use 0 for backwards compatibility reasons.
+        val LEGACY_POLICY_ENUM_WITH_ZERO_VALUE_ALLOWED =
+            setOf("AUTO_TIME_USER_CHOICE", "AUTO_TIME_ZONE_USER_CHOICE")
+
         /** Find the first value matching a predicate on the key. */
         fun <K, V> Map<K, V>.firstValue(filter: (K) -> Boolean): V {
             return entries.first { (key, _) -> filter(key) }.value
@@ -92,7 +100,7 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
         val enumPolicyAnnotation =
             element.getAnnotation(EnumPolicyDefinition::class.java)
                 ?: throw IllegalStateException(
-                    "Processor should only be called on elements with @EnumPolicyMetadata"
+                    "Processor should only be called on elements with @EnumPolicyDefinition"
                 )
 
         if (!processingEnv.typeUtils.isSameType(policyType(element), integerType)) {
@@ -131,6 +139,10 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
 
         // In the class-level example above, these would be ENUM_ENTRY_1 and ENUM_ENTRY_2.
         val entries = getIntDefIdentifiers(annotationMirror, intDefElement)
+        validateEnumValues(entries, intDefElement)
+
+        val resolutionMechanism =
+            getResolutionMechanism(enumPolicyAnnotation.resolutionMechanism, entries, element)
 
         val metadata =
             TypeSpecificPolicyMetadata.newBuilder()
@@ -140,6 +152,7 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
                         .setIntDefName(enumName)
                         .setDocumentation(enumDoc)
                         .addAllValues(entries)
+                        .setResolutionMechanism(resolutionMechanism)
                         .build()
                 )
                 .build()
@@ -174,7 +187,7 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
     private fun getIntDefIdentifiers(
         annotationMirror: AnnotationMirror,
         intDefElement: TypeElement,
-    ): List<TypeSpecificPolicyMetadata.EnumPolicyMetadata.EnumValue> {
+    ): List<EnumValueProto> {
         val annotationValue: AnnotationValue =
             annotationMirror.elementValues.firstValue { key ->
                 key.simpleName.contentEquals("value")
@@ -206,12 +219,127 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
         }
 
         return fields.mapIndexed { i, field ->
-            TypeSpecificPolicyMetadata.EnumPolicyMetadata.EnumValue.newBuilder()
+            EnumValueProto.newBuilder()
                 .setFieldName(names[i])
                 .setIntValue(values[i])
                 .setDocumentation(docs[i])
                 .build()
         }
+    }
+
+    /**
+     * Verify that enum should not be declared with 0 value which is reserved for *_UNSPECIFIED
+     * value (https://google.aip.dev/126).
+     */
+    private fun validateEnumValues(entries: List<EnumValueProto>, element: Element) {
+        entries.forEach { entry ->
+            if (
+                entry.getIntValue() == 0 &&
+                    !LEGACY_POLICY_ENUM_WITH_ZERO_VALUE_ALLOWED.contains(entry.getShortFieldName())
+            ) {
+                printError(
+                    element,
+                    "The Protobuf enum value '0' is reserved for the default *_UNSPECIFIED case " +
+                        "(https://google.aip.dev/126) and should not be used for any other enum " +
+                        "value. Found in: ${entry.getShortFieldName()}",
+                )
+            }
+        }
+    }
+
+    /*
+     * Given a policy definition element:
+     *   * Finds the modeled resolution mechanism
+     *   * Verifies only one is specified
+     *   * If `mostRestrictive` is selected: verifies each enum value is mentioned exactly once.
+     *
+     */
+    private fun getResolutionMechanism(
+        annotationValue: EnumResolutionMechanism,
+        allValues: List<EnumValueProto>,
+        element: Element,
+    ): EnumResolutionMechanismProto {
+        if (!verifyResolutionMechanism(annotationValue, allValues, element)) {
+            // Error is already printed
+            return EnumResolutionMechanismProto.newBuilder().build()
+        }
+
+        val builder = EnumResolutionMechanismProto.newBuilder()
+        if (annotationValue.custom) {
+            builder.setCustom(true)
+        } else {
+            builder.setMostRestrictive(
+                MostRestrictiveProto.newBuilder()
+                    .addAllMostToLeastRestrictive(annotationValue.mostRestrictive.toList())
+                    .build()
+            )
+        }
+        return builder.build()
+    }
+
+    private fun verifyResolutionMechanism(
+        annotation: EnumResolutionMechanism,
+        allValues: List<EnumValueProto>,
+        element: Element,
+    ): Boolean {
+        val isCustom = annotation.custom
+        val isMostRestrictive = annotation.mostRestrictive.isNotEmpty()
+
+        if (isCustom && isMostRestrictive) {
+            printError(
+                element,
+                "In @EnumResolutionMechanism, `custom` and `mostRestrictive` " +
+                    "can not be set together.",
+            )
+            return false
+        }
+
+        if (!isCustom && !isMostRestrictive) {
+            printError(
+                element,
+                "In @EnumResolutionMechanism, either `custom` or `mostRestrictive` must be set.",
+            )
+            return false
+        }
+
+        if (isMostRestrictive) {
+            return verifyMostRestrictive(annotation.mostRestrictive.toList(), allValues, element)
+        }
+        return true
+    }
+
+    private fun verifyMostRestrictive(
+        values: List<Int>,
+        allValues: List<EnumValueProto>,
+        element: Element,
+    ): Boolean {
+        var success =
+            ensureNoDuplicates(
+                element,
+                values,
+                "mostRestrictive",
+                elementToString = { v -> valueToString(v, allValues) },
+            ) &&
+                ensureNoUnexpectedValues(
+                    element,
+                    values,
+                    expectedValues = allValues.map { it.intValue },
+                    listName = "mostRestrictive",
+                ) &&
+                ensureNoMissingValues(
+                    element,
+                    values,
+                    expectedValues = allValues.map { it.intValue },
+                    listName = "mostRestrictive",
+                    elementToString = { v -> valueToString(v, allValues) },
+                )
+
+        return success
+    }
+
+    private fun valueToString(value: Int, allValues: List<EnumValueProto>): String {
+        val matchingEnum = allValues.firstOrNull { it.intValue == value }
+        return matchingEnum?.fieldName?.fieldName ?: value.toString()
     }
 
     private fun getElementForIdentifier(
@@ -253,6 +381,8 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
             // In our example this would be {"ExampleClass", "ENUM_ENTRY_1"}.
             getFullyQualifiedFieldName(element)
         }
+
+    private fun EnumValueProto.getShortFieldName(): String = getFieldName().getFieldName()
 
     private class IdentifierVisitor : SimpleTreeVisitor<Void, ArrayList<String>>() {
         override fun visitNewArray(node: NewArrayTree, identifiers: ArrayList<String>): Void? {

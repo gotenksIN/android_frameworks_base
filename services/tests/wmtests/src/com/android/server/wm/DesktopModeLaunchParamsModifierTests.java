@@ -47,10 +47,10 @@ import static android.view.Surface.ROTATION_90;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doCallRealMethod;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
+import static com.android.internal.policy.DesktopModeLaunchBoundsUtils.centerInScreen;
 import static com.android.internal.policy.SystemBarUtils.getDesktopViewAppHeaderHeightPx;
 import static com.android.server.wm.DesktopModeBoundsCalculator.DESKTOP_MODE_INITIAL_BOUNDS_SCALE;
 import static com.android.server.wm.DesktopModeBoundsCalculator.DESKTOP_MODE_LANDSCAPE_APP_PADDING;
-import static com.android.server.wm.DesktopModeBoundsCalculator.centerInScreen;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.RESULT_CONTINUE;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.RESULT_DONE;
 import static com.android.server.wm.LaunchParamsController.LaunchParamsModifier.RESULT_SKIP;
@@ -2001,14 +2001,78 @@ public class DesktopModeLaunchParamsModifierTests extends
 
         assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).setLayout(
                 layout).calculate());
-
         assertEquals(DISPLAY_STABLE_BOUNDS.right, mResult.mBounds.right);
         assertEquals(DISPLAY_STABLE_BOUNDS.bottom, mResult.mBounds.bottom);
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-            Flags.FLAG_ENABLE_DESKTOP_FIRST_PERSISTED_LAUNCH_PARAMS_BUGFIX})
+    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE, Flags.FLAG_ENABLE_STEPPED_CASCADING})
+    public void testOptionsBoundsSet_steppedCascading() {
+        setupDesktopModeLaunchParamsModifier();
+        doReturn(true).when(mTarget).isDesktopModeSupportedOnDisplay(any());
+        doReturn(true).when(mTarget).isEnteringDesktopMode(any(), any(), any(), any());
+
+        final TestDisplayContent display = createDisplayContent(ORIENTATION_LANDSCAPE,
+                LANDSCAPE_DISPLAY_BOUNDS, WINDOWING_MODE_FREEFORM);
+
+        // Create a root task that will contain both existing and launching tasks
+        final Task rootTask = new TaskBuilder(mSupervisor)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                .setDisplay(display)
+                .build();
+
+        // Create an existing task that matches the centered bounds
+        final int modifiedWidth =
+                (int) (LANDSCAPE_DISPLAY_BOUNDS.width() * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
+        final int modifiedHeight =
+                (int) (LANDSCAPE_DISPLAY_BOUNDS.height() * DESKTOP_MODE_INITIAL_BOUNDS_SCALE);
+        final Rect centeredBounds = centerInScreen(
+                new Size(modifiedWidth, modifiedHeight), LANDSCAPE_DISPLAY_BOUNDS);
+
+        final Task existingTask = new TaskBuilder(mSupervisor)
+                .setParentTask(rootTask)
+                .setDisplay(display)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                .setCreateActivity(true)
+                .build();
+        existingTask.setBounds(centeredBounds);
+        existingTask.getTopMostActivity().setVisibleRequested(true);
+        existingTask.getTopMostActivity().setVisible(true);
+
+        // New task to be launched
+        final Task launchingTask = new TaskBuilder(mSupervisor)
+                .setParentTask(rootTask)
+                .setDisplay(display)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                .setCreateActivity(true)
+                .build();
+
+        // ActivityOptions with flexibleLaunchSize. Set some inappropriate launch bounds so that
+        // they will be adjusted in Core and we can verify cascading is applied to the adjusted
+        // bounds in this case.
+        final ActivityOptions options = ActivityOptions.makeBasic();
+        options.setFlexibleLaunchSize(true);
+        options.setLaunchBounds(new Rect(0, 0, 100, 100));
+        options.setLaunchWindowingMode(WINDOWING_MODE_FREEFORM);
+
+        assertEquals(RESULT_DONE, new CalculateRequestBuilder()
+                .setTask(launchingTask)
+                .setActivity(launchingTask.getTopMostActivity())
+                .setOptions(options)
+                .calculate());
+
+        // The result should be cascaded from existingTask.getBounds()
+        final int offset = mContext.getResources().getDimensionPixelSize(
+                com.android.internal.R.dimen.desktop_mode_cascading_offset);
+        final Rect expectedBounds = new Rect(centeredBounds);
+        expectedBounds.offset(offset, offset);
+
+        assertEquals(expectedBounds, mResult.mBounds);
+    }
+
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testDoesntInheritWindowingModeFromCurrentParams() {
         setupDesktopModeLaunchParamsModifier();
         doCallRealMethod().when(mTarget).isEnteringDesktopMode(any(), any(), any(), any());
@@ -2204,8 +2268,7 @@ public class DesktopModeLaunchParamsModifierTests extends
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM,
-            Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_FULLSCREEN_DECISION_BUGFIX})
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM)
     public void testCalculate_desktopFirstPolicy_fullscreenRelaunch_bypassesPolicy() {
         setupDesktopModeLaunchParamsModifier();
         when(mTarget.isEnteringDesktopMode(any(), any(), any(), any())).thenCallRealMethod();
@@ -2269,8 +2332,7 @@ public class DesktopModeLaunchParamsModifierTests extends
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM,
-            Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_FULLSCREEN_DECISION_BUGFIX})
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM)
     public void testCalculate_desktopFirstPolicy_requestFullscreen_bypassesPolicy() {
         setupDesktopModeLaunchParamsModifier();
         when(mTarget.isEnteringDesktopMode(any(), any(), any(), any())).thenCallRealMethod();
@@ -2293,8 +2355,7 @@ public class DesktopModeLaunchParamsModifierTests extends
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM,
-            Flags.FLAG_ENABLE_DESKTOP_FIRST_PERSISTED_LAUNCH_PARAMS_BUGFIX})
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM)
     public void testCalculate_desktopFirstPolicy_clearCurrentParams() {
         setupDesktopModeLaunchParamsModifier();
         when(mTarget.isEnteringDesktopMode(any(), any(), any(), any())).thenCallRealMethod();

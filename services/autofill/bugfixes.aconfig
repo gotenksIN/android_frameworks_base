@@ -121,16 +121,6 @@ flag {
 }
 
 flag {
-  name: "get_view_coordinates_in_ui_thread"
-  namespace: "autofill"
-  description: "Avoid native crash due to threading issue"
-  bug: "442258201"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "get_autofill_view_id_from_autofill_manager"
   namespace: "autofill"
   description: "Use autofill manager to get autofill view id if view has non-activity context"
@@ -165,6 +155,36 @@ flag {
   namespace: "autofill"
   description: "make string rebuild masterseeed persistent across reboots but different per user profile."
   bug: "456535350"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "add_dialog_presentation_check"
+  namespace: "autofill"
+  description: "Add check for dialog presentation in when setting authentication inFillResponse."
+  bug: "486879419"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "set_locale_for_text_view"
+  namespace: "autofill"
+  description: "Let TextView set the locale field when providing AssistStructure for autofill"
+  bug: "487046283"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "destroy_save_ui_before_showing_next_one"
+  namespace: "autofill"
+  description: "Destroy the current showing save dialog before showing the next one to fix device unresponsive issue"
+  bug: "484831460"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

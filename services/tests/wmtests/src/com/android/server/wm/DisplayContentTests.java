@@ -93,9 +93,7 @@ import static com.android.server.wm.WindowContainer.POSITION_TOP;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowTracingLogLevel.ALL;
 import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES;
-import static com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING;
 import static com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE;
-import static com.android.window.flags.Flags.FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API;
 import static com.android.window.flags.Flags.FLAG_FIX_TF_ADJACENT_FOCUS;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -1907,8 +1905,8 @@ public class DisplayContentTests extends WindowTestsBase {
 
         doReturn(true).when(nonTopVisible).hasFixedRotationTransform();
         assertFalse("Not skip orientation update if fixed rotation app switched without transition",
-                mDisplayContent.handleTopActivityLaunchingInDifferentOrientation(
-                        nonTopVisible, true /* checkOpening */));
+                mDisplayContent.handleTopActivityLaunchingInDifferentOrientation(nonTopVisible,
+                        true /* checkOpening */, WindowConfiguration.ROTATION_UNDEFINED));
         assertTrue(mDisplayContent.isFixedRotationLaunchingApp(nonTopVisible));
     }
 
@@ -2290,7 +2288,8 @@ public class DisplayContentTests extends WindowTestsBase {
 
         assertNotNull(mirror.getMirrorSurfaceControl());
         verify(mTransaction).reparent(notNull(), eq(mirror.getMirrorSurfaceControl()));
-        verify(mTransaction).show(mirror.getMirrorSurfaceControl());
+        // The mirror surface control is initially hidden
+        verify(mTransaction, never()).show(mirror.getMirrorSurfaceControl());
     }
 
     @Test
@@ -3309,25 +3308,14 @@ public class DisplayContentTests extends WindowTestsBase {
     verify(mWm.mUmInternal, never()).getUserAssignedToDisplay(displayId);
   }
 
-    @EnableFlags(FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     @Test
     public void cameraCompatFreeformFlagEnabled_cameraCompatFreeformPolicyNotNull() {
         doReturn(true).when(() ->
                 DesktopModeHelper.canEnterDesktopMode(any(Context.class)));
 
         assertTrue(createNewDisplay().mAppCompatCameraPolicy.hasSimReqOrientationPolicy());
-    }
+  }
 
-    @DisableFlags(FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
-    @Test
-    public void cameraCompatFreeformFlagNotEnabled_cameraCompatFreeformPolicyIsNull() {
-        doReturn(true).when(() ->
-                DesktopModeHelper.canEnterDesktopMode(any(Context.class)));
-
-        assertFalse(createNewDisplay().mAppCompatCameraPolicy.hasSimReqOrientationPolicy());
-    }
-
-    @EnableFlags(FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     @DisableFlags({FLAG_ENABLE_DESKTOP_WINDOWING_MODE, FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES})
     @Test
     public void desktopWindowingFlagNotEnabled_cameraCompatFreeformPolicyIsNull() {
@@ -3502,29 +3490,6 @@ public class DisplayContentTests extends WindowTestsBase {
 
         // Verify that forced density is updated based on the ratio.
         assertEquals(320, dc.mBaseDisplayDensity);
-    }
-
-    @EnableFlags(FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
-    @Test
-    public void testIsTaskMoveAllowedOnDisplay_eagerCalculation() {
-        final TaskDisplayArea taskDisplayArea = mDisplayContent.getDefaultTaskDisplayArea();
-        final Task rootTask = taskDisplayArea.createRootTask(WINDOWING_MODE_FULLSCREEN,
-                ACTIVITY_TYPE_STANDARD, ON_TOP);
-
-        taskDisplayArea.setIsTaskMoveAllowed(true);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-
-        taskDisplayArea.setIsTaskMoveAllowed(true);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-
-        rootTask.setIsTaskMoveAllowed(true);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-
-        taskDisplayArea.setIsTaskMoveAllowed(false);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-
-        rootTask.setIsTaskMoveAllowed(false);
-        assertFalse(mDisplayContent.isTaskMoveAllowedOnDisplay());
     }
 
     @Test

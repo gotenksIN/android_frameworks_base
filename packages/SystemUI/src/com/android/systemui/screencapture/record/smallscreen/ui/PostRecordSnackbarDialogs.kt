@@ -17,6 +17,7 @@
 package com.android.systemui.screencapture.record.smallscreen.ui
 
 import android.content.Context
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
 import android.view.Display
@@ -42,13 +43,16 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
+import com.android.internal.logging.UiEventLogger
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
 import com.android.systemui.screencapture.record.domain.interactor.ScreenCaptureRecordFeaturesInteractor
+import com.android.systemui.screencapture.record.shared.model.ScreenRecordEvent
 import com.android.systemui.screencapture.record.smallscreen.ui.compose.PostRecordSnackbar
 import com.android.systemui.screencapture.record.smallscreen.ui.compose.SnackbarVisualsWithIcon
+import com.android.systemui.screenrecord.notification.ScreenRecordingServiceNotificationInteractor
 import com.android.systemui.statusbar.phone.DialogDelegate
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import com.android.systemui.statusbar.phone.SystemUIDialog.DIALOG_WINDOW_TYPE
@@ -65,6 +69,9 @@ constructor(
     private val drawableViewModel: DrawableLoaderViewModel,
     private val activityStarter: ActivityStarter,
     private val screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
+    private val screenRecordingServiceNotificationInteractor:
+        ScreenRecordingServiceNotificationInteractor,
+    private val uiEventLogger: UiEventLogger,
 ) {
 
     fun showVideoSaved() {
@@ -76,7 +83,12 @@ constructor(
         )
     }
 
-    fun showVideoDeleted(uri: Uri, display: Display? = null) {
+    fun showVideoDeleted(
+        uri: Uri,
+        notificationId: Int,
+        display: Display? = null,
+        thumbnail: Icon? = null,
+    ) {
         showSnackbar(
             display = display,
             visuals =
@@ -88,12 +100,20 @@ constructor(
             onActionPerformed = {
                 if (!screenCaptureRecordFeaturesInteractor.isLargeScreenRecordingEnabled) {
                     activityStarter.startActivity(
-                        SmallScreenPostRecordingActivity.showRecording(context, uri),
+                        SmallScreenPostRecordingActivity.showRecording(
+                            context = context,
+                            videoUri = uri,
+                            notificationId = notificationId,
+                        ),
                         true,
                     )
                 }
             },
-            onDismissed = { context.contentResolver.delete(uri, null) },
+            onDismissed = {
+                context.contentResolver.delete(uri, null)
+                screenRecordingServiceNotificationInteractor.cancel(notificationId)
+                uiEventLogger.log(ScreenRecordEvent.SCREEN_RECORD_POST_RECORDING_DELETE)
+            },
         )
     }
 

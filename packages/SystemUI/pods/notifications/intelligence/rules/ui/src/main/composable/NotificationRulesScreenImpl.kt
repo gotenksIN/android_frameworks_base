@@ -16,134 +16,67 @@
 
 package com.android.systemui.notifications.intelligence.rules.ui.composable
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.FilterModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRuleEditViewModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesScreenViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.RulesScreenViewState
 import javax.inject.Inject
-import kotlinx.coroutines.launch
 
 class NotificationRulesScreenImpl @Inject constructor() : NotificationRulesScreen {
     @Composable
     override fun Content(
         viewModelFactory: NotificationRulesScreenViewModel.Factory,
+        editViewModelFactory: NotificationRuleEditViewModel.Factory,
         dismissRulesScreen: () -> Unit,
         modifier: Modifier,
     ) {
-        val viewModel = rememberViewModel("NotificationRulesScreen") { viewModelFactory.create() }
-        val scope = rememberCoroutineScope()
+        // TODO: b/486844997 - When the new platform drop for androidx.compose.animation is in, this
+        // can be replaced by the navigation3 library, which will also support back gestures.
+        val backStack = remember {
+            mutableStateListOf<RulesScreenViewState>(RulesScreenViewState.CurrentRules)
+        }
+        val screenViewModel =
+            rememberViewModel("NotificationRulesScreen") { viewModelFactory.create(backStack) }
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.Top),
-            modifier = modifier.background(MaterialTheme.colorScheme.background).padding(16.dp),
-        ) {
-            item("Title") {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Button(onClick = dismissRulesScreen, modifier = Modifier) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            // TODO: b/478225883 - Translate content description (requires moving
-                            // resources to pods)
-                            contentDescription = "Back",
-                        )
-                    }
-                    Text(
-                        text = "Notification Rules",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(start = 8.dp),
+        Box(modifier = modifier) {
+            when (val viewState = screenViewModel.currentScreen) {
+                is RulesScreenViewState.CurrentRules -> {
+                    CurrentRulesScreen(
+                        viewModel = screenViewModel,
+                        onDismissCurrentRulesScreen = dismissRulesScreen,
+                        onNavigateToEditScreen = { draftRule ->
+                            val newState =
+                                RulesScreenViewState.EditRule(
+                                    editViewModelFactory.create(draftRule)
+                                )
+                            backStack.add(newState)
+                        },
                     )
                 }
-            }
 
-            viewModel.rules.forEach { rule -> item(rule.toString()) { CurrentRule(rule) } }
-
-            item("Fake rule button") {
-                Button(onClick = { scope.launch { viewModel.createRule(generateFakeRule()) } }) {
-                    Text("Add fake rule")
+                is RulesScreenViewState.EditRule -> {
+                    NotificationRuleEdit(
+                        viewModel = viewState.viewModel,
+                        onDismissRuleEditScreen = { backStack.removeLast() },
+                        onEnterEditField = { backStack.add(it) },
+                        onExitEditField = { backStack.removeLast() },
+                    )
+                }
+                is RulesScreenViewState.EditField.Action -> {
+                    ActionChoiceScreen(viewState, onDismissRequest = { backStack.removeLast() })
+                }
+                is RulesScreenViewState.EditField.Contacts -> {
+                    ContactChoiceScreen(viewState, onDismissRequest = { backStack.removeLast() })
+                }
+                is RulesScreenViewState.EditField.Apps -> {
+                    AppChoiceScreen(viewState, onDismissRequest = { backStack.removeLast() })
                 }
             }
         }
     }
-}
-
-@Composable
-private fun CurrentRule(rule: RuleModel) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier.fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = MaterialTheme.shapes.large,
-                )
-                .minimumInteractiveComponentSize(),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Star,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(18.dp).padding(start = 4.dp),
-        )
-        Text(
-            text = rule.toText(),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f).padding(start = 4.dp),
-        )
-    }
-}
-
-private fun RuleModel.toText(): String {
-    // TODO: b/478225883 - Internationalize this string when design is ready.
-    // TODO: b/478225883 - Re-use text rendering from edit screen.
-    val contactsList = filter.contacts?.contacts
-    val contactsString =
-        if (contactsList != null) {
-            " from ${contactsList.joinToString { it.name }}"
-        } else {
-            ""
-        }
-
-    return "${action.name} notifications$contactsString"
-}
-
-private fun generateFakeRule(): RuleModel {
-    val contactId = (0..1000).random()
-    return RuleModel(
-        ActionModel.Silence,
-        filter =
-            FilterModel(
-                contacts = ContactsModel(listOf(ContactModel("Contact #$contactId"))),
-                includedApps = null,
-            ),
-    )
 }

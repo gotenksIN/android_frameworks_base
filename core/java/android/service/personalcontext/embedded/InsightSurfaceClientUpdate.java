@@ -20,22 +20,18 @@ import static android.view.View.SCROLL_AXIS_NONE;
 
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.StyleRes;
 import android.annotation.SystemApi;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.service.personalcontext.Flags;
-import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWrapper;
 import android.view.View;
 
 import androidx.annotation.Nullable;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * This class is used to publish updates from an {@link InsightSurfaceClient} to a connected
@@ -70,9 +66,6 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
 
     /** Key for a {@link Configuration} update. */
     public static final String KEY_CONFIGURATION = "key_configuration";
-
-    /** Key for a {@link Set} of {@link ContextHint}s in the update. */
-    public static final String KEY_HINTS = "key_hints";
 
     private final Bundle mUpdateValues;
 
@@ -111,7 +104,7 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
     /**
      * Returns whether the update contains the value with the given key.
      * @param key the update key to be queried
-     * @return true if the update contains a value for the given key
+     * @return {@code true} if the update contains a value for the given key
      */
     public boolean hasUpdate(@NonNull String key) {
         return mUpdateValues.containsKey(key);
@@ -138,8 +131,8 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
     }
 
     /**
-     * Return the background {@link Color} for this update, or null if the update doesn't contain
-     * such a value.
+     * Return the background {@link Color} for this update, or {@code null} if the update doesn't
+     * contain such a value.
      */
     @Nullable
     public Color getBackgroundColor() {
@@ -149,7 +142,7 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
     }
 
     /**
-     * Return the nested scroll axes for this update, or  {@link android.view.View#SCROLL_AXIS_NONE}
+     * Return the nested scroll axes for this update, or {@link android.view.View#SCROLL_AXIS_NONE}
      * if the update doesn't contain such a value.
      */
     public int getNestedScrollAxes() {
@@ -159,8 +152,8 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
     }
 
     /**
-     * Return the lock nested scrolling value for this update, or false if the update doesn't
-     * contain such a value.
+     * Return the lock nested scrolling value for this update, or {@code false} if the update
+     * doesn't contain such a value.
      */
     public boolean isNestedScrollAxisLocked() {
         return hasUpdate(KEY_NESTED_SCROLL_AXIS_LOCKED) && mUpdateValues.getBoolean(
@@ -168,28 +161,29 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
     }
 
     /**
-     * Return the should blur value for this update, or false if the update doesn't
-     * contain such a value.
+     * Return whether the embedded surface should apply a blur. This should be {@code true} when the
+     * client view is blurred so that the embedded surface can also apply a blur to match it.
      */
     public boolean shouldBlur() {
         return hasUpdate(KEY_SHOULD_BLUR) && mUpdateValues.getBoolean(KEY_SHOULD_BLUR);
     }
 
     /**
-     * Return the theme resource name update for this update, or null if the update doesn't
-     * contain such a value.
-     * @see InsightSurfaceClientInfo#getThemeResourceName()
+     * Return the theme resource name update for this update, or {@link Resources#ID_NULL} if the
+     * update doesn't contain such a value.
+     *
+     * @see InsightSurfaceClientInfo#getThemeResourceId()
      */
-    @Nullable
-    public String getThemeResourceName() {
+    @StyleRes
+    public int getThemeResourceId() {
         return hasUpdate(KEY_THEME_RESOURCE_NAME)
-                ? mUpdateValues.getString(KEY_THEME_RESOURCE_NAME)
-                : null;
+                ? mUpdateValues.getInt(KEY_THEME_RESOURCE_NAME)
+                : Resources.ID_NULL;
     }
 
     /**
-     * Return the {@link Configuration} for this update, or null if the update doesn't contain a
-     * configuration.
+     * Return the {@link Configuration} for this update, or {@code null} if the update doesn't
+     * contain a configuration.
      */
     @Nullable
     public Configuration getConfiguration() {
@@ -198,25 +192,9 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
                 : null;
     }
 
-    /**
-     * Return the {@link Set} of {@link ContextHint}s for this update, or an empty {@link Set} if
-     * the update doesn't contain hints.
-     */
-    @NonNull
-    public Set<ContextHint> getHints() {
-        final Set<ContextHint> hints = new HashSet<>();
-        if (hasUpdate(KEY_HINTS)) {
-            ContextHintWrapper.unwrapInto(
-                    mUpdateValues.getParcelableArrayList(KEY_HINTS, ContextHintWrapper.class),
-                    hints);
-        }
-        return hints;
-    }
-
     /** Builder for {@link InsightSurfaceClientUpdate}. */
     public static final class Builder {
         private final Bundle mValues = new Bundle();
-        private final Set<ContextHint> mHints = new HashSet<>();
 
         public Builder() {
         }
@@ -255,7 +233,7 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
          * Set whether nested scrolling is locked to the nested scroll axes for the update. Note
          * that this value can be set for the update even if the nested scroll axes aren't also
          * updated.
-         * @param isLocked whether nested scrolling is locked
+         * @param isLocked {@code true} if nested scrolling is locked
          */
         @NonNull
         public Builder setNestedScrollAxisLocked(boolean isLocked) {
@@ -264,8 +242,10 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
         }
 
         /**
-         * Set whether the embedded surface should blur to match client blurring.
-         * @param shouldBlur whether the embedded surface should blur
+         * Set whether the embedded surface should apply a blur. Clients would set this to
+         * {@code true} when the client view is blurred so that the embedded surface can also apply
+         * a blur to match it.
+         * @param shouldBlur {@code true} if the embedded surface should apply a blur
          */
         @NonNull
         public Builder setShouldBlur(boolean shouldBlur) {
@@ -274,13 +254,13 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
         }
 
         /**
-         * Set the theme resource name for this update.
-         * @see InsightSurfaceClient.Builder#setThemeResourceName(String)
-         * @param themeResourceName the name of the theme resource
+         * Set the theme resource id for this update.
+         * @see InsightSurfaceClient.Builder#setThemeResourceId(int)
+         * @param themeResourceId the id of the theme resource, or {@code null} to clear it
          */
         @NonNull
-        public Builder setThemeResourceName(@Nullable String themeResourceName) {
-            mValues.putString(KEY_THEME_RESOURCE_NAME, themeResourceName);
+        public Builder setThemeResourceId(@StyleRes int themeResourceId) {
+            mValues.putInt(KEY_THEME_RESOURCE_NAME, themeResourceId);
             return this;
         }
 
@@ -305,24 +285,10 @@ public final class InsightSurfaceClientUpdate implements Parcelable {
         }
 
         /**
-         * Add a {@link ContextHint} to the update.
-         * @param hint the {@link ContextHint} to add
-         */
-        @NonNull
-        public Builder addHint(@NonNull ContextHint hint) {
-            mHints.add(hint);
-            return this;
-        }
-
-        /**
          * Build and return a new {@link InsightSurfaceClientUpdate}.
          */
         @NonNull
         public InsightSurfaceClientUpdate build() {
-            if (!mHints.isEmpty()) {
-                mValues.putParcelableArrayList(
-                        KEY_HINTS, new ArrayList<>(ContextHintWrapper.wrapList(mHints)));
-            }
             return new InsightSurfaceClientUpdate(mValues);
         }
     }

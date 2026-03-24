@@ -15,10 +15,27 @@
  */
 package com.android.wm.shell.hierarchy.utils
 
+import android.view.Surface
 import android.window.WindowContainerToken
+import com.android.internal.protolog.ProtoLog
+import com.android.wm.shell.hierarchy.ContainerHierarchy
 import com.android.wm.shell.hierarchy.containers.Container
-import com.android.wm.shell.hierarchy.updates.HierarchySnapshot
 import com.android.wm.shell.hierarchy.updates.EMPTY_SNAPSHOT
+import com.android.wm.shell.hierarchy.updates.HierarchyChangeFlags
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_BOUNDS
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_CHILDREN
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_FOCUS
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_INSETS
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_MODE
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_PARENT
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_PIP_PARAMS
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_ROOT_EXAMPLE_SHELL_PROPERTY
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_ROTATION
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_TASK_DESCRIPTION
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_VISIBILITY
+import com.android.wm.shell.hierarchy.updates.HierarchySnapshot.Companion.CHANGED_WINDOWING_MODE
+import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_MODES
 
 /**
  * Utility functions to support debugging the hierarchy.
@@ -34,18 +51,55 @@ class HierarchyDebugUtils {
         val NONE = "\u001b[0m"
 
         /**
+         * Returns a dumps of the hierarchy.
+         */
+        fun getHierarchyDump(
+            hierarchy: ContainerHierarchy,
+            snapshot: HierarchySnapshot = EMPTY_SNAPSHOT,
+        ): String {
+            return dumpToString(hierarchy.root, hierarchy.root, "", true, snapshot, WHITE)
+        }
+
+        /**
+         * Dumps the hierarchy to protolog.
+         */
+        fun dumpHierarchy(
+            hierarchy: ContainerHierarchy,
+            snapshot: HierarchySnapshot = EMPTY_SNAPSHOT,
+        ) {
+            dumpContainer(hierarchy.root, snapshot)
+        }
+
+        /**
+         * Dumps the container & children to protolog.
+         */
+        fun dumpContainer(
+            container: Container,
+            snapshot: HierarchySnapshot = EMPTY_SNAPSHOT,
+        ) {
+            @SuppressWarnings("ProtoLogNoContext")
+            ProtoLog.v(
+                WM_SHELL_MODES,
+                "%s",
+                dumpToString(container, container, "", true, snapshot, WHITE)
+            )
+        }
+
+        /**
          * Returns a string representation of a hierarchy rooted at the given container.
          */
         fun dumpToString(
+            root: Container,
             container: Container,
-            prefix: String = "",
+            rawPrefix: String = "",
+            isLastChildInParent: Boolean = true,
             snapshot: HierarchySnapshot = EMPTY_SNAPSHOT,
             withColor: String? = null,
         ): String {
             val changeFlags = snapshot.getChanges(container)
             val oldState =
                 if (!changeFlags.isEmpty) {
-                    snapshot.snapshots.getValue(container).state
+                    snapshot.snapshots.getValue(container)
                 } else null
             val startColorTag = withColor ?: ""
             val endColorTag = if (withColor != null) NONE else ""
@@ -56,9 +110,18 @@ class HierarchyDebugUtils {
             val endModeColorTag = if (withColor != null) NONE else ""
             val modeStr = if (container.mode != null)
                 " ${startModeColorTag}${container.mode!!.getId()}${endModeColorTag}" else ""
-            val changeFlagStr = if (!changeFlags.isEmpty) " changes=$changeFlags" else ""
-            output += "${prefix}${startColorTag}${container.name}${endColorTag}" +
+            val changeFlagStr = if (!changeFlags.isEmpty) " changes=${flagsToStr(changeFlags)}"
+                else ""
+            val branch = if (root == container) ""
+                else if (isLastChildInParent) "\u2514\u2500\u2500"
+                else "\u251C\u2500\u2500"
+            output += "${rawPrefix}${branch}${startColorTag}${container.name}${endColorTag}" +
                     "${modeStr}${changeFlagStr}\n"
+
+            // Account for the branch
+            val prefix = if (root == container) rawPrefix
+                else if (isLastChildInParent) "$rawPrefix   "
+                else "$rawPrefix\u2502  "
 
             // Dump current & previous window oinfo
             if (oldState != null) {
@@ -93,12 +156,8 @@ class HierarchyDebugUtils {
 
             // Dump the current children
             if (container.children.isNotEmpty()) {
-                val innerPrefix = "${prefix}| "
                 val allChildren = removedChildren + container.children
                 for ((index, child) in allChildren.withIndex()) {
-                    if (index > 0) {
-                        output += "${prefix}| -\n"
-                    }
                     var withColor = WHITE
                     if (child in removedChildren) {
                         withColor = RED
@@ -107,7 +166,8 @@ class HierarchyDebugUtils {
                     } else if (child in addedChildren) {
                         withColor = GREEN
                     }
-                    output += dumpToString(child, innerPrefix, snapshot, withColor)
+                    val isLastChild = index == (allChildren.size - 1)
+                    output += dumpToString(root, child, prefix, isLastChild, snapshot, withColor)
                     output += "\n"
                 }
             }
@@ -122,7 +182,65 @@ class HierarchyDebugUtils {
                 .removePrefix("WCT{android.os.BinderProxy@")
                 .removePrefix("WCT{android.os.Binder@")
                 .removeSuffix("}")
-            return "Token=${windowTokenStr}"
+            return "@${windowTokenStr}"
+        }
+
+        /**
+         * Returns the rotation in degrees for the given surface rotation constant.
+         */
+        fun rotationToDegrees(@Surface.Rotation rotation: Int): Int {
+            val deg = when (rotation) {
+                Surface.ROTATION_0 -> 0
+                Surface.ROTATION_90 -> 90
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_270 -> 270
+                else -> rotation
+            }
+            return deg
+        }
+
+        /**
+         * Returns a string of the given change flags in human readable form.
+         */
+        fun flagsToStr(changeFlags: HierarchyChangeFlags): String {
+            val flags = mutableListOf<Int>()
+            var i = changeFlags.nextSetBit(0)
+            while (i != -1) {
+                flags.add(i)
+                i = changeFlags.nextSetBit(i + 1)
+            }
+            return flags
+                .map {
+                    when (it) {
+                        CHANGED_PARENT -> "parent"
+                        CHANGED_MODE -> "mode"
+                        CHANGED_CHILDREN -> "children"
+                        CHANGED_BOUNDS -> "bounds"
+                        CHANGED_ROTATION -> "rot"
+                        CHANGED_WINDOWING_MODE -> "winMode"
+                        CHANGED_VISIBILITY -> "visibility"
+
+                        // Root
+                        CHANGED_ROOT_EXAMPLE_SHELL_PROPERTY -> "example_prop"
+                        CHANGED_FOCUS -> "focus"
+
+                        // Display
+                        CHANGED_INSETS -> "insets"
+
+                        // Task
+                        CHANGED_TASK_DESCRIPTION -> "task desc"
+                        CHANGED_PIP_PARAMS -> "pip params"
+                        else -> it.toString()
+                    }
+                }
+                .joinToString(prefix = "(", separator = ",", postfix = ")")
+        }
+
+        /**
+         * Capitalizes the given string (since the std kotlin capitalize() fn is now deprecated).
+         */
+        fun capitalize(str: String): String {
+            return str.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
         }
     }
 }

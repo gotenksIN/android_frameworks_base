@@ -17,33 +17,62 @@
 package com.android.systemui.dreams.ui.viewmodel
 
 import android.content.Intent
+import android.content.res.Resources
 import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.android.internal.logging.UiEventLogger
+import com.android.systemui.communal.data.repository.ContextualSetupRepository
+import com.android.systemui.communal.domain.definition.UprightChargingSetupDefinition
+import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.dreams.ui.metrics.DreamSetupUiEvent
 import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.res.R
 import javax.inject.Inject
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
+import kotlinx.coroutines.launch
 
 /** Events that can be triggered from the dream setup screen. */
 sealed interface DreamSetupEvent {
     /** Called when the setup flow is dismissed without taking action. */
-    object Dismiss : DreamSetupEvent
+    data object Dismiss : DreamSetupEvent
 
     /** Called when the user chooses not to set up the dream at this time. */
-    object NotNow : DreamSetupEvent
+    data object NotNow : DreamSetupEvent
 
     /** Called when the user chooses to proceed with setting up the dream. */
-    object SetUp : DreamSetupEvent
+    data object SetUp : DreamSetupEvent
 }
 
-class DreamSetupViewModel(private val activityStarter: ActivityStarter) : ViewModel() {
+class DreamSetupViewModel(
+    private val activityStarter: ActivityStarter,
+    private val contextualSetupRepository: ContextualSetupRepository,
+    @Main private val resources: Resources,
+    private val uiEventLogger: UiEventLogger,
+) : ViewModel() {
 
-    class Factory @Inject constructor(private val activityStarter: ActivityStarter) :
-        ViewModelProvider.Factory {
+    class Factory
+    @Inject
+    constructor(
+        private val activityStarter: ActivityStarter,
+        private val contextualSetupRepository: ContextualSetupRepository,
+        @Main private val resources: Resources,
+        private val uiEventLogger: UiEventLogger,
+    ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(DreamSetupViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return DreamSetupViewModel(activityStarter) as T
+                return DreamSetupViewModel(
+                    activityStarter,
+                    contextualSetupRepository,
+                    resources,
+                    uiEventLogger,
+                )
+                    as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
@@ -59,14 +88,39 @@ class DreamSetupViewModel(private val activityStarter: ActivityStarter) : ViewMo
 
     private fun handleDismiss() {
         Log.d(TAG, "User dismissed the setup flow.")
+        uiEventLogger.log(DreamSetupUiEvent.DREAM_SETUP_DISMISSED)
+        viewModelScope.launch {
+            val count =
+                contextualSetupRepository.incrementFailureCount(
+                    UprightChargingSetupDefinition.FLOW_ID
+                )
+            if (count >= maxDismissCount) {
+                contextualSetupRepository.dismiss(UprightChargingSetupDefinition.FLOW_ID)
+            }
+        }
     }
 
     private fun handleNotNow() {
         Log.d(TAG, "User clicked 'Not now'.")
+        uiEventLogger.log(DreamSetupUiEvent.DREAM_SETUP_SNOOZED)
+        viewModelScope.launch {
+            contextualSetupRepository.snooze(UprightChargingSetupDefinition.FLOW_ID, snoozeDuration)
+        }
+    }
+
+    private val maxDismissCount: Int by lazy {
+        resources.getInteger(R.integer.config_dream_setup_max_dismiss_count)
+    }
+
+    private val snoozeDuration: Duration by lazy {
+        resources
+            .getInteger(R.integer.config_dream_setup_snooze_duration_minutes)
+            .toDuration(DurationUnit.MINUTES)
     }
 
     private fun handleSetUp() {
         Log.d(TAG, "User clicked 'Set up'.")
+        uiEventLogger.log(DreamSetupUiEvent.DREAM_SETUP_TRIGGERED)
         activityStarter.postStartActivityDismissingKeyguard(
             Intent(Settings.ACTION_DREAM_SETTINGS)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),

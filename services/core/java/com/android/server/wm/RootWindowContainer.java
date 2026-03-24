@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wm;
@@ -31,7 +35,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.RootWindowCo
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
-import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_SUSTAINED_PERFORMANCE_MODE;
+import static android.view.WindowManager.LayoutParams.RENDERING_HINT_SUSTAINED_PERFORMANCE_MODE;
 import static android.view.WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
@@ -144,8 +148,6 @@ import android.window.WindowContainerToken;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.ResolverActivity;
 import com.android.internal.protolog.ProtoLog;
-import com.android.internal.util.function.pooled.PooledLambda;
-import com.android.internal.util.function.pooled.PooledPredicate;
 import com.android.server.LocalServices;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.am.AppTimeTracker;
@@ -154,11 +156,8 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+import com.android.server.am.QtiBackgroundManager;
 import com.android.server.wm.utils.RegionUtils;
-import com.android.window.flags.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -981,7 +980,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // keyguard if this display is always unlocked.
                 displayHasContent = true;
             }
-            if ((w.mAttrs.privateFlags & PRIVATE_FLAG_SUSTAINED_PERFORMANCE_MODE) != 0) {
+            if ((w.mAttrs.renderingHints & RENDERING_HINT_SUSTAINED_PERFORMANCE_MODE) != 0) {
                 mSustainedPerformanceModeCurrent = true;
             }
         }
@@ -1695,8 +1694,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             return false;
         }
 
-        if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()
-                && DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
+        if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
             if (!display.mDisplay.canHostTasks()) {
                 // Can't launch home on display that cannot host tasks.
                 return false;
@@ -1775,12 +1773,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // to send to the client now.
         final Configuration config =
                 displayContent.updateOrientationAndComputeConfig(true /* forceUpdate */);
-        // Visibilities may change so let the starting activity have a chance to report. Can't do it
-        // when visibility is changed in each AppWindowToken because it may trigger wrong
-        // configuration push because the visibility of some activities may not be updated yet.
-        if (starting != null) {
-            starting.reportDescendantOrientationChangeIfNeeded();
-        }
 
         // Update the configuration of the activities on the display.
         displayContent.updateDisplayOverrideConfigurationLocked(config, starting, deferResume);
@@ -1988,7 +1980,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         mCurrentUser = userId;
 
-        mTaskSupervisor.mStartingUsers.add(uss);
+        if (!mTaskSupervisor.mStartingUsers.contains(uss)) {
+            mTaskSupervisor.mStartingUsers.add(uss);
+        }
         forAllRootTasks(rootTask -> {
             rootTask.switchUser(userId);
         });
@@ -2167,9 +2161,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         final TransitionController transitionController = task.mTransitionController;
 
-        transitionController.deferTransitionReady();
         final Transition.ReadyCondition pipChangesApplied =
-                new Transition.ReadyCondition("movedToPip", !Flags.migrateBasicLegacyReady());
+                new Transition.ReadyCondition("movedToPip", false);
         transitionController.waitFor(pipChangesApplied);
         mService.deferWindowLayout();
         boolean localVisibilityDeferred = false;
@@ -2363,7 +2356,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     ensureActivitiesVisible();
                 }
             } finally {
-                transitionController.continueTransitionReady();
                 pipChangesApplied.meet();
             }
         }
@@ -2627,12 +2619,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                    ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                    if (freezer != null && freezer.useFreezerManager()) {
-                        freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
-                    }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+
+                    QtiBackgroundManager.getInstance().freezeProcessLevel(
+                            r.packageName, QtiBackgroundManager.WARM_LAUNCH_FREEZE);
 // QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 }
 // QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
@@ -2653,12 +2642,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
 // QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                if (freezer != null && freezer.useFreezerManager()) {
-                    freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
-                }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+                QtiBackgroundManager.getInstance().freezeProcessLevel(
+                        r.packageName, QtiBackgroundManager.FIRST_LAUNCH_FREEZE);
 // QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");
@@ -3237,18 +3222,15 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     ActivityRecord findActivity(Intent intent, ActivityInfo info, boolean compareIntentFilters) {
-        ComponentName cls = intent.getComponent();
+        final ComponentName cls;
         if (info.targetActivity != null) {
             cls = new ComponentName(info.packageName, info.targetActivity);
+        } else {
+            cls = intent.getComponent();
         }
         final int userId = UserHandle.getUserId(info.getUid());
 
-        final PooledPredicate p = PooledLambda.obtainPredicate(
-                RootWindowContainer::matchesActivity, PooledLambda.__(ActivityRecord.class),
-                userId, compareIntentFilters, intent, cls);
-        final ActivityRecord r = getActivity(p);
-        p.recycle();
-        return r;
+        return getActivity(r -> matchesActivity(r, userId, compareIntentFilters, intent, cls));
     }
 
     private static boolean matchesActivity(ActivityRecord r, int userId,
@@ -3410,11 +3392,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             return false;
         }
 
-        if (DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
-            if (task.getTaskDisplayArea().shouldKeepNoTask()) {
-                Slog.w(TAG, "canLaunchOnDisplay(), Task display area should keep no task: " + task);
-                return false;
-            }
+        if (task.getTaskDisplayArea().shouldKeepNoTask()) {
+            Slog.w(TAG, "canLaunchOnDisplay(), Task display area should keep no task: " + task);
+            return false;
         }
 
         return canLaunchOnDisplay(r, task.getTaskDisplayArea().getDisplayId());
@@ -3836,10 +3816,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     + " lookup");
         }
 
-        final PooledPredicate p = PooledLambda.obtainPredicate(
-                Task::isTaskId, PooledLambda.__(Task.class), id);
-        Task task = getTask(p);
-        p.recycle();
+        Task task = getTask(t -> t.isTaskId(id));
 
         if (task != null) {
             if (aOptions != null) {

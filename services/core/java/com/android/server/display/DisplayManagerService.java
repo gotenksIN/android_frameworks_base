@@ -57,6 +57,7 @@ import static android.os.Build.HW_TIMEOUT_MULTIPLIER;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
 import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.os.Process.ROOT_UID;
+import static android.os.UserHandle.isApp;
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS;
 import static android.provider.Settings.Secure.INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY;
 import static android.provider.Settings.Secure.MIRROR_BUILT_IN_DISPLAY;
@@ -93,6 +94,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
 import android.content.pm.UserInfo;
@@ -194,7 +196,6 @@ import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FrameworkStatsLog;
-import com.android.internal.util.NamedLock;
 import com.android.internal.util.SettingsWrapper;
 import com.android.server.AnimationThread;
 import com.android.server.DisplayThread;
@@ -204,6 +205,7 @@ import com.android.server.SystemService;
 import com.android.server.UiThread;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.display.LogicalDisplay.CachedDisplayInfo;
+import com.android.server.display.ModeRequestManager.RequestStatus;
 import com.android.server.display.config.SensorData;
 import com.android.server.display.feature.DeviceConfigParameterProvider;
 import com.android.server.display.feature.DisplayManagerFlags;
@@ -396,6 +398,8 @@ public final class DisplayManagerService extends SystemService {
     private final HighBrightnessModeMetadataMapper mHighBrightnessModeMetadataMapper =
             new HighBrightnessModeMetadataMapper();
 
+    private final ModeRequestManager mModeRequestManager;
+
     // List of all currently registered display adapters.
     private final ArrayList<DisplayAdapter> mDisplayAdapters = new ArrayList<>();
 
@@ -516,6 +520,9 @@ public final class DisplayManagerService extends SystemService {
     // Whether the system has finished booting or not.
     private boolean mSystemReady;
 
+    @GuardedBy("mSyncRoot")
+    private boolean mStopped;
+
     // The top inset of the default display.
     // This gets persisted so that the boot animation knows how to transition from the display's
     // full size to the size configured by the user. Right now we only persist and animate the top
@@ -565,6 +572,7 @@ public final class DisplayManagerService extends SystemService {
     private boolean mMinimalPostProcessingAllowed;
 
     // Receives notifications about changes to Settings.
+    @Nullable
     private SettingsObserver mSettingsObserver;
 
     // Receives notifications about changes to task stack.
@@ -720,11 +728,12 @@ public final class DisplayManagerService extends SystemService {
                 displayId -> getDisplayInfoInternal(displayId, Process.myUid()));
         Predicate<DisplayInfo> isDisplayAllowedInTopoogy =
                 mDisplayTopologyCoordinator::isDisplayAllowedInTopology;
+        mModeRequestManager = new ModeRequestManager();
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext, foldSettingProvider,
                 mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags,
                 isDisplayAllowedInTopoogy, mStableEdidsFlag, mDisplayInfoCache);
         mDisplayModeDirector = new DisplayModeDirector(
-                context, mHandler, mFlags, mDisplayDeviceConfigProvider);
+                context, mHandler, mFlags, mDisplayDeviceConfigProvider, mModeRequestManager);
         mBrightnessSynchronizer = new BrightnessSynchronizer(mContext, displayThreadLooper);
         Resources resources = mContext.getResources();
         mDefaultDisplayDefaultColorMode = mContext.getResources().getInteger(
@@ -819,6 +828,18 @@ public final class DisplayManagerService extends SystemService {
                     } catch (InterruptedException ex) {
                     }
                 }
+            }
+        } else if (phase == PHASE_SYSTEM_SERVICES_READY &&
+                Flags.enableChargingExperienceByDefault()) {
+            ContentResolver contentResolver = mContext.getContentResolver();
+            if (Settings.Global.getInt(contentResolver,
+                    Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED, -1) == -1) {
+                Settings.Global.putInt(contentResolver,
+                        Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED,
+                        mContext.getResources().getBoolean(
+                                com.android.internal.R.bool.config_wearChargingExperienceEnabled)
+                                ? 1 : 0
+                );
             }
         } else if (phase == PHASE_BOOT_COMPLETED) {
             synchronized (mSyncRoot) {
@@ -915,9 +936,7 @@ public final class DisplayManagerService extends SystemService {
             mContext.getSystemService(DeviceStateManager.class).registerCallback(
                     mHandlerExecutor, new DeviceStateListener());
 
-            if (mFlags.isDisplayMirrorInLockTaskModeEnabled()) {
-                setupTaskStackListener();
-            }
+            setupTaskStackListener();
 
             mLogicalDisplayMapper.onWindowManagerReady();
             scheduleTraversalLocked(false);
@@ -1027,6 +1046,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     @VisibleForTesting
+    @Nullable
     ContentObserver getSettingsObserver() {
         return mSettingsObserver;
     }
@@ -1283,8 +1303,7 @@ public final class DisplayManagerService extends SystemService {
                                 MIRROR_BUILT_IN_DISPLAY), false, this, UserHandle.USER_ALL);
             }
 
-            if (mFlags.isDefaultDisplayInTopologySwitchEnabled()
-                    && !mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
+            if (!mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
                 mContext.getContentResolver().registerContentObserver(
                         Settings.Secure.getUriFor(
                                 Settings.Secure.INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY),
@@ -1338,7 +1357,7 @@ public final class DisplayManagerService extends SystemService {
 
     private boolean updateMirrorBuiltInDisplaySettingLocked(boolean shouldSendDisplayChangeEvent) {
         final boolean mirrorBuiltInDisplay;
-        if (mFlags.isDisplayMirrorInLockTaskModeEnabled()
+        if (mActivityTaskManagerInternal != null
                 && mActivityTaskManagerInternal.getLockTaskModeState()
                 == ActivityManager.LOCK_TASK_MODE_LOCKED) {
             // If the device is in lock task mode, enable external displays mirroring regardless of
@@ -1370,8 +1389,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void handleIncludeDefaultDisplayInTopologySettingChangeLocked() {
-        if (!mFlags.isDefaultDisplayInTopologySwitchEnabled()
-                || mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
+        if (mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
             return;
         }
 
@@ -1506,7 +1524,33 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private DisplayInfo getDisplayInfoForFrameRateOverride(
+    private DisplayInfo getDisplayInfoForOverrides(
+            DisplayEventReceiver.FrameRateOverride[] frameRateOverrides,
+            DisplayInfo info, int callingUid) {
+        final DisplayInfo overriddenInfo = new DisplayInfo();
+        overriddenInfo.copyFrom(info);
+        applyFrameRateOverride(frameRateOverrides, overriddenInfo, callingUid);
+        applyPresentationMaskingOverride(overriddenInfo, callingUid);
+        return overriddenInfo;
+    }
+
+    private void applyPresentationMaskingOverride(DisplayInfo info, int callingUid) {
+        if (!com.android.window.flags.Flags.maskPresentationFlagsOnInternalDisplays()) {
+            return;
+        }
+
+        if (info.type != Display.TYPE_INTERNAL
+                || (info.flags & Display.FLAG_PRESENTATION) == 0) {
+            return;
+        }
+
+        if (isApp(callingUid) && CompatChanges.isChangeEnabled(
+                ActivityInfo.MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS, callingUid)) {
+            info.flags &= ~Display.FLAG_PRESENTATION;
+        }
+    }
+
+    private void applyFrameRateOverride(
             DisplayEventReceiver.FrameRateOverride[] frameRateOverrides,
             DisplayInfo info, int callingUid) {
         // Start with the display frame rate
@@ -1521,7 +1565,7 @@ public final class DisplayManagerService extends SystemService {
         }
 
         if (frameRateHz == 0) {
-            return info;
+            return;
         }
 
         // For non-apps users we always return the physical refresh rate from display mode
@@ -1538,12 +1582,9 @@ public final class DisplayManagerService extends SystemService {
         float numPeriods = vsyncRate / frameRateHz;
         float numPeriodsRound = Math.round(numPeriods);
         if (Math.abs(numPeriods - numPeriodsRound) > THRESHOLD_FOR_REFRESH_RATES_DIVISORS) {
-            return info;
+            return;
         }
         frameRateHz = vsyncRate / numPeriodsRound;
-
-        DisplayInfo overriddenInfo = new DisplayInfo();
-        overriddenInfo.copyFrom(info);
 
         // If there is a mode that matches the override, use that one.
         // On ARR devices, this logic is not needed as the mode doesn't change based
@@ -1561,32 +1602,31 @@ public final class DisplayManagerService extends SystemService {
                     if (DEBUG) {
                         Slog.d(TAG, "found matching modeId " + mode.getModeId());
                     }
-                    overriddenInfo.refreshRateOverride = mode.getRefreshRate();
+                    info.refreshRateOverride = mode.getRefreshRate();
 
                     if (!displayModeReturnsPhysicalRefreshRate) {
-                        overriddenInfo.modeId = mode.getModeId();
+                        info.modeId = mode.getModeId();
                     }
-                    return overriddenInfo;
+                    return;
                 }
             }
         }
-        overriddenInfo.refreshRateOverride = frameRateHz;
+        info.refreshRateOverride = frameRateHz;
 
         // Create a fake mode for app compat
         if (!displayModeReturnsPhysicalRefreshRate) {
-            overriddenInfo.supportedModes = Arrays.copyOf(info.supportedModes,
+            info.supportedModes = Arrays.copyOf(info.supportedModes,
                     info.supportedModes.length + 1);
-            overriddenInfo.supportedModes[overriddenInfo.supportedModes.length - 1] =
+            info.supportedModes[info.supportedModes.length - 1] =
                     new Display.Mode(Display.DISPLAY_MODE_ID_FOR_FRAME_RATE_OVERRIDE,
                             currentMode.getPhysicalWidth(), currentMode.getPhysicalHeight(),
-                            overriddenInfo.refreshRateOverride,
+                            info.refreshRateOverride,
                             currentMode.getVsyncRate(),
                             new float[0], currentMode.getSupportedHdrTypes());
-            overriddenInfo.modeId =
-                    overriddenInfo.supportedModes[overriddenInfo.supportedModes.length - 1]
+            info.modeId =
+                    info.supportedModes[info.supportedModes.length - 1]
                             .getModeId();
         }
-        return overriddenInfo;
     }
 
     private int[] getDisplayIdsInternal(int callingUid, boolean includeDisabled) {
@@ -1623,7 +1663,7 @@ public final class DisplayManagerService extends SystemService {
                             + " for uid " + callingUid
                             + " displayId " + displayId);
                 }
-                return getDisplayInfoForFrameRateOverride(
+                return getDisplayInfoForOverrides(
                         info.frameRateOverrides(), info.info(), callingUid);
             }
         }
@@ -1631,7 +1671,7 @@ public final class DisplayManagerService extends SystemService {
             final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
             if (display != null) {
                 final DisplayInfo info =
-                        getDisplayInfoForFrameRateOverride(display.getFrameRateOverrides(),
+                        getDisplayInfoForOverrides(display.getFrameRateOverrides(),
                                 display.getDisplayInfoLocked(), callingUid);
                 if (mInjector.doesCallingUidHaveAccessToDisplay(callingUid, info)) {
                     if (DEBUG) {
@@ -2548,6 +2588,9 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void registerDisplayAdapterLocked(DisplayAdapter adapter) {
+        if (mStopped) {
+            return;
+        }
         mDisplayAdapters.add(adapter);
         adapter.registerLocked();
     }
@@ -3087,10 +3130,64 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private void setUserPreferredModeForDisplayLocked(int displayId, Display.Mode mode) {
+    private boolean setUserPreferredModeForDisplayLocked(int displayId, Display.Mode mode) {
         DisplayDevice displayDevice = getDeviceForDisplayLocked(displayId);
         if (displayDevice != null) {
-            displayDevice.setUserPreferredDisplayModeLocked(mode);
+            return displayDevice.setUserPreferredDisplayModeLocked(mode);
+        }
+        return false;
+    }
+
+    void setUserPreferredDisplayModesInternal(
+            @NonNull ModeRequestManager.UserPreferredModeRequest[] requests) {
+        if (mModeRequestManager.isDisabled()) {
+            return;
+        }
+
+        // return if there are already other requests in progress
+        if (mModeRequestManager.hasActiveRequests()) {
+            Slog.w(ModeRequestManager.TAG, "There is an ongoing mode change request. "
+                    + "Requests ignored.");
+            return;
+        }
+        synchronized (mSyncRoot) {
+            boolean requestSuccessful =
+                    mModeRequestManager.onUserPreferredModesRequestedLocked(requests);
+            if (requestSuccessful) {
+                boolean changed = false;
+                for (ModeRequestManager.UserPreferredModeRequest request : requests) {
+                    boolean storeMode = request.mStoreMode;
+
+                    DisplayDevice displayDevice = getDeviceForDisplayLocked(request.mDisplayId);
+                    if (displayDevice == null) {
+                        Slog.w(ModeRequestManager.TAG, "Device not found for at least one"
+                                + " of the requested displays in a mode change. Requests cleared.");
+                        mModeRequestManager.clearRequests();
+                        return;
+                    }
+                    mModeRequestManager.waitingForDeviceInfo(request.mDisplayId);
+
+                    if (storeMode) {
+                        storeModeLocked(request.mDisplayId, request.mMode);
+                    }
+                    if (displayDevice.setUserPreferredDisplayModeLocked(request.mMode)) {
+                        changed = true;
+                    }
+                    mModeRequestManager.storeMode(request.mDisplayId,
+                            displayDevice.getUserPreferredDisplayModeLocked());
+                }
+
+                if (changed) {
+                    mLogicalDisplayMapper.updateLogicalDisplaysLocked();
+                    for (ModeRequestManager.UserPreferredModeRequest request : requests) {
+                        DisplayInfo displayInfo = getDisplayInfoInternal(request.mDisplayId,
+                                Process.myUid());
+                        mModeRequestManager.infoUpdated(request.mDisplayId, displayInfo);
+                    }
+                } else {
+                    mModeRequestManager.clearRequests();
+                }
+            }
         }
     }
 
@@ -3398,13 +3495,20 @@ public final class DisplayManagerService extends SystemService {
 
         // Configure each display device.
         mLogicalDisplayMapper.forEachLocked((LogicalDisplay display) -> {
+            boolean isInBatch =
+                    mModeRequestManager.isRequestInProgress(display.getDisplayIdLocked());
             final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
             final SurfaceControl.Transaction displayTransaction =
                     displayTransactions.get(display.getDisplayIdLocked(), t);
             if (device != null) {
-                configureDisplayLocked(displayTransaction, device);
+                configureDisplayLocked(displayTransaction, device, isInBatch);
             }
         });
+
+        if (mModeRequestManager.allDisplaysReachedStatus(RequestStatus.MODE_SPECS_SET)) {
+            mDisplayAdapters.forEach(DisplayAdapter::applyBatchDisplayModeUpdatesLocked);
+            mModeRequestManager.clearRequests();
+        }
 
         // Tell the input system about these new viewports.
         if (mInputManagerInternal != null) {
@@ -3733,7 +3837,8 @@ public final class DisplayManagerService extends SystemService {
         return Optional.empty();
     }
 
-    private void configureDisplayLocked(SurfaceControl.Transaction t, DisplayDevice device) {
+    private void configureDisplayLocked(SurfaceControl.Transaction t, DisplayDevice device,
+                                        boolean isInBatch) {
         final DisplayDeviceInfo info = device.getDisplayDeviceInfoLocked();
 
         // Find the logical display that the display device is showing.
@@ -3748,7 +3853,7 @@ public final class DisplayManagerService extends SystemService {
             return;
         }
         display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF,
-                mHandlerExecutor);
+                mHandlerExecutor, isInBatch);
         final Optional<Integer> viewportType = getViewportType(info);
         if (viewportType.isPresent()) {
             populateViewportLocked(viewportType.get(), display.getDisplayIdLocked(), device, info);
@@ -4252,14 +4357,16 @@ public final class DisplayManagerService extends SystemService {
     @VisibleForTesting
     void stop() {
         synchronized (mSyncRoot) {
+            mStopped = true;
             for (int i = 0; i < mDisplayPowerControllers.size(); i++) {
                 mDisplayPowerControllers.valueAt(i).stop();
             }
             for (DisplayAdapter adapter : mDisplayAdapters) {
-                if (adapter instanceof LocalDisplayAdapter) {
-                    ((LocalDisplayAdapter) adapter).stop();
-                }
+                adapter.stop();
             }
+        }
+        if (mSettingsObserver != null) {
+            mContext.getContentResolver().unregisterContentObserver(mSettingsObserver);
         }
     }
 
@@ -6911,6 +7018,13 @@ public final class DisplayManagerService extends SystemService {
         }
 
         @Override
+        public SparseIntArray getGroupIdsByDisplayIds() {
+            synchronized (mSyncRoot) {
+                return mLogicalDisplayMapper.getGroupIdsByDisplayIdsLocked();
+            }
+        }
+
+        @Override
         public int[] getDisplayIds(boolean includeDisabled) {
             return getDisplayIdsInternal(Process.myUid(), includeDisabled);
         }
@@ -7019,6 +7133,7 @@ public final class DisplayManagerService extends SystemService {
                 display.setDesiredDisplayModeSpecsLocked(desiredDisplayModeSpecs);
                 mChanged = true;
             }
+            mModeRequestManager.onSpecsSet(displayId);
         };
 
         @GuardedBy("mSyncRoot")

@@ -148,7 +148,7 @@
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Eingabegerät"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"Internetzugriff"</string>
     <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"Zugriff auf Kontakte und Anrufliste gewähren"</string>
-    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Die Daten werden z. B. für Anrufbenachrichtigungen verwendet"</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Die Daten werden u. a. für Anrufbenachrichtigungen verwendet"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"Freigabe der Internetverbindung"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"SMS"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"Zugriff auf SIM"</string>
@@ -530,8 +530,8 @@
     <string name="power_charging_limited" msgid="4144004473976005214">"<xliff:g id="LEVEL">%1$s</xliff:g> – Ladevorgang zum Schutz des Akkus angehalten"</string>
     <string name="power_charging_future_paused" msgid="1809543660923642799">"<xliff:g id="LEVEL">%1$s</xliff:g> – Wird geladen"</string>
     <string name="power_fast_charging_duration_v2" msgid="3797735998640359490">"<xliff:g id="LEVEL">%1$s</xliff:g> – <xliff:g id="STATUS">%2$s</xliff:g> – Vollständig geladen in <xliff:g id="TIME">%3$s</xliff:g>"</string>
-    <string name="power_charging_duration_v2" msgid="2938998284074003248">"<xliff:g id="LEVEL">%1$s</xliff:g> – Vollständig geladen in <xliff:g id="TIME">%2$s</xliff:g>"</string>
-    <string name="power_remaining_charging_duration_only_v2" msgid="5358176435722950193">"Vollständig geladen um <xliff:g id="TIME">%1$s</xliff:g>"</string>
+    <string name="power_charging_duration_v2" msgid="2938998284074003248">"<xliff:g id="LEVEL">%1$s</xliff:g> – Vollständig geladen bis <xliff:g id="TIME">%2$s</xliff:g>"</string>
+    <string name="power_remaining_charging_duration_only_v2" msgid="5358176435722950193">"Vollständig geladen bis <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="power_remaining_fast_charging_duration_only_v2" msgid="6270950195810579563">"Vollständig geladen bis <xliff:g id="TIME">%1$s</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="268625384868401114">"Unbekannt"</string>
     <string name="battery_info_status_charging" msgid="4279958015430387405">"Wird aufgeladen"</string>

@@ -196,16 +196,6 @@ flag {
 }
 
 flag {
-    name: "fix_flickers_during_switch_from_dismiss"
-    namespace: "multitasking"
-    description: "Fixes flickers while switching bubbles as a result of dismissing a bubble."
-    bug: "452305969"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_bubble_swipe_up_gesture"
     namespace: "multitasking"
     description: "Fixes the swipe up gesture getting broken due to bubbles."
@@ -237,16 +227,6 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where resolving package name for task trampoline."
     bug: "370653710"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_open_app_bubble_from_lockscreen"
-    namespace: "multitasking"
-    description: "Fix opening app bubble from notification on lock screen"
-    bug: "416389130"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -333,6 +313,26 @@ flag {
 }
 
 flag {
+    name: "update_bubble_bar_taskbar_intersection"
+    namespace: "multitasking"
+    description: "Update the logic to determine if the expanded  bubble bar will intersect the persistent taskbar"
+    bug: "478462570"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "bbev_square_corners_fix"
+    namespace: "multitasking"
+    description: "Fixes square corners when expanding Bubbles from PiP"
+    bug: "475068406"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "update_bubble_bounds_during_rotation"
     namespace: "multitasking"
     description: "Update the bounds of the expanded bubble task as part of the rotation transition"
@@ -343,10 +343,80 @@ flag {
 }
 
 flag {
+    name: "bubble_dismiss_magnetize_collision_prevention"
+    namespace: "multitasking"
+    description: "Move the dismiss view higher so it`s magnetize zone does not collide with the bubble bar"
+    bug: "481701224"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "fix_flicker_when_app_bubble_from_overflow"
     namespace: "multitasking"
     description: "Fixes a flicker issue that happens when promoting an app bubble from overflow"
     bug: "472080053"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_notification_showing_in_lock_screen"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubble notification persist on lock screen"
+    bug: "466186520"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_bar_stashing_with_hardware_keyboard"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubble bar stashes incorrectly when a hardware keyboard is connected"
+    bug: "461660471"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_swipe_up_notification_shade_with_bubble_bar"
+    namespace: "multitasking"
+    description: "Fixes an issue where swiping from the bottom of the notification shade while bubbles were expanded below wouldn't work"
+    bug: "483561405"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_verify_bubble_task_id_on_removal"
+    namespace: "multitasking"
+    description: "Fixes a bug where we remove a bubble based on package name after the bubble task has changed"
+    bug: "482877474"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubbles_stashing_on_home"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubbles could be stashed on launcher home"
+    bug: "487360955"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "bubbles_fix_issues_with_repeated_fold_unfold"
+    namespace: "multitasking"
+    description: "Fixes bubble issues when transitioning between modes due to repeated folding and unfolding"
+    bug: "450107220"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

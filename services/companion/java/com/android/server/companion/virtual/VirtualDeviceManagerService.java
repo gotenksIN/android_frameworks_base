@@ -212,7 +212,7 @@ public class VirtualDeviceManagerService extends SystemService {
         mNativeImpl = new VirtualDeviceManagerNativeImpl();
         mLocalService = new LocalService();
         mComputerControlSessionProcessor =
-                new ComputerControlSessionProcessor(context,
+                new ComputerControlSessionProcessor(context, mLocalService,
                         (token, attributionSource, params) ->
                                 new VirtualDeviceManager.VirtualDevice(context,
                                         mImpl.createLocalVirtualDevice(
@@ -297,12 +297,21 @@ public class VirtualDeviceManagerService extends SystemService {
             Slog.e(TAG, "Failed to find CompanionDeviceManager. No CDM association info "
                     + " will be available.");
         }
-        if (android.companion.virtualdevice.flags.Flags.deviceAwareDisplayPower()) {
-            mStrongAuthTracker = new StrongAuthTracker(getContext());
-            new LockPatternUtils(getContext()).registerStrongAuthTracker(mStrongAuthTracker);
-        }
+
+        mStrongAuthTracker = new StrongAuthTracker(getContext());
+        new LockPatternUtils(getContext()).registerStrongAuthTracker(mStrongAuthTracker);
 
         mComputerControlSessionProcessor.initialize();
+    }
+
+    @Override
+    public void onUserStarting(@NonNull TargetUser user) {
+        super.onUserStarting(user);
+        ArrayList<VirtualDeviceImpl> virtualDevicesSnapshot = getVirtualDevicesSnapshot();
+        for (int i = 0; i < virtualDevicesSnapshot.size(); i++) {
+            VirtualDeviceImpl virtualDevice = virtualDevicesSnapshot.get(i);
+            virtualDevice.onUserStarting(user.getUserIdentifier());
+        }
     }
 
     // Called when the global lockdown state changes, i.e. lockdown is considered active if any user

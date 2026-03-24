@@ -16,7 +16,11 @@
 
 package android.service.personalcontext.hint;
 
+import static android.service.personalcontext.ParcelUtils.roundTripThroughParcel;
+
 import static com.google.common.truth.Truth.assertThat;
+
+import android.os.Parcel;
 
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
@@ -42,26 +46,27 @@ public class HintFilterTest {
     private static final String HINT_CLASS_E =
             "android.service.personalcontext.hint.HintFilterTest.E";
 
-    private static ContextHintWithSignature makeHint(String hintClass)
+    private static PublishedContextHint makeHint(String hintClass)
             throws GeneralSecurityException {
-        return new ContextHintWithSignature.Builder(
+        return new PublishedContextHint.Builder(
                 new BundleHint.Builder().setHintTypeName(hintClass).build(),
                 ContextHintTestUtils.generateSignedHintKey())
+            .setOriginatingPackage("personalcontext.cts")
             .build();
     }
 
     @Test
     public void testHintFilterRequireAll() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_A, true)
-                        .addHintType(HINT_CLASS_B, true)
-                        .addHintType(HINT_CLASS_C, true)
-                        .build()
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_B, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_C, HintFilter.FILTER_TYPE_REQUIRED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
@@ -70,15 +75,15 @@ public class HintFilterTest {
 
     @Test
     public void testHintFilterRequireSome() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_A, true)
-                        .addHintType(HINT_CLASS_B, true)
-                        .build()
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_B, HintFilter.FILTER_TYPE_REQUIRED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
@@ -86,19 +91,32 @@ public class HintFilterTest {
     }
 
     @Test
-    public void testHintFilterRequireMissingSome() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+    public void testHintFilterParceling() throws GeneralSecurityException {
+        final HintFilter filter = roundTripThroughParcel(new HintFilter.Builder()
+                .addBundleHintTypeName("hintTypeName", HintFilter.FILTER_TYPE_ALLOWED)
+                .build());
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_A, true)
-                        .addHintType(HINT_CLASS_B, true)
-                        .addHintType(HINT_CLASS_C, true)
-                        .addHintType(HINT_CLASS_D, true)
-                        .addHintType(HINT_CLASS_E, true)
-                        .build()
+        Parcel parcel = Parcel.obtain();
+        parcel.writeParcelable(filter, 0);
+
+        final HintFilter filter2 = parcel.readParcelable(HintFilter.class.getClassLoader());
+    }
+
+
+    @Test
+    public void testHintFilterRequireMissingSome() throws GeneralSecurityException {
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
+
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_B, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_C, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_D, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_E, HintFilter.FILTER_TYPE_REQUIRED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
@@ -107,15 +125,15 @@ public class HintFilterTest {
 
     @Test
     public void testHintFilterRequireNone() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_D, true)
-                        .addHintType(HINT_CLASS_E, true)
-                        .build()
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_D, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_E, HintFilter.FILTER_TYPE_REQUIRED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
@@ -124,15 +142,15 @@ public class HintFilterTest {
 
     @Test
     public void testHintFilterAllowOne() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_A, false)
-                        .addHintType(HINT_CLASS_D, false)
-                        .build()
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_ALLOWED)
+                        .addBundleHintTypeName(HINT_CLASS_D, HintFilter.FILTER_TYPE_ALLOWED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
@@ -141,16 +159,16 @@ public class HintFilterTest {
 
     @Test
     public void testHintFilterAllowMany() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_A, false)
-                        .addHintType(HINT_CLASS_B, false)
-                        .addHintType(HINT_CLASS_C, false)
-                        .build()
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_ALLOWED)
+                        .addBundleHintTypeName(HINT_CLASS_B, HintFilter.FILTER_TYPE_ALLOWED)
+                        .addBundleHintTypeName(HINT_CLASS_C, HintFilter.FILTER_TYPE_ALLOWED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
@@ -159,18 +177,52 @@ public class HintFilterTest {
 
     @Test
     public void testHintFilterAllowSome() throws GeneralSecurityException {
-        ContextHintWithSignature hintA = makeHint(HINT_CLASS_A);
-        ContextHintWithSignature hintB = makeHint(HINT_CLASS_B);
-        ContextHintWithSignature hintC = makeHint(HINT_CLASS_C);
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
 
-        final Set<ContextHintWithSignature> interestedHintSet =
-                new HintFilter.Builder()
-                        .addHintType(HINT_CLASS_A, false)
-                        .addHintType(HINT_CLASS_B, false)
-                        .build()
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_ALLOWED)
+                        .addBundleHintTypeName(HINT_CLASS_B, HintFilter.FILTER_TYPE_ALLOWED)
+                        .build())
                         .getInterestedHintClusters(
                                 Set.of(hintA, hintB, hintC), Collections.emptySet());
 
         assertThat(interestedHintSet).containsExactly(hintA, hintB);
+    }
+
+    @Test
+    public void testHintFilterMultipleFilterTypesOneHint() throws GeneralSecurityException {
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addHintType(BundleHint.class, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addPackage("personalcontext.cts", HintFilter.FILTER_TYPE_REQUIRED)
+                        .build())
+                        .getInterestedHintClusters(
+                                Set.of(hintA), Collections.emptySet());
+
+        assertThat(interestedHintSet).containsExactly(hintA);
+    }
+
+    @Test
+    public void testHintFilterMultipleFilterTypesMultipleHints() throws GeneralSecurityException {
+        PublishedContextHint hintA = makeHint(HINT_CLASS_A);
+        PublishedContextHint hintB = makeHint(HINT_CLASS_B);
+        PublishedContextHint hintC = makeHint(HINT_CLASS_C);
+
+        final Set<PublishedContextHint> interestedHintSet =
+                roundTripThroughParcel(new HintFilter.Builder()
+                        .addHintType(BundleHint.class, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addBundleHintTypeName(HINT_CLASS_A, HintFilter.FILTER_TYPE_REQUIRED)
+                        .addPackage("personalcontext.cts", HintFilter.FILTER_TYPE_REQUIRED)
+                        .build())
+                        .getInterestedHintClusters(
+                                Set.of(hintA, hintB, hintC), Collections.emptySet());
+
+        assertThat(interestedHintSet).containsExactly(hintA, hintB, hintC);
     }
 }

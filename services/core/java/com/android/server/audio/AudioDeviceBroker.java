@@ -22,6 +22,7 @@
  */
 package com.android.server.audio;
 
+import static android.media.AudioDeviceAttributes.ROLE_OUTPUT;
 import static android.media.audio.Flags.scoManagedByAudio;
 import static android.media.audio.Flags.unifyAbsoluteVolumeManagement;
 import static android.media.AudioSystem.DEVICE_IN_ALL_SCO_SET;
@@ -85,6 +86,8 @@ import android.media.ICommunicationDeviceDispatcher;
 import android.media.IStrategyNonDefaultDevicesDispatcher;
 import android.media.IStrategyPreferredDevicesDispatcher;
 import android.media.MediaMetrics;
+import android.media.audio.DeviceIdentity;
+import android.media.audio.IAudioModeSession;
 import android.media.audiopolicy.AudioProductStrategy;
 import android.os.Binder;
 import android.os.Handler;
@@ -120,6 +123,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -405,7 +410,7 @@ public class AudioDeviceBroker {
      * @param eventSource for logging purposes
      * @return false if there is no device and no communication client
      */
-    /*package*/ boolean setCommunicationDevice(IBinder cb,
+    /*package*/ public boolean setCommunicationDevice(IBinder cb,
             @NonNull AttributionSource attributionSource, AudioDeviceInfo device,
             boolean isPrivileged, String eventSource) {
         if (AudioService.DEBUG_COMM_RTE) {
@@ -588,7 +593,7 @@ public class AudioDeviceBroker {
      * Returns the device currently requested for communication use case.
      * @return AudioDeviceInfo the requested device for communication.
      */
-    /* package */ AudioDeviceInfo getCommunicationDevice() {
+    /* package */ public AudioDeviceInfo getCommunicationDevice() {
         synchronized (mCommunicationDeviceLock) {
             final long start = System.currentTimeMillis();
             long elapsed = 0;
@@ -1357,6 +1362,20 @@ public class AudioDeviceBroker {
         return mDeviceInventory.getPreferredDevicesForStrategy(strategy);
     }
 
+    public @Nullable AudioDeviceInfo getPreferredCommunicationDevice() {
+        if (mCommunicationStrategyId == -1) {
+            initRoutingStrategyIds();
+        }
+        List<AudioDeviceAttributes> devices =
+                mDeviceInventory.getExternalPreferredDevicesForStrategy(mCommunicationStrategyId);
+        if (devices != null && !devices.isEmpty()) {
+            AudioDeviceAttributes attr = devices.get(0);
+            // TODO remove dependency on device info
+            return AudioManager.getDeviceInfoFromTypeAndAddress(attr.getType(), attr.getAddress());
+        }
+        return null;
+    }
+
     /*package*/ int removePreferredDevicesForStrategySync(int strategy) {
         return mDeviceInventory.removePreferredDevicesForStrategyAndSave(strategy);
     }
@@ -1461,7 +1480,13 @@ public class AudioDeviceBroker {
             mAudioService.updateBtCommDeviceActive(
                     isBluetoothScoActive() ? BT_COMM_DEVICE_ACTIVE_SCO : btCommDeviceActiveType);
         }
-
+        mBrokerHandler.post(() -> {
+            synchronized (mAudioModeSessions) {
+                for (AudioModeSession session : mAudioModeSessions) {
+                    session.onCommunicationDeviceChanged(device);
+                }
+            }
+        });
         final int nbDispatchers = mCommDevDispatchers.beginBroadcast();
         for (int i = 0; i < nbDispatchers; i++) {
             try {
@@ -2190,6 +2215,9 @@ public class AudioDeviceBroker {
                 case MSG_IL_UPDATED_ADI_DEVICE_STATE:
                     mAudioService.onUpdatedAdiDeviceState((AdiDeviceState) msg.obj, msg.arg1 == 1);
                     break;
+                case MSG_L_CONNECTED_DEVICES_CHANGED:
+                    onConnectedDevicesChanged();
+                    break;
 
                 default:
                     Log.wtf(TAG, "Invalid message " + msg.what);
@@ -2268,6 +2296,7 @@ public class AudioDeviceBroker {
     private static final int MSG_IL_BT_HEARING_AID_TIMEOUT = 61;
 
     private static final int MSG_I_MUTE_CALL = 62;
+    private static final int MSG_L_CONNECTED_DEVICES_CHANGED = 63;
 
 
     private static boolean isMessageHandledUnderWakelock(int msgId) {
@@ -2417,9 +2446,7 @@ public class AudioDeviceBroker {
             return false;
         }
         // Do not mute on bluetooth event if music is playing on a wired headset.
-        if (message == MSG_L_SET_BT_ACTIVE_DEVICE
-                || message == MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE
-                && AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)
+        if (AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)
                 && hasIntersection(mDeviceInventory.DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG_SET,
                 mAudioService.getDeviceSetForStream(AudioSystem.STREAM_MUSIC).stream().map(
                         AudioDeviceAttributes::getInternalType).collect(
@@ -2928,6 +2955,48 @@ public class AudioDeviceBroker {
     // for testing purposes only
     void clearDeviceInventory() {
         mDeviceInventory.clearDeviceInventory();
+    }
+
+    //----------------------------------------------------------
+    // For AudioModeSession
+
+    private final ArrayList<AudioModeSession> mAudioModeSessions =
+            new ArrayList<>();
+
+    private final Executor mSessionExecutor = Executors.newSingleThreadExecutor();
+
+    /*package*/ android.media.audio.IAudioModeSession createAudioModeSession(
+            @NonNull android.media.audio.AudioModeSessionRequest request,
+            @NonNull android.media.audio.IAudioModeSessionCallback callback) {
+        AudioModeSession session =
+                new AudioModeSession(mAudioService, this, request, callback, mSessionExecutor);
+        synchronized (mAudioModeSessions) {
+            mAudioModeSessions.add(session);
+        }
+        postOnConnectedDevicesChanged();
+        return session;
+    }
+
+    /*package*/ public void removeAudioModeSession(AudioModeSession session) {
+        synchronized (mAudioModeSessions) {
+            mAudioModeSessions.remove(session);
+        }
+    }
+
+    void postOnConnectedDevicesChanged() {
+        // Post the message to the handler to ensure the callback is called on the same thread
+        // as other audio service updates, preventing potential race conditions.
+        // Using SENDMSG_REPLACE to avoid flooding if multiple changes happen quickly.
+        sendMsg(MSG_L_CONNECTED_DEVICES_CHANGED, SENDMSG_REPLACE, 0);
+    }
+
+    private void onConnectedDevicesChanged() {
+        List<AudioDeviceInfo> devices = getAvailableCommunicationDevices();
+        synchronized (mAudioModeSessions) {
+            for (AudioModeSession session : mAudioModeSessions) {
+                session.onAvailableDevicesChanged(devices);
+            }
+        }
     }
 
 }

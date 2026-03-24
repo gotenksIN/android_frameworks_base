@@ -16,7 +16,6 @@
 
 package com.android.systemui.scene
 
-import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.testing.TestableLooper.RunWithLooper
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,12 +36,11 @@ import com.android.systemui.authentication.shared.model.AuthenticationMethodMode
 import com.android.systemui.bouncer.ui.viewmodel.PasswordBouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.PinBouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.bouncerOverlayContentViewModel
-import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.integration.SystemUiIntegrationTest
-import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
+import com.android.systemui.keyguard.domain.interactor.lockAfterScreenTimeoutInteractor
 import com.android.systemui.keyguard.ui.viewmodel.lockscreenUserActionsViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
@@ -71,14 +69,12 @@ import com.android.systemui.telephony.data.repository.fakeTelephonyRepository
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.whenever
-import com.android.systemui.util.settings.data.repository.userAwareSecureSettingsRepository
 import com.android.telecom.mockTelecomManager
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.advanceTimeBy
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
@@ -478,7 +474,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         // Set the lockscreen enabled bit _before_ set the auth method as the code picks up on the
         // lockscreen enabled bit _after_ the auth method is changed and the lockscreen enabled bit
         // is not an observable that can trigger a new evaluation.
-        fakeDeviceEntryRepository.setLockscreenEnabled(enableLockscreen)
+        fakeKeyguardRepository.setKeyguardEnabled(enableLockscreen)
         fakeAuthenticationRepository.setAuthenticationMethod(authMethod)
 
         // TODO(b/466145787): Merge this state with the one in DeviceEntryRepository.
@@ -641,14 +637,9 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             .isTrue()
 
         powerInteractor.setAsleepForTest()
-        testScope.advanceTimeBy(
-            kosmos.userAwareSecureSettingsRepository
-                .getInt(
-                    Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT,
-                    KeyguardViewMediator.KEYGUARD_LOCK_AFTER_DELAY_DEFAULT,
-                )
-                .toLong()
-        )
+        runCurrent()
+        kosmos.lockAfterScreenTimeoutInteractor.timeoutElapsedForTesting()
+        runCurrent()
 
         powerInteractor.setAwakeForTest()
     }
@@ -735,22 +726,19 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
     }
 
     /** Changes device wakefulness state from awake to asleep, going through intermediary states. */
-    private suspend fun Kosmos.putDeviceToSleep(waitForLock: Boolean = true) {
+    private suspend fun Kosmos.putDeviceToSleep(lockTimerElapses: Boolean = true) {
         val wakefulnessModel = currentValue(powerInteractor.detailedWakefulness)
         assertWithMessage("Cannot put device to sleep as it's already asleep!")
             .that(wakefulnessModel.isAwake())
             .isTrue()
 
         powerInteractor.setAsleepForTest()
-        if (waitForLock) {
-            testScope.advanceTimeBy(
-                userAwareSecureSettingsRepository
-                    .getInt(
-                        Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT,
-                        KeyguardViewMediator.KEYGUARD_LOCK_AFTER_DELAY_DEFAULT,
-                    )
-                    .toLong()
-            )
+        runCurrent()
+        if (lockTimerElapses) {
+            // The waiting is actually implemented using AlarmManager, and tests currently only have
+            // a mock AlarmManager. Pretend that its alarm has fired..
+            kosmos.lockAfterScreenTimeoutInteractor.timeoutElapsedForTesting()
+            runCurrent()
         }
     }
 

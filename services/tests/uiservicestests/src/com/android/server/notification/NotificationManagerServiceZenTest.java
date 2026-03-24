@@ -39,7 +39,6 @@ import static android.content.pm.PackageManager.FEATURE_WATCH;
 import static android.os.Build.VERSION_CODES.O_MR1;
 import static android.os.Build.VERSION_CODES.P;
 import static android.os.Process.INVALID_UID;
-import static android.os.UserHandle.USER_SYSTEM;
 import static android.provider.Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS;
 import static android.service.notification.Condition.SOURCE_CONTEXT;
 import static android.service.notification.Condition.SOURCE_USER_ACTION;
@@ -113,7 +112,6 @@ import android.content.pm.IPackageManager;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
-import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutServiceInternal;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
@@ -121,7 +119,6 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -202,7 +199,6 @@ import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -213,7 +209,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -566,8 +561,7 @@ public class NotificationManagerServiceZenTest extends UiServiceTestCase {
 
     @SuppressLint("MissingPermission")
     private void initNMS(int upToBootPhase) throws Exception {
-        mService = new TestableNotificationManagerService(mContext, mNotificationRecordLogger,
-                mNotificationInstanceIdSequence);
+        mService = new TestableNotificationManagerService(mContext, mTestableLooper);
 
         // apps allowed as convos
         mService.setStringArrayResourceValue(PKG_O);
@@ -582,11 +576,13 @@ public class NotificationManagerServiceZenTest extends UiServiceTestCase {
                 mPackageManagerClient, mLightsManager, mListeners, mAssistants, mConditionProviders,
                 mCompanionMgr, mSnoozeHelper, mUsageStats, mPolicyFile, mRulesFile,
                 mActivityManager, mGroupHelper, mAm, mAtm, mAppUsageStats, mDevicePolicyManager,
-                mUgm, mUgmInternal, mAppOpsManager, mUm, mHistoryManager, mStatsManager, mAmi,
+                mUgm, mUgmInternal, mAppOpsManager, mHistoryManager, mStatsManager, mAmi,
                 mToastRateLimiter, mPermissionHelper, mock(UsageStatsManagerInternal.class),
                 mTelecomManager, mLogger, mTestFlagResolver, mPermissionManager, mPowerManager,
                 mock(PostNotificationTrackerFactory.class), mUiEventLogger, mBitmapOffloader,
-                new NotificationListenerStats(MAX_CHANNELS_CREATED_BY_NLS_FOR_TESTING));
+                new NotificationListenerStats(MAX_CHANNELS_CREATED_BY_NLS_FOR_TESTING),
+                mNotificationRecordLogger,
+                mNotificationInstanceIdSequence);
 
         mService.setAttentionHelper(mAttentionHelper);
         mService.setLockPatternUtils(mock(LockPatternUtils.class));

@@ -21,35 +21,39 @@ import static java.util.Collections.emptySet;
 import android.annotation.EnforcePermission;
 import android.annotation.PermissionManuallyEnforced;
 import android.annotation.RequiresNoPermission;
+import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityManagerInternal;
+import android.app.BroadcastOptions;
+import android.app.role.RoleManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.database.ContentObserver;
 import android.os.Binder;
-import android.os.Bundle;
 import android.os.ParcelUuid;
 import android.os.PermissionEnforcer;
 import android.os.Process;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
+import android.service.personalcontext.Flags;
 import android.service.personalcontext.IPersonalContextManager;
 import android.service.personalcontext.PersonalContextManager;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
-import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
 import android.service.personalcontext.hint.ContextHintWrapper;
 import android.service.personalcontext.hint.NotificationEvent;
 import android.service.personalcontext.hint.NotificationHint;
+import android.service.personalcontext.hint.PublishedContextHint;
+import android.service.personalcontext.hint.PublishedContextHintWrapper;
 import android.service.personalcontext.hint.TextClassificationHint;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsight;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
 import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.util.Log;
@@ -63,8 +67,10 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.util.DumpUtils;
 import com.android.server.SystemService;
+import com.android.server.contentcapture.ContentCaptureManagerInternal;
 import com.android.server.notification.NotificationManagerInternal;
 import com.android.server.personalcontext.component.Refiner;
+import com.android.server.personalcontext.component.Renderer;
 import com.android.server.personalcontext.embedded.EmbeddedInsightRenderer;
 import com.android.server.personalcontext.notifications.ContextActionResolver;
 import com.android.server.personalcontext.notifications.NotificationActionFactory;
@@ -101,13 +107,16 @@ import javax.crypto.spec.SecretKeySpec;
 public class PersonalContextManagerService extends SystemService {
     private static final String TAG = "PersonalContext";
 
+    @VisibleForTesting
+    static final String ROLE_SYSTEM_UI_INTELLIGENCE = "android.app.role.SYSTEM_UI_INTELLIGENCE";
+
     static final SecretKeySpec HINT_SIGNING_KEY;
 
     static {
         // Generate a new random signing key on each system start.
         final byte[] key = new byte[64];
         new SecureRandom().nextBytes(key);
-        HINT_SIGNING_KEY = new SecretKeySpec(key, ContextHintWithSignature.HMAC_ALGORITHM);
+        HINT_SIGNING_KEY = new SecretKeySpec(key, PublishedContextHint.HMAC_ALGORITHM);
     }
 
     private static class SettingObserver extends ContentObserver {
@@ -158,14 +167,47 @@ public class PersonalContextManagerService extends SystemService {
     private final SparseArray<UserState> mUserStates = new SparseArray<>();
     private final ContextLogger mLogger = new ContextLogger();
 
+    private final RoleManager mRoleManager;
     private final ActivityManagerInternal mActivityManager;
     private final PackageManagerInternal mPackageManager;
+    private final ContentCaptureManagerInternal mContentCaptureManagerInternal;
+
+    private final AccessController mAccessController;
     private final PersonalContextManagerInternal mInternalService = new LocalService();
+
     public PersonalContextManagerService(Context context) {
+        this(context, new AccessController(context));
+    }
+
+    protected PersonalContextManagerService(Context context, AccessController controller) {
         super(context);
 
+        mRoleManager = context.getSystemService(RoleManager.class);
         mActivityManager = getLocalService(ActivityManagerInternal.class);
         mPackageManager = getLocalService(PackageManagerInternal.class);
+        mContentCaptureManagerInternal = getLocalService(ContentCaptureManagerInternal.class);
+        mAccessController = controller;
+    }
+
+    private boolean isEnabled() {
+        return Flags.enablePersonalContextServiceFeature();
+    }
+
+    private boolean checkAndLogEnabledState(String stage) {
+        final boolean enabled = isEnabled();
+        if (!enabled) {
+            Slog.i(TAG, "PersonalContext[" + stage + "]: not enabled.");
+        }
+
+        return enabled;
+    }
+
+    private void checkUidAccess(int uid, @AccessController.Access int access) {
+        if (!mAccessController.hasAccess(uid, access)) {
+            throw new SecurityException(
+                    "component (uid=" + uid + ") not allowed to perform operation requiring access:"
+                            + access);
+        }
     }
 
     @Override
@@ -179,6 +221,10 @@ public class PersonalContextManagerService extends SystemService {
 
     @Override
     public void onUserStarting(@NonNull TargetUser user) {
+        if (!checkAndLogEnabledState("onUserStarting")) {
+            return;
+        }
+
         final int userId = user.getUserIdentifier();
         synchronized (mUserStates) {
             final UserState oldState = mUserStates.get(userId);
@@ -190,11 +236,13 @@ public class PersonalContextManagerService extends SystemService {
             Slog.i(TAG, "Creating new state for user " + userId);
             Context userContext = getContext().createContextAsUser(user.getUserHandle(), 0);
             final ContextComponentManager componentManager =
-                    new ContextComponentManager(userContext, user.getUserHandle());
+                    new ContextComponentManager(userContext, user.getUserHandle(),
+                            mAccessController);
             final ContextComponentMonitor monitor = new ContextComponentMonitor(componentManager);
             final HintInvalidationUnderstander hintInvalidationUnderstander =
                     new HintInvalidationUnderstander(
-                            insight -> startInsightWorkflow(userId, Set.of(insight)));
+                            (insight, componentId) ->
+                                    startInsightWorkflow(userId, componentId, Set.of(insight)));
             final SettingObserver observer = new SettingObserver(userContext, mExecutor, 0);
             final NotificationActionRenderer notificationActionRenderer =
                     new NotificationActionRenderer(
@@ -235,6 +283,10 @@ public class PersonalContextManagerService extends SystemService {
 
     @Override
     public void onUserUnlocked(@NonNull TargetUser user) {
+        if (!checkAndLogEnabledState("onUserUnlocked")) {
+            return;
+        }
+
         final int userId = user.getUserIdentifier();
         Slog.i(TAG, "Unlocking user " + userId);
 
@@ -286,6 +338,10 @@ public class PersonalContextManagerService extends SystemService {
 
     @Override
     public void onUserStopping(@NonNull TargetUser user) {
+        if (!checkAndLogEnabledState("onUserStopping")) {
+            return;
+        }
+
         final int userId = user.getUserIdentifier();
         Slog.i(TAG, "Stopping user " + userId);
         synchronized (mUserStates) {
@@ -310,7 +366,7 @@ public class PersonalContextManagerService extends SystemService {
     @VisibleForTesting
     void startRefinerWorkflow(
             @UserIdInt int userId,
-            int processId,
+            int callingUid,
             Set<ContextHint> hints,
             Set<RenderToken> renderTokens,
             Set<ContextHint> attributionHints) {
@@ -321,16 +377,16 @@ public class PersonalContextManagerService extends SystemService {
         }
 
         try {
-            final Set<ContextHintWithSignature> signedAttributionHints = new HashSet<>();
+            final Set<PublishedContextHint> signedAttributionHints = new HashSet<>();
             if (attributionHints != null) {
                 for (ContextHint hint : attributionHints) {
-                    signedAttributionHints.add(signHint(hint, processId, emptySet(), emptySet()));
+                    signedAttributionHints.add(signHint(hint, callingUid, emptySet(), emptySet()));
                 }
             }
 
-            final Set<ContextHintWithSignature> signedHints = new HashSet<>();
+            final Set<PublishedContextHint> signedHints = new HashSet<>();
             for (ContextHint hint : hints) {
-                signedHints.add(signHint(hint, processId, renderTokens, signedAttributionHints));
+                signedHints.add(signHint(hint, callingUid, renderTokens, signedAttributionHints));
             }
 
             RefinerWorkflow.start(
@@ -339,20 +395,35 @@ public class PersonalContextManagerService extends SystemService {
                     renderTokens,
                     HINT_SIGNING_KEY,
                     mLogger,
-                    mExecutor);
+                    mExecutor,
+                    (componentId, insights)
+                            -> startInsightWorkflow(userId, componentId, insights));
         } catch (GeneralSecurityException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void startInsightWorkflow(@UserIdInt int userId, Set<ContextInsight> insights) {
+    @VisibleForTesting
+    void startInsightWorkflow(@UserIdInt int userId, UUID componentId,
+            Set<ContextInsight> insights) {
+        final HashSet<PublishedContextInsight> publishedInsights = new HashSet<>();
+        for (ContextInsight insight : insights) {
+            publishedInsights.add(new PublishedContextInsight(insight, componentId));
+        }
+
+        startPublishedInsightWorkflow(userId, componentId, publishedInsights);
+    }
+
+    private void startPublishedInsightWorkflow(@UserIdInt int userId, UUID componentId,
+            Set<PublishedContextInsight> insights) {
         final ContextComponentManager componentManager = getComponentManagerForUser(userId);
         if (componentManager == null) {
             Slog.w(TAG, "Cannot start renderer workflow, no component manager for user " + userId);
             return;
         }
 
-        RendererWorkflow.start(componentManager, insights, HINT_SIGNING_KEY, mLogger, mExecutor);
+        RendererWorkflow.start(componentManager, insights, HINT_SIGNING_KEY, mLogger,
+                mExecutor);
     }
 
     /** Returns the component manager for the given user, for testing purposes. */
@@ -365,23 +436,13 @@ public class PersonalContextManagerService extends SystemService {
 
     private void registerInsightSurfaceClient(
             int userId,
-            int processId,
-            Set<ContextHint> clientHints,
             InsightSurfaceClientInfo clientInfo) {
         final UserState userState = getUserStateSynchronized(userId);
         if (userState == null) {
             return;
         }
 
-        userState.embeddedInsightRenderer.registerInsightSurfaceClient(
-                clientInfo, renderToken -> {
-                    if (renderToken == null) {
-                        Slog.e(TAG, "No render token for client " + clientInfo.getId());
-                        return;
-                    }
-                    startRefinerWorkflow(
-                            userId, processId, clientHints, Set.of(renderToken), emptySet());
-                });
+        userState.embeddedInsightRenderer.registerInsightSurfaceClient(clientInfo);
     }
 
     private void unregisterInsightSurfaceClient(int userId, UUID id) {
@@ -393,7 +454,7 @@ public class PersonalContextManagerService extends SystemService {
 
     private void publishInsightSurfaceHints(
             int userId,
-            int processId,
+            int callingUid,
             Set<ContextHint> hints,
             InsightSurfaceClientInfo clientInfo) {
         final UserState userState = getUserStateSynchronized(userId);
@@ -409,12 +470,63 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
-        startRefinerWorkflow(userId, processId, hints, Set.of(renderToken), emptySet());
+        startRefinerWorkflow(userId, callingUid, hints, Set.of(renderToken), emptySet());
+    }
+
+    @SuppressLint("MissingPermission")
+    private void sendPersonalContextModeChangedBroadcasts(
+            String packageName, @UserIdInt int userId) {
+        Intent broadcastIntent =
+                new Intent(Intent.ACTION_PERSONAL_CONTEXT_MODE_CHANGED)
+                        .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
+                        .setPackage(packageName);
+        broadcastIntent.putExtra(Intent.EXTRA_PACKAGE_NAME, packageName);
+
+        // Send broadcast to the application the setting changed for.
+        UserHandle userHandle = UserHandle.getUserHandleForUid(userId);
+        final BroadcastOptions options = BroadcastOptions.makeBasic();
+        // This allows the broadcasting system to discard any older broadcasts waiting to be
+        // delivered. This is okay as the intent doesn't contain any info the application for which
+        // the setting changed cares about. They only need to know that the setting changed.
+        options.setDeliveryGroupPolicy(BroadcastOptions.DELIVERY_GROUP_POLICY_MOST_RECENT);
+        getContext().sendBroadcastAsUser(broadcastIntent, userHandle, null, options.toBundle());
+
+        // TODO(b/482458833): send change notification directly to content capture framework
+
+        // Send broadcast to the user's content capture service, if any.
+        String contentCaptureServicePackageName = null;
+        if (mContentCaptureManagerInternal != null) {
+            contentCaptureServicePackageName =
+                    mContentCaptureManagerInternal.getContentCaptureServicePackageNameForUser(
+                            userId);
+            if (contentCaptureServicePackageName != null) {
+                Intent contentCaptureServiceBroadcastIntent =
+                        new Intent(broadcastIntent).setPackage(contentCaptureServicePackageName);
+                getContext()
+                        .sendBroadcastAsUser(
+                                contentCaptureServiceBroadcastIntent, userHandle, null, null);
+            }
+        }
+
+        // Send broadcast to the system UI intelligence app, if any.
+        if (mRoleManager != null) {
+            List<String> roleHolderPackageNames =
+                    mRoleManager.getRoleHoldersAsUser(ROLE_SYSTEM_UI_INTELLIGENCE, userHandle);
+            for (String rolePackageName : roleHolderPackageNames) {
+                if (rolePackageName == contentCaptureServicePackageName) {
+                    // The content capture service may also be a system UI intelligence app.
+                    continue;
+                }
+                Intent roleBroadcastIntent =
+                        new Intent(broadcastIntent).setPackage(rolePackageName);
+                getContext().sendBroadcastAsUser(roleBroadcastIntent, userHandle, null, null);
+            }
+        }
     }
 
     private void reportEvent(
             int userId,
-            int processId,
+            int callingUid,
             InsightEvent event) {
         final UserState userState = getUserStateSynchronized(userId);
         if (userState == null) {
@@ -422,7 +534,8 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
-        final UUID componentId = event.getInsight().getOriginatingComponentId();
+        final UUID componentId = event.getInsight().getPublisherComponentId();
+
         final Refiner refiner = userState.componentManager.getRefinerById(componentId);
         if (refiner == null) {
             Slog.e(
@@ -431,35 +544,8 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
-        final String packageName = mActivityManager.getPackageNameByPid(processId);
+        final String packageName = mPackageManager.getNameForUid(callingUid);
         refiner.handleEvent(packageName, event);
-    }
-
-    private void reportFeedback(
-            int userId,
-            ContextInsight insight,
-            Bundle partialFeedback) {
-        final UserState userState = getUserStateSynchronized(userId);
-        if (userState == null) {
-            Slog.e(TAG, "No user state when reporting insight event");
-            return;
-        }
-
-        // Make sure partialFeedback isn't null.
-        partialFeedback = partialFeedback == null ? new Bundle() : partialFeedback;
-
-        // TODO(b/475327093): Handle the feedback UI in SysUI, for now we'll just deliver it.
-
-        final UUID componentId = insight.getOriginatingComponentId();
-        final Refiner refiner = userState.componentManager.getRefinerById(componentId);
-        if (refiner == null) {
-            Slog.e(
-                    TAG,
-                    "No component found with ID " + componentId + " when reporting insight event");
-            return;
-        }
-
-        refiner.handleFeedback(insight, partialFeedback);
     }
 
     private void updateEmbeddedClientInfo(
@@ -481,14 +567,14 @@ public class PersonalContextManagerService extends SystemService {
         }
     }
 
-    private ContextHintWithSignature signHint(
+    private PublishedContextHint signHint(
             ContextHint hint,
-            int callingPid,
+            int callingUid,
             Set<RenderToken> renderTokens,
-            Set<ContextHintWithSignature> attributionHints)
+            Set<PublishedContextHint> attributionHints)
             throws GeneralSecurityException {
-        return new ContextHintWithSignature.Builder(hint, HINT_SIGNING_KEY)
-                .setOriginatingPackage(mActivityManager.getPackageNameByPid(callingPid))
+        return new PublishedContextHint.Builder(hint, HINT_SIGNING_KEY)
+                .setOriginatingPackage(mPackageManager.getNameForUid(callingUid))
                 .addRenderTokens(renderTokens)
                 .addAttributionHints(attributionHints)
                 .build();
@@ -532,7 +618,7 @@ public class PersonalContextManagerService extends SystemService {
 
         @PermissionManuallyEnforced
         @Override
-        public boolean isPersonalContextModeEnabled(String packageName, int userId) {
+        public boolean isPersonalContextModeEnabled(String packageName, @UserIdInt int userId) {
             final int callingUid = Binder.getCallingUid();
 
             // Manifest.permission.QUERY_ALL_PACKAGES permission is enforced inside package manager.
@@ -543,15 +629,16 @@ public class PersonalContextManagerService extends SystemService {
                                         mPackageManager.getPersonalContextMode(
                                                 packageName, callingUid, userId);
                                 return personalContextMode
-                                                == PackageManager.PERSONAL_CONTEXT_MODE_UNSET
+                                        == PackageManager.PERSONAL_CONTEXT_MODE_UNSET
                                         || personalContextMode
-                                                == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
+                                        == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
                             }));
         }
 
         @EnforcePermission(android.Manifest.permission.CHANGE_PERSONAL_CONTEXT_MODE)
         @Override
-        public void setPersonalContextModeEnabled(String packageName, int userId, boolean enabled) {
+        public void setPersonalContextModeEnabled(
+                String packageName, @UserIdInt int userId, boolean enabled) {
             setPersonalContextModeEnabled_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             Binder.withCleanCallingIdentity(
@@ -560,97 +647,180 @@ public class PersonalContextManagerService extends SystemService {
                                 enabled
                                         ? PackageManager.PERSONAL_CONTEXT_MODE_USER_ON
                                         : PackageManager.PERSONAL_CONTEXT_MODE_USER_OFF;
-                        mPackageManager.setPersonalContextMode(
-                                packageName, callingUid, userId, mode);
+                        if (mPackageManager.setPersonalContextMode(
+                                packageName, callingUid, userId, mode)) {
+                            getService()
+                                    .sendPersonalContextModeChangedBroadcasts(packageName, userId);
+                        }
                     });
         }
 
-        @PermissionManuallyEnforced
+        // Suppressing warning as enforcement is currently behind a flag
+        @SuppressWarnings("MissingEnforcePermissionHelper")
+        @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_READ_SETTINGS)
+        @Override
+        public boolean isEnabled(int userId) {
+            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
+                isEnabled_enforcePermission();
+            }
+            verifyUser(userId);
+            return Boolean.TRUE.equals(
+                    Binder.withCleanCallingIdentity(
+                            () -> {
+                                // TODO(b/477958468): Correctly handle enabling/disabling the
+                                //  service and then make the default "disabled".
+                                final Context context = getService().getContext();
+                                return Settings.Secure.getIntForUser(
+                                        context.getContentResolver(),
+                                        Settings.Secure.PERSONAL_CONTEXT_ENABLED,
+                                        1, userId) == 1;
+                            }));
+        }
+
+        // Suppressing warning as enforcement is currently behind a flag
+        @SuppressWarnings("MissingEnforcePermissionHelper")
+        @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_WRITE_SETTINGS)
+        @Override
+        public void setEnabled(int userId, boolean enabled) {
+            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
+                setEnabled_enforcePermission();
+            }
+            verifyUser(userId);
+            Binder.withCleanCallingIdentity(
+                    () -> {
+                        final Context context = getService().getContext();
+                        Settings.Secure.putIntForUser(
+                                context.getContentResolver(),
+                                Settings.Secure.PERSONAL_CONTEXT_ENABLED,
+                                enabled ? 1 : 0, userId);
+                    });
+        }
+
+        // Suppressing warning as enforcement is currently behind a flag
+        @SuppressWarnings("MissingEnforcePermissionHelper")
+        @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_PUBLISH_HINTS)
         @Override
         public void publishTriggeringHint(
                 List<ContextHintWrapper> hints,
                 List<RenderToken> renderTokens,
                 List<ContextHintWrapper> attributionHints,
                 int userId) {
+            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
+                publishTriggeringHint_enforcePermission();
+            }
             verifyUser(userId);
 
-            final int callingPid = Binder.getCallingPid();
+            final int callingUid = Binder.getCallingUid();
 
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () -> getService()
-                            .startRefinerWorkflow(
-                                    userId,
-                                    callingPid,
-                                    ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
-                                    new HashSet<>(renderTokens == null ? List.of() : renderTokens),
-                                    ContextHintWrapper.unwrapInto(attributionHints,
-                                            new HashSet<>())));
+                    () -> {
+                        final PersonalContextManagerService service = getService();
+
+                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
+                            service.checkUidAccess(callingUid,
+                                    AccessController.ACCESS_PUBLISH_HINTS);
+                        }
+
+                        service
+                                .startRefinerWorkflow(
+                                        userId,
+                                        callingUid,
+                                        ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
+                                        new HashSet<>(
+                                                renderTokens == null ? List.of() : renderTokens),
+                                        ContextHintWrapper.unwrapInto(attributionHints,
+                                                new HashSet<>()));
+                    });
         }
 
-        @PermissionManuallyEnforced
+        // Suppressing warning as enforcement is currently behind a flag
+        @SuppressWarnings("MissingEnforcePermissionHelper")
+        @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_PUBLISH_INSIGHTS)
         @Override
-        public void publishInsight(List<ContextInsightWrapper> insights, int userId) {
+        public void publishInsight(List<ContextInsightWrapper> insights, ParcelUuid componentId,
+                int userId) {
+            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
+                publishInsight_enforcePermission();
+            }
             verifyUser(userId);
 
-            // TODO(b/450547433): Add security checks.
+            int callingUid = Binder.getCallingUid();
+
             Binder.withCleanCallingIdentity(
-                    () ->
-                            getService()
-                                    .startInsightWorkflow(
-                                            userId,
-                                            ContextInsightWrapper.unwrapInto(
-                                                    insights, new HashSet<>())));
+                    () -> {
+
+                        final PersonalContextManagerService service = getService();
+
+                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
+                            service.checkUidAccess(callingUid,
+                                    AccessController.ACCESS_PUBLISH_INSIGHTS);
+                        }
+                        service
+                                .startInsightWorkflow(
+                                        userId,
+                                        componentId.getUuid(),
+                                        ContextInsightWrapper.unwrapInto(
+                                                insights, new HashSet<>()));
+                    });
         }
 
         @RequiresNoPermission
         @Override
-        public ContextHintWithSignatureWrapper signHint(
+        public PublishedContextHintWrapper signHint(
                 ContextHintWrapper hint, List<ContextHintWrapper> attributionHints) {
-            final int callingPid = Binder.getCallingPid();
+            final int callingUid = Binder.getCallingUid();
 
             return Binder.withCleanCallingIdentity(
                     () -> {
-                        final Set<ContextHintWithSignature> signedAttributionHints =
+                        final Set<PublishedContextHint> signedAttributionHints =
                                 new HashSet<>();
                         if (attributionHints != null) {
                             for (ContextHintWrapper attributionHint : attributionHints) {
                                 signedAttributionHints.add(getService().signHint(
                                         attributionHint.getContextHint(),
-                                        callingPid,
+                                        callingUid,
                                         emptySet(),
                                         emptySet()));
                             }
                         }
 
-                        return new ContextHintWithSignatureWrapper(getService().signHint(
+                        return new PublishedContextHintWrapper(getService().signHint(
                                 hint.getContextHint(),
-                                callingPid,
+                                callingUid,
                                 emptySet(),
                                 signedAttributionHints));
                     });
         }
 
-        @PermissionManuallyEnforced
+        // Suppressing warning as enforcement is currently behind a flag
+        @SuppressWarnings("MissingEnforcePermissionHelper")
+        @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_HOST_INSIGHT_SURFACE)
         @Override
         public void registerInsightSurfaceClient(
-                List<ContextHintWrapper> clientHints,
                 InsightSurfaceClientInfo clientInfo,
                 int userId) {
+            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
+                registerInsightSurfaceClient_enforcePermission();
+            }
             verifyUser(userId);
 
-            final int callingPid = Binder.getCallingPid();
+            final int callingUid = Binder.getCallingUid();
 
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () ->
-                            getService()
-                                    .registerInsightSurfaceClient(
-                                            userId,
-                                            callingPid,
-                                            ContextHintWrapper.unwrapInto(
-                                                    clientHints, new HashSet<>()),
-                                            clientInfo));
+                    () -> {
+                        final PersonalContextManagerService service = getService();
+
+                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
+                            service.checkUidAccess(callingUid,
+                                    AccessController.ACCESS_RECEIVE_INSIGHTS
+                                    | AccessController.ACCESS_PUBLISH_HINTS);
+                        }
+                        service.registerInsightSurfaceClient(
+                                userId,
+                                clientInfo);
+                    });
         }
 
         @PermissionManuallyEnforced
@@ -675,17 +845,25 @@ public class PersonalContextManagerService extends SystemService {
                 List<ContextHintWrapper> hints, InsightSurfaceClientInfo clientInfo, int userId) {
             verifyUser(userId);
 
-            final int callingPid = Binder.getCallingPid();
+            final int callingUid = Binder.getCallingUid();
 
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () ->
-                            getService()
-                                    .publishInsightSurfaceHints(
-                                            userId,
-                                            callingPid,
-                                            ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
-                                            clientInfo));
+                    () -> {
+                        final PersonalContextManagerService service = getService();
+
+                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
+                            service.checkUidAccess(callingUid,
+                                    AccessController.ACCESS_PUBLISH_INSIGHTS);
+                        }
+                        getService()
+                                .publishInsightSurfaceHints(
+                                        userId,
+                                        callingUid,
+                                        ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
+                                        clientInfo);
+                    }
+            );
         }
 
         @PermissionManuallyEnforced
@@ -693,29 +871,14 @@ public class PersonalContextManagerService extends SystemService {
         public void reportEvent(InsightEvent event, int userId) {
             verifyUser(userId);
 
-            final int callingPid = Binder.getCallingPid();
+            final int callingUid = Binder.getCallingUid();
 
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
                     () -> getService().reportEvent(
                             userId,
-                            callingPid,
+                            callingUid,
                             event));
-        }
-
-        @PermissionManuallyEnforced
-        @Override
-        public void reportFeedback(
-                ContextInsightWrapper insight, Bundle partialFeedback, int userId) {
-            verifyUser(userId);
-
-            // TODO(b/450547433): Add security checks.
-
-            Binder.withCleanCallingIdentity(
-                    () -> getService().reportFeedback(
-                            userId,
-                            insight.getContextInsight(),
-                            partialFeedback));
         }
 
         @PermissionManuallyEnforced
@@ -735,6 +898,8 @@ public class PersonalContextManagerService extends SystemService {
             if (!DumpUtils.checkDumpPermission(service.getContext(), TAG, fout)) {
                 return;
             }
+
+            fout.println("Enabled:" + service.isEnabled());
 
             synchronized (service.mUserStates) {
                 for (int i = 0; i < service.mUserStates.size(); i++) {
@@ -778,11 +943,18 @@ public class PersonalContextManagerService extends SystemService {
                 return;
             }
 
+            final HashSet<RenderToken> rendererTokens = new HashSet<>();
+
+            for (Renderer renderer : userState.componentManager.getRenderersWithProperties(
+                    Renderer.PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS)) {
+                rendererTokens.add(renderer.mintRenderToken());
+            }
+
             startRefinerWorkflow(
                     user.getIdentifier(),
-                    Process.myPid(),
+                    Process.myUid(),
                     Set.of(new NotificationHint.Builder(event).build()),
-                    Set.of(userState.notificationActionRenderer().mintRenderToken()),
+                    rendererTokens,
                     Collections.emptySet());
         }
 
@@ -801,7 +973,7 @@ public class PersonalContextManagerService extends SystemService {
 
             startRefinerWorkflow(
                     userId,
-                    Process.myPid(),
+                    Process.myUid(),
                     Set.of(new TextClassificationHint.Builder(request, sessionId).build()),
                     Set.of(userState.textClassificationActionRenderer().mintRenderToken()),
                     Collections.emptySet());
@@ -811,7 +983,7 @@ public class PersonalContextManagerService extends SystemService {
         public void publishTriggeringHint(@NonNull Set<ContextHint> hints,
                 @Nullable Set<RenderToken> renderTokens, int userId) {
             startRefinerWorkflow(
-                    userId, Process.myPid(), hints, renderTokens, Collections.emptySet());
+                    userId, Process.myUid(), hints, renderTokens, Collections.emptySet());
         }
     }
 }

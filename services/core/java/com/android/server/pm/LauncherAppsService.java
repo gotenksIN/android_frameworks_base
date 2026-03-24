@@ -621,19 +621,11 @@ public class LauncherAppsService extends SystemService {
 
         @VisibleForTesting // We override it in unit tests
         void verifyCallingPackage(String callingPackage, int callerUid) {
-            int packageUid = -1;
-            try {
-                packageUid = mIPM.getPackageUid(callingPackage,
-                        PackageManager.MATCH_DIRECT_BOOT_AWARE
-                                | PackageManager.MATCH_DIRECT_BOOT_UNAWARE
-                                | PackageManager.MATCH_UNINSTALLED_PACKAGES,
-                        UserHandle.getUserId(callerUid));
-            } catch (RemoteException ignore) {
-            }
-            if (packageUid < 0) {
-                Log.e(TAG, "Package not found: " + callingPackage);
-            }
-            if (packageUid != callerUid) {
+            if (!mPackageManagerInternal.isSameApp(callingPackage,
+                    PackageManager.MATCH_DIRECT_BOOT_AWARE
+                            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE
+                            | PackageManager.MATCH_UNINSTALLED_PACKAGES,
+                    callerUid, UserHandle.getUserId(callerUid))) {
                 throw new SecurityException("Calling package name mismatch");
             }
         }
@@ -922,10 +914,11 @@ public class LauncherAppsService extends SystemService {
                 return null;
             }
             final int callingUid = injectBinderCallingUid();
+            final int callingPid = injectBinderCallingPid();
             long ident = injectClearCallingIdentity();
             try {
                 return new ParceledListSlice<>(queryIntentLauncherActivities(intent, callingUid,
-                        user));
+                        callingPid, user));
             } finally {
                 injectRestoreCallingIdentity(ident);
             }
@@ -1036,7 +1029,13 @@ public class LauncherAppsService extends SystemService {
         @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
         List<LauncherActivityInfoInternal> queryIntentLauncherActivities(
                 Intent intent, int callingUid, UserHandle user) {
-            final int callingPid = injectBinderCallingPid();
+            return queryIntentLauncherActivities(intent, callingUid, injectBinderCallingPid(),
+                    user);
+        }
+
+        @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+        List<LauncherActivityInfoInternal> queryIntentLauncherActivities(
+                Intent intent, int callingUid, int callingPid, UserHandle user) {
             final List<ResolveInfo> apps = mPackageManagerInternal.queryIntentActivities(intent,
                     intent.resolveTypeIfNeeded(mContext.getContentResolver()),
                     PackageManager.MATCH_DIRECT_BOOT_AWARE
@@ -1196,8 +1195,8 @@ public class LauncherAppsService extends SystemService {
             final long ident = Binder.clearCallingIdentity();
             try {
                 final ApplicationInfo info = mPackageManagerInternal.getApplicationInfo(packageName,
-                        flags | getAppLockInfoFlag(callingPid, callingUid), callingUid,
-                        user.getIdentifier());
+                        Integer.toUnsignedLong(flags) | getAppLockInfoFlag(callingPid, callingUid),
+                        callingUid, user.getIdentifier());
                 return info;
             } finally {
                 Binder.restoreCallingIdentity(ident);

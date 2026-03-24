@@ -51,6 +51,9 @@ interface PreferenceScreenMetadata : PreferenceGroup {
     val arguments: Bundle?
         get() = null
 
+    val keyParametersSchema: KeyParametersSchema?
+        get() = null
+
     val keyParameters: ValidatedKeyParameters?
         get() = null
 
@@ -66,6 +69,10 @@ interface PreferenceScreenMetadata : PreferenceGroup {
      */
     val launchScreenExtra: Bundle?
         get() = null
+
+    /** The default sensitivity level of the screen. */
+    override val sensitivityLevel: @SensitivityLevel Int
+        get() = SensitivityLevel.NO_SENSITIVITY
 
     /**
      * The screen title resource, which precedes [getScreenTitle] if provided.

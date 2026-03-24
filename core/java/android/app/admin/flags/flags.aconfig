@@ -493,7 +493,7 @@ flag {
   name: "multi_user_management_device_provisioning"
   is_exported: true
   namespace: "enterprise"
-  description: "Enable the multi user management device provisioning APIs."
+  description: "Enable the multi user management device provisioning APIs. Will be replaced by multiuser_management_device_provisioning soon."
   bug: "390162247"
 }
 
@@ -552,7 +552,7 @@ flag {
   name: "multi_user_management_user_provisioning"
   is_exported: true
   namespace: "enterprise"
-  description: "Enable the multi user management user provisioning APIs."
+  description: "Enable the multi user management user provisioning APIs. Will be replaced by multiuser_management_user_provisioning soon."
   bug: "390162247"
 }
 
@@ -579,6 +579,14 @@ flag {
   namespace: "enterprise"
   description: "Enable passing a null admin component to DPM.enableSystemApp and DPM.setPermissionPolicy."
   bug: "346490174"
+  is_exported: true
+}
+
+flag {
+  name: "managed_esim_outgoing_transfer_policy"
+  namespace: "enterprise"
+  description: "Adds a new API for setting the outgoing transfer policy of managed eSIMs"
+  bug: "461421887"
   is_exported: true
 }
 
@@ -617,8 +625,75 @@ flag {
 }
 
 flag {
+  name: "use_hardened_frp_active_check"
+  namespace: "enterprise"
+  description: "Use hardened FRP active check during ChooseLockGeneric creation"
+  bug: "481171742"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "policy_streamlining_maximum_time_to_lock"
   namespace: "enterprise"
   description: "Redirect set/getMaximumTimeToLock to the generic set/getPolicy APIs."
   bug: "444381053"
+}
+
+flag {
+  name: "check_personal_suspension_for_all_profiles"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+  namespace: "enterprise"
+  description: "When ACTION_DATE_CHANGED or ACTION_TIME_CHANGED is received, iterates through all managed profiles on the device to determine if personal apps should be suspended, instead of relying on the main user setting."
+  bug: "470176722"
+}
+
+flag {
+  name: "policy_streamlining_auto_time_zone"
+  namespace: "enterprise"
+  description: "Redirect set/getAutoTimeZoneEnabled to the generic set/getPolicy APIs."
+  bug: "434919316"
+  is_exported: true
+}
+
+flag {
+  name: "multiuser_management_user_provisioning"
+  is_exported: false
+  namespace: "enterprise"
+  description: "Enable the multi user management user provisioning APIs."
+  bug: "390162247"
+}
+
+flag {
+  name: "multiuser_management_device_provisioning"
+  is_exported: false
+  namespace: "enterprise"
+  description: "Enable the multi user management device provisioning APIs."
+  bug: "390162247"
+}
+
+flag {
+  name: "push_dpc_packages_to_system_services"
+  namespace: "enterprise"
+  description: "Update the methods that push the device/profile owner packages to system services to use more generic names."
+  bug: "481619042"
+}
+
+flag {
+  name: "policy_streamlining_easter_eggs"
+  namespace: "enterprise"
+  description: "Redirect addUserRestriction/getUserRestriction for DISALLOW_FUN to the generic set/getPolicy APIs."
+  bug: "444381084"
+  is_exported: true
+}
+
+flag {
+  name: "policy_streamlining_keyguard_status"
+  namespace: "enterprise"
+  description: "Redirect setKeyguardDisabled to the generic setPolicy APIs"
+  bug: "434919316"
+  is_exported: true
 }

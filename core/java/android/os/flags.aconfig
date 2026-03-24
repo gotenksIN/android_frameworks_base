@@ -3,16 +3,6 @@ container: "system"
 
 # keep-sorted start block=yes newline_separated=yes
 flag {
-    name: "adpf_25q2_metrics"
-    namespace: "game"
-    description: "Add missing metrics for ADPF 25Q2 features."
-    bug: "367803904"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "adpf_audio_performance"
     is_exported: false
     namespace: "media_audio"
@@ -60,14 +50,6 @@ flag {
     namespace: "game"
     description: "Guards the ADPF power efficiency API"
     bug: "288117936"
-}
-
-flag {
-    name: "adpf_use_load_hints"
-    namespace: "game"
-    description: "Guards use of the ADPF public load hints behind a readonly flag"
-    is_fixed_read_only: true
-    bug: "367803904"
 }
 
 flag {
@@ -305,10 +287,10 @@ flag {
 }
 
 flag {
-    name: "material_colors_2025_03"
+    name: "material_colors_2026_03"
     namespace: "systemui"
-    description: "Adding new Material Tokens as of March 2025"
-    bug: "394371316"
+    description: "Adding new Fixed Color Tokens as of March 2026"
+    bug: "487965330"
     is_exported: true
     metadata {
         purpose: PURPOSE_FEATURE

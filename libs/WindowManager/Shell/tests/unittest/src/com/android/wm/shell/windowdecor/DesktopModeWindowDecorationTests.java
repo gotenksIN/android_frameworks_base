@@ -29,7 +29,7 @@ import static android.view.WindowManager.TRANSIT_CHANGE;
 
 import static com.android.wm.shell.MockSurfaceControlHelper.createMockSurfaceControlTransaction;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.wm.shell.windowdecor.DesktopModeWindowDecoration.CLOSE_MAXIMIZE_MENU_DELAY_MS;
+import static com.android.wm.shell.windowdecor.DesktopModeWindowDecoration.CLOSE_LAYOUT_MENU_DELAY_MS;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -83,6 +83,7 @@ import android.view.MotionEvent;
 import android.view.SurfaceControl;
 import android.view.SurfaceControlViewHost;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.window.WindowContainerTransaction;
@@ -111,9 +112,11 @@ import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.desktopmode.CaptionState;
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger;
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger;
+import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.desktopmode.data.DesktopRepository;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.shared.desktopmode.FakeDesktopConfig;
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState;
 import com.android.wm.shell.splitscreen.SplitScreenController;
@@ -204,8 +207,6 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     @Mock
     private CoroutineScope mMockMainCoroutineScope;
     @Mock
-    private CoroutineScope mMockBgCoroutineScope;
-    @Mock
     private SyncTransactionQueue mMockSyncQueue;
     @Mock
     private AppHeaderViewHolder.Factory mMockAppHeaderViewHolderFactory;
@@ -273,6 +274,10 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     private LockTaskChangeListener mLockTaskChangeListener;
     @Mock
     private FocusTransitionObserver mFocusTransitionObserver;
+    @Mock
+    private PinnedLayerController mPinnedLayerController;
+    @Mock
+    private DesktopTasksController mDesktopTasksController;
     private final TestHandler mTestHandler = new TestHandler(Looper.getMainLooper());
     @Captor
     private ArgumentCaptor<Function1<Boolean, Unit>> mOnMaxMenuHoverChangeListener;
@@ -335,7 +340,8 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                         any(), any(), any(), any()))
                 .thenReturn(mMockAppHeaderViewHolder);
         when(mMockAppHandleViewHolderFactory
-                .create(any(), any(), any(), any(), any(), any(), any()))
+                .create(any(), any(), any(), any(), any(), any(),
+                        any(), any(), any(), any(), any()))
                 .thenReturn(mMockAppHandleViewHolder);
         when(mMockDesktopUserRepositories.getCurrent()).thenReturn(mDesktopRepository);
         when(mMockDesktopUserRepositories.getProfile(anyInt())).thenReturn(mDesktopRepository);
@@ -1016,7 +1022,6 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_IMMERSIVE_DRAG_BUGFIX)
     public void updateRelayoutParams_header_fullyImmersive_captionVisDuringDrag() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
         taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
@@ -1201,14 +1206,14 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void createMaximizeMenu_showsMenu() {
+    public void createLayoutMenu_showsMenu() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
         assertFalse(decoration.isLayoutMenuActive());
 
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
 
         verify(menu).show(anyBoolean(), anyBoolean(), anyBoolean(),
                 mOnMaxMenuHoverChangeListener.capture(), any(), any());
@@ -1216,20 +1221,20 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void maximizeMenu_unHoversMenu_schedulesCloseMenu() {
+    public void layoutMenu_unHoversMenu_schedulesCloseMenu() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
-        decoration.setAppHeaderMaximizeButtonHovered(false);
-        createMaximizeMenu(decoration);
+        decoration.setHeaderMaximizeButtonHovered(false);
+        createLayoutMenu(decoration);
         verify(menu).show(anyBoolean(), anyBoolean(), anyBoolean(),
                 mOnMaxMenuHoverChangeListener.capture(), any(), any());
 
         mOnMaxMenuHoverChangeListener.getValue().invoke(false);
 
         verify(mMockHandler)
-                .postDelayed(mCloseMaxMenuRunnable.capture(), eq(CLOSE_MAXIMIZE_MENU_DELAY_MS));
+                .postDelayed(mCloseMaxMenuRunnable.capture(), eq(CLOSE_LAYOUT_MENU_DELAY_MS));
 
         mCloseMaxMenuRunnable.getValue().run();
         verify(menu).close(any());
@@ -1237,18 +1242,18 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void maximizeMenu_unHoversButton_schedulesCloseMenu() {
+    public void layoutMenu_unHoversButton_schedulesCloseMenu() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
-        decoration.setAppHeaderMaximizeButtonHovered(true);
-        createMaximizeMenu(decoration);
+        decoration.setHeaderMaximizeButtonHovered(true);
+        createLayoutMenu(decoration);
 
-        decoration.setAppHeaderMaximizeButtonHovered(false);
+        decoration.setHeaderMaximizeButtonHovered(false);
 
         verify(mMockHandler)
-                .postDelayed(mCloseMaxMenuRunnable.capture(), eq(CLOSE_MAXIMIZE_MENU_DELAY_MS));
+                .postDelayed(mCloseMaxMenuRunnable.capture(), eq(CLOSE_LAYOUT_MENU_DELAY_MS));
 
         mCloseMaxMenuRunnable.getValue().run();
         verify(menu).close(any());
@@ -1256,12 +1261,12 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void maximizeMenu_hoversMenu_cancelsCloseMenu() {
+    public void layoutMenu_hoversMenu_cancelsCloseMenu() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
         verify(menu).show(anyBoolean(), anyBoolean(), anyBoolean(),
                 mOnMaxMenuHoverChangeListener.capture(), any(), any());
 
@@ -1271,29 +1276,29 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void maximizeMenu_hoversButton_cancelsCloseMenu() {
+    public void layoutMenu_hoversButton_cancelsCloseMenu() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
         verify(menu).show(anyBoolean(), anyBoolean(), anyBoolean(),
                 mOnMaxMenuHoverChangeListener.capture(), any(), any());
 
-        decoration.setAppHeaderMaximizeButtonHovered(true);
+        decoration.setHeaderMaximizeButtonHovered(true);
 
         verify(mMockHandler).removeCallbacks(any());
     }
 
     @Test
-    public void createMaximizeMenu_taskRequestsImmersive_showsImmersiveOption() {
+    public void createLayoutMenu_taskRequestsImmersive_showsImmersiveOption() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         taskInfo.requestedVisibleTypes = ~statusBars();
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
 
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
 
         verify(menu).show(
                 anyBoolean(),
@@ -1306,14 +1311,14 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void createMaximizeMenu_taskDoesNotRequestImmersive_hiddenImmersiveOption() {
+    public void createLayoutMenu_taskDoesNotRequestImmersive_hiddenImmersiveOption() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         taskInfo.requestedVisibleTypes = statusBars();
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
 
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
 
         verify(menu).show(
                 anyBoolean(),
@@ -1326,14 +1331,14 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void createMaximizeMenu_taskResizable_showsSnapOptions() {
+    public void createLayoutMenu_taskResizable_showsSnapOptions() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         taskInfo.isResizeable = true;
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
 
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
 
         verify(menu).show(
                 anyBoolean(),
@@ -1346,14 +1351,14 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    public void createMaximizeMenu_taskUnresizable_hiddenSnapOptions() {
+    public void createLayoutMenu_taskUnresizable_hiddenSnapOptions() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
         taskInfo.isResizeable = false;
         final LayoutMenu menu = mock(LayoutMenu.class);
         final DesktopModeWindowDecoration decoration = createWindowDecoration(taskInfo,
                 new FakeLayoutMenuFactory(menu));
 
-        createMaximizeMenu(decoration);
+        createLayoutMenu(decoration);
 
         verify(menu).show(
                 anyBoolean(),
@@ -1553,20 +1558,6 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    @DisableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION,
-            Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION,
-            Flags.FLAG_ENABLE_APP_HANDLE_POSITION_REPORTING})
-    public void notifyCaptionStateChanged_flagDisabled_doNoNotify() {
-        final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
-        final DesktopModeWindowDecoration spyWindowDecor = spy(createWindowDecoration(taskInfo));
-        taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
-
-        spyWindowDecor.relayout(taskInfo, true /* hasGlobalFocus */, mExclusionRegion);
-
-        verify(mMockCaptionHandleRepository, never()).notifyCaptionChanged(any());
-    }
-
-    @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
     public void notifyCaptionStateChanged_inFullscreenMode_notifiesAppHandleVisible() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
@@ -1763,7 +1754,7 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                 : appToWebData.getOpenInAppOrBrowserIntent().getData().equals(uri);
     }
 
-    private void createMaximizeMenu(DesktopModeWindowDecoration decoration) {
+    private void createLayoutMenu(DesktopModeWindowDecoration decoration) {
         final Function0<Unit> l = () -> Unit.INSTANCE;
         decoration.createLayoutMenu();
     }
@@ -1855,7 +1846,7 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                 mContext, mMockDisplayController, mMockTaskResourceLoader,
                 mMockSplitScreenController, mMockDesktopUserRepositories, mMockShellTaskOrganizer,
                 taskInfo, mMockSurfaceControl, handler, mMainExecutor,
-                mMockMainCoroutineDispatcher, mMockMainCoroutineScope, mMockBgCoroutineScope,
+                mMockMainCoroutineDispatcher, mMockMainCoroutineScope,
                 mBgExecutor, mTransitions,
                 mMockChoreographer, mMockSyncQueue, mMockAppHeaderViewHolderFactory,
                 mMockAppHandleViewHolderFactory, mMockRootTaskDisplayAreaOrganizer,
@@ -1866,7 +1857,7 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                 mMockMultiInstanceHelper, mMockCaptionHandleRepository, mDesktopModeEventLogger,
                 mDesktopModeUiEventLogger, mDesktopModeCompatPolicy, mDesktopState,
                 mDesktopConfig, mMockWindowDecorationActions, mLockTaskChangeListener,
-                mFocusTransitionObserver);
+                mFocusTransitionObserver, mPinnedLayerController, mDesktopTasksController);
         windowDecor.setCaptionListeners(mMockTouchEventListener,
                 mMockTouchEventListener, mMockTouchEventListener);
         windowDecor.setExclusionRegionListener(mMockExclusionRegionListener);
@@ -1955,8 +1946,9 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     private static class TestTouchEventListener extends GestureDetector.SimpleOnGestureListener
-            implements View.OnClickListener, View.OnTouchListener, View.OnLongClickListener,
-            View.OnGenericMotionListener, DragDetector.MotionEventHandler {
+            implements View.OnClickListener, WindowDecorLinearLayout.GestureInterceptor,
+            View.OnLongClickListener, View.OnGenericMotionListener,
+            DragDetector.MotionEventHandler {
 
         @Override
         public void onClick(View v) {}
@@ -1968,6 +1960,11 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
 
         @Override
         public boolean onLongClick(View v) {
+            return false;
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(ViewGroup v, MotionEvent event) {
             return false;
         }
 

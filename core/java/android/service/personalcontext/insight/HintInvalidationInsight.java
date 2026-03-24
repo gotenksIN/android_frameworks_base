@@ -16,15 +16,18 @@
 
 package android.service.personalcontext.insight;
 
+import static java.util.Objects.requireNonNull;
+
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.os.Bundle;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.HintInvalidationHint;
+import android.service.personalcontext.hint.PublishedContextHint;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,17 +37,19 @@ import java.util.UUID;
  * An insight that contains information about a hint that should be invalidated.
  *
  * @see HintInvalidationHint
+ * @hide
  */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public final class HintInvalidationInsight extends ContextInsight {
-    private final ContextHintWithSignature mInvalidationHint;
+    private final PublishedContextHint mInvalidationHint;
 
     /** Private constructor used by {@link Builder}. */
     private HintInvalidationInsight(
             @NonNull ConstructorParams baseParams) {
         super(baseParams);
 
-        final List<ContextHintWithSignature> hintList = new ArrayList<>(getOriginHints());
+        final List<PublishedContextHint> hintList = new ArrayList<>(getOriginHints());
         if (hintList.size() != 1
                 || (!(hintList.getFirst().getContextHint() instanceof HintInvalidationHint))) {
             throw new IllegalArgumentException(
@@ -74,7 +79,7 @@ public final class HintInvalidationInsight extends ContextInsight {
     }
 
     /** Confirms whether the provided hint was invalidated by this insight. */
-    public boolean isHintInvalidated(@NonNull ContextHintWithSignature hint) {
+    public boolean isHintInvalidated(@NonNull PublishedContextHint hint) {
         return getInvalidatedHintId().equals(hint.getContextHint().getHintId())
                 && mInvalidationHint.getOriginatingPackage().equals(hint.getOriginatingPackage());
     }
@@ -120,7 +125,8 @@ public final class HintInvalidationInsight extends ContextInsight {
          *
          * @param invalidationHint the hint with information about which hint to invalidate.
          */
-        public Builder(@NonNull ContextHintWithSignature invalidationHint) {
+        public Builder(@NonNull PublishedContextHint invalidationHint) {
+            requireNonNull(invalidationHint);
             if (!(invalidationHint.getContextHint() instanceof HintInvalidationHint)) {
                 throw new IllegalArgumentException(
                         "invalidationHint must contain a HintInvalidationHint");
@@ -136,7 +142,7 @@ public final class HintInvalidationInsight extends ContextInsight {
          */
         @NonNull
         public Builder addToken(@NonNull Token token) {
-            mBaseBuilder.addToken(token);
+            mBaseBuilder.addToken(requireNonNull(token));
             return this;
         }
 

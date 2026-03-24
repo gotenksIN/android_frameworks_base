@@ -15,6 +15,7 @@
 
 package com.android.wm.shell.windowdecor
 
+import android.app.ActivityManager
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
 import android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED
@@ -74,7 +75,6 @@ import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopTasksController.SnapPosition
 import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction
-import com.android.wm.shell.recents.RecentsTransitionStateListener
 import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
 import com.android.wm.shell.splitscreen.SplitScreenController
@@ -787,6 +787,70 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
+    fun testDecor_opensHandleMenu_failsNumberOfInstancesCheckWithOneInstance() {
+        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
+        task.baseIntent = Intent()
+        task.baseIntent.component = ComponentName.createRelative(context, ".Activity1")
+        val decor = setUpMockDecorationForTask(task)
+        val handleMenuController = mock<HandleMenuController>()
+        whenever(decor.handleMenuController).thenReturn(handleMenuController)
+
+        val recentTask = ActivityManager.RecentTaskInfo()
+        recentTask.taskId = task.taskId
+        recentTask.baseIntent = task.baseIntent
+
+        onTaskOpening(task)
+
+        val openHandleMenuCallbackCaptor = argumentCaptor<(Int) -> Unit>()
+        verify(mockAppHandleEducationController, times(1))
+            .setAppHandleEducationTooltipCallbacks(openHandleMenuCallbackCaptor.capture(), any())
+
+        whenever(mockActivityTaskManager.getRecentTasks(any(), any(), any()))
+            .thenReturn(listOf(recentTask))
+
+        openHandleMenuCallbackCaptor.lastValue.invoke(task.taskId)
+        bgExecutor.flushAll()
+        testShellExecutor.flushAll()
+
+        verify(handleMenuController).createHandleMenu(false)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
+    fun testDecor_opensHandleMenu_passesNumberOfInstancesCheckWithTwoInstances() {
+        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
+        task.baseIntent = Intent()
+        task.baseIntent.component = ComponentName.createRelative(context, ".Activity1")
+        val decor = setUpMockDecorationForTask(task)
+        val handleMenuController = mock<HandleMenuController>()
+        whenever(decor.handleMenuController).thenReturn(handleMenuController)
+
+        val recentTask1 = ActivityManager.RecentTaskInfo()
+        recentTask1.taskId = task.taskId
+        recentTask1.baseIntent = task.baseIntent
+        val recentTask2 = ActivityManager.RecentTaskInfo()
+        recentTask2.taskId = task.taskId + 1
+        recentTask2.baseIntent = Intent()
+        recentTask2.baseIntent.component = ComponentName.createRelative(context, ".Activity2")
+
+        onTaskOpening(task)
+
+        val openHandleMenuCallbackCaptor = argumentCaptor<(Int) -> Unit>()
+        verify(mockAppHandleEducationController, times(1))
+            .setAppHandleEducationTooltipCallbacks(openHandleMenuCallbackCaptor.capture(), any())
+
+        whenever(mockActivityTaskManager.getRecentTasks(any(), any(), any()))
+            .thenReturn(listOf(recentTask1, recentTask2))
+
+        openHandleMenuCallbackCaptor.lastValue.invoke(task.taskId)
+        bgExecutor.flushAll()
+        testShellExecutor.flushAll()
+
+        verify(handleMenuController).createHandleMenu(true)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_HANDLE_EDUCATION)
     fun testDecor_invokeOnToDesktopCallback_setsAppHandleEducationTooltipClickCallbacks() {
         desktopState.canEnterDesktopMode = true
         val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
@@ -964,12 +1028,12 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     @Test
     fun testCloseButtonInFreeform_closeWindow_ignoreMoveEventsWithoutBoundsChange() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
-        val onTouchListenerCaptor = argumentCaptor<View.OnTouchListener>()
+        val gestureInterceptorCaptor = argumentCaptor<WindowDecorLinearLayout.GestureInterceptor>()
         val decor =
             createOpenTaskDecoration(
                 windowingMode = WINDOWING_MODE_FREEFORM,
                 onCaptionButtonClickListener = onClickListenerCaptor,
-                onCaptionButtonTouchListener = onTouchListenerCaptor,
+                gestureInterceptor = gestureInterceptorCaptor,
             )
 
         mockTaskPositioner.stub {
@@ -985,7 +1049,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 on { getViewRootImpl() } doReturn viewRootImpl
             }
 
-        onTouchListenerCaptor.firstValue.onTouch(
+        gestureInterceptorCaptor.firstValue.onTouch(
             view,
             MotionEvent.obtain(
                 SystemClock.uptimeMillis(),
@@ -996,7 +1060,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 /* metaState= */ 0,
             ),
         )
-        onTouchListenerCaptor.firstValue.onTouch(
+        gestureInterceptorCaptor.firstValue.onTouch(
             view,
             MotionEvent.obtain(
                 SystemClock.uptimeMillis(),
@@ -1007,7 +1071,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 /* metaState= */ 0,
             ),
         )
-        onTouchListenerCaptor.firstValue.onTouch(
+        gestureInterceptorCaptor.firstValue.onTouch(
             view,
             MotionEvent.obtain(
                 SystemClock.uptimeMillis(),
@@ -1026,17 +1090,17 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     @Test
     fun testOnTouchWithClassification_doesNothing() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
-        val onTouchListenerCaptor = argumentCaptor<View.OnTouchListener>()
+        val gestureInterceptorCaptor = argumentCaptor<WindowDecorLinearLayout.GestureInterceptor>()
         val decor =
             createOpenTaskDecoration(
                 windowingMode = WINDOWING_MODE_FREEFORM,
                 onCaptionButtonClickListener = onClickListenerCaptor,
-                onCaptionButtonTouchListener = onTouchListenerCaptor,
+                gestureInterceptor = gestureInterceptorCaptor,
             )
 
         val view = mock<View> { on { id } doReturn R.id.desktop_mode_caption }
 
-        val onTouchListener = onTouchListenerCaptor.firstValue
+        val onTouchListener = gestureInterceptorCaptor.firstValue
         assertFalse(
             onTouchListener.onTouch(
                 view,
@@ -1262,51 +1326,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    fun testRecentsTransitionStateListener_requestedState_setsTransitionRunning() {
-        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
-        val decoration = setUpMockDecorationForTask(task)
-        onTaskOpening(task, SurfaceControl())
-
-        desktopModeRecentsTransitionStateListener.onTransitionStateChanged(
-            RecentsTransitionStateListener.TRANSITION_STATE_REQUESTED
-        )
-
-        verify(decoration).setIsRecentsTransitionRunning(true)
-    }
-
-    @Test
-    fun testRecentsTransitionStateListener_nonRunningState_setsTransitionNotRunning() {
-        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
-        val decoration = setUpMockDecorationForTask(task)
-        onTaskOpening(task, SurfaceControl())
-        desktopModeRecentsTransitionStateListener.onTransitionStateChanged(
-            RecentsTransitionStateListener.TRANSITION_STATE_REQUESTED
-        )
-
-        desktopModeRecentsTransitionStateListener.onTransitionStateChanged(
-            RecentsTransitionStateListener.TRANSITION_STATE_NOT_RUNNING
-        )
-
-        verify(decoration).setIsRecentsTransitionRunning(false)
-    }
-
-    @Test
-    fun testRecentsTransitionStateListener_requestedAndAnimating_setsTransitionRunningOnce() {
-        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
-        val decoration = setUpMockDecorationForTask(task)
-        onTaskOpening(task, SurfaceControl())
-
-        desktopModeRecentsTransitionStateListener.onTransitionStateChanged(
-            RecentsTransitionStateListener.TRANSITION_STATE_REQUESTED
-        )
-        desktopModeRecentsTransitionStateListener.onTransitionStateChanged(
-            RecentsTransitionStateListener.TRANSITION_STATE_ANIMATING
-        )
-
-        verify(decoration, times(1)).setIsRecentsTransitionRunning(true)
-    }
-
-    @Test
     @EnableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
     @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testOnTaskOpening_startingAppBubbleTask_skipsWindowDecorationCreation() {
@@ -1389,14 +1408,14 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
 
     @Test
     fun testOnFreeformWindowDragEnd_toDesktopModeDisplay_updateBounds() {
-        val onTouchListenerCaptor = argumentCaptor<View.OnTouchListener>()
+        val gestureInterceptorCaptor = argumentCaptor<WindowDecorLinearLayout.GestureInterceptor>()
         val decor =
             createOpenTaskDecoration(
                 windowingMode = WINDOWING_MODE_FREEFORM,
-                onCaptionButtonTouchListener = onTouchListenerCaptor,
+                gestureInterceptor = gestureInterceptorCaptor,
             )
 
-        val touchListener = onTouchListenerCaptor.firstValue
+        val touchListener = gestureInterceptorCaptor.firstValue
         if (touchListener is DesktopModeTouchEventListener) {
             val taskInfo = decor.taskInfo
             shellDesktopState.overrideWindowDropTargetEligibility[DEFAULT_DISPLAY] = true
@@ -1515,14 +1534,14 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
 
     @Test
     fun testOnFreeformWindowDragMove_toNonDesktopModeDisplay_setsNoDropIcon() {
-        val onTouchListenerCaptor = argumentCaptor<View.OnTouchListener>()
+        val gestureInterceptorCaptor = argumentCaptor<WindowDecorLinearLayout.GestureInterceptor>()
         val decor =
             createOpenTaskDecoration(
                 windowingMode = WINDOWING_MODE_FREEFORM,
-                onCaptionButtonTouchListener = onTouchListenerCaptor,
+                gestureInterceptor = gestureInterceptorCaptor,
             )
 
-        val touchListener = onTouchListenerCaptor.firstValue
+        val touchListener = gestureInterceptorCaptor.firstValue
         if (touchListener is DesktopModeTouchEventListener) {
             val taskInfo = decor.taskInfo
             shellDesktopState.overrideWindowDropTargetEligibility[DEFAULT_DISPLAY] = true
@@ -1635,7 +1654,8 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         // Capture the listener set on DesktopTasksController during initialization.
         val listenerCaptor = argumentCaptor<OnTaskResizeAnimationListener>()
         shellInit.init()
-        verify(mockDesktopTasksController).setOnTaskResizeAnimationListener(listenerCaptor.capture())
+        verify(mockDesktopTasksController)
+            .setOnTaskResizeAnimationListener(listenerCaptor.capture())
         val listener = listenerCaptor.firstValue
 
         // Create a task with a window decoration.
@@ -1656,7 +1676,8 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         requestingImmersive: Boolean = false,
         displayId: Int = DEFAULT_DISPLAY,
         onCaptionButtonClickListener: KArgumentCaptor<View.OnClickListener> = argumentCaptor(),
-        onCaptionButtonTouchListener: KArgumentCaptor<View.OnTouchListener> = argumentCaptor(),
+        gestureInterceptor: KArgumentCaptor<WindowDecorLinearLayout.GestureInterceptor> =
+            argumentCaptor(),
     ): WindowDecorationWrapper {
         val task =
             createTask(
@@ -1668,7 +1689,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         verify(decor)
             .setCaptionListeners(
                 onCaptionButtonClickListener.capture(),
-                onCaptionButtonTouchListener.capture(),
+                gestureInterceptor.capture(),
                 any(),
                 any(),
             )

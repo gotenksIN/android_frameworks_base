@@ -20,19 +20,24 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.when;
 
+import android.app.ActivityManagerInternal;
+import android.content.Context;
 import android.content.theming.ThemeStyle;
 import android.graphics.Color;
 
+import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.server.pm.UserManagerInternal;
 import com.android.systemui.monet.ColorScheme;
 
-import com.google.ux.material.libmonet.dynamiccolor.ColorSpec.SpecVersion;
-import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme.Platform;
-
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidJUnit4.class)
 public class ThemeStatePairTests {
@@ -46,8 +51,30 @@ public class ThemeStatePairTests {
 
     private static final int USER_ID = 0;
 
-    private ThemeStatePair mStatePair = new ThemeStatePair(USER_ID, true, SEED_COLOR_VALID,
-            CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+    private ThemeStatePair mStatePair;
+    private ThemeEnvironment mEnvironment;
+    @Mock
+    private ActivityManagerInternal mActivityManagerInternal;
+    @Mock
+    private UserManagerInternal mUserManagerInternal;
+    @Mock
+    private ThemeUserLifecycle mThemeUserLifecycle;
+
+    @Before
+    public void setup() {
+        MockitoAnnotations.initMocks(this);
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        when(mUserManagerInternal.isHeadlessSystemUserMode()).thenReturn(false);
+
+        // Ensure services are registered for internal use by Environment if any (though
+        // Environment just uses context/reader here)
+        // But ThemeUserLifecycle might be needed if we set booting complete.
+        // Here we just need the environment instance.
+        mEnvironment = new ThemeEnvironment(context, (key, def) -> def);
+        mEnvironment.setBootingComplete(mThemeUserLifecycle); // Ensure not booting by default
+        mStatePair = new ThemeStatePair(USER_ID, true, SEED_COLOR_VALID,
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
+    }
 
     @Test
     public void testShouldUpdateOverlays_noChanges() {
@@ -141,59 +168,63 @@ public class ThemeStatePairTests {
     @Test
     public void testShouldUpdate_differentTimestamp_shouldUpdate() {
         mStatePair.forceUpdate();
-        assertTrue(mStatePair.shouldUpdate(false));
+        assertTrue(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_sameState_shouldNotUpdate() {
-        assertFalse(mStatePair.shouldUpdate(false));
+        assertFalse(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_userNotSetup_shouldNotUpdate() {
         mStatePair = new ThemeStatePair(USER_ID, false, SEED_COLOR_VALID, CONTRAST_DEFAULT,
-                STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
-        assertFalse(mStatePair.shouldUpdate(false));
+                STYLE_VALID, mEnvironment);
+        assertFalse(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_backgroundChangesDeferred_shouldNotUpdate() {
         mStatePair.setDeferUpdatesOnLock(true);
         mStatePair.applySeedColor(SEED_COLOR_RED);
-        assertFalse(mStatePair.shouldUpdate(false));
+        assertFalse(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_backgroundChangesDeferredButForced_shouldUpdate() {
         mStatePair.setDeferUpdatesOnLock(true);
         mStatePair.forceUpdate(); // Force the update by changing the timestamp
-        assertTrue(mStatePair.shouldUpdate(false));
+        assertTrue(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_overlaysShouldUpdate_shouldUpdate() {
         mStatePair.applySeedColor(SEED_COLOR_RED);
-        assertTrue(mStatePair.shouldUpdate(false));
+        assertTrue(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_noChanges_shouldUpdate() {
         mStatePair.forceUpdate(); // This ensures the timestamps are different
-        assertTrue(mStatePair.shouldUpdate(false));
+        assertTrue(mStatePair.shouldUpdate());
     }
 
     @Test
     public void testShouldUpdate_booting_shouldUpdateEvenIfNotSetup() {
+        // Create a fresh environment that is still booting
+        ThemeEnvironment bootingEnv = new ThemeEnvironment(
+                InstrumentationRegistry.getInstrumentation().getTargetContext(),
+                (key, def) -> def);
+
         mStatePair = new ThemeStatePair(USER_ID, false /* isSetup */, SEED_COLOR_VALID,
                 CONTRAST_DEFAULT,
-                STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                STYLE_VALID, bootingEnv);
         // Apply a change so pending != current, but do NOT use forceUpdate() because
         // that bypasses the setup check.
         mStatePair.applySeedColor(SEED_COLOR_RED);
 
         // User not setup, normally returns false.
-        assertFalse(mStatePair.shouldUpdate(false));
         // But if booting, should return true.
-        assertTrue(mStatePair.shouldUpdate(true));
+        assertTrue(mStatePair.shouldUpdate());
     }
 }

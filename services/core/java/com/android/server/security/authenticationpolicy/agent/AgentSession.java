@@ -16,10 +16,15 @@
 
 package com.android.server.security.authenticationpolicy.agent;
 
-/** Immutable metadata for a connected agent. */
+import android.annotation.NonNull;
+
+/**
+ * Immutable metadata for a connected agent.
+ *
+ * @hide
+ */
 public class AgentSession {
 
-    private final int mId;
     private final int mUserId;
     private final boolean mAllowed;
 
@@ -27,30 +32,42 @@ public class AgentSession {
      * Create an initially authorized AgentSession record to cache any signals / status from
      * when the agent's device connected.
      *
-     * @param id a unique id for this session
+     * @param userId user that owns this session
      */
-    public static AgentSession authorized(int userId, int id) {
-        return new AgentSession(userId, id, true);
+    public static AgentSession authorized(int userId) {
+        return new AgentSession(userId, true);
+    }
+
+    /**
+     * Update an existing session to authorized and return a new copy.
+     *
+     * @param session existing session to copy from
+     */
+    public static AgentSession authorized(@NonNull AgentSession session) {
+        return new AgentSession(session.mUserId, true);
     }
 
     /**
      * Create a session record for a device that is not authorized for automation.
      *
-     * @param id a unique id for this session
+     * @param userId user that owns this session
      */
-    public static AgentSession notAuthorized(int userId, int id) {
-        return new AgentSession(userId, id, false);
+    public static AgentSession notAuthorized(int userId) {
+        return new AgentSession(userId, false);
     }
 
-    private AgentSession(int userId, int id, boolean allowAutomation) {
-        mId = id;
+    /**
+     * Update an existing session to not authorized and return a new copy.
+     *
+     * @param session existing session to copy from
+     */
+    public static AgentSession notAuthorized(@NonNull AgentSession session) {
+        return new AgentSession(session.mUserId, false);
+    }
+
+    private AgentSession(int userId, boolean allowAutomation) {
         mUserId = userId;
         mAllowed = allowAutomation;
-    }
-
-    /** Get the id of this session. */
-    public int getId() {
-        return mId;
     }
 
     /** Get the user of the session owner. */

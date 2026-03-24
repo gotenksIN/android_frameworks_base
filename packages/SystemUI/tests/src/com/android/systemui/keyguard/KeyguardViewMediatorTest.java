@@ -82,6 +82,7 @@ import android.testing.TestableLooper;
 // QTI_BEGIN: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.testing.TestableLooper.RunWithLooper;
 // QTI_END: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
+import android.uilatencystats.UiLatencyStatsManager;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.View;
@@ -121,6 +122,7 @@ import com.android.systemui.log.SessionTracker;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.process.ProcessWrapper;
 import com.android.systemui.scene.FakeWindowRootViewComponent;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.scene.ui.view.WindowRootView;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.NotificationShadeWindowControllerImpl;
@@ -176,6 +178,7 @@ import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
 import platform.test.runner.parameterized.Parameters;
 
 import java.util.List;
+import java.util.Optional;
 
 @RunWith(ParameterizedAndroidJunit4.class)
 @TestableLooper.RunWithLooper
@@ -261,6 +264,8 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     private @Mock DreamViewModel mDreamViewModel;
     private @Mock CommunalTransitionViewModel mCommunalTransitionViewModel;
     private @Mock SystemPropertiesHelper mSystemPropertiesHelper;
+
+    private @Mock UiLatencyStatsManager mUiLatencyStatsManager;
 
     private FakeFeatureFlags mFeatureFlags;
     private final int mDefaultUserId = 100;
@@ -1840,7 +1845,9 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mKeyguardTransitionBootInteractor,
                 mKosmos::getCommunalSceneInteractor,
                 mKosmos::getCommunalSettingsInteractor,
-                mock(WindowManagerOcclusionManager.class)) {
+                mock(WindowManagerOcclusionManager.class),
+                Optional.of(mUiLatencyStatsManager),
+                () -> mock(SceneInteractor.class)) {
 
                     @Override
                     void postAfterTraversal(Runnable runnable) {

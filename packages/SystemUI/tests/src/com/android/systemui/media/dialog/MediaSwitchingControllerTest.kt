@@ -21,7 +21,9 @@ import android.bluetooth.BluetoothDevice
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.content.pm.PackageManager.ApplicationInfoFlags
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
 import android.media.AudioDeviceAttributes
@@ -404,6 +406,39 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
         mMediaSwitchingController.tryToLaunchInAppRoutingIntent(TEST_DEVICE_1_ID, mDialogLaunchView)
 
         verify(mStarter).startActivity(any<Intent>(), any(), eq(mController))
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    fun tryToLaunchMissingPermissionsResolveIntent_noMissingPermissions_doesNothing() {
+        whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(null)
+        mMediaSwitchingController.start(mCallback)
+
+        mMediaSwitchingController.tryToLaunchMissingPermissionsResolveIntent()
+
+        verify(mCallback, never()).dismissDialog()
+        verify(mSpyContext, never()).startActivityAsUser(any(), any())
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    fun tryToLaunchMissingPermissionsResolveIntent_hasMissingPermissions_launchesActivity() {
+        val componentName = ComponentName(mPackageName, "class")
+        val perms = setOf("perm1", "perm2")
+        val info = MissingPermissionsInfo(componentName, perms)
+        val user = UserHandle.of(123)
+        whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(info)
+        whenever(mLocalMediaManager.userHandle).thenReturn(user)
+        mContext.prepareCreateContextAsUser(user, mContext)
+        mMediaSwitchingController.start(mCallback)
+
+        mMediaSwitchingController.tryToLaunchMissingPermissionsResolveIntent()
+
+        verify(mCallback).dismissDialog()
+        val intentCaptor = argumentCaptor<Intent>()
+        verify(mSpyContext).startActivityAsUser(intentCaptor.capture(), eq(user))
+        assertThat(intentCaptor.firstValue.action)
+            .isEqualTo(RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS)
     }
 
     @Test
@@ -791,7 +826,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_groupPlaybackAndExpanded_allSelectedDevicesOnTop() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(true)
@@ -825,7 +859,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_groupPlaybackAndCollapsed_groupControlAtTheTop() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(true)
@@ -854,7 +887,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_sessionVolumeUnavailable_noGroupControl() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(true)
@@ -887,7 +919,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun onDeviceListUpdate_groupPlaybackCreatedLater_noGroupControl() {
         whenever(mMediaDevice1.isSelected).thenReturn(true)
         whenever(mMediaDevice2.isSelected).thenReturn(false)
@@ -1857,10 +1888,7 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_USE_OF_SESSION_RELEASE_TYPE_FOR_STOP_BUTTON,
-        Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_USE_OF_SESSION_RELEASE_TYPE_FOR_STOP_BUTTON)
     fun getStopButtonText_sessionReleaseSharing_returnsSharingText() {
         doReturn(RoutingSessionInfo.RELEASE_TYPE_SHARING)
             .whenever(mLocalMediaManager)
@@ -1868,17 +1896,6 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
 
         assertThat(mMediaSwitchingController.getStopButtonStringRes())
             .isEqualTo(R.string.media_output_dialog_button_stop_sharing)
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_USE_OF_SESSION_RELEASE_TYPE_FOR_STOP_BUTTON)
-    @DisableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
-    fun getStopButtonText_sessionReleaseSharingDisabled_returnsNull() {
-        doReturn(RoutingSessionInfo.RELEASE_TYPE_SHARING)
-            .whenever(mLocalMediaManager)
-            .sessionReleaseType
-
-        assertThat(mMediaSwitchingController.getStopButtonStringRes()).isNull()
     }
 
     @Test
@@ -1929,50 +1946,50 @@ class MediaSwitchingControllerTest(flags: FlagsParameterization) : SysuiTestCase
 
     @Test
     @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
-    fun getMissingPermissionsResolveIntent_noMissingPermissionsInfo_returnsNull() {
+    fun getMissingPermissionsWarning_noMissingPermissionsInfo_returnsNull() {
         whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(null)
 
-        assertThat(mMediaSwitchingController.getMissingPermissionsResolveIntent()).isNull()
+        assertThat(mMediaSwitchingController.getMissingPermissionsWarning()).isNull()
     }
 
     @Test
     @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
-    fun getMissingPermissionsResolveIntent_emptyPermissions_returnsNull() {
+    fun getMissingPermissionsWarning_emptyPermissions_returnsNull() {
         val componentName = ComponentName(mPackageName, "class")
         val info = MissingPermissionsInfo(componentName, setOf())
         whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(info)
 
-        assertThat(mMediaSwitchingController.getMissingPermissionsResolveIntent()).isNull()
+        assertThat(mMediaSwitchingController.getMissingPermissionsWarning()).isNull()
     }
 
     @Test
     @RequiresFlagsDisabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
-    fun getMissingPermissionsResolveIntent_flagDisabled_returnsNull() {
+    fun getMissingPermissionsWarning_flagDisabled_returnsNull() {
         val componentName = ComponentName(mPackageName, "class")
         val perms = setOf("perm1", "perm2")
         val info = MissingPermissionsInfo(componentName, perms)
         whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(info)
-        assertThat(mMediaSwitchingController.getMissingPermissionsResolveIntent()).isNull()
+        assertThat(mMediaSwitchingController.getMissingPermissionsWarning()).isNull()
     }
 
     @Test
     @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
-    fun getMissingPermissionsResolveIntent_validInfo_returnsIntent() {
+    fun getMissingPermissionsWarning_validInfo_returnsWarning() {
         val componentName = ComponentName(mPackageName, "class")
         val perms = setOf("perm1", "perm2")
         val info = MissingPermissionsInfo(componentName, perms)
+        val user = UserHandle.of(123)
         whenever(mLocalMediaManager.missingPermissionsInfo).thenReturn(info)
+        whenever(mLocalMediaManager.userHandle).thenReturn(user)
+        mContext.prepareCreateContextAsUser(user, mContext)
+        whenever(mPackageManager.getApplicationInfo(any(), any<ApplicationInfoFlags>()))
+            .thenReturn(ApplicationInfo())
+        whenever(mPackageManager.getApplicationLabel(any())).thenReturn("Test Name")
 
-        val intent = mMediaSwitchingController.getMissingPermissionsResolveIntent()
+        val warningInfo = mMediaSwitchingController.getMissingPermissionsWarning()
 
-        assertThat(intent).isNotNull()
-        assertThat(intent!!.getAction())
-            .isEqualTo(RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS)
-        assertThat(intent.getComponent()).isEqualTo(componentName)
-        val extraPermissions =
-            intent.getStringArrayListExtra(RouteListingPreference.EXTRA_MISSING_PERMISSIONS)
-        assertThat(extraPermissions).containsExactly("perm1", "perm2")
-        assertThat(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK).isNotEqualTo(0)
+        assertThat(warningInfo).isNotNull()
+        assertThat(warningInfo!!.appName).isEqualTo("Test Name")
     }
 
     private fun getMediaDevices(mediaItemList: List<MediaItem>): List<MediaDevice> {

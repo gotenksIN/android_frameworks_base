@@ -39,7 +39,6 @@ import com.android.compose.animation.scene.mechanics.UserActionGesture
 import com.android.compose.animation.scene.mechanics.UserActionGestureFlag
 import com.android.mechanics.spec.MotionSpec
 import com.android.mechanics.spec.builder.spatialDirectionalMotionSpec
-import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

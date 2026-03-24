@@ -18,15 +18,13 @@ package android.service.personalcontext.insight.interaction;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
-import android.annotation.Nullable;
 import android.annotation.SystemApi;
-import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.RenderToken;
-import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
 
 import androidx.annotation.NonNull;
 
@@ -56,7 +54,8 @@ public final class InsightEvent implements Parcelable {
                     EVENT_USER_LONG_PRESS,
                     EVENT_USER_DISMISS,
                     EVENT_USER_ATTRIBUTION_REQUESTED,
-                    EVENT_USER_FEEDBACK_INITITATED,
+                    EVENT_USER_FEEDBACK_POSITIVE,
+                    EVENT_USER_FEEDBACK_NEGATIVE,
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface EventType {
@@ -83,41 +82,38 @@ public final class InsightEvent implements Parcelable {
     /** Event type for when the user requests attribution for the insight. */
     public static final int EVENT_USER_ATTRIBUTION_REQUESTED = 6;
 
-    /** Event type for when the user begins entering feedback on the insight. */
-    public static final int EVENT_USER_FEEDBACK_INITITATED = 7;
+    /** Event type for when the user enters positive feedback on the insight. */
+    public static final int EVENT_USER_FEEDBACK_POSITIVE = 7;
+
+    /** Event type for when the user enters negative feedback on the insight. */
+    public static final int EVENT_USER_FEEDBACK_NEGATIVE = 8;
 
     private final @EventType int mEventType;
-    private final ContextInsight mInsight;
+    private final PublishedContextInsight mPublishedContextInsight;
     private final long mTimestamp;
 
     @NonNull
     private final RenderToken mRenderToken;
 
-    @NonNull
-    private final Bundle mExtras;
-
     /** @hide */
     public InsightEvent(
             @EventType int eventType,
-            @NonNull ContextInsight insight,
+            @NonNull PublishedContextInsight publishedInsight,
             long timestamp,
-            @NonNull RenderToken renderToken,
-            @Nullable Bundle extras) {
+            @NonNull RenderToken renderToken) {
         mEventType = eventType;
-        mInsight = insight;
+        mPublishedContextInsight = publishedInsight;
         mTimestamp = timestamp;
         mRenderToken = renderToken;
-        mExtras = new Bundle();
-        mExtras.putAll(extras);
     }
 
     private InsightEvent(Parcel in) {
         mEventType = in.readInt();
-        mInsight = in.readParcelable(
-                /* classLoader= */ null, ContextInsightWrapper.class).getContextInsight();
+        mPublishedContextInsight = in.readParcelable(
+                /* classLoader= */ null, PublishedContextInsightWrapper.class)
+                .getPublishedContextInsight();
         mTimestamp = in.readLong();
         mRenderToken = in.readParcelable(null, RenderToken.class);
-        mExtras = in.readBundle();
     }
 
     /** Gets the type of event that occurred. */
@@ -127,8 +123,8 @@ public final class InsightEvent implements Parcelable {
 
     /** Gets the insight that the event occurred on. */
     @NonNull
-    public ContextInsight getInsight() {
-        return mInsight;
+    public PublishedContextInsight getInsight() {
+        return mPublishedContextInsight;
     }
 
     /** Gets the system timethat the event occurred at. */
@@ -140,12 +136,6 @@ public final class InsightEvent implements Parcelable {
     @NonNull
     public RenderToken getRenderToken() {
         return mRenderToken;
-    }
-
-    /** Gets the extras provided at the time of event creation. */
-    @NonNull
-    public Bundle getExtras() {
-        return mExtras.deepCopy();
     }
 
     @NonNull
@@ -169,9 +159,8 @@ public final class InsightEvent implements Parcelable {
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
         dest.writeInt(mEventType);
-        dest.writeParcelable(new ContextInsightWrapper(mInsight), 0);
+        dest.writeParcelable(new PublishedContextInsightWrapper(mPublishedContextInsight), 0);
         dest.writeLong(mTimestamp);
         dest.writeParcelable(mRenderToken, flags);
-        dest.writeBundle(mExtras);
     }
 }

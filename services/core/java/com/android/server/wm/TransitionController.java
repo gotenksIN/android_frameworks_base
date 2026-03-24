@@ -24,7 +24,6 @@ import static android.view.WindowManager.TRANSIT_NONE;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
-import static android.window.DesktopExperienceFlags.ENABLE_PARALLEL_CD_TRANSITIONS_DURING_RECENTS;
 import static android.window.TransitionInfo.FLAGS_IS_NON_APP_WINDOW;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
@@ -1085,6 +1084,12 @@ class TransitionController {
         mCollectingTransition.recordTaskOrder(wc);
     }
 
+    /** @see Transition#recordLifecycle */
+    void recordLifecycle(@NonNull WindowContainer<?> wc) {
+        if (mCollectingTransition == null) return;
+        mCollectingTransition.recordLifecycle(wc);
+    }
+
     /** @see Transition#hasOrderChanges */
     boolean hasOrderChanges() {
         if (mCollectingTransition == null) return false;
@@ -1173,26 +1178,6 @@ class TransitionController {
     /** @see Transition#setReady */
     void setReady(WindowContainer wc) {
         setReady(wc, true);
-    }
-
-    /** @see Transition#deferTransitionReady */
-    void deferTransitionReady() {
-        if (Flags.migrateBasicLegacyReady()) return;
-        if (!isShellTransitionsEnabled()) return;
-        if (mCollectingTransition == null) {
-            throw new IllegalStateException("No collecting transition to defer readiness for.");
-        }
-        mCollectingTransition.deferTransitionReady();
-    }
-
-    /** @see Transition#continueTransitionReady */
-    void continueTransitionReady() {
-        if (Flags.migrateBasicLegacyReady()) return;
-        if (!isShellTransitionsEnabled()) return;
-        if (mCollectingTransition == null) {
-            throw new IllegalStateException("No collecting transition to defer readiness for.");
-        }
-        mCollectingTransition.continueTransitionReady();
     }
 
     /** @see Transition#finishTransition */
@@ -1423,8 +1408,7 @@ class TransitionController {
             for (int i = 0; i < collecting.mParticipants.size(); ++i) {
                 final WindowContainer wc = collecting.mParticipants.valueAt(i);
                 final boolean isOnDifferentDisplay = !queued.isOnDisplay(wc.mDisplayContent);
-                if (isOnDifferentDisplay
-                        && ENABLE_PARALLEL_CD_TRANSITIONS_DURING_RECENTS.isTrue()) {
+                if (isOnDifferentDisplay) {
                     // Running in a different display, could be independent.
                     continue;
                 }
@@ -1486,8 +1470,7 @@ class TransitionController {
         for (int i = 0; i < other.mTargets.size(); ++i) {
             final WindowContainer wc = other.mTargets.get(i).mContainer;
             final boolean isOnDifferentDisplay = !recents.isOnDisplay(wc.mDisplayContent);
-            if (isOnDifferentDisplay
-                    && ENABLE_PARALLEL_CD_TRANSITIONS_DURING_RECENTS.isTrue()) {
+            if (isOnDifferentDisplay) {
                 // Running in a different display, could be independent.
                 continue;
             }
@@ -1696,7 +1679,7 @@ class TransitionController {
             for (int j = 0; j < mLegacyListeners.size(); ++j) {
                 final var listener = mLegacyListeners.get(j);
                 if (shouldDispatchLegacyListener(listener, displayId)) {
-                    listener.onAppTransitionCancelledLocked(false /* keyguardGoingAwayCancelled */);
+                    listener.onAppTransitionCancelledLocked();
                 }
             }
         }

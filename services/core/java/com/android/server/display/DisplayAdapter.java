@@ -107,6 +107,8 @@ abstract class DisplayAdapter {
     public void dumpLocked(PrintWriter pw) {
     }
 
+    public void stop() {}
+
     /**
      * Sends a display device event to the display adapter listener asynchronously.
      */
@@ -136,6 +138,8 @@ abstract class DisplayAdapter {
                 return SurfaceControl.POWER_MODE_NORMAL;
         }
     }
+
+    public void applyBatchDisplayModeUpdatesLocked() {}
 
     public interface Listener {
         void onDisplayDeviceEvent(DisplayDevice device, int event);

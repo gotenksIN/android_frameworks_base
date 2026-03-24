@@ -69,7 +69,6 @@ import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_LAUNCH_TASK;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_MOVE_PIP_ACTIVITY_TO_PINNED_TASK;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_PENDING_INTENT;
-import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_PRESERVE_LEAF_TASK_IF_RELAUNCH;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REMOVE_INSETS_FRAME_PROVIDER;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REMOVE_ROOT_TASK;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REMOVE_TASK;
@@ -85,6 +84,7 @@ import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_KEYGUARD_STATE;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_LAUNCH_ADJACENT_FLAG_ROOT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_LAUNCH_ROOT;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_PRESERVE_LEAF_TASK_IF_RELAUNCH;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH_FROM_HOME;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS;
@@ -410,8 +410,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 // waitAsyncStart), so add a condition to ensure that it finishes applying.
                 final Transition.ReadyCondition wctApplied;
                 if (t != null) {
-                    wctApplied = new Transition.ReadyCondition("start WCT applied",
-                            !Flags.migrateBasicLegacyReady());
+                    wctApplied = new Transition.ReadyCondition("start WCT applied", false);
                     transition.mReadyTracker.add(wctApplied);
                 } else {
                     wctApplied = null;
@@ -578,7 +577,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             // Currently, application of wct can span multiple looper loops (ie. waitAsyncStart),
             // so need a condition to ensure that it finishes applying.
             final Transition.ReadyCondition wctApplied = new Transition.ReadyCondition(
-                    "TF WCT Applied", !Flags.migrateBasicLegacyReady());
+                    "TF WCT Applied", false);
             if (mService.mWindowManager.mSyncEngine.hasActiveSync()
                     && !shouldApplyIndependently) {
                 // Although there is an active sync, we want to apply the transaction now.
@@ -664,11 +663,17 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             final Map.Entry<IBinder, WindowContainerTransaction.Change> entry = entries.next();
             final WindowContainer wc = WindowContainer.fromBinder(entry.getKey());
             if (wc == null || wc.isOrganized()) continue;
-            Slog.wtf(TAG, "Attempting to externally manipulate a non-organized container: " + wc
-                    + " isAttached=" + wc.isAttached()
+            final String report = "Attempting to externally change a non-organized container: "
+                    + wc + "=" + entry.getValue()
                     + " playercount=" + mTransitionController.getTransitionPlayerCount()
-                    + " taskorg=" + mTaskOrganizerController.getTaskOrganizer());
+                    + " taskorg=" + mTaskOrganizerController.getTaskOrganizer();
             entries.remove();
+            if (wc.isAttached()) {
+                Slog.wtf(TAG, report);
+            } else {
+                // Only error-level since changing a detached container would be a no-op anyway.
+                Slog.e(TAG, report);
+            }
         }
         List<WindowContainerTransaction.HierarchyOp> hops = t.getHierarchyOps();
         for (int h = hops.size() - 1; h >= 0; --h) {
@@ -683,7 +688,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             if (binder == null) continue;
             final WindowContainer wc = WindowContainer.fromBinder(binder);
             if (wc == null || wc.isOrganized()) continue;
-            Slog.wtf(TAG, "Trying to externally manipulate a non-organized container: " + wc);
+            Slog.wtf(TAG, "Attempting to externally manipulate a non-organized container: "
+                    + wc + "=" + hop);
             hops.remove(h);
         }
     }
@@ -801,7 +807,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 }
 
                 int containerEffect = applyWindowContainerChange(wc, entry.getValue(),
-                        t.getErrorCallbackToken());
+                        t.getErrorCallbackToken(), chain);
                 effects |= containerEffect;
 
                 if (forceHiddenForPip) {
@@ -1030,7 +1036,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         return effects;
     }
 
-    private int applyTaskChanges(Task tr, WindowContainerTransaction.Change c) {
+    private int applyTaskChanges(Task tr, WindowContainerTransaction.Change c,
+            @NonNull ActionChain chain) {
         final SurfaceControl.Transaction t = c.getBoundsChangeTransaction();
         // Check bounds change transaction at the beginning because it may pause updating window
         // surface position. Then the following changes won't apply intermediate position.
@@ -1073,6 +1080,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 & WindowContainerTransaction.Change.CHANGE_DISABLE_LAUNCH_ADJACENT) != 0) {
             tr.setLaunchAdjacentDisabled(c.getDisableLaunchAdjacent());
         }
+
+        effects |= applyTaskCascadingChanges(tr, c, chain);
 
         final int childWindowingMode = c.getActivityWindowingMode();
         if (!ActivityTaskManagerService.isPip2ExperimentEnabled()
@@ -1134,6 +1143,35 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         }
 
         return effects;
+    }
+
+    /** Applying the changes that may cascade and change the child containers. */
+    private int applyTaskCascadingChanges(Task tr, WindowContainerTransaction.Change c,
+            @NonNull ActionChain chain) {
+        boolean recomputeConfigNeeded = false;
+        if ((c.getChangeMask() & WindowContainerTransaction.Change
+                .CHANGE_DISALLOW_OVERRIDE_BOUNDS_FOR_CHILDREN) != 0) {
+            tr.forAllTasks(chain::collect);
+            if (tr.setDisallowOverrideBoundsForChildren(c.getDisallowOverrideBoundsForChildren())
+                    != BOUNDS_CHANGE_NONE) {
+                recomputeConfigNeeded = true;
+            }
+        }
+
+        if ((c.getChangeMask() & WindowContainerTransaction.Change
+                .CHANGE_DISALLOW_OVERRIDE_WINDOWING_MODE_FOR_CHILDREN) != 0) {
+            tr.forAllTasks(chain::collect);
+            if (tr.setDisallowOverrideWindowingModeForChildren(
+                    c.getDisallowOverrideWindowingModeForChildren())) {
+                recomputeConfigNeeded = true;
+            }
+        }
+
+        if (recomputeConfigNeeded) {
+            tr.recomputeConfiguration();
+            return TRANSACT_EFFECTS_LIFECYCLE;
+        }
+        return TRANSACT_EFFECTS_NONE;
     }
 
     // TODO(b/333452456): For testing on local easier. Remove after the use case is gone.
@@ -2614,12 +2652,13 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
     }
 
     private int applyWindowContainerChange(WindowContainer wc,
-            WindowContainerTransaction.Change c, @Nullable IBinder errorCallbackToken) {
+            WindowContainerTransaction.Change c, @Nullable IBinder errorCallbackToken,
+            @NonNull ActionChain chain) {
         sanitizeWindowContainer(wc);
         if (wc.asDisplayArea() != null) {
             return applyDisplayAreaChanges(wc.asDisplayArea(), c);
         } else if (wc.asTask() != null) {
-            return applyTaskChanges(wc.asTask(), c);
+            return applyTaskChanges(wc.asTask(), c, chain);
         } else if (wc.asTaskFragment() != null && wc.asTaskFragment().isEmbedded()) {
             return applyTaskFragmentChanges(wc.asTaskFragment(), c, errorCallbackToken);
         } else {

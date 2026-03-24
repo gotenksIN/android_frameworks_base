@@ -34,7 +34,6 @@ import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
 import com.android.testing.wm.util.MockToken
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
-import com.android.wm.shell.Flags.FLAG_FIX_OPEN_APP_BUBBLE_FROM_LOCKSCREEN
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController
@@ -86,45 +85,47 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     private val bubbleController = mock<BubbleController>()
     private val bubbleRootTask = mock<BubbleRootTask>()
     private val bubbleHelper = spy(BubbleHelperImpl(bubbleRootTask = bubbleRootTask))
-    private val bubbleTransitions =
-        spy(
-            BubbleTransitions(
-                mContext,
-                transitions,
-                mock(),
-                mock(),
-                mock(),
-                mock(),
-                mock(),
-                bubbleHelper,
-            )
-        )
     private val pinnedLayerHandler = mock<PinnedLayerHandler>()
     private val normalAppLayerHandler = mock<NormalAppLayerHandler>()
     private val pipScheduler = mock<PipScheduler>()
-
     private val shellInit: ShellInit = ShellInit(TestShellExecutor())
-    private val mixedHandler =
-        DefaultMixedHandler(
-            shellInit,
-            transitions,
-            Optional.of(splitScreenController),
-            pipTransitionController,
-            Optional.of(pipScheduler),
-            normalAppLayerHandler,
-            pinnedLayerHandler,
-            Optional.of(recentsTransitionHandler),
-            keyguardTransitionHandler,
-            Optional.of(desktopTasksController),
-            desktopTasksTransitionHandler,
-            Optional.of(unfoldTransitionHandler),
-            Optional.of(activityEmbeddingController),
-            bubbleTransitions,
-            bubbleHelper,
-        )
+
+    private lateinit var bubbleTransitions: BubbleTransitions
+    private lateinit var mixedHandler: DefaultMixedHandler
 
     @Before
     fun setUp() {
+        bubbleTransitions =
+            spy(
+                BubbleTransitions(
+                    mContext,
+                    transitions,
+                    mock(),
+                    mock(),
+                    mock(),
+                    mock(),
+                    mock(),
+                    bubbleHelper,
+                )
+            )
+        mixedHandler =
+            DefaultMixedHandler(
+                shellInit,
+                transitions,
+                Optional.of(splitScreenController),
+                pipTransitionController,
+                Optional.of(pipScheduler),
+                normalAppLayerHandler,
+                pinnedLayerHandler,
+                Optional.of(recentsTransitionHandler),
+                keyguardTransitionHandler,
+                Optional.of(desktopTasksController),
+                desktopTasksTransitionHandler,
+                Optional.of(unfoldTransitionHandler),
+                Optional.of(activityEmbeddingController),
+                bubbleTransitions,
+                bubbleHelper,
+            )
         shellInit.init()
         bubbleTransitions.setBubbleController(bubbleController)
     }
@@ -182,7 +183,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
             .`when`(bubbleTransitions)
             .storePendingEnterTransition(any(), any())
 
-        mixedHandler.handleRequest(Binder(), request)
+        mixedHandler.handleRequestOnly(Binder(), request)
         verify(remoteTransition).onTransitionConsumed(any(), eq(false))
     }
 
@@ -244,7 +245,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
 
         bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
-        mixedHandler.handleRequest(Binder(), request)
+        mixedHandler.handleRequestOnly(Binder(), request)
 
         verify(remoteTransition).onTransitionConsumed(any(), eq(false))
     }
@@ -364,7 +365,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_FIX_OPEN_APP_BUBBLE_FROM_LOCKSCREEN)
+    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE)
     fun test_startAnimation_bubbleOpensFromKeyguard() {
         val transition = Binder()
         val info = TransitionInfo(TRANSIT_OPEN, TRANSIT_FLAG_KEYGUARD_GOING_AWAY)

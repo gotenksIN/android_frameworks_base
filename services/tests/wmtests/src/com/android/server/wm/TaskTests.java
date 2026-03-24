@@ -1842,11 +1842,7 @@ public class TaskTests extends WindowTestsBase {
 
         final Task preservedRootTask = leafTask.getPreservedRootTaskIfEnabled();
 
-        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()) {
-            assertEquals(rootTask, preservedRootTask);
-        } else {
-            assertNull(preservedRootTask);
-        }
+        assertEquals(rootTask, preservedRootTask);
     }
 
     @Test
@@ -2524,6 +2520,22 @@ public class TaskTests extends WindowTestsBase {
         verify(activity.app).onTaskPackageUpdateHandled(task);
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testContinuePackageUpdate_noProcess_doesNotCallHandled() {
+        final Task task = getTestTask();
+        final ActivityRecord activity = task.getTopMostActivity();
+        task.mHandlePackageUpdate = true;
+        final WindowProcessController mockApp = mock(WindowProcessController.class);
+        activity.app = mockApp;
+        // Detach process from activity.
+        activity.app = null;
+
+        task.continuePackageUpdate();
+
+        verify(mockApp, never()).onTaskPackageUpdateHandled(task);
+    }
+
     @DisableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
     @Test
     public void testRealActivityAppLockEnabled_appLockFlagIsOff_appLockEnabled_disabled() {
@@ -2662,7 +2674,6 @@ public class TaskTests extends WindowTestsBase {
         assertTrue(task.disableAppCompatRoundedCorners());
     }
 
-    @EnableFlags(Flags.FLAG_IMPROVE_OCCLUSION_CALCULATION)
     @Test
     public void testFillTestInfo_isActivityStackTransparent_withTransparentEmbeddedActivity() {
         final Task task = createTask(mDisplayContent);
@@ -2696,6 +2707,52 @@ public class TaskTests extends WindowTestsBase {
 
         assertThrows(IllegalStateException.class,
                 () -> r.reparent(visibilityBarrier, POSITION_TOP));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ALLOW_DRAG_AND_DROP_WHEN_INTERACTIVE_BUGFIX)
+    public void testSetInteractive_leafTask_setsAndUnsetsAsInteractive() {
+        final Task rootTask = createTask(mDisplayContent);
+        final Task leafTask = createTaskInRootTask(rootTask, 0 /* userId */);
+
+        leafTask.setInteractive(true);
+        assertTrue(leafTask.isInteractive());
+
+        leafTask.setInteractive(false);
+        assertFalse(leafTask.isInteractive());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ALLOW_DRAG_AND_DROP_WHEN_INTERACTIVE_BUGFIX)
+    public void testSetInteractive_leafTask_updatesParentInteractiveState() {
+        final Task rootTask = createTask(mDisplayContent);
+        final Task leafTask = createTaskInRootTask(rootTask, 0 /* userId */);
+
+        leafTask.setInteractive(true);
+        assertTrue(rootTask.isInteractive());
+
+        leafTask.setInteractive(false);
+        assertFalse(rootTask.isInteractive());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ALLOW_DRAG_AND_DROP_WHEN_INTERACTIVE_BUGFIX)
+    public void testSetInteractive_multipleChildren_oneChildKeepsParentInteractive() {
+        final Task rootTask = createTask(mDisplayContent);
+        final Task leafTask1 = createTaskInRootTask(rootTask, 0 /* userId */);
+        final Task leafTask2 = createTaskInRootTask(rootTask, 0 /* userId */);
+
+        leafTask1.setInteractive(true);
+        assertTrue(rootTask.isInteractive());
+
+        leafTask2.setInteractive(true);
+        assertTrue(rootTask.isInteractive());
+
+        leafTask1.setInteractive(false);
+        assertTrue(rootTask.isInteractive());
+
+        leafTask2.setInteractive(false);
+        assertFalse(rootTask.isInteractive());
     }
 
     private Task getTestTask() {

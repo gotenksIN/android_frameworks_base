@@ -32,6 +32,9 @@ policy_metadata {
         int_value: 2
         documentation: "Screen capture is allowed. "
       }
+      resolution_mechanism {
+        custom: true
+      }
     }
   }
   allowed_scopes: POLICY_SCOPE_USER
@@ -56,7 +59,7 @@ policy_metadata {
     class_name: "Integer"
     package_name: "java.lang"
   }
-  documentation: "Policy that controls whether the time is automatically obtained from the network or not."
+  documentation: "Policy that controls whether the time is automatically obtained from the network or not. "
   type_specific_metadata {
     enum_metadata {
       int_def_name: "android.app.admin.PolicyIdentifier.AutoTimeValue"
@@ -76,7 +79,7 @@ policy_metadata {
           package_name: "android.app.admin"
         }
         int_value: 1
-        documentation: "The admin has disabled the time to be automatically obtained from the network. This is not\nenforced and the user can still enable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME}\nto enforce the policy."
+        documentation: "The admin has disabled the time to be automatically obtained from the network. This is not\nenforced and the user can still enable it."
       }
       values {
         field_name {
@@ -85,7 +88,7 @@ policy_metadata {
           package_name: "android.app.admin"
         }
         int_value: 2
-        documentation: "The admin has enabled the time to be automatically obtained from the network. This is not\nenforced and the user can still disable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME}\nto enforce the policy."
+        documentation: "The admin has enabled the time to be automatically obtained from the network. This is not\nenforced and the user can still disable it."
       }
       values {
         field_name {
@@ -105,6 +108,9 @@ policy_metadata {
         int_value: 4
         documentation: "The admin has enabled the time to be automatically obtained from the network. This is\nenforced and the user cannot disable it."
       }
+      resolution_mechanism {
+        custom: true
+      }
     }
   }
   allowed_scopes: POLICY_SCOPE_DEVICE
@@ -117,6 +123,179 @@ policy_metadata {
 }
 policy_metadata {
   identifier {
+    field_name: "MANAGED_ESIM_OUTGOING_TRANSFER_POLICY"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether outgoing transfer is allowed for managed embedded subscriptions."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 1
+      int_def_name: "android.app.admin.PolicyIdentifier.ManagedEsimOutgoingTransferPolicy"
+      documentation: "@hide "
+      values {
+        field_name {
+          field_name: "MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "Specifies that the user is allowed to transfer managed eSIMs from the device."
+      }
+      values {
+        field_name {
+          field_name: "MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "Specifies that the user is not allowed to transfer managed eSIMs from the device."
+      }
+      resolution_mechanism {
+        most_restrictive {
+          most_to_least_restrictive: 2
+          most_to_least_restrictive: 1
+        }
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_DEVICE
+  affected_resource: RESOURCE_DEVICE_WIDE
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
+  allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+}
+policy_metadata {
+  identifier {
+    field_name: "AUTO_TIME_ZONE"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether the device\'s time zone is set automatically, e.g. obtained from\nnetwork or location."
+  type_specific_metadata {
+    enum_metadata {
+      int_def_name: "android.app.admin.PolicyIdentifier.AutoTimeZoneValue"
+      documentation: "Possible values {@link #AUTO_TIME_ZONE}\n\n@hide"
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_USER_CHOICE"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        documentation: "The user can choose whether the device\'s time zone is set automatically or not. "
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_DISABLED_UNENFORCED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "The admin has disabled automatic time zone detection. This is not enforced and the user can\nstill enable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME} to enforce the policy."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_ENABLED_UNENFORCED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "The admin has enabled the time zone to be automatically obtained from the network. This is\nnot enforced and the user can still disable it. Use {@link\nUserManager#DISALLOW_CONFIG_DATE_TIME} to enforce the policy."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_DISABLED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 3
+        documentation: "The admin has disabled automatic time zone detection. This is enforced and the user cannot\nenable it."
+      }
+      values {
+        field_name {
+          field_name: "AUTO_TIME_ZONE_ENABLED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 4
+        documentation: "The admin has enabled the time zone to be automatically obtained from the network. This is\nenforced and the user cannot disable it."
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_DEVICE
+  affected_resource: RESOURCE_DEVICE_WIDE
+  required_permission: "android.permission.SET_TIME_ZONE"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+}
+policy_metadata {
+  identifier {
+    field_name: "EASTER_EGGS"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether the user is allowed to access various Easter egg games across\nthe system (for instance, in settings)."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 2
+      int_def_name: "android.app.admin.PolicyIdentifier.EasterEggsValue"
+      documentation: "Possible values {@link EASTER_EGGS}\n\n@hide"
+      values {
+        field_name {
+          field_name: "EASTER_EGGS_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "Easter eggs are disallowed. "
+      }
+      values {
+        field_name {
+          field_name: "EASTER_EGGS_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "Easter eggs are allowed. "
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  allowed_scopes: POLICY_SCOPE_DEVICE
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_FUN"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
+  allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+}
+policy_metadata {
+  identifier {
     field_name: "LOCKSCREEN_MESSAGE"
     class_name: "PolicyIdentifier"
     package_name: "android.app.admin"
@@ -125,7 +304,7 @@ policy_metadata {
     class_name: "String"
     package_name: "java.lang"
   }
-  documentation: "Policy that sets a custom message to be shown on the lock screen. This message is displayed\non the device screen when locked, and is useful for a lost or stolen device.\n<p>\nThe message set using this method overrides any owner information manually set by the user\nand prevents the user from further changing it.\n<p>\nIf the message is {@code null} then the device owner info is cleared and the user\nowner info is shown on the lock screen if it is set.\n<p>\nIf the message contains only whitespaces then the message on the lock screen will be blank\nand the user will not be allowed to change it.\n<p>\nIf the message needs to be localized, it is the responsibility of the\n{@link DeviceAdminReceiver} to listen to the {@link Intent#ACTION_LOCALE_CHANGED} broadcast\nand set a new version of this string accordingly."
+  documentation: "Policy that sets a custom message to be shown on the lock screen. This message is displayed\non the device screen when locked, and is useful for a lost or stolen device.\n\n<p>The message set using this method overrides any owner information manually set by the user\nand prevents the user from further changing it.\n\n<p>If the message is {@code null} then the device owner info is cleared and the user owner\ninfo is shown on the lock screen if it is set.\n\n<p>If the message contains only whitespaces then the message on the lock screen will be blank\nand the user will not be allowed to change it.\n\n<p>If the message needs to be localized, it is the responsibility of the {@link\nDeviceAdminReceiver} to listen to the {@link Intent#ACTION_LOCALE_CHANGED} broadcast and set\na new version of this string accordingly."
   type_specific_metadata {
     string_metadata {
     }
@@ -134,6 +313,30 @@ policy_metadata {
   affected_resource: RESOURCE_DEVICE_WIDE
   required_permission: "android.permission.MANAGE_DEVICE_POLICY_LOCKSCREEN_MESSAGE"
   required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+}
+policy_metadata {
+  identifier {
+    field_name: "CONTENT_RESTRICTION_APPS"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "List<java.lang.String>"
+    package_name: "java.util"
+  }
+  documentation: "Policy that sets the list of packages as the holders of the {@link\nandroid.app.role.RoleManager#ROLE_CONTENT_RESTRICTION} role.\n\n<p>If the value is {@code null}, any previously set role holder set through this policy will\nbe removed."
+  type_specific_metadata {
+    list_metadata {
+      string_metadata {
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL"
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
 }

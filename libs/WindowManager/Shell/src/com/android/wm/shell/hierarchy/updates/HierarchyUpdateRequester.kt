@@ -20,8 +20,6 @@ import android.window.WindowContainerTransaction
 import com.android.wm.shell.hierarchy.containers.Container
 import com.android.wm.shell.hierarchy.modes.Mode
 
-val UNSPECIFIED_WCT = WindowContainerTransaction()
-
 /**
  * Interface for requesting updates to a container hierarchy.
  */
@@ -65,6 +63,17 @@ interface HierarchyUpdateRequester {
         reason: String,
         transitType: Int,
         wct: WindowContainerTransaction,
+    ) {
+        throw IllegalStateException("Requesting update before initialization")
+    }
+
+    /**
+     * A call to specifically update the displays in the hierarchy, and for modes to be given an
+     * opportunity to update the state of their managed tasks in the new display configuration.
+     */
+    fun updateDisplay(
+        displayId: Int,
+        outWct: WindowContainerTransaction
     ) {
         throw IllegalStateException("Requesting update before initialization")
     }

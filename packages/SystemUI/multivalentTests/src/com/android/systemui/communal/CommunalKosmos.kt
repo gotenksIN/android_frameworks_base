@@ -16,14 +16,16 @@
 
 package com.android.systemui.communal
 
-import com.android.systemui.communal.data.preconditions.CommonSetupPreconditions
-import com.android.systemui.communal.data.preconditions.fake.FakeCommonSetupPreconditions
 import com.android.systemui.communal.data.repository.ContextualSetupRepository
-import com.android.systemui.communal.data.repository.UprightChargingTriggerRepository
 import com.android.systemui.communal.data.repository.fake.FakeContextualSetupRepository
-import com.android.systemui.communal.data.repository.fake.FakeUprightChargingTriggerRepository
 import com.android.systemui.communal.domain.definition.ContextualSetupDefinition
 import com.android.systemui.communal.domain.definition.fake.FakeContextualSetupDefinition
+import com.android.systemui.communal.domain.interactor.ContextualSetupInteractor
+import com.android.systemui.communal.domain.interactor.UprightChargingInteractor
+import com.android.systemui.communal.domain.interactor.fake.FakeUprightChargingInteractor
+import com.android.systemui.communal.domain.preconditions.CommonSetupPreconditions
+import com.android.systemui.communal.domain.preconditions.fake.FakeCommonSetupPreconditions
+import com.android.systemui.dump.dumpManager
 import com.android.systemui.kosmos.Kosmos
 
 val Kosmos.commonSetupPreconditions: CommonSetupPreconditions by
@@ -31,10 +33,10 @@ val Kosmos.commonSetupPreconditions: CommonSetupPreconditions by
 val CommonSetupPreconditions.fake: FakeCommonSetupPreconditions
     get() = this as FakeCommonSetupPreconditions
 
-val Kosmos.uprightChargingTriggerRepository: UprightChargingTriggerRepository by
-    Kosmos.Fixture { FakeUprightChargingTriggerRepository() }
-val UprightChargingTriggerRepository.fake: FakeUprightChargingTriggerRepository
-    get() = this as FakeUprightChargingTriggerRepository
+val Kosmos.uprightChargingInteractor: UprightChargingInteractor by
+    Kosmos.Fixture { FakeUprightChargingInteractor() }
+val UprightChargingInteractor.fake: FakeUprightChargingInteractor
+    get() = this as FakeUprightChargingInteractor
 
 val Kosmos.contextualSetupRepository: ContextualSetupRepository by
     Kosmos.Fixture { FakeContextualSetupRepository() }
@@ -45,3 +47,15 @@ val Kosmos.contextualSetupDefinitionFactory: (String) -> ContextualSetupDefiniti
     Kosmos.Fixture { { id -> FakeContextualSetupDefinition(id) } }
 val ContextualSetupDefinition.fake: FakeContextualSetupDefinition
     get() = this as FakeContextualSetupDefinition
+
+val Kosmos.contextualSetupInteractorFactory:
+    (Set<ContextualSetupDefinition>) -> ContextualSetupInteractor by
+    Kosmos.Fixture {
+        { definitions ->
+            ContextualSetupInteractor(
+                repository = contextualSetupRepository,
+                definitions = definitions,
+                dumpManager = dumpManager,
+            )
+        }
+    }

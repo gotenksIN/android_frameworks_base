@@ -64,10 +64,10 @@ flag {
 }
 
 flag {
-  name: "no_alpha_rotation_enter_animation"
+  name: "use_snapshot_fixed_rotation"
   namespace: "windowing_frontend"
-  description: "Remove alpha effect of rotation enter animation"
-  bug: "438615184"
+  description: "Use known rotation of snapshot to apply fixed rotation"
+  bug: "488963381"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -88,26 +88,6 @@ flag {
   namespace: "windowing_frontend"
   description: "Let regular windows create their own surface"
   bug: "308662081"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "refactor_dimmer_crop"
-  namespace: "windowing_frontend"
-  description: "Reuse existing logic and fix corner issue"
-  bug: "435301249"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "remove_legacy_orientation_report"
-  namespace: "windowing_frontend"
-  description: "Remove legacy task letterbox logic"
-  bug: "464110049"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -150,20 +130,13 @@ flag {
 }
 
 flag {
-  name: "universal_resizable_by_default"
-  namespace: "windowing_frontend"
-  description: "The orientation, aspect ratio, resizability of activity will follow system behavior by default"
-  bug: "357141415"
-}
-
-flag {
-  name: "default_animator_single_transaction2"
-  namespace: "windowing_frontend"
-  description: "Reduce binder transaction to SF if there are multiple default animations"
-  bug: "456665218"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
+    name: "enable_split_dismiss_animation"
+    namespace: "windowing_frontend"
+    description: "Resize animation for expanding and collapsing surfaces when split screen is dismissed"
+    bug: "481965406"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -203,16 +176,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-    name: "remove_set_wake_ready_immediately"
-    namespace: "windowing_frontend"
-    description: "Remove a potentially obsolete Transition.setReady() when waking up"
-    bug: "429140578"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -282,16 +245,6 @@ flag {
 }
 
 flag {
-    name: "exit_split_on_display_move_bugfix"
-    namespace: "windowing_frontend"
-    description: "Exit split to remaining task when one task moves to another display"
-    bug: "460447267"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "aod_transition"
     namespace: "windowing_frontend"
     description: "Support to show lock wallpaper in aod state"
@@ -302,16 +255,6 @@ flag {
     name: "respect_requested_task_snapshot_resolution"
     namespace: "windowing_frontend"
     description: "Produce a task snapshot object that respects the requested resolution, and only cache low resolution snapshot in system server."
-    bug: "238206323"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "clean_up_task_snapshot_legacy_methods"
-    namespace: "windowing_frontend"
-    description: "Clean up legacy access methods to access task snapshot from IActivityTaskManager."
     bug: "238206323"
     metadata {
         purpose: PURPOSE_BUGFIX
@@ -363,13 +306,6 @@ flag {
     namespace: "windowing_frontend"
     description: "Use a fallback transition-player while sysui is starting or crashed."
     bug: "365884835"
-}
-
-flag {
-    name: "migrate_basic_legacy_ready"
-    namespace: "windowing_frontend"
-    description: "Migrate basic legacy ready-conditions to new ready tracking"
-    bug: "294925498"
 }
 
 flag {
@@ -431,16 +367,6 @@ flag {
 }
 
 flag {
-    name: "defer_snapshot_removal_for_predictive_back_with_ime"
-    namespace: "windowing_frontend"
-    description: "Prevents flicker by keeping the snapshot visible until the input method has drawn"
-    bug: "435285991"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_cross_activity_back_animation_in_bubbles"
     namespace: "windowing_frontend"
     description: "Enables the predictive cross-activity back animation in bubbles"
@@ -451,20 +377,17 @@ flag {
 }
 
 flag {
-    name: "simulate_touch_display_from_navigation_back"
-    namespace: "windowing_frontend"
-    description: "Trigger potential display focus change for non-gesture input because SystemUI won't inject input event."
-    bug: "461642122"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "improve_fluid_resizing_performance"
     namespace: "windowing_frontend"
     description: "Improve the performance during fluid resizing."
     bug: "429960813"
+}
+
+flag {
+    name: "perfect_edge"
+    namespace: "windowing_frontend"
+    description: "Make the app window match the window decoration during fluid resizing."
+    bug: "475362867"
 }
 
 flag {
@@ -495,6 +418,13 @@ flag {
 }
 
 flag {
+    name: "enable_merge_animations"
+    namespace: "windowing_frontend"
+    description: "Create animations for windows during mergeAnimation"
+    bug: "477175273"
+}
+
+flag {
     name: "only_cache_low_res_task_snapshot"
     namespace: "windowing_frontend"
     description: "Only cache low resolution task snapshot in system server."
@@ -508,6 +438,16 @@ flag {
     bug: "476223353"
     metadata {
         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "send_new_insets_state_with_rotation"
+    namespace: "windowing_frontend"
+    description: "Send the new InsetsState to the shell when the display rotates"
+    bug: "480967801"
+    metadata {
+      purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -526,4 +466,21 @@ flag {
     namespace: "windowing_frontend"
     description: "Synchronize the applied insets to a view with the ongoing system insets animation."
     bug: "463899193"
+}
+
+flag {
+    name: "cross_display_transition"
+    namespace: "windowing_frontend"
+    description: "Cross fade transition between two displays"
+    bug: "481219379"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "sync_before_enabling_screen"
+    namespace: "windowing_frontend"
+    description: "Sync storage before enabling screen during boot"
+    bug: "467888558"
 }

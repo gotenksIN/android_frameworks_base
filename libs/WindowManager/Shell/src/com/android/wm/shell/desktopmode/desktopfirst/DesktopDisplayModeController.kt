@@ -47,7 +47,9 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.sysui.ShellCommandHandler
+import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
+import com.android.wm.shell.sysui.UserChangeListener
 import com.android.wm.shell.transition.Transitions
 import java.io.PrintWriter
 
@@ -55,7 +57,8 @@ import java.io.PrintWriter
 class DesktopDisplayModeController(
     private val context: Context,
     shellInit: ShellInit,
-    shellCommandHandler: ShellCommandHandler,
+    private val shellCommandHandler: ShellCommandHandler,
+    private val shellController: ShellController,
     private val transitions: Transitions,
     private val rootTaskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
     private val windowManager: IWindowManager,
@@ -125,12 +128,33 @@ class DesktopDisplayModeController(
         }
 
     init {
-        shellInit.addInitCallback({ shellCommandHandler.addDumpCallback(this::dump, this) }, this)
-        if (DesktopExperienceFlags.FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH.isTrue) {
-            inputManager.registerInputDeviceListener(inputDeviceListener, mainHandler)
-        }
+        shellInit.addInitCallback({ onInit() }, this)
+        inputManager.registerInputDeviceListener(inputDeviceListener, mainHandler)
         if (Flags.enableDesktopFirstLaptopStateBugfix()) {
             deviceStateManager.registerCallback(mainExecutor, deviceStateCallback)
+        }
+    }
+
+    private fun onInit() {
+        shellCommandHandler.addDumpCallback(this::dump, this)
+        if (Flags.enableDesktopFirstUserChangeBugfix()) {
+            shellController.addUserChangeListener(
+                object : UserChangeListener {
+                    override fun onUserChanged(newUserId: Int, userContext: Context) {
+                        val displayIds = rootTaskDisplayAreaOrganizer.displayIds.toSet()
+                        logV("onUserChanged newUserId=%d displays=%s", newUserId, displayIds)
+                        // Changing a user results in reconfiguring a display so we here ensure the
+                        // windowing mode.
+                        displayIds.forEach { displayId ->
+                            if (displayId == DEFAULT_DISPLAY) {
+                                updateDefaultDisplayWindowingMode()
+                            } else {
+                                updateExternalDisplayWindowingMode(displayId)
+                            }
+                        }
+                    }
+                }
+            )
         }
     }
 
@@ -167,9 +191,11 @@ class DesktopDisplayModeController(
         if (currentDisplayWindowingMode == targetDisplayWindowingMode) {
             // If the windowing mode is already as needed, just make sure that the task move allowed
             // bit is set correctly.
+            // LINT.IfChange(setIsTaskMoveAllowed)
             val wct = WindowContainerTransaction()
             wct.setIsTaskMoveAllowed(tdaInfo.token, taskMoveAllowed)
             transitions.startTransition(TRANSIT_CHANGE, wct, /* handler= */ null)
+            // LINT.ThenChange(/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/multidesks/RootTaskDesksOrganizer.kt:updateTaskMoveAllowed)
 
             // Already in the target mode.
             return
@@ -248,18 +274,16 @@ class DesktopDisplayModeController(
             if (isExtendedDisplayEnabled && hasExternalDisplay) {
                 return true
             }
-            if (DesktopExperienceFlags.FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH.isTrue) {
-                val hasAnyTouchpadDevice = hasAnyTouchpadDevice()
-                val hasAnyPhysicalKeyboardDevice = hasAnyPhysicalKeyboardDevice()
-                logV(
-                    "canDesktopFirstModeBeEnabledOnDefaultDisplay: hasAnyTouchpadDevice=%b" +
-                        " hasAnyPhysicalKeyboardDevice=%b",
-                    hasAnyTouchpadDevice,
-                    hasAnyPhysicalKeyboardDevice,
-                )
-                if (hasAnyTouchpadDevice && hasAnyPhysicalKeyboardDevice) {
-                    return true
-                }
+            val hasAnyTouchpadDevice = hasAnyTouchpadDevice()
+            val hasAnyPhysicalKeyboardDevice = hasAnyPhysicalKeyboardDevice()
+            logV(
+                "canDesktopFirstModeBeEnabledOnDefaultDisplay: hasAnyTouchpadDevice=%b" +
+                    " hasAnyPhysicalKeyboardDevice=%b",
+                hasAnyTouchpadDevice,
+                hasAnyPhysicalKeyboardDevice,
+            )
+            if (hasAnyTouchpadDevice && hasAnyPhysicalKeyboardDevice) {
+                return true
             }
             if (Flags.enableDesktopFirstLaptopStateBugfix()) {
                 logV(
@@ -282,14 +306,7 @@ class DesktopDisplayModeController(
             return DESKTOP_FIRST_DISPLAY_WINDOWING_MODE
         }
 
-        return if (DesktopExperienceFlags.FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH.isTrue) {
-            TOUCH_FIRST_DISPLAY_WINDOWING_MODE
-        } else {
-            // If form factor-based desktop first switch is disabled, use the default display
-            // windowing mode here to keep the freeform mode for some form factors (e.g.,
-            // FEATURE_PC).
-            windowManager.getWindowingMode(DEFAULT_DISPLAY)
-        }
+        return TOUCH_FIRST_DISPLAY_WINDOWING_MODE
     }
 
     private fun isExtendedDisplayEnabled(): Boolean {
@@ -361,10 +378,8 @@ class DesktopDisplayModeController(
         pw.println(
             "FORCE_DESKTOP_FIRST_ON_DEFAULT_DISPLAY=" + FORCE_DESKTOP_FIRST_ON_DEFAULT_DISPLAY
         )
-        if (DesktopExperienceFlags.FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH.isTrue) {
-            pw.println("hasAnyTouchpadDevice=" + hasAnyTouchpadDevice())
-            pw.println("hasAnyPhysicalKeyboardDevice=" + hasAnyPhysicalKeyboardDevice())
-        }
+        pw.println("hasAnyTouchpadDevice=" + hasAnyTouchpadDevice())
+        pw.println("hasAnyPhysicalKeyboardDevice=" + hasAnyPhysicalKeyboardDevice())
         if (Flags.enableDesktopFirstLaptopStateBugfix()) {
             pw.println("isDesktopFirstDeviceState=" + isDesktopFirstDeviceState)
         }

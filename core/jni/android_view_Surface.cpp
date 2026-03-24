@@ -155,7 +155,8 @@ static inline bool isSurfaceValid(const sp<Surface>& sur) {
 static jlong nativeCreateFromSurfaceTexture(JNIEnv* env, jclass clazz,
         jobject surfaceTextureObj) {
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_SURFACETEXTURE)
-    sp<Surface> surface = SurfaceTexture_getSurface(env, surfaceTextureObj);
+    sp<Surface> originalSurface = SurfaceTexture_getSurface(env, surfaceTextureObj);
+    sp<Surface> surface = originalSurface ? originalSurface->createEvilTwin() : nullptr;
 #else
     sp<IGraphicBufferProducer> producer(SurfaceTexture_getProducer(env, surfaceTextureObj));
     if (producer == NULL) {

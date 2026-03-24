@@ -21,6 +21,8 @@ import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.SdkConstant;
+import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
@@ -29,7 +31,10 @@ import android.annotation.UserHandleAware;
 import android.annotation.UserIdInt;
 import android.app.contentrestriction.flags.Flags;
 import android.content.Context;
+import android.content.Intent;
+import android.content.LocusId;
 import android.os.Binder;
+import android.os.OutcomeReceiver;
 import android.os.RemoteException;
 
 import java.util.concurrent.Executor;
@@ -43,6 +48,23 @@ import java.util.function.Consumer;
 public class ContentRestrictionManager {
     private final Context mContext;
     private final IContentRestrictionManager mService;
+
+    /**
+     * Activity Action: Launch an activity showing information about restricted content.
+     * <p>
+     * Apps holding the {@link android.app.role.RoleManager#ROLE_CONTENT_RESTRICTION} must
+     * declare an activity that handles this action to show specific content restriction details.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SHOW_RESTRICTED_CONTENT_DETAILS =
+            "android.app.contentrestriction.action.SHOW_RESTRICTED_CONTENT_DETAILS";
+
+    /**
+     * Extra for {@link #ACTION_SHOW_RESTRICTED_CONTENT_DETAILS} containing the locus ID of the
+     * restricted content.
+     */
+    public static final String EXTRA_CONTENT_LOCUS_ID =
+            "android.app.contentrestriction.extra.CONTENT_LOCUS_ID";
 
     /** @hide */
     public ContentRestrictionManager(
@@ -70,10 +92,10 @@ public class ContentRestrictionManager {
     public void requestClassification(
             @NonNull ClassifiableContent content,
             @NonNull @CallbackExecutor Executor executor,
-            @NonNull Consumer<Boolean> callback) {
+            @NonNull OutcomeReceiver<Boolean, Exception> callback) {
 
         if (!isContentRestrictionEnabled()) {
-            executor.execute(() -> callback.accept(true));
+            executor.execute(() -> callback.onResult(true));
             return;
         }
 
@@ -84,7 +106,18 @@ public class ContentRestrictionManager {
                 public void onResult(boolean isContentAllowed) {
                     final long token = Binder.clearCallingIdentity();
                     try {
-                        executor.execute(() -> callback.accept(isContentAllowed));
+                        executor.execute(() -> callback.onResult(isContentAllowed));
+                    } finally {
+                        Binder.restoreCallingIdentity(token);
+                    }
+                }
+
+                @Override
+                public void onError(int error, String message) {
+                    final long token = Binder.clearCallingIdentity();
+                    try {
+                        executor.execute(()
+                            -> callback.onError(new IllegalStateException(message)));
                     } finally {
                         Binder.restoreCallingIdentity(token);
                     }
@@ -145,5 +178,25 @@ public class ContentRestrictionManager {
                 throw e.rethrowFromSystemServer();
             }
         }
+    }
+
+    /**
+     * Creates an {@link Intent} that can be used with {@link Context#startActivity(Intent)} to
+     * display a dialog about the restricted content.
+     *
+     * @param locusId the {@link LocusId} of the content to be restricted
+     * @return the intent to display the restricted content dialog
+     */
+    @FlaggedApi(Flags.FLAG_CONTENT_RESTRICTION_API)
+    @NonNull
+    public Intent createContentRestrictedIntent(@NonNull LocusId locusId) {
+        if (mService != null) {
+            try {
+                return mService.createContentRestrictedIntent(locusId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return null;
     }
 }

@@ -16,6 +16,7 @@
 
 package com.android.systemui.screencapture.record.largescreen.data.repository
 
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
@@ -25,6 +26,9 @@ import com.android.systemui.screencapture.record.largescreen.shared.model.Screen
 import com.android.systemui.shared.settings.data.repository.SecureSettingsRepository
 import com.android.systemui.user.data.repository.UserRepository
 import java.io.File
+import java.time.Duration
+import java.time.Instant
+import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -95,25 +99,50 @@ constructor(
         secureSettingsRepository.setBoolean(CUSTOM_SAVE_LOCATION_IS_ACTIVE_KEY_NAME, isActive)
     }
 
-    /** Gets user's previously selected capture type. Returns screenshot type by default. */
+    /**
+     * Gets user's previously selected capture type. Returns screenshot type by default. If the time
+     * of selected type exceeds the retention period, the default type will be returned.
+     */
     suspend fun getSelectedCaptureType(): ScreenCaptureType {
+        if (isSavedTimeExpired(SELECTED_SCREEN_CAPTURE_TYPE_REGION_TIME_NAME)) {
+            return DEFAULT_SCREEN_CAPTURE_TYPE
+        }
+
         val typeString = secureSettingsRepository.getString(SELECTED_SCREEN_CAPTURE_TYPE_NAME)
         return when (typeString) {
             TYPE_SCREENSHOT -> ScreenCaptureType.SCREENSHOT
             TYPE_RECORDING -> ScreenCaptureType.RECORDING
-            else -> ScreenCaptureType.SCREENSHOT
+            else -> DEFAULT_SCREEN_CAPTURE_TYPE
         }
     }
 
-    /** Gets user's previously selected capture region. Returns fullscreen region by default. */
+    /**
+     * Gets user's previously selected capture region. Returns partial region by default. If the
+     * time of selected region exceeds the retention period, the default region will be returned.
+     */
     suspend fun getSelectedCaptureRegion(): ScreenCaptureRegion {
+        if (isSavedTimeExpired(SELECTED_SCREEN_CAPTURE_TYPE_REGION_TIME_NAME)) {
+            return DEFAULT_SCREEN_CAPTURE_REGION
+        }
+
         val regionString = secureSettingsRepository.getString(SELECTED_SCREEN_CAPTURE_REGION_NAME)
         return when (regionString) {
             REGION_FULLSCREEN -> ScreenCaptureRegion.FULLSCREEN
             REGION_PARTIAL -> ScreenCaptureRegion.PARTIAL
             REGION_APP_WINDOW -> ScreenCaptureRegion.APP_WINDOW
-            else -> ScreenCaptureRegion.PARTIAL
+            else -> DEFAULT_SCREEN_CAPTURE_REGION
         }
+    }
+
+    /** Gets user's previously selected region box for partial screen capture. */
+    suspend fun getSelectedCaptureRegionBox(): Rect? {
+        if (isSavedTimeExpired(SELECTED_SCREEN_CAPTURE_REGION_BOX_TIME_NAME)) {
+            return null
+        }
+
+        return Rect.unflattenFromString(
+            secureSettingsRepository.getString(SELECTED_SCREEN_CAPTURE_REGION_BOX_NAME)
+        )
     }
 
     /**
@@ -128,6 +157,7 @@ constructor(
                 ScreenCaptureType.RECORDING -> TYPE_RECORDING
             }
         secureSettingsRepository.setString(SELECTED_SCREEN_CAPTURE_TYPE_NAME, typeString)
+        saveSelectedCaptureTypeRegionTime(Instant.now())
     }
 
     /**
@@ -143,6 +173,60 @@ constructor(
                 ScreenCaptureRegion.APP_WINDOW -> REGION_APP_WINDOW
             }
         secureSettingsRepository.setString(SELECTED_SCREEN_CAPTURE_REGION_NAME, regionString)
+        saveSelectedCaptureTypeRegionTime(Instant.now())
+    }
+
+    /**
+     * Updates the user's selected region box for partial screen capture.
+     *
+     * @param regionBox Currently selected capture region box.
+     */
+    suspend fun updateSelectedCaptureRegionBoxString(regionBox: Rect?) {
+        secureSettingsRepository.setString(
+            SELECTED_SCREEN_CAPTURE_REGION_BOX_NAME,
+            regionBox?.flattenToString(),
+        )
+        saveSelectedCaptureRegionBoxTime(Instant.now())
+    }
+
+    /**
+     * Save the time when the user selects a capture type or region.
+     *
+     * @param time Currently the time when the user selects capture type or region.
+     */
+    suspend fun saveSelectedCaptureTypeRegionTime(time: Instant) {
+        secureSettingsRepository.setString(
+            SELECTED_SCREEN_CAPTURE_TYPE_REGION_TIME_NAME,
+            time.toString(),
+        )
+    }
+
+    /**
+     * Save the time when the user updates the partial screen capture region box.
+     *
+     * @param time Currently the time when the user updates the partial screen capture region box.
+     */
+    suspend fun saveSelectedCaptureRegionBoxTime(time: Instant) {
+        secureSettingsRepository.setString(
+            SELECTED_SCREEN_CAPTURE_REGION_BOX_TIME_NAME,
+            time.toString(),
+        )
+    }
+
+    /**
+     * Gets if a saved time expires.
+     *
+     * @param timeName The name of the capture parameter's save time.
+     */
+    private suspend fun isSavedTimeExpired(timeName: String): Boolean {
+        val timestampString = secureSettingsRepository.getString(timeName) ?: return true
+        return try {
+            val selectedTime = Instant.parse(timestampString)
+            val duration = Duration.between(selectedTime, Instant.now())
+            duration.toMinutes() > VALID_OPTION_DURATION_MINUTES
+        } catch (e: DateTimeParseException) {
+            true
+        }
     }
 
     companion object {
@@ -152,10 +236,19 @@ constructor(
             Environment.DIRECTORY_PICTURES + File.separator + Environment.DIRECTORY_SCREENSHOTS
         private const val SELECTED_SCREEN_CAPTURE_TYPE_NAME = "selected_screen_capture_type"
         private const val SELECTED_SCREEN_CAPTURE_REGION_NAME = "selected_screen_capture_region"
+        private const val SELECTED_SCREEN_CAPTURE_TYPE_REGION_TIME_NAME =
+            "selected_screen_capture_type_region_time"
+        private const val SELECTED_SCREEN_CAPTURE_REGION_BOX_NAME =
+            "selected_screen_capture_region_box"
+        private const val SELECTED_SCREEN_CAPTURE_REGION_BOX_TIME_NAME =
+            "selected_screen_capture_region_box_time"
         private const val TYPE_SCREENSHOT = "screenshot"
         private const val TYPE_RECORDING = "recording"
         private const val REGION_FULLSCREEN = "fullscreen"
         private const val REGION_PARTIAL = "partial"
         private const val REGION_APP_WINDOW = "app_window"
+        private const val VALID_OPTION_DURATION_MINUTES = 10
+        private val DEFAULT_SCREEN_CAPTURE_TYPE = ScreenCaptureType.SCREENSHOT
+        private val DEFAULT_SCREEN_CAPTURE_REGION = ScreenCaptureRegion.PARTIAL
     }
 }

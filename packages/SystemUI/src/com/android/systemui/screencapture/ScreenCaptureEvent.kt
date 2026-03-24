@@ -22,7 +22,7 @@ import com.android.systemui.screencapture.record.largescreen.shared.model.Screen
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
 
 /** Enum of available screen capture events. */
-enum class ScreenCaptureEvent(private val mId: Int) : UiEventEnum {
+enum class ScreenCaptureEvent(private val id: Int) : UiEventEnum {
 
     @UiEvent(doc = "Closed the large-screen pre-capture UI without any capture")
     SCREEN_CAPTURE_LARGE_SCREEN_CLOSE_UI_WITHOUT_CAPTURE(2486),
@@ -50,12 +50,14 @@ enum class ScreenCaptureEvent(private val mId: Int) : UiEventEnum {
     SCREEN_CAPTURE_LARGE_SCREEN_APP_WINDOW_SCREENSHOT_REQUESTED(2569),
     @UiEvent(doc = "Opened the screen capture UI from Quick Settings")
     SCREEN_CAPTURE_UI_SOURCE_QUICK_SETTINGS(2593),
+    @UiEvent(doc = "Opened the screen capture UI from recording notification")
+    SCREEN_CAPTURE_UI_SOURCE_NOTIFICATION(2662),
     @UiEvent(doc = "Took fullscreen recording in the large-screen pre-capture UI")
     SCREEN_CAPTURE_LARGE_SCREEN_TOOK_FULLSCREEN_RECORDING(2624),
     @UiEvent(doc = "Took app window recording in the large-screen pre-capture UI")
     SCREEN_CAPTURE_LARGE_SCREEN_TOOK_APP_WINDOW_RECORDING(2625);
 
-    override fun getId(): Int = mId
+    override fun getId(): Int = id
 
     companion object {
         /**

@@ -185,8 +185,7 @@ class InternetTileViewModelTest : SysuiTestCase() {
 
             assertThat(latest?.secondaryTitle).isEqualTo("test ssid")
             assertThat(latest?.secondaryLabel).isNull()
-            assertThat(latest?.icon)
-                .isEqualTo(ResourceIcon.get(WifiIcons.WIFI_NO_INTERNET_ICONS[4]))
+            assertThat(latest?.icon).isEqualTo(ResourceIcon.get(WifiIcons.WIFI_FULL_ICONS[4]))
             assertThat(latest?.iconId).isNull()
             assertThat(latest?.contentDescription.loadContentDescription(context))
                 .isEqualTo("$internet,test ssid")
@@ -210,8 +209,7 @@ class InternetTileViewModelTest : SysuiTestCase() {
             wifiRepository.setIsWifiDefault(true)
             wifiRepository.setWifiNetwork(networkModel)
 
-            assertThat(latest?.icon)
-                .isEqualTo(ResourceIcon.get(WifiIcons.WIFI_NO_INTERNET_ICONS[4]))
+            assertThat(latest?.icon).isEqualTo(ResourceIcon.get(WifiIcons.WIFI_FULL_ICONS[4]))
             assertThat(latest?.stateDescription.loadContentDescription(context))
                 .doesNotContain(context.getString(WIFI_OTHER_DEVICE_CONNECTION))
         }
@@ -429,7 +427,7 @@ class InternetTileViewModelTest : SysuiTestCase() {
                     context.getString(
                         R.string.mobile_carrier_text_format,
                         networkName,
-                        context.getString(R.string.qs_tile_satellite_label),
+                        context.getString(com.android.internal.R.string.satellite_indicator),
                     ),
                     0,
                 )

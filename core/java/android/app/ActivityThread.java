@@ -18,7 +18,7 @@ package android.app;
 
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
-import static android.app.Flags.customBackupagentInstantiation;
+import static android.app.Flags.customBackupagentCreation;
 import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
@@ -36,6 +36,7 @@ import static android.content.res.Configuration.UI_MODE_TYPE_DESK;
 import static android.content.res.Configuration.UI_MODE_TYPE_MASK;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
+import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE;
 import static android.window.ConfigurationHelper.freeTextLayoutCachesIfNeeded;
 import static android.window.ConfigurationHelper.isDifferentDisplay;
 import static android.window.ConfigurationHelper.shouldUpdateResources;
@@ -1059,6 +1060,7 @@ public final class ActivityThread extends ClientTransactionHandler
         ContentCaptureOptions contentCaptureOptions;
 
         long[] disabledCompatChanges;
+        long[] enabledCompatChanges;
         long[] mLoggableCompatChanges;
         boolean mLogChangeChecksToStatsD;
 
@@ -1447,6 +1449,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 AutofillOptions autofillOptions,
                 ContentCaptureOptions contentCaptureOptions,
                 long[] disabledCompatChanges,
+                long[] enabledCompatChanges,
                 long[] loggableCompatChanges,
                 boolean logChangeChecksToStatsD,
                 SharedMemory serializedSystemFontMap,
@@ -1530,6 +1533,7 @@ public final class ActivityThread extends ClientTransactionHandler
             data.autofillOptions = autofillOptions;
             data.contentCaptureOptions = contentCaptureOptions;
             data.disabledCompatChanges = disabledCompatChanges;
+            data.enabledCompatChanges = enabledCompatChanges;
             data.mLoggableCompatChanges = loggableCompatChanges;
             data.mLogChangeChecksToStatsD = logChangeChecksToStatsD;
             data.mSerializedSystemFontMap = serializedSystemFontMap;
@@ -2467,8 +2471,17 @@ public final class ActivityThread extends ClientTransactionHandler
         public void getExecutableMethodFileOffsets(
                 @NonNull MethodDescriptor methodDescriptor,
                 @NonNull IOffsetCallback resultCallback) {
-            Executable executable = MethodDescriptorParser.parseMethodDescriptor(
-                    getClass().getClassLoader(), methodDescriptor);
+            Executable executable;
+            if (android.security.Flags.dynamicInstrumentationAppClassloader()) {
+                Application app = currentApplication();
+                ClassLoader cl = (app != null) ? app.getClassLoader() : getClass().getClassLoader();
+                executable = MethodDescriptorParser.parseMethodDescriptor(cl, methodDescriptor);
+            } else {
+                executable =
+                        MethodDescriptorParser.parseMethodDescriptor(
+                                getClass().getClassLoader(), methodDescriptor);
+            }
+
             VMDebug.ExecutableMethodFileOffsets location;
             if (com.android.art.flags.Flags.executableMethodFileOffsetsV2()) {
                 location = VMDebug.getExecutableMethodFileOffsets(executable);
@@ -4728,14 +4741,11 @@ public final class ActivityThread extends ClientTransactionHandler
             final int tid = HardwareRenderer.preload();
             // Adjust the RenderThread priority as soon as it's created.
             if (tid > 0) {
-                AsyncTask.THREAD_POOL_EXECUTOR.execute(() -> {
-                    HardwareRenderer.waitForRenderThreadPriorityInitialized();
-                    try {
-                        ActivityManager.getService().setRenderThread(tid);
-                    } catch (Throwable t) {
-                        Log.w(TAG, "Failed to set scheduler for RenderThread", t);
-                    }
-                });
+                try {
+                    ActivityManager.getService().setRenderThread(tid);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to set scheduler for RenderThread", t);
+                }
             }
         }
 
@@ -5472,7 +5482,7 @@ public final class ActivityThread extends ClientTransactionHandler
                     if (DEBUG_BACKUP) Slog.v(TAG, "Initializing agent class " + classname);
 
                     java.lang.ClassLoader cl = packageInfo.getClassLoader();
-                    if (customBackupagentInstantiation()) {
+                    if (customBackupagentCreation()) {
                         agent = packageInfo.getAppFactory().instantiateBackupAgent(cl, classname);
                     } else {
                         agent = (BackupAgent) cl.loadClass(classname).newInstance();
@@ -7972,8 +7982,10 @@ public final class ActivityThread extends ClientTransactionHandler
 
         AppCompatCallbacks.install(
                 data.disabledCompatChanges,
+                data.enabledCompatChanges,
                 data.mLoggableCompatChanges,
-                data.mLogChangeChecksToStatsD);
+                data.mLogChangeChecksToStatsD,
+                data.appInfo.targetSdkVersion);
         // Let libcore handle any compat changes after installing the list of compat changes.
         AppSpecializationHooks.handleCompatChangesBeforeBindingApplication();
 
@@ -8084,7 +8096,7 @@ public final class ActivityThread extends ClientTransactionHandler
             handleAttachAgent(agent, data.info);
         }
 
-        /**
+        /*
          * Switch this process to density compatibility mode if needed.
          */
 // QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
@@ -8421,8 +8433,20 @@ public final class ActivityThread extends ClientTransactionHandler
         // Initialize embedding if needed.
         if (com.android.window.flags.Flags.virtualGamepadOverride()
                 && CompatChanges.isChangeEnabled(OVERRIDE_ENABLE_VIRTUAL_GAMEPAD)
+                && isVirtualGamepadOverrideAllowed(app)
                 && !Process.isIsolated()) {
             WindowExtensionsHelper.initEmbedding(app);
+        }
+    }
+
+    private static boolean isVirtualGamepadOverrideAllowed(Application app) {
+        try {
+            return app.getPackageManager().getProperty(
+                    PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE,
+                    app.getPackageName()).getBoolean();
+        } catch (PackageManager.NameNotFoundException e) {
+            // Default to true if the property is not specified.
+            return true;
         }
     }
 

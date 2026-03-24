@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.windowdecor
 
+import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
@@ -64,8 +65,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.animation.addListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat
+import androidx.core.view.children
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.common.DisplayController
@@ -286,8 +289,12 @@ class LayoutMenu(
     ) : OnClickListener, OnTouchListener {
         val rootView =
             LayoutInflater.from(context)
-                .inflate(R.layout.desktop_mode_window_decor_layout_menu, null /* root */)
-                as CaptionMenuLayout
+                .inflate(
+                    if (Flags.enableConsolidatedWindowOptions())
+                        R.layout.desktop_mode_window_decor_layout_menu
+                    else R.layout.desktop_mode_window_decor_layout_menu_legacy,
+                    null, /* root */
+                ) as CaptionMenuLayout
         private val container = requireViewById(R.id.container)
         private val immersiveToggleContainer =
             requireViewById(R.id.layout_menu_immersive_toggle_container) as View
@@ -304,6 +311,10 @@ class LayoutMenu(
         private val snapContainer = requireViewById(R.id.layout_menu_snap_container) as View
         private val snapWindowText = requireViewById(R.id.layout_menu_snap_window_text) as TextView
         private val snapButtonsLayout = requireViewById(R.id.layout_menu_snap_menu_layout)
+        private val windowingPillView =
+            if (Flags.enableConsolidatedWindowOptions())
+                requireViewById(R.id.windowing_pill) as WindowingPillView
+            else null
 
         // If layout direction is RTL, layout menu will be mirrored, switching the order of the
         // snap right/left buttons.
@@ -613,6 +624,16 @@ class LayoutMenu(
             sizeToggleButtonText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             immersiveToggleButton.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             immersiveToggleButtonText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
+            if (Flags.enableConsolidatedWindowOptions()) {
+                requireWindowingPillView()
+                    .initialize(
+                        windowDecorationActions,
+                        desktopModeUiEventLogger,
+                        /* shouldShowDesktopModeButton= */ true,
+                        onPillItemClicked = { onLayoutMenuClickedListener?.invoke() },
+                    )
+            }
         }
 
         override fun onClick(v: View) {
@@ -647,7 +668,11 @@ class LayoutMenu(
             this.taskInfo = taskInfo
             this.style = calculateMenuStyle(taskInfo)
 
-            rootView.background.setTint(style.backgroundColor)
+            if (Flags.enableConsolidatedWindowOptions()) {
+                container.background.setTint(style.backgroundColor)
+            } else {
+                rootView.background.setTint(style.backgroundColor)
+            }
 
             // Maximize option.
             sizeToggleButton.background = style.maximizeOption.drawable
@@ -660,83 +685,112 @@ class LayoutMenu(
             // Snap options.
             snapWindowText.setTextColor(style.textColor)
             updateSplitSnapSelection(SnapToHalfSelection.NONE)
+
+            if (Flags.enableConsolidatedWindowOptions()) {
+                requireWindowingPillView().bind(taskInfo)
+                requireWindowingPillView().background.setTint(style.backgroundColor)
+            }
         }
 
         /** Animate the opening of the menu */
         fun animateOpenMenu(onEnd: () -> Unit) {
-            sizeToggleButton.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            sizeToggleButtonText.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            immersiveToggleButton.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            immersiveToggleButtonText.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            val animatingControls =
+                mutableListOf<View>(
+                    sizeToggleButton,
+                    sizeToggleButtonText,
+                    immersiveToggleButton,
+                    immersiveToggleButtonText,
+                    snapButtonsLayout,
+                    snapWindowText,
+                )
+            if (Flags.enableConsolidatedWindowOptions()) {
+                animatingControls.addAll(requireWindowingPillView().children.toList())
+            }
+            animatingControls.forEach { view ->
+                view.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                // Alpha animation is delayed by [CONTROLS_ALPHA_OPEN_MENU_ANIMATION_DELAY_MS]. So
+                // we here reset the alpha value to 0, so that the animation can start from 0 and
+                // fade in.
+                view.alpha = 0.0f
+            }
             menuAnimatorSet = AnimatorSet()
-            menuAnimatorSet?.playTogether(
-                ObjectAnimator.ofFloat(rootView, SCALE_Y, STARTING_MENU_HEIGHT_SCALE, 1f).apply {
-                    duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
-                    interpolator = EMPHASIZED_DECELERATE
-                },
-                ValueAnimator.ofFloat(STARTING_MENU_HEIGHT_SCALE, 1f).apply {
-                    duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
-                    interpolator = EMPHASIZED_DECELERATE
-                    addUpdateListener {
-                        // Animate padding so that controls stay pinned to the bottom of
-                        // the menu.
-                        val value = animatedValue as Float
-                        val topPadding = menuPadding - ((1 - value) * measureHeight()).toInt()
-                        container.setPadding(menuPadding, topPadding, menuPadding, menuPadding)
-                    }
-                },
-                ValueAnimator.ofFloat(1 / STARTING_MENU_HEIGHT_SCALE, 1f).apply {
-                    duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
-                    interpolator = EMPHASIZED_DECELERATE
-                    addUpdateListener {
-                        // Scale up the children of the layout menu so that the menu
-                        // scale is cancelled out and only the background is scaled.
-                        val value = animatedValue as Float
-                        sizeToggleButton.scaleY = value
-                        immersiveToggleButton.scaleY = value
-                        snapButtonsLayout.scaleY = value
-                        sizeToggleButtonText.scaleY = value
-                        immersiveToggleButtonText.scaleY = value
-                        snapWindowText.scaleY = value
-                    }
-                },
-                ObjectAnimator.ofFloat(
-                        rootView,
-                        TRANSLATION_Y,
-                        (STARTING_MENU_HEIGHT_SCALE - 1) * measureHeight(),
-                        0f,
-                    )
-                    .apply {
+            val animators =
+                mutableListOf<Animator>(
+                    ValueAnimator.ofFloat(STARTING_MENU_HEIGHT_SCALE, 1f).apply {
                         duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
                         interpolator = EMPHASIZED_DECELERATE
+                        addUpdateListener {
+                            // Animate padding so that controls stay pinned to the bottom of
+                            // the menu.
+                            val value = animatedValue as Float
+                            val topPadding = menuPadding - ((1 - value) * measureHeight()).toInt()
+                            container.setPadding(menuPadding, topPadding, menuPadding, menuPadding)
+                        }
                     },
-                ObjectAnimator.ofInt(rootView.background, "alpha", MAX_DRAWABLE_ALPHA_VALUE).apply {
-                    duration = ALPHA_ANIMATION_DURATION_MS
-                },
-                ValueAnimator.ofFloat(0f, 1f).apply {
-                    duration = ALPHA_ANIMATION_DURATION_MS
-                    startDelay = CONTROLS_ALPHA_OPEN_MENU_ANIMATION_DELAY_MS
-                    addUpdateListener {
-                        val value = animatedValue as Float
-                        sizeToggleButton.alpha = value
-                        immersiveToggleButton.alpha = value
-                        snapButtonsLayout.alpha = value
-                        sizeToggleButtonText.alpha = value
-                        immersiveToggleButtonText.alpha = value
-                        snapWindowText.alpha = value
+                    ValueAnimator.ofFloat(1 / STARTING_MENU_HEIGHT_SCALE, 1f).apply {
+                        duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
+                        interpolator = EMPHASIZED_DECELERATE
+                        addUpdateListener {
+                            // Scale up the children of the layout menu so that the menu
+                            // scale is cancelled out and only the background is scaled.
+                            val value = animatedValue as Float
+                            animatingControls.forEach { view -> view.scaleY = value }
+                        }
+                    },
+                    ValueAnimator.ofFloat(0f, 1f).apply {
+                        duration = ALPHA_ANIMATION_DURATION_MS
+                        startDelay = CONTROLS_ALPHA_OPEN_MENU_ANIMATION_DELAY_MS
+                        addUpdateListener {
+                            val value = animatedValue as Float
+                            animatingControls.forEach { view -> view.alpha = value }
+                        }
+                    },
+                )
+
+            val animatingContainers = mutableListOf<View>()
+            if (Flags.enableConsolidatedWindowOptions()) {
+                animatingContainers.add(container)
+                animatingContainers.add(requireWindowingPillView())
+            } else {
+                animatingContainers.add(rootView)
+            }
+            animatingContainers.forEach { view ->
+                animators.add(
+                    ObjectAnimator.ofFloat(view, SCALE_Y, STARTING_MENU_HEIGHT_SCALE, 1f).apply {
+                        duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
+                        interpolator = EMPHASIZED_DECELERATE
                     }
-                },
-                ObjectAnimator.ofFloat(rootView, TRANSLATION_Z, MENU_Z_TRANSLATION).apply {
-                    duration = ELEVATION_ANIMATION_DURATION_MS
-                    startDelay = CONTROLS_ALPHA_OPEN_MENU_ANIMATION_DELAY_MS
-                },
-            )
+                )
+                animators.add(
+                    ObjectAnimator.ofFloat(
+                            view,
+                            TRANSLATION_Y,
+                            (STARTING_MENU_HEIGHT_SCALE - 1) * view.measureHeight(),
+                            0f,
+                        )
+                        .apply {
+                            duration = OPEN_MENU_HEIGHT_ANIMATION_DURATION_MS
+                            interpolator = EMPHASIZED_DECELERATE
+                        }
+                )
+                animators.add(
+                    ObjectAnimator.ofInt(view.background, "alpha", 0, MAX_DRAWABLE_ALPHA_VALUE)
+                        .apply { duration = ALPHA_ANIMATION_DURATION_MS }
+                )
+                animators.add(
+                    ObjectAnimator.ofFloat(view, TRANSLATION_Z, 0f, MENU_Z_TRANSLATION).apply {
+                        duration = ELEVATION_ANIMATION_DURATION_MS
+                        startDelay = CONTROLS_ALPHA_OPEN_MENU_ANIMATION_DELAY_MS
+                    }
+                )
+            }
+
+            menuAnimatorSet?.playTogether(animators)
             menuAnimatorSet?.addListener(
                 onEnd = {
-                    sizeToggleButton.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                    sizeToggleButtonText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                    immersiveToggleButton.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                    immersiveToggleButtonText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    animatingControls.forEach { view ->
+                        view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    }
                     onEnd.invoke()
                 }
             )
@@ -745,80 +799,99 @@ class LayoutMenu(
 
         /** Animate the closing of the menu */
         fun animateCloseMenu(onEnd: (() -> Unit)) {
-            sizeToggleButton.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            sizeToggleButtonText.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            immersiveToggleButton.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            immersiveToggleButtonText.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            val animatingControls =
+                mutableListOf<View>(
+                    sizeToggleButton,
+                    sizeToggleButtonText,
+                    immersiveToggleButton,
+                    immersiveToggleButtonText,
+                    snapButtonsLayout,
+                    snapWindowText,
+                )
+            if (Flags.enableConsolidatedWindowOptions()) {
+                animatingControls.addAll(requireWindowingPillView().children.toList())
+            }
+            animatingControls.forEach { view -> view.setLayerType(View.LAYER_TYPE_HARDWARE, null) }
             cancelAnimation()
             menuAnimatorSet = AnimatorSet()
-            menuAnimatorSet?.playTogether(
-                ObjectAnimator.ofFloat(rootView, SCALE_Y, 1f, STARTING_MENU_HEIGHT_SCALE).apply {
-                    duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
-                    interpolator = FAST_OUT_LINEAR_IN
-                },
-                ValueAnimator.ofFloat(1f, STARTING_MENU_HEIGHT_SCALE).apply {
-                    duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
-                    interpolator = FAST_OUT_LINEAR_IN
-                    addUpdateListener {
-                        // Animate padding so that controls stay pinned to the bottom of
-                        // the menu.
-                        val value = animatedValue as Float
-                        val topPadding = menuPadding - ((1 - value) * measureHeight()).toInt()
-                        container.setPadding(menuPadding, topPadding, menuPadding, menuPadding)
-                    }
-                },
-                ValueAnimator.ofFloat(1f, 1 / STARTING_MENU_HEIGHT_SCALE).apply {
-                    duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
-                    interpolator = FAST_OUT_LINEAR_IN
-                    addUpdateListener {
-                        // Scale up the children of the layout menu so that the menu
-                        // scale is cancelled out and only the background is scaled.
-                        val value = animatedValue as Float
-                        sizeToggleButton.scaleY = value
-                        immersiveToggleButton.scaleY = value
-                        snapButtonsLayout.scaleY = value
-                        sizeToggleButtonText.scaleY = value
-                        immersiveToggleButtonText.scaleY = value
-                        snapWindowText.scaleY = value
-                    }
-                },
-                ObjectAnimator.ofFloat(
-                        rootView,
-                        TRANSLATION_Y,
-                        0f,
-                        (STARTING_MENU_HEIGHT_SCALE - 1) * measureHeight(),
-                    )
-                    .apply {
+            val animators =
+                mutableListOf<Animator>(
+                    ValueAnimator.ofFloat(1f, STARTING_MENU_HEIGHT_SCALE).apply {
                         duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
                         interpolator = FAST_OUT_LINEAR_IN
+                        addUpdateListener {
+                            // Animate padding so that controls stay pinned to the bottom of
+                            // the menu.
+                            val value = animatedValue as Float
+                            val topPadding = menuPadding - ((1 - value) * measureHeight()).toInt()
+                            container.setPadding(menuPadding, topPadding, menuPadding, menuPadding)
+                        }
                     },
-                ObjectAnimator.ofInt(rootView.background, "alpha", MAX_DRAWABLE_ALPHA_VALUE, 0)
-                    .apply {
-                        startDelay = CONTAINER_ALPHA_CLOSE_MENU_ANIMATION_DELAY_MS
+                    ValueAnimator.ofFloat(1f, 1 / STARTING_MENU_HEIGHT_SCALE).apply {
+                        duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
+                        interpolator = FAST_OUT_LINEAR_IN
+                        addUpdateListener {
+                            // Scale up the children of the layout menu so that the menu
+                            // scale is cancelled out and only the background is scaled.
+                            val value = animatedValue as Float
+                            animatingControls.forEach { view -> view.scaleY = value }
+                        }
+                    },
+                    ValueAnimator.ofFloat(1f, 0f).apply {
                         duration = ALPHA_ANIMATION_DURATION_MS
+                        addUpdateListener {
+                            val value = animatedValue as Float
+                            animatingControls.forEach { view -> view.alpha = value }
+                        }
                     },
-                ValueAnimator.ofFloat(1f, 0f).apply {
-                    duration = ALPHA_ANIMATION_DURATION_MS
-                    addUpdateListener {
-                        val value = animatedValue as Float
-                        sizeToggleButton.alpha = value
-                        immersiveToggleButton.alpha = value
-                        snapButtonsLayout.alpha = value
-                        sizeToggleButtonText.alpha = value
-                        immersiveToggleButtonText.alpha = value
-                        snapWindowText.alpha = value
+                )
+
+            val animatingContainers = mutableListOf<View>()
+            if (Flags.enableConsolidatedWindowOptions()) {
+                animatingContainers.add(container)
+                animatingContainers.add(requireWindowingPillView())
+            } else {
+                animatingContainers.add(rootView)
+            }
+            animatingContainers.forEach { view ->
+                animators.add(
+                    ObjectAnimator.ofFloat(view, SCALE_Y, 1f, STARTING_MENU_HEIGHT_SCALE).apply {
+                        duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
+                        interpolator = FAST_OUT_LINEAR_IN
                     }
-                },
-                ObjectAnimator.ofFloat(rootView, TRANSLATION_Z, MENU_Z_TRANSLATION, 0f).apply {
-                    duration = ELEVATION_ANIMATION_DURATION_MS
-                },
-            )
+                )
+                animators.add(
+                    ObjectAnimator.ofFloat(
+                            view,
+                            TRANSLATION_Y,
+                            0f,
+                            (STARTING_MENU_HEIGHT_SCALE - 1) * view.measureHeight(),
+                        )
+                        .apply {
+                            duration = CLOSE_MENU_HEIGHT_ANIMATION_DURATION_MS
+                            interpolator = FAST_OUT_LINEAR_IN
+                        }
+                )
+                animators.add(
+                    ObjectAnimator.ofInt(view.background, "alpha", MAX_DRAWABLE_ALPHA_VALUE, 0)
+                        .apply {
+                            startDelay = CONTAINER_ALPHA_CLOSE_MENU_ANIMATION_DELAY_MS
+                            duration = ALPHA_ANIMATION_DURATION_MS
+                        }
+                )
+                animators.add(
+                    ObjectAnimator.ofFloat(view, TRANSLATION_Z, MENU_Z_TRANSLATION, 0f).apply {
+                        duration = ELEVATION_ANIMATION_DURATION_MS
+                    }
+                )
+            }
+
+            menuAnimatorSet?.playTogether(animators)
             menuAnimatorSet?.addListener(
                 onEnd = {
-                    sizeToggleButton.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                    sizeToggleButtonText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                    immersiveToggleButton.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                    immersiveToggleButtonText.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    animatingControls.forEach { view ->
+                        view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    }
                     onEnd?.invoke()
                 }
             )
@@ -907,8 +980,12 @@ class LayoutMenu(
 
         /** Measure height of the root view of this menu. */
         fun measureHeight(): Int {
-            rootView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-            return rootView.measuredHeight
+            return rootView.measureHeight()
+        }
+
+        private fun View.measureHeight(): Int {
+            measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            return measuredHeight
         }
 
         private fun deactivateSnapOptions() {
@@ -1108,6 +1185,11 @@ class LayoutMenu(
         }
 
         private fun requireViewById(id: Int) = rootView.requireViewById<View>(id)
+
+        private fun requireWindowingPillView() =
+            checkNotNull(windowingPillView) {
+                "windowingPillView should not be null with flag enabled"
+            }
 
         /** The style to apply to the menu. */
         data class MenuStyle(

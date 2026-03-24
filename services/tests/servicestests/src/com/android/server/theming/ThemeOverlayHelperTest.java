@@ -21,10 +21,12 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.app.ActivityManagerInternal;
 import android.content.om.FabricatedOverlay;
 import android.content.om.OverlayIdentifier;
 import android.content.om.OverlayInfo;
@@ -38,10 +40,9 @@ import android.testing.TestableResources;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.R;
+import com.android.server.LocalServices;
 import com.android.server.om.OverlayManagerInternal;
-
-import com.google.ux.material.libmonet.dynamiccolor.ColorSpec.SpecVersion;
-import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme.Platform;
+import com.android.server.pm.UserManagerInternal;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -70,6 +71,10 @@ public class ThemeOverlayHelperTest {
 
     @Mock
     private OverlayManagerInternal mOverlayManager;
+    @Mock
+    private ActivityManagerInternal mActivityManagerInternal;
+    @Mock
+    private UserManagerInternal mUserManagerInternal;
     @Captor
     private ArgumentCaptor<OverlayManagerTransaction> mTransactionCaptor;
 
@@ -78,12 +83,19 @@ public class ThemeOverlayHelperTest {
             null);
 
     private ThemeOverlayHelper mThemeOverlayHelper;
+    private ThemeEnvironment mEnvironment;
 
     @Before
     public void setup() {
         // This initializes all fields annotated with @Mock and @Captor
         MockitoAnnotations.initMocks(this);
-        mThemeOverlayHelper = new ThemeOverlayHelper(mOverlayManager);
+        LocalServices.removeServiceForTest(OverlayManagerInternal.class);
+        LocalServices.removeServiceForTest(UserManagerInternal.class);
+
+        LocalServices.addService(OverlayManagerInternal.class, mOverlayManager);
+        LocalServices.addService(UserManagerInternal.class, mUserManagerInternal);
+
+        mThemeOverlayHelper = new ThemeOverlayHelper();
 
         TestableResources resources = mContext.getOrCreateTestableResources();
         resources.addOverride(R.array.theming_legacy_overlays, new String[]{
@@ -96,6 +108,9 @@ public class ThemeOverlayHelperTest {
                 "com.google.android.apps.wearable.systemui|accent",
                 "com.google.android.apps.wearable.systemui|dynamic"
         });
+
+        when(mUserManagerInternal.isHeadlessSystemUserMode()).thenReturn(false);
+        mEnvironment = new ThemeEnvironment(mContext, (key, def) -> def);
     }
 
 
@@ -103,7 +118,7 @@ public class ThemeOverlayHelperTest {
     public void applyCurrentStateOverlays_foregroundUser_enablesForSelfAndSystemAndProfiles() {
         // Setup: A primary user with an associated profile.
         ThemeStatePair statePair = new ThemeStatePair(PRIMARY_USER_ID, true, SEED_COLOR_VALID,
-                CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
         statePair.addProfile(PROFILE_USER_ID);
         ThemeStatePair.OverlaySnapshot snapshot = statePair.commitAndGetOverlayData();
 
@@ -126,7 +141,7 @@ public class ThemeOverlayHelperTest {
     public void applyCurrentStateOverlays_backgroundUser_doesNotEnableForSystem() {
         // Setup: A background user (simulated by passing false to the helper)
         ThemeStatePair statePair = new ThemeStatePair(PRIMARY_USER_ID, true, SEED_COLOR_VALID,
-                CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
         ThemeStatePair.OverlaySnapshot snapshot = statePair.commitAndGetOverlayData();
 
         // Action: Pass false because this is simulating a Background User
@@ -147,7 +162,7 @@ public class ThemeOverlayHelperTest {
     public void applyCurrentStateOverlays_whenUserIsSystem_enablesOnce() {
         // Setup: The user is the system user.
         ThemeStatePair statePair = new ThemeStatePair(SYSTEM_USER_ID, true, SEED_COLOR_VALID,
-                CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
         ThemeStatePair.OverlaySnapshot snapshot = statePair.commitAndGetOverlayData();
 
         // Is does not matter if we pass true/false here.
@@ -170,8 +185,14 @@ public class ThemeOverlayHelperTest {
     public void applyCurrentStateOverlays_skipRegistration_enablesWithoutRegistering() {
         // Setup: A primary user.
         ThemeStatePair statePair = new ThemeStatePair(PRIMARY_USER_ID, true, SEED_COLOR_VALID,
-                CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
         ThemeStatePair.OverlaySnapshot snapshot = statePair.commitAndGetOverlayData();
+
+        // Setup: Simulate overlays exist so we don't fallback to register
+        OverlayIdentifier identifier = new OverlayIdentifier("android", "dynamic_10");
+        when(mOverlayManager.getOverlayInfo(eq(identifier), eq(UserHandle.of(PRIMARY_USER_ID))))
+                .thenReturn(new OverlayInfo("android", "dynamic_10", "android", null, null,
+                        "/path", 0, 0, 0, true, true));
 
         // Action: Pass true for applyToSystem, but FALSE for shouldRegister.
         mThemeOverlayHelper.applyCurrentStateOverlays(snapshot, true, false);
@@ -195,7 +216,7 @@ public class ThemeOverlayHelperTest {
         // Setup a commit failure
         doThrow(new SecurityException("Test Exception")).when(mOverlayManager).commit(any());
         ThemeStatePair statePair = new ThemeStatePair(PRIMARY_USER_ID, true, SEED_COLOR_VALID,
-                CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
         ThemeStatePair.OverlaySnapshot snapshot = statePair.commitAndGetOverlayData();
 
         // Action & Verification (should not crash)
@@ -203,6 +224,32 @@ public class ThemeOverlayHelperTest {
 
         // Verify commit was still attempted
         verify(mOverlayManager).commit(any(OverlayManagerTransaction.class));
+    }
+
+    @Test
+    public void applyCurrentStateOverlays_missingOverlay_recreatesOverlays() {
+        // Setup: A primary user.
+        ThemeStatePair statePair = new ThemeStatePair(PRIMARY_USER_ID, true, SEED_COLOR_VALID,
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
+        ThemeStatePair.OverlaySnapshot snapshot = statePair.commitAndGetOverlayData();
+
+        // Setup: Simulate missing overlay by returning null from getOverlayInfo
+        // The helper checks if overlays exist before deciding to skip registration.
+        when(mOverlayManager.getOverlayInfo(any(OverlayIdentifier.class), any(UserHandle.class)))
+                .thenReturn(null);
+
+        // Action: Pass FALSE for shouldRegister. Normally this would skip registration.
+        // But because overlays are missing, it should force registration.
+        mThemeOverlayHelper.applyCurrentStateOverlays(snapshot, true, false);
+
+        // Verification
+        verify(mOverlayManager).commit(mTransactionCaptor.capture());
+        String transactionString = mTransactionCaptor.getValue().toString();
+
+        // Check that REGISTER request IS present (meaning it fell back to heavy path)
+        assertThat(transactionString).contains("TYPE_REGISTER_FABRICATED");
+        // And enable is also there
+        assertSetEnabled(transactionString, "dynamic", PRIMARY_USER_ID, PRIMARY_USER_ID);
     }
 
     @Test
@@ -235,7 +282,7 @@ public class ThemeOverlayHelperTest {
     @Test
     public void createDynamicOverlay_containsNeutralAndAccentColors() {
         ThemeStatePair statePair = new ThemeStatePair(PRIMARY_USER_ID, true, SEED_COLOR_VALID,
-                CONTRAST_DEFAULT, STYLE_VALID, SpecVersion.SPEC_2025, Platform.PHONE);
+                CONTRAST_DEFAULT, STYLE_VALID, mEnvironment);
 
         FabricatedOverlay overlay = mThemeOverlayHelper.createDynamicOverlay(
                 statePair.getLightScheme(), statePair.getDarkScheme(), PRIMARY_USER_ID);

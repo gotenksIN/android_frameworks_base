@@ -18,6 +18,7 @@ package android.app;
 
 import static android.aiseal.Flags.aisealHostApis;
 import static android.app.appfunctions.flags.Flags.enableAppFunctionManager;
+import static android.app.appfunctions.flags.Flags.enableAppFunctionPermissionV2;
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.PackageManager.FEATURE_AISEAL;
@@ -237,6 +238,8 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.Vibrator;
 import android.os.VibratorManager;
+import android.os.allowlist.AllowlistManager;
+import android.os.allowlist.IAllowlistService;
 import android.os.flagging.ConfigInfrastructureFrameworkInitializer;
 import android.os.health.SystemHealthManager;
 import android.os.image.DynamicSystemManager;
@@ -865,9 +868,9 @@ public final class SystemServiceRegistry {
                     return new TelephonyRegistryManager(ctx);
                 }});
 
-        if (!android.telecom.flags.Flags.telecomMainlineApi()) {
+        if (!TelecomDependencies.isMainlineBuildFlagEnabled()) {
             registerService(Context.TELECOM_SERVICE, TelecomManager.class,
-                new CachedServiceFetcher<TelecomManager>() {
+                new CachedServiceFetcher<>() {
                     @Override
                     public TelecomManager createService(ContextImpl ctx) {
                         return TelecomDependencies.createTelecomManager(ctx);
@@ -2055,6 +2058,24 @@ public final class SystemServiceRegistry {
                     }
                 });
 
+        registerService(Context.UI_LATENCY_STATS_SERVICE,
+                android.uilatencystats.UiLatencyStatsManager.class,
+                new CachedServiceFetcher<android.uilatencystats.UiLatencyStatsManager>() {
+                    @Override
+                    public android.uilatencystats.UiLatencyStatsManager createService(
+                            ContextImpl ctx) throws ServiceNotFoundException {
+                        if (!com.android.server.ui_latency_stats.Flags.uiLatencyStatsService()) {
+                            throw new ServiceNotFoundException(
+                                    "UiLatencyStatsManager is not supported");
+                        }
+                        android.uilatencystats.IUiLatencyStats service =
+                                android.uilatencystats.IUiLatencyStats.Stub.asInterface(
+                                        ServiceManager.getServiceOrThrow(
+                                                Context.UI_LATENCY_STATS_SERVICE));
+                        return new android.uilatencystats.UiLatencyStatsManager(ctx, service);
+                    }
+                });
+
         if (interactiveChooser()) {
             registerService(
                     Context.CHOOSER_SERVICE,
@@ -2084,6 +2105,21 @@ public final class SystemServiceRegistry {
                                 return null;
                             }
                             return new AiSealManager(ctx);
+                        }
+                    });
+        }
+
+        if (enableAppFunctionPermissionV2()) {
+            registerService(
+                    Context.ALLOWLIST_SERVICE,
+                    AllowlistManager.class,
+                    new CachedServiceFetcher<>() {
+                        @Override
+                        public AllowlistManager createService(ContextImpl ctx)
+                                throws ServiceNotFoundException {
+                            IBinder b = ServiceManager.getServiceOrThrow(Context.ALLOWLIST_SERVICE);
+                            IAllowlistService service = IAllowlistService.Stub.asInterface(b);
+                            return new AllowlistManager(ctx, service);
                         }
                     });
         }
@@ -2149,7 +2185,7 @@ public final class SystemServiceRegistry {
             VirtualizationFrameworkInitializer.registerServiceWrappers();
             ConnectivityFrameworkInitializerBaklava.registerServiceWrappers();
 
-            if (android.telecom.flags.Flags.telecomMainlineApi()) {
+            if (TelecomDependencies.isMainlineBuildFlagEnabled()) {
                 TelecomDependencies.registerServiceWrapper();
             }
 

@@ -15,12 +15,18 @@
  */
 package com.android.systemui.communal.domain.definition
 
-import com.android.systemui.communal.data.preconditions.CommonSetupPreconditions
+import android.content.ComponentName
+import android.content.res.Resources
+import android.util.IndentingPrintWriter
 import com.android.systemui.communal.data.repository.ContextualSetupRepository
 import com.android.systemui.communal.data.repository.SetupState
-import com.android.systemui.communal.data.repository.UprightChargingTriggerRepository
+import com.android.systemui.communal.domain.interactor.UprightChargingInteractor
+import com.android.systemui.communal.domain.preconditions.CommonSetupPreconditions
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.res.R
 import com.android.systemui.util.kotlin.FlowDumper
+import com.android.systemui.util.kotlin.SimpleFlowDumper
 import java.io.PrintWriter
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -34,13 +40,22 @@ class UprightChargingSetupDefinition
 @Inject
 constructor(
     private val commonConditions: CommonSetupPreconditions,
-    private val triggerRepo: UprightChargingTriggerRepository,
+    private val uprightChargingInteractor: UprightChargingInteractor,
     private val contextualSetupRepo: ContextualSetupRepository,
-    private val flowDumper: FlowDumper,
-    override val target: SetupTarget,
-) : ContextualSetupDefinition {
+    @Main private val resources: Resources,
+) : ContextualSetupDefinition, FlowDumper by SimpleFlowDumper() {
 
-    override val id = "upright_charging_mode"
+    override val id = FLOW_ID
+
+    override val target: SetupTarget? by lazy {
+        ComponentName.unflattenFromString(
+            resources.getString(R.string.config_communalUprightChargingSetupActivityComponent)
+        )?.let { SetupTarget.Activity(it) }
+    }
+
+    override val priority: Int by lazy {
+        resources.getInteger(R.integer.config_communalUprightChargingPriority)
+    }
 
     // Power Optimization:
     // We strictly gate the expensive trigger (accelerometer) behind the cheap preconditions.
@@ -54,18 +69,22 @@ constructor(
             .flatMapLatest { preconditionsMet ->
                 if (preconditionsMet) {
                     // Preconditions met: Safe to subscribe to expensive hardware trigger
-                    triggerRepo.isTriggered
+                    uprightChargingInteractor.isTriggered
                 } else {
                     // Preconditions failed: Ensure sensor is OFF
                     flowOf(false)
                 }
             }
-            .let { with(flowDumper) { it.dumpWhileCollecting("isReady") } }
+            .dumpWhileCollecting("isReady")
 
-    override fun dump(pw: PrintWriter, args: Array<String>) {
+    override fun dump(pw: PrintWriter, args: Array<out String>) {
         pw.println("UprightChargingSetupDefinition:")
         pw.println("  id: $id")
         pw.println("  target: $target")
-        flowDumper.dump(pw, args)
+        dumpFlows(IndentingPrintWriter(pw, "  "))
+    }
+
+    companion object {
+        const val FLOW_ID = "upright_charging_mode"
     }
 }

@@ -15,43 +15,106 @@
  */
 package com.android.wm.shell.hierarchy.modes
 
+import android.window.WindowAnimationState
+import android.window.WindowContainerTransaction
 import com.android.wm.shell.hierarchy.containers.Container
+import com.android.wm.shell.hierarchy.properties.DisplayContainerProperties
 import com.android.wm.shell.hierarchy.updates.HierarchyChangeFlags
 import com.android.wm.shell.hierarchy.updates.HierarchySnapshot
+import com.android.wm.shell.transition.DetachResult
+import com.android.wm.shell.transition.ITransitionAnimation
+import com.google.common.truth.Truth.assertThat
+import org.mockito.kotlin.mock
 
 /**
  * A test Mode for a container in the ContainerHierarchy.
  */
-open class StubMode() : Mode {
-    val attachedRoots = mutableListOf<Container>()
-    val attachedContainers = mutableListOf<Container>()
-    val updates = mutableListOf<Pair<Container, HierarchyChangeFlags>>()
+open class StubMode(
+    private val name: String=""
+) : Mode {
+    val addedContainers = mutableListOf<Container>()
+    val removedContainers = mutableListOf<Container>()
+    val changedContainers = mutableListOf<Container>()
+    val ancestorsChangedContainers = mutableListOf<Container>()
+    val displayChanges = mutableListOf<DisplayContainerProperties>()
+
+    // The containers to compare againest those provided in the next prepareForAnimation() call
+    var expectedPrepareForAnimationContainers: List<Container>? = null
+    // If true, will "consume" the next prepareForAnimation() call
+    var consumePrepareForAnimation = false
+    // The containers to compare againest those provided in the next createAnimation() call
+    var expectedCreateAnimationContainers: List<Container>? = null
+    // If true, will "consume" the next createAnimation() call
+    var consumeCreateAnimation = false
 
     override fun getId(): String {
-        return "TestMode"
+        return "TestMode_$name"
     }
 
-    override fun attachToContainer(
+    override fun globalStateChanged(
         updateContext: Mode.UpdateContext,
-        container: Container,
-        isDirectlyAssigned: Boolean
-    ) {
-        if (isDirectlyAssigned) {
-            attachedRoots.add(container)
-        }
-        attachedContainers.add(container)
-    }
-
-    override fun detachFromContainer(updateContext: Mode.UpdateContext, container: Container) {
-        attachedRoots.remove(container)
-        attachedContainers.remove(container)
-    }
-
-    override fun containerChanged(
-        updateContext: Mode.UpdateContext,
-        container: Container,
+        modeContainer: Container,
         snapshot: HierarchySnapshot
     ) {
-        updates.add(container to snapshot.getChanges(container))
+        ancestorsChangedContainers.add(modeContainer)
+    }
+
+    override fun containersChanged(
+        updateContext: Mode.UpdateContext,
+        modeContainer: Container,
+        addedContainers: List<Container>,
+        changedContainers: List<Container>,
+        snapshot: HierarchySnapshot
+    ) {
+        this.addedContainers.addAll(addedContainers)
+        this.changedContainers.addAll(changedContainers)
+    }
+
+    override fun containersRemoved(
+        updateContext: Mode.UpdateContext,
+        modeContainer: Container,
+        removedContainers: List<Container>,
+        snapshot: HierarchySnapshot
+    ) {
+        this.removedContainers.addAll(removedContainers)
+    }
+
+    override fun requestUpdateForDisplayChange(
+        directlyAssignedContainer: Container,
+        curProps: DisplayContainerProperties,
+        newProps: DisplayContainerProperties,
+        wct: WindowContainerTransaction
+    ) {
+        displayChanges.add(newProps)
+    }
+
+    override fun prepareForAnimation(containers: List<Container>): List<DetachResult>? {
+        val expectedContainers = expectedPrepareForAnimationContainers
+        if (expectedContainers != null) {
+            assertThat(expectedContainers.toSet() == containers.toSet()).isTrue()
+        }
+        if (consumePrepareForAnimation) {
+            val results = mutableListOf<DetachResult>()
+            for (container in containers) {
+                results.add(DetachResult(listOf(WindowAnimationState())))
+            }
+            return results
+        }
+        return null
+    }
+
+    override fun createAnimation(
+        animContext: Mode.AnimationContext,
+        containers: List<Container>,
+        snapshot: HierarchySnapshot
+    ): ITransitionAnimation? {
+        val expectedContainers = expectedCreateAnimationContainers
+        if (expectedContainers != null) {
+            assertThat(expectedContainers.toSet() == containers.toSet()).isTrue()
+        }
+        if (consumeCreateAnimation) {
+            return mock<ITransitionAnimation>()
+        }
+        return null
     }
 }

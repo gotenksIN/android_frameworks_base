@@ -21,11 +21,11 @@ import static android.appwidget.flags.Flags.appLockWidgetRemoval;
 import static android.appwidget.flags.Flags.limitIconMemory;
 import static android.appwidget.flags.Flags.remoteAdapterConversion;
 import static android.appwidget.flags.Flags.remoteViewsProto;
-import static android.appwidget.flags.Flags.removeAppWidgetServiceIoFromCriticalPath;
 import static android.appwidget.flags.Flags.securityPolicyInteractAcrossUsers;
 import static android.appwidget.flags.Flags.supportResumeRestoreAfterReboot;
 import static android.appwidget.flags.Flags.widgetDisplayChanges;
 import static android.content.Context.KEYGUARD_SERVICE;
+import static android.content.Intent.EXTRA_USER_ID;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.res.Resources.ID_NULL;
@@ -55,7 +55,6 @@ import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.app.StatsManager;
-import android.app.admin.DevicePolicyIdentifiers;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.DevicePolicyManagerInternal.OnCrossProfileWidgetProvidersChangeListener;
 import android.app.job.JobScheduler;
@@ -427,13 +426,9 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         mJobScheduler = (JobScheduler) mContext.getSystemService(Context.JOB_SCHEDULER_SERVICE);
         mDevicePolicyManagerInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
         mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
-        if (removeAppWidgetServiceIoFromCriticalPath()) {
-            mSaveStateHandler = new Handler(BackgroundThread.get().getLooper(),
-                    this::handleSaveMessage);
-            mAlarmHandler = new Handler(BackgroundThread.get().getLooper());
-        } else {
-            mSaveStateHandler = BackgroundThread.getHandler();
-        }
+        mSaveStateHandler = new Handler(BackgroundThread.get().getLooper(),
+                this::handleSaveMessage);
+        mAlarmHandler = new Handler(BackgroundThread.get().getLooper());
         mSavePreviewsHandler = new Handler(BackgroundThread.get().getLooper());
         mServiceThread = new ServiceThread(TAG,
             android.os.Process.THREAD_PRIORITY_FOREGROUND, false /* allowIo */);
@@ -1072,10 +1067,9 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 if (suspendingPackage != null
                         && PLATFORM_PACKAGE_NAME.equals(suspendingPackage.packageName)) {
                     if (android.app.admin.flags.Flags.policyTransparencyRefactorEnabled()) {
-                        onClickIntent =
-                                mDevicePolicyManagerInternal.createShowAdminSupportIntentForPolicy(
-                                        appUserId,
-                                        DevicePolicyIdentifiers.PACKAGES_SUSPENDED_POLICY);
+                        onClickIntent = new Intent(
+                                Settings.ACTION_SHOW_SUSPENDED_PACKAGE_ADMIN_SUPPORT_DETAILS);
+                        onClickIntent.putExtra(EXTRA_USER_ID, appUserId);
                     } else {
                         onClickIntent = mDevicePolicyManagerInternal.createShowAdminSupportIntent(
                                 appUserId, true);
@@ -3056,11 +3050,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 mAlarmManager.cancel(broadcast);
                 broadcast.cancel();
             };
-            if (removeAppWidgetServiceIoFromCriticalPath()) {
-                mAlarmHandler.post(cancelRunnable);
-            } else {
-                mSaveStateHandler.post(cancelRunnable);
-            }
+            mAlarmHandler.post(cancelRunnable);
             provider.broadcast = null;
         }
     }
@@ -3136,12 +3126,8 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     }
 
     private void saveGroupStateAsync(int groupId) {
-        if (removeAppWidgetServiceIoFromCriticalPath()) {
-            mSaveStateHandler.removeMessages(groupId);
-            mSaveStateHandler.sendEmptyMessage(groupId);
-        } else {
-            mSaveStateHandler.post(new SaveStateRunnable(groupId));
-        }
+        mSaveStateHandler.removeMessages(groupId);
+        mSaveStateHandler.sendEmptyMessage(groupId);
     }
 
     private void updateAppWidgetInstanceLocked(Widget widget, RemoteViews views,
@@ -3790,11 +3776,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                     mAlarmManager.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                             SystemClock.elapsedRealtime() + period, period, broadcast);
                 };
-                if (removeAppWidgetServiceIoFromCriticalPath()) {
-                    mAlarmHandler.post(repeatRunnable);
-                } else {
-                    mSaveStateHandler.post(repeatRunnable);
-                }
+                mAlarmHandler.post(repeatRunnable);
             }
         }
     }

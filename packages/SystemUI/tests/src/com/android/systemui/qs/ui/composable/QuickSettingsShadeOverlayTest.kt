@@ -17,10 +17,12 @@
 package com.android.systemui.qs.ui.composable
 
 import android.platform.test.annotations.EnableFlags
-import android.platform.test.annotations.WithDesktopTest
 import android.testing.TestableLooper
 import android.view.Display
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getBoundsInRoot
@@ -32,6 +34,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.TestContentScope
 import com.android.compose.theme.PlatformTheme
+import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.Flags.FLAG_EXPANDED_AUDIO_DETAILED_VIEW
 import com.android.systemui.Flags.FLAG_QS_TILE_DETAILED_VIEW
 import com.android.systemui.SysuiTestCase
@@ -46,13 +49,18 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.qs.panels.data.repository.defaultLargeTilesRepository
 import com.android.systemui.qs.panels.domain.interactor.iconTilesInteractor
+import com.android.systemui.qs.panels.ui.viewmodel.detailsViewModel
+import com.android.systemui.qs.panels.ui.viewmodel.editModeViewModel
 import com.android.systemui.qs.pipeline.domain.interactor.currentTilesInteractor
 import com.android.systemui.qs.pipeline.shared.TileSpec
+import com.android.systemui.res.R
 import com.android.systemui.scene.ui.composable.WithSceneContainerPreloadedResources
+import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
 import com.android.systemui.util.FixedActivitySizeComposeTestRule
+import com.google.common.truth.Truth.assertThat
 import junit.framework.TestCase.assertEquals
 import kotlin.test.Test
 import org.junit.Rule
@@ -101,7 +109,8 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
     }
 
     @Test
-    @WithDesktopTest
+    // TODO(b/485387343): Re-enable this test on desktop once the
+    // SystemUITests_desktop is fixed.
     fun testBrightnessSlider() =
         kosmos.runTest {
             composeTestRule.setQSShadeOverlay()
@@ -122,7 +131,8 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
         }
 
     @Test
-    @WithDesktopTest
+    // TODO(b/485387343): Re-enable this test on desktop once the
+    // SystemUITests_desktop is fixed.
     fun testSmallTileSize() =
         kosmos.runTest {
             currentTilesInteractor.setTiles(listOf(TileSpec.create("airplane")))
@@ -145,7 +155,8 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
         }
 
     @Test
-    @WithDesktopTest
+    // TODO(b/485387343): Re-enable this test on desktop once the
+    // SystemUITests_desktop is fixed.
     fun testLargeTileSize() =
         kosmos.runTest {
             iconTilesInteractor.setLargeTiles(defaultLargeTilesRepository.defaultLargeTiles)
@@ -164,7 +175,8 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
         }
 
     @Test
-    @WithDesktopTest
+    // TODO(b/485387343): Re-enable this test on desktop once the
+    // SystemUITests_desktop is fixed.
     fun testToolbar() =
         kosmos.runTest {
             composeTestRule.setQSShadeOverlay()
@@ -182,7 +194,8 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
         }
 
     @Test
-    @WithDesktopTest
+    // TODO(b/485387343): Re-enable this test on desktop once the
+    // SystemUITests_desktop is fixed.
     @EnableFlags(FLAG_QS_TILE_DETAILED_VIEW, FLAG_EXPANDED_AUDIO_DETAILED_VIEW)
     fun testVolumeSlider() =
         kosmos.runTest {
@@ -194,4 +207,54 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
                 .onNodeWithTag(resIdToTestTag("Media"))
                 .assertHeightIsEqualTo(if (DesktopSizing.isEnabled) 48.dp else 52.dp)
         }
+
+    @Test
+    fun testAccessibilityPaneTitle() =
+        kosmos.runTest {
+            composeTestRule.setQSShadeOverlay()
+            composeTestRule.waitForIdle()
+
+            val expectedTitle = mContext.getString(R.string.accessibility_desc_quick_settings)
+            composeTestRule
+                .onNodeWithTag(resIdToTestTag("quick_settings_container"))
+                .assert(hasPaneTitle(expectedTitle))
+        }
+
+    @Test
+    fun testAccessibilityPaneTitle_editing() =
+        kosmos.runTest {
+            kosmos.editModeViewModel.startEditing()
+            composeTestRule.setQSShadeOverlay()
+            composeTestRule.waitForIdle()
+
+            val expectedTitle = mContext.getString(R.string.accessibility_desc_quick_settings_edit)
+            composeTestRule
+                .onNodeWithTag(resIdToTestTag("quick_settings_container"))
+                .assert(hasPaneTitle(expectedTitle))
+        }
+
+    @Test
+    @EnableFlags(FLAG_QS_TILE_DETAILED_VIEW, FLAG_DUAL_SHADE)
+    fun testAccessibilityPaneTitle_details() =
+        kosmos.runTest {
+            enableDualShade()
+            val fakeTitle = "Fake title"
+            val fakeSpec = TileSpec.create(fakeTitle)
+            currentTilesInteractor.setTiles(listOf(fakeSpec))
+            assertThat(currentTilesInteractor.currentTilesSpecs).hasSize(1)
+
+            composeTestRule.setQSShadeOverlay()
+            composeTestRule.waitForIdle()
+
+            kosmos.detailsViewModel.onTileClicked(fakeSpec)
+            assertThat(kosmos.detailsViewModel.activeTileDetails).isNotNull()
+            composeTestRule.waitForIdle()
+
+            composeTestRule
+                .onNodeWithTag(resIdToTestTag("quick_settings_container"))
+                .assert(hasPaneTitle(fakeTitle))
+        }
+
+    private fun hasPaneTitle(title: String): SemanticsMatcher =
+        SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, title)
 }

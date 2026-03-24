@@ -19,6 +19,7 @@ android.app.ActivityOptions
 android.app.ActivityThread
 android.app.AppCompatCallbacks
 android.app.AppComponentFactory
+android.app.AppOpsManager
 android.app.Application
 android.app.ApplicationPackageManager
 android.app.BroadcastOptions
@@ -285,6 +286,7 @@ android.os.BatteryStats
 android.os.BatteryUsageStats
 android.os.BatteryUsageStatsQuery
 android.os.Binder
+android.os.BinderProxy
 android.os.BluetoothBatteryStats
 android.os.Broadcaster
 android.os.Build
@@ -317,6 +319,7 @@ android.os.ParcelFormatException
 android.os.ParcelUuid
 android.os.Parcelable
 android.os.PatternMatcher
+android.os.PerfettoCategories
 android.os.PerfettoTrace
 android.os.PerfettoTrackEventExtra
 android.os.PermissionEnforcer
@@ -355,7 +358,9 @@ android.os.connectivity.WifiActivityEnergyInfo
 android.os.connectivity.WifiBatteryStats
 android.os.storage.operations.sources.AppDataFileSource
 android.os.storage.operations.sources.OperationSource
+android.os.storage.operations.sources.OperationSourceWrapper
 android.os.storage.operations.targets.OperationTarget
+android.os.storage.operations.targets.OperationTargetWrapper
 android.os.storage.operations.targets.PccTarget
 android.os.vibrator.BasicPwleSegment
 android.os.vibrator.HapticFeedbackRequest
@@ -535,6 +540,7 @@ android.util.Base64
 android.util.Base64DataException
 android.util.Base64InputStream
 android.util.Base64OutputStream
+android.util.BucketPriorityQueue
 android.util.CloseGuard
 android.util.ContainerHelpers
 android.util.CopyOnWriteSparseArray
@@ -670,6 +676,7 @@ com.android.internal.os.ProcStatsUtil
 com.android.internal.os.RuntimeInit
 com.android.internal.os.SomeArgs
 com.android.internal.os.StoragedUidIoStatsReader
+com.android.internal.os.ZygoteArguments
 com.android.internal.pm.pkg.component.AconfigFlags
 com.android.internal.pm.pkg.parsing.ParsingPackageUtils
 com.android.internal.power.EnergyConsumerStats
@@ -742,7 +749,6 @@ com.android.server.ServiceThread
 com.android.server.SystemService
 com.android.server.SystemServiceManager
 com.android.server.am.ConnectionRecord
-com.android.server.am.PowerManagerBatchProxy
 com.android.server.am.psc.AsyncBatchSession
 com.android.server.am.psc.BatchSession
 com.android.server.am.psc.BinderSession
@@ -752,7 +758,13 @@ com.android.server.am.psc.GraphEdge
 com.android.server.am.psc.GraphNode
 com.android.server.am.psc.OomAdjuster
 com.android.server.am.psc.ProcessEdge
+com.android.server.am.psc.ProcessNode
+com.android.server.am.psc.ProcessServiceRecordInternal
+com.android.server.am.psc.ProviderBindingEdge
+com.android.server.am.psc.ServiceBindingEdge
 com.android.server.am.psc.SyncBatchSession
+com.android.server.am.psc.SystemNode
+com.android.server.power.PowerManagerBatchProxy
 com.android.server.utils.TimingsTraceAndSlog
 com.google.android.collect.Lists
 com.google.android.collect.Maps

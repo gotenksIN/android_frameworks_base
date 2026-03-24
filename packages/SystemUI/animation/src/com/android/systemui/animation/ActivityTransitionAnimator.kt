@@ -61,7 +61,6 @@ import androidx.annotation.UiThread
 import com.android.app.animation.Interpolators
 import com.android.internal.annotations.VisibleForTesting
 import com.android.internal.policy.ScreenDecorationsUtils
-import com.android.systemui.Flags.animationLibraryAtomicListeners
 import com.android.systemui.Flags.animationLibraryShellMigration
 import com.android.systemui.animation.ActivityTransitionAnimator.Companion.LONG_TRANSITION_TIMEOUT
 import com.android.systemui.animation.ActivityTransitionAnimator.Companion.TRANSITION_TIMEOUT
@@ -242,35 +241,19 @@ constructor(
     private val lifecycleListener =
         object : Listener {
             override fun onTransitionAnimationStart() {
-                if (animationLibraryAtomicListeners()) {
-                    listenersLock.withLock {
-                        LinkedHashSet(listeners).forEach { it.onTransitionAnimationStart() }
-                    }
-                } else {
+                listenersLock.withLock {
                     LinkedHashSet(listeners).forEach { it.onTransitionAnimationStart() }
                 }
             }
 
             override fun onTransitionAnimationEnd(transaction: SurfaceControl.Transaction) {
-                if (animationLibraryAtomicListeners()) {
-                    listenersLock.withLock {
-                        LinkedHashSet(listeners).forEach {
-                            it.onTransitionAnimationEnd(transaction)
-                        }
-                    }
-                } else {
+                listenersLock.withLock {
                     LinkedHashSet(listeners).forEach { it.onTransitionAnimationEnd(transaction) }
                 }
             }
 
             override fun onTransitionAnimationProgress(linearProgress: Float) {
-                if (animationLibraryAtomicListeners()) {
-                    listenersLock.withLock {
-                        LinkedHashSet(listeners).forEach {
-                            it.onTransitionAnimationProgress(linearProgress)
-                        }
-                    }
-                } else {
+                listenersLock.withLock {
                     LinkedHashSet(listeners).forEach {
                         it.onTransitionAnimationProgress(linearProgress)
                     }
@@ -278,11 +261,7 @@ constructor(
             }
 
             override fun onTransitionAnimationCancelled() {
-                if (animationLibraryAtomicListeners()) {
-                    listenersLock.withLock {
-                        LinkedHashSet(listeners).forEach { it.onTransitionAnimationCancelled() }
-                    }
-                } else {
+                listenersLock.withLock {
                     LinkedHashSet(listeners).forEach { it.onTransitionAnimationCancelled() }
                 }
             }
@@ -882,20 +861,12 @@ constructor(
 
     /** Add a [Listener] that can listen to transition animations. */
     fun addListener(listener: Listener) {
-        if (animationLibraryAtomicListeners()) {
-            listenersLock.withLock { listeners.add(listener) }
-        } else {
-            listeners.add(listener)
-        }
+        listenersLock.withLock { listeners.add(listener) }
     }
 
     /** Remove a [Listener]. */
     fun removeListener(listener: Listener) {
-        if (animationLibraryAtomicListeners()) {
-            listenersLock.withLock { listeners.remove(listener) }
-        } else {
-            listeners.remove(listener)
-        }
+        listenersLock.withLock { listeners.remove(listener) }
     }
 
     /**
@@ -1363,6 +1334,7 @@ constructor(
 
         @UiThread
         fun postTimeouts() {
+            if (cancelled) return
             timeoutHandler?.let {
                 it.postDelayed(onTimeout, TRANSITION_TIMEOUT)
                 it.postDelayed(onLongTimeout, LONG_TRANSITION_TIMEOUT)
@@ -1506,9 +1478,29 @@ constructor(
         override fun onTransitionConsumed(token: IBinder?, aborted: Boolean) {
             removeTimeouts()
             token?.let { transitionHelper.onTransitionConsumed(it) }
-            mainExecutor.execute {
-                cancelled = true
-                delegate?.onAnimationCancelled()
+
+            scope.launch {
+                if (delegate == null) {
+                    val controller = createController?.invoke() ?: return@launch
+                    delegate =
+                        TransitionAnimationDelegate(
+                            mainExecutor,
+                            controller,
+                            callback,
+                            DelegatingAnimationCompletionListener(
+                                listener,
+                                this@OriginTransition::dispose,
+                            ),
+                            transitionAnimator,
+                            disableWmTimeout,
+                            skipReparentTransaction,
+                        )
+                }
+
+                mainExecutor.execute {
+                    cancelled = true
+                    delegate?.onAnimationCancelled()
+                }
             }
         }
 
@@ -1540,8 +1532,9 @@ constructor(
             finishedCallback: IRemoteTransitionFinishedCallback?,
         ) {
             // If the helper fails, this method was called _before_ the helper setup happened. In
-            // that case, invoke the callback directly.
-            if (token == null || !transitionHelper.cleanUpAnimation(token, transaction)) {
+            // that case, invoke the callback directly, unless the transition was already cancelled.
+            val cleanedUp = token != null && transitionHelper.cleanUpAnimation(token, transaction)
+            if (!cleanedUp && !cancelled) {
                 finishedCallback?.invoke(info, transaction)
             }
 
@@ -1610,7 +1603,7 @@ constructor(
             val apps = ArrayList<RemoteAnimationTarget>()
             val filteredStates = ArrayList<WindowAnimationState>()
             val leashMap = ArrayMap<SurfaceControl, SurfaceControl>()
-            val leafTaskFilter = TransitionUtil.LeafTaskFilter()
+            val leafTaskFilter = TransitionUtil.LeafTaskFilter(info)
 
             // About layering: we divide up the "layer space" into 2 regions (each the size of the
             // change count). This lets us categorize things into above and below while
@@ -2001,13 +1994,15 @@ constructor(
                 }
 
             var candidate: TransitionInfo.Change? = null
+            var candidateOrder: Int? = null
             var state: WindowAnimationState? = null
 
+            val leafTaskFilter = TransitionUtil.LeafTaskFilter(info)
             for ((index, it) in info.changes.withIndex()) {
                 // Ignore changes that are not standalone tasks or activities, as these are not new
                 // containers to animate (e.g. they are changes within an existing and already
                 // showing task or activity window).
-                val isLeafTask = TransitionUtil.LeafTaskFilter().test(it)
+                val isLeafTask = leafTaskFilter.test(it)
                 val isActivity = it.activityComponent != null
                 if (!isLeafTask && !isActivity) continue
 
@@ -2036,17 +2031,21 @@ constructor(
 
                     if (candidate == null) {
                         candidate = it
+                        candidateOrder = info.changes.size - index
                         state = states?.get(index)
                         continue
                     }
                     if (it.endAbsBounds.hasGreaterAreaThan(candidate.endAbsBounds)) {
                         candidate = it
+                        candidateOrder = info.changes.size - index
                         state = states?.get(index)
                     }
                 }
             }
 
-            return candidate?.let { AnimatedSurface.from(candidate, state) }
+            return if (candidate != null && candidateOrder != null) {
+                AnimatedSurface.from(candidate, state, candidateOrder)
+            } else null
         }
 
         private fun Rect.hasGreaterAreaThan(other: Rect): Boolean {

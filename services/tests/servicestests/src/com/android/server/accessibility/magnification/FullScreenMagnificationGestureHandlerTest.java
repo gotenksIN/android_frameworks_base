@@ -494,28 +494,7 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_REBASED_DELAYED_MOTION_EVENT)
-    public void testSendDelayedMotionEvents_flagOff_onlyDownTimeAdjusted() {
-        final EventCaptor eventCaptor = new EventCaptor();
-        mMgh.setNext(eventCaptor);
-
-        // Use two taps to verify that rebased logic applies individually, preserving the interval.
-        tap(DEFAULT_X, DEFAULT_Y);
-        fastForward(50);
-        tap(DEFAULT_X, DEFAULT_Y);
-        // Wait for timeout to trigger delegation.
-        fastForward1sec();
-
-        MotionEvent firstDownEvent = eventCaptor.mEvents.get(0);
-        MotionEvent secondDownEvent = eventCaptor.mEvents.get(2);
-        assertThat(firstDownEvent.getDownTime()).isNotEqualTo(secondDownEvent.getDownTime());
-        assertThat(firstDownEvent.getEventTime()).isNotEqualTo(firstDownEvent.getDownTime());
-        assertThat(secondDownEvent.getEventTime()).isNotEqualTo(secondDownEvent.getDownTime());
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_REBASED_DELAYED_MOTION_EVENT)
-    public void testActionDownMotionEvent_flagOn_downTimeAndEventTimeAdjusted() {
+    public void testSendDelayedMotionEvents_downTimeAndEventTimeAdjusted() {
         final EventCaptor eventCaptor = new EventCaptor();
         mMgh.setNext(eventCaptor);
 
@@ -665,6 +644,47 @@ public class FullScreenMagnificationGestureHandlerTest {
                 STATE_ZOOMED_WITH_PERSISTED_SCALE_TMP);
         assertZoomsImmediatelyOnSwipeFrom(STATE_ZOOMED_OUT_FROM_SERVICE_2TAPS,
                 STATE_ZOOMED_WITH_PERSISTED_SCALE_TMP);
+    }
+
+    @Test
+    public void testTripleTapAndHold_onTemporaryModeStart() {
+        goFromStateIdleTo(STATE_IDLE);
+        reset(mMockCallback);
+
+        tap();
+        tap();
+        swipeAndHold();
+
+        verify(mMockCallback).onTemporaryModeStart(mMgh.mDisplayId, mMgh.getMode());
+    }
+
+    @Test
+    public void testExitedTemporaryMode_onTemporaryModeEnd() {
+        goFromStateIdleTo(STATE_ZOOMED_FURTHER_TMP);
+        reset(mMockCallback);
+
+        send(upEvent());
+
+        verify(mMockCallback).onTemporaryModeEnd(mMgh.mDisplayId, mMgh.getMode());
+    }
+
+    @Test
+    public void testTriggeringShortcut_onShortcutTriggerArmed() {
+        goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
+
+        verify(mMockCallback).onShortcutTriggerChanged(mMgh.mDisplayId, mMgh.getMode(),
+                /* isShortcutTrigger= */ true);
+    }
+
+    @Test
+    public void testSingleTapAfterTriggeringShortcut_onShortcutTriggerDisarmed() {
+        goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
+        reset(mMockCallback);
+
+        tap();
+
+        verify(mMockCallback).onShortcutTriggerChanged(mMgh.mDisplayId, mMgh.getMode(),
+                /* isShortcutTrigger= */ false);
     }
 
     @Test

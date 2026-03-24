@@ -20,6 +20,7 @@ import com.android.wm.shell.RootDisplayAreaOrganizer
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.DisplayController
+import com.android.wm.shell.common.DisplayInsetsController
 import com.android.wm.shell.dagger.WMShellConcurrencyModule
 import com.android.wm.shell.dagger.WMShellCoroutinesModule
 import com.android.wm.shell.dagger.WMSingleton
@@ -27,6 +28,7 @@ import com.android.wm.shell.hierarchy.ContainerHierarchy
 import com.android.wm.shell.hierarchy.ContainerHierarchyCommandHandler
 import com.android.wm.shell.hierarchy.ContainerHierarchyController
 import com.android.wm.shell.hierarchy.modes.FormFactorModes
+import com.android.wm.shell.hierarchy.transitions.HierarchyTransitionPlanner
 import com.android.wm.shell.hierarchy.updates.HierarchyUpdateRequester
 import com.android.wm.shell.hierarchy.updates.HierarchyUpdateRequesterImpl
 import com.android.wm.shell.hierarchy.updates.HierarchyUpdater
@@ -78,12 +80,14 @@ abstract class ContainerHierarchyModule {
         @WMSingleton
         @Provides
         fun provideHierarchyUpdateRequester(
+            displayController: DisplayController,
             transitions: Transitions,
             hierarchy: ContainerHierarchy,
             updater: HierarchyUpdater,
             shellTaskOrganizer: ShellTaskOrganizer,
         ): HierarchyUpdateRequester {
             return HierarchyUpdateRequesterImpl(
+                displayController,
                 transitions,
                 hierarchy,
                 updater,
@@ -96,6 +100,7 @@ abstract class ContainerHierarchyModule {
         fun provideHierarchyUpdater(
             shellTaskOrganizer: ShellTaskOrganizer,
             transitions: Transitions,
+            displayInsetsController: DisplayInsetsController,
             hierarchy: ContainerHierarchy,
             formFactorModes: FormFactorModes,
             shellInit: ShellInit,
@@ -103,8 +108,25 @@ abstract class ContainerHierarchyModule {
             return HierarchyUpdater(
                 shellTaskOrganizer,
                 transitions,
+                displayInsetsController,
                 hierarchy,
                 formFactorModes,
+                shellInit
+            )
+        }
+
+        @WMSingleton
+        @Provides
+        fun provideHierarchyTransitionPlanner(
+            transitions: Transitions,
+            hierarchy: ContainerHierarchy,
+            updater: HierarchyUpdater,
+            shellInit: ShellInit,
+        ): HierarchyTransitionPlanner {
+            return HierarchyTransitionPlanner(
+                transitions,
+                hierarchy,
+                updater,
                 shellInit
             )
         }
@@ -135,6 +157,7 @@ abstract class ContainerHierarchyModule {
         fun provideContainerHierarchyController(
             shellInit: ShellInit,
             shellCommandHandler: ShellCommandHandler,
+            displayController: DisplayController,
             hierarchy: ContainerHierarchy,
         ): Optional<ContainerHierarchyController> {
             if (!Flags.enableShellModes()) {
@@ -144,9 +167,21 @@ abstract class ContainerHierarchyModule {
                 ContainerHierarchyController(
                     shellInit,
                     shellCommandHandler,
+                    displayController,
                     hierarchy,
                 )
             )
+        }
+
+        @WMSingleton
+        @Provides
+        fun provideContainerHierarchyDependency(
+            initialHierarchyPopulator: InitialHierarchyPopulator,
+        ): Optional<ContainerHierarchyDependency> {
+            // Depending on InitialHierarchyPopulator (and indirectly HierarchyUpdater) ensures that
+            // we add the root task hook and populate the hierarchy before any other shell component
+            // creates their own root tasks.
+            return Optional.empty()
         }
 
         //
@@ -160,6 +195,7 @@ abstract class ContainerHierarchyModule {
             initialContainerHierarchyPopulator: InitialHierarchyPopulator,
             containerHierarchyUpdater: HierarchyUpdater,
             containerHierarchyUpdateRequester: HierarchyUpdateRequester,
+            containerHierarchyTransitionPlanner: HierarchyTransitionPlanner,
             containerHierarchyCommandHandler: ContainerHierarchyCommandHandler,
             containerHierarchyController: Optional<ContainerHierarchyController>
         ): Object {

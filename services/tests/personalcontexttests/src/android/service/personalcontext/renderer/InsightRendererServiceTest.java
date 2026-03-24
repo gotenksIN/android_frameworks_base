@@ -16,9 +16,12 @@
 
 package android.service.personalcontext.renderer;
 
+import static com.android.server.personalcontext.util.InsightUtils.fakePublishInsight;
+
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.Assert.assertThrows;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -26,11 +29,15 @@ import android.content.Intent;
 import android.os.IBinder;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
+import android.service.personalcontext.IOpCallback;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.insight.BundleInsight;
-import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.InsightFilter;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
+import android.service.personalcontext.testutil.FakeExecutor;
 
+import androidx.annotation.NonNull;
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
@@ -43,52 +50,88 @@ import java.util.UUID;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class InsightRendererServiceTest {
+    private final FakeExecutor mFakeExecutor = new FakeExecutor();
+    final Intent mServiceIntent = new Intent(InsightRendererService.SERVICE_INTERFACE);
+
     @Test
     public void testOnBind() {
-        final InsightRendererService service =
-                mock(InsightRendererService.class, Answers.CALLS_REAL_METHODS);
+        final InsightRendererService service = new InsightRendererService() {
+            @NonNull
+            @Override
+            public InsightFilter onInitializeFilter() {
+                return null;
+            }
 
-        final Intent serviceIntent = new Intent(InsightRendererService.SERVICE_INTERFACE);
-        assertThat(service.onBind(serviceIntent)).isNotNull();
-    }
+            @Override
+            public void onRender(@NonNull PublishedContextInsight insight,
+                    @NonNull RenderToken renderToken) {
+            }
+        };
 
-    @Test
-    public void testOnRegisteredCalled() throws RemoteException {
-        final InsightRendererService service =
-                mock(InsightRendererService.class, Answers.CALLS_REAL_METHODS);
-        final IBinder binder = service.onBind(new Intent(InsightRendererService.SERVICE_INTERFACE));
-        final IInsightRenderer renderer = IInsightRenderer.Stub.asInterface(binder);
-        renderer.configure(new ParcelUuid(UUID.randomUUID()));
-        verify(service).onConnected();
+        service.setExecutor(mFakeExecutor);
+
+        assertThat(service.onBind(mServiceIntent)).isNotNull();
     }
 
     @Test
     public void testOnRenderCalledWithRenderToken() throws RemoteException {
-        final InsightRendererService service =
-                mock(InsightRendererService.class, Answers.CALLS_REAL_METHODS);
-        final IBinder binder = service.onBind(new Intent(InsightRendererService.SERVICE_INTERFACE));
-        final IInsightRenderer renderer = IInsightRenderer.Stub.asInterface(binder);
-        renderer.configure(new ParcelUuid(UUID.randomUUID()));
+        final InsightRendererService service = new InsightRendererService() {
+            @NonNull
+            @Override
+            public InsightFilter onInitializeFilter() {
+                return null;
+            }
 
-        final ContextInsight insight = new BundleInsight.Builder().build();
-        final RenderToken renderToken = service.mintRenderToken(null);
-        renderer.render(new ContextInsightWrapper(insight), renderToken);
-        verify(service).onRender(eq(insight), eq(renderToken));
+            @Override
+            public void onRender(@NonNull PublishedContextInsight insight,
+                    @NonNull RenderToken renderToken) {
+            }
+        };
+
+        service.setExecutor(mFakeExecutor);
+
+        final IInsightRenderer renderer = (IInsightRenderer) service.onBind(mServiceIntent);
+
+        final PublishedContextInsight insight = fakePublishInsight(
+                new BundleInsight.Builder().build());
+        // prime the renderer by getting the filter first
+        renderer.getFilter(new ParcelUuid(UUID.randomUUID()), mock(IGetFilterCallback.class),
+                mock(IOpCallback.class));
+        mFakeExecutor.runAll();
+
+        // Should be able to fetch token now that the service is set up.
+        final RenderToken renderToken = service.mintRenderToken();
+
+        final IOpCallback callback = mock(IOpCallback.Stub.class);
+        renderer.render(new ParcelUuid(UUID.randomUUID()),
+                new PublishedContextInsightWrapper(insight),
+                renderToken,
+                callback);
+        mFakeExecutor.runAll();
+        verify(callback).signalCompletion();
     }
 
     @Test
-    public void testMintRenderToken() throws RemoteException {
+    public void mintRenderToken_beforeConfigured_throwsIllegalStateException() {
+        // This test verifies that calling mintRenderToken before the service is configured
+        // (i.e., before onConnected is called) results in an IllegalStateException.
+        // The service is instantiated in setUp() but not configured.
+
         final InsightRendererService service =
                 mock(InsightRendererService.class, Answers.CALLS_REAL_METHODS);
         final IBinder binder = service.onBind(new Intent(InsightRendererService.SERVICE_INTERFACE));
         final IInsightRenderer renderer = IInsightRenderer.Stub.asInterface(binder);
 
-        final UUID id = UUID.randomUUID();
-        renderer.configure(new ParcelUuid(id));
+        // Assert that the expected exception is thrown.
+        assertThrows(
+                "mintRenderToken should throw IllegalStateException if called before configure",
+                IllegalStateException.class,
+                () -> service.mintRenderToken("some_tag"));
 
-        final String tag = "baz";
-        final RenderToken token = service.mintRenderToken(tag);
-        assertThat(token.getRendererComponentId()).isEqualTo(id);
-        assertThat(token.getTag()).isEqualTo(tag);
+        // Also test the overload without a tag.
+        assertThrows(
+                "mintRenderToken should throw IllegalStateException if called before configure",
+                IllegalStateException.class,
+                service::mintRenderToken);
     }
 }

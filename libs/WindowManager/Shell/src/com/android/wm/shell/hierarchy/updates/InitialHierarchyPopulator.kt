@@ -61,7 +61,7 @@ class InitialHierarchyPopulator(
         addInitialTaskDisplayAreas(taskDisplayAreaOrganizer.getInitialTaskDisplayAreas())
         addInitialTasks(shellTaskOrganizer.getInitialTasks())
 
-        updater.notifyModes(Mode.UpdateContext(), snapshot)
+        updater.notifyModes(Mode.UpdateContext(reason = "Initial population"), snapshot)
     }
 
     @VisibleForTesting
@@ -112,12 +112,12 @@ class InitialHierarchyPopulator(
 
         // Sort the list by increasing parent task id (with no parents (-1) first)
         tasks.sortWith { a, b ->
-            a.props<TaskContainerProperties>().taskInfo.parentTaskId
-            -b.props<TaskContainerProperties>().taskInfo.parentTaskId
+            a.taskProps().taskInfo.parentTaskId
+            -b.taskProps().taskInfo.parentTaskId
         }
 
         for (container in tasks) {
-            val displayId = container.props<TaskContainerProperties>().taskInfo.displayId
+            val displayId = container.taskProps().taskInfo.displayId
             container.parent =
                 HierarchyUtils.resolveParentForContainer(hierarchy.root, container, null, displayId)
         }

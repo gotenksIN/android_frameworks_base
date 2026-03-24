@@ -113,6 +113,7 @@ import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvision
 import com.android.systemui.statusbar.window.shared.model.StatusBarWindowState
 import com.android.systemui.testKosmos
 import com.android.systemui.user.data.repository.fakeUserRepository
+import com.android.wm.shell.scrolltotop.fakeScrollToTop
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -1705,6 +1706,21 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             assertThat(currentOverlays).doesNotContain(Overlays.NotificationsShade)
         }
 
+    @EnableSceneContainer
+    @EnableFlags(Flags.FLAG_STATUS_BAR_EVENT_FORWARDING_MODERNIZATION, FLAG_DUAL_SHADE)
+    @Test
+    fun onStatusBarLongPressed_expandsShade() =
+        kosmos.runTest {
+            enableDualShade()
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            assertThat(currentOverlays).doesNotContain(Overlays.QuickSettingsShade)
+
+            underTest.onStatusBarLongPressed()
+
+            assertThat(currentOverlays).contains(Overlays.QuickSettingsShade)
+        }
+
     @Test
     @EnableFlags(FLAG_SCENE_CONTAINER, StatusBarForDesktop.FLAG_NAME, FLAG_DUAL_SHADE)
     fun onNotificationIconChipClicked_notificationsShadeIsClosed_expandsShade() =
@@ -1742,6 +1758,16 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
             underTest.onShadeExpansionIntent(eventX, statusBarWidth)
             assertThat(displayId).isEqualTo(EXTERNAL_DISPLAY)
+        }
+
+    @Test
+    fun onStatusBarTap_callsScrollToTopInteractor() =
+        kosmos.runTest {
+            val eventX = 150f
+            underTest.onStatusBarTap(eventX)
+
+            assertThat(fakeScrollToTop.lastScrollToTopDisplayId).isEqualTo(DEFAULT_DISPLAY)
+            assertThat(fakeScrollToTop.lastScrollToTopX).isEqualTo(150)
         }
 
     @Test

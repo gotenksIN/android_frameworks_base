@@ -45,6 +45,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.UserInfo;
 import android.content.res.Resources;
 // QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.database.ContentObserver;
@@ -57,6 +58,7 @@ import android.graphics.drawable.LayerDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.wifi.WifiConfiguration;
 // QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.net.Uri;
 // QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
@@ -67,6 +69,7 @@ import android.os.Handler;
 import android.os.RemoteException;
 // QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.provider.Settings;
 import android.telephony.AccessNetworkConstants;
 import android.telephony.NetworkRegistrationInfo;
@@ -126,7 +129,9 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.toast.SystemUIToast;
 import com.android.systemui.toast.ToastFactory;
+import com.android.systemui.user.data.repository.UserRepository;
 import com.android.systemui.util.CarrierConfigTracker;
+import com.android.systemui.util.kotlin.JavaAdapterKt;
 // QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.CarrierNameCustomization;
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
@@ -135,6 +140,7 @@ import com.android.wifitrackerlib.HotspotNetworkEntry;
 import com.android.wifitrackerlib.MergedCarrierEntry;
 import com.android.wifitrackerlib.WifiEntry;
 
+import kotlinx.coroutines.CoroutineScope;
 // QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import com.qti.extphone.ExtTelephonyManager;
 // QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
@@ -264,6 +270,8 @@ public class InternetDetailsContentController implements AccessPointController.A
     private int mActiveDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 // QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     private boolean mIsMobileDataEnabled = false;
+    private UserRepository mUserRepository;
+    private boolean mHasMultipleFullUsers = false;
 
     @VisibleForTesting
     Map<Integer, ServiceState> mSubIdServiceState = new HashMap<>();
@@ -419,6 +427,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             FeatureFlags featureFlags,
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             ShadeDialogContextInteractor shadeDialogContextInteractor,
+            UserRepository userRepository,
 // QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             CarrierNameCustomization carrierNameCustomization
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
@@ -461,6 +470,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         mCarrierNameCustomization = carrierNameCustomization;
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mShadeDialogContextInteractor = shadeDialogContextInteractor;
+        mUserRepository = userRepository;
 // QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
 // QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
@@ -469,7 +479,8 @@ public class InternetDetailsContentController implements AccessPointController.A
 // QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     }
 
-    void onStart(@NonNull InternetDialogCallback callback, boolean canConfigWifi) {
+    void onStart(@NonNull InternetDialogCallback callback,
+            boolean canConfigWifi, @NonNull CoroutineScope coroutineScope) {
         if (DEBUG) {
             Log.d(TAG, "onStart");
         }
@@ -506,6 +517,15 @@ public class InternetDetailsContentController implements AccessPointController.A
                 Log.w(TAG, "Unable to register callback for modem state changes : " + e);
             }
         }
+
+        JavaAdapterKt.collectFlow(
+                coroutineScope,
+                mUserRepository.getHasMultipleFullUsers(),
+                hasMultipleFullUsers -> {
+                    mHasMultipleFullUsers = hasMultipleFullUsers;
+                    scanWifiAccessPoints();
+                }
+        );
 // QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         if (!mIsExtTelServiceConnected) {
             mExtTelephonyManager.connectService(mExtTelServiceCallback);
@@ -2289,6 +2309,30 @@ public class InternetDetailsContentController implements AccessPointController.A
         }, SHORT_DURATION_TIMEOUT);
     }
 
+    /** @return  true if the current user is at the login screen. */
+    @VisibleForTesting
+    boolean isHeadlessSystemUser() {
+        int userId = mUserRepository.getSelectedUserInfo().id;
+        return UserManager.isHeadlessSystemUserMode()
+                && userId == UserHandle.USER_SYSTEM;
+    }
+
+    /** @return  true if the current user is a guest. */
+    @VisibleForTesting
+    boolean isGuestUser() {
+        UserInfo userInfo = mUserRepository.getSelectedUserInfo();
+        return userInfo != null && userInfo.isGuest();
+    }
+
+    private boolean isNetworkOwner(@NonNull WifiConfiguration config) {
+        int currentUserId = mUserRepository.getSelectedUserInfo().id;
+        int creatorUserId = config.getCreatorUserId();
+
+        // Network is "owned" if it's a single-user device OR if the creator
+        // matches the current user
+        return !mHasMultipleFullUsers || (currentUserId == creatorUserId);
+    }
+
     Intent getConfiguratorQrCodeGeneratorIntentOrNull(WifiEntry wifiEntry) {
         if (!mFeatureFlags.isEnabled(Flags.SHARE_WIFI_QS_BUTTON) || wifiEntry == null
                 || mWifiManager == null || !wifiEntry.canShare()) {
@@ -2296,6 +2340,10 @@ public class InternetDetailsContentController implements AccessPointController.A
         }
         var wifiConfiguration = wifiEntry.getWifiConfiguration();
         if (wifiConfiguration == null) {
+            return null;
+        }
+        if (isGuestUser() || isHeadlessSystemUser()
+                || !isNetworkOwner(wifiConfiguration)) {
             return null;
         }
         Intent intent = new Intent();

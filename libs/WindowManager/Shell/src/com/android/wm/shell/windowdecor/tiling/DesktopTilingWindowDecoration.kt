@@ -732,7 +732,7 @@ class DesktopTilingWindowDecoration(
 
         if (taskId == leftTaskResizingHelper?.taskInfo?.taskId) {
             logD("Removing left tiled task with id=%d", taskId)
-            logV("Stack: ${Log.getStackTraceString(Throwable())}")
+            logV("Stack: %s", Log.getStackTraceString(Throwable()))
             removeLeftTiledTaskFromDesk()
             removeTask(leftTaskResizingHelper, taskVanished, shouldDelayUpdate)
             leftTaskResizingHelper = null
@@ -872,6 +872,10 @@ class DesktopTilingWindowDecoration(
         desktopTilingDividerWindowManager?.hideDividerBar()
     }
 
+    fun showDividerBar(isTilingVisibleAfterRecents: Boolean) {
+        desktopTilingDividerWindowManager?.showDividerBar(isTilingVisibleAfterRecents)
+    }
+
     /**
      * Moves the tiled pair to the front of the task stack, if the [taskInfo] is focused and one of
      * the two tiled tasks.
@@ -925,7 +929,7 @@ class DesktopTilingWindowDecoration(
         rightBounds: Rect,
         stableBounds: Rect,
     ): Boolean {
-        return DragPositioningCallbackUtility.isExceedingWidthConstraint(
+        return DragPositioningCallbackUtility.isViolatingWidthConstraints(
             newLeftBounds.width(),
             leftBounds.width(),
             stableBounds,
@@ -933,7 +937,7 @@ class DesktopTilingWindowDecoration(
             leftTaskResizingHelper?.windowDecoration,
             desktopState.canEnterDesktopMode,
         ) ||
-            DragPositioningCallbackUtility.isExceedingWidthConstraint(
+            DragPositioningCallbackUtility.isViolatingWidthConstraints(
                 newRightBounds.width(),
                 rightBounds.width(),
                 stableBounds,

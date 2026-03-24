@@ -306,7 +306,6 @@ cc_defaults_for_libandroid_runtime {
                 ],
                 default: [],
             }),
-
             static_libs: [
                 "android.os.flags-aconfig-cc",
                 "libasync_safe",
@@ -315,7 +314,6 @@ cc_defaults_for_libandroid_runtime {
                 "libgenfslabelsversion.ffi",
                 "libgui_window_info_static",
                 "libkernelconfigs",
-                "liblogger",
                 "libnativehelper_lazy",
                 "libseccomp_policy",
                 "libgrallocusage",
@@ -323,6 +321,7 @@ cc_defaults_for_libandroid_runtime {
                 "libstatssocket_lazy",
                 "libskia",
                 "pw_status",
+                "libPlatformProperties",
             ] + select(release_flag("RELEASE_NATIVE_FRAMEWORK_PROTOTYPE"), {
                 true: [
                     "libflatbuffers-cpp",
@@ -358,8 +357,8 @@ cc_defaults_for_libandroid_runtime {
                 "android.hardware.common.fmq-V1-ndk",
                 "android.hardware.common-V2-ndk",
                 "android.hardware.contexthub-V5-ndk",
+                "chre_flags_c_lib",
                 "contexthub_data_flow",
-                "libandroid_net",
                 "libfmq",
                 "libbattery",
                 "libnetdutils",
@@ -380,7 +379,6 @@ cc_defaults_for_libandroid_runtime {
                 "libhwui",
                 "libmediandk",
                 "libpermission",
-                "libPlatformProperties",
                 "libsensor",
                 "libinput",
                 "libicu",
@@ -415,6 +413,7 @@ cc_defaults_for_libandroid_runtime {
                 "libimg_utils",
                 "libnetd_client",
                 "libprocessgroup",
+                "libprocessgroup_platform",
                 "libnativebridge_lazy",
                 "libnativeloader_lazy",
                 "libmemunreachable",
@@ -448,6 +447,7 @@ cc_defaults_for_libandroid_runtime {
                 "dnsproxyd_protocol_headers",
                 "flatbuffer_headers",
                 "tensorflow_headers",
+                "bpf_prog_headers",
             ] + select(release_flag("RELEASE_NATIVE_FRAMEWORK_PROTOTYPE"), {
                 true: [
                     "libzygote_messages_schema_headers",
@@ -456,6 +456,14 @@ cc_defaults_for_libandroid_runtime {
             }),
             runtime_libs: [
                 "libidmap2",
+            ],
+        },
+        android_x86_64: {
+            srcs: [
+                "com_android_internal_os_KernelCpuCyclePerUidBpf.cpp",
+            ],
+            shared_libs: [
+                "libcycleperuid",
             ],
         },
         host: {
@@ -475,33 +483,9 @@ cc_defaults_for_libandroid_runtime {
             ],
             static_libs: [
                 "libandroidfw",
-                "libbinary_parse",
-                "libdng_sdk",
-                "libft2",
-                "libharfbuzz_ng",
                 "libhostgraphics",
-                "libhwui",
-                "libimage_type_recognition",
-                "libinput",
-                "libjpeg",
-                "libminikin",
                 "libnativehelper_jvm",
-                "libpiex",
-                "libpng",
-                "libsqlite",
-                "libtiff_directory",
                 "libui-types",
-                "libwebp-decode",
-                "libwebp-encode",
-                "libperfetto_c",
-                "libtracing_perfetto",
-                "libwuffs_mirror_release_c",
-                "libz",
-                "libimage_io",
-                "libjpegdecoder",
-                "libjpegencoder",
-                "libultrahdr",
-                "server_configurable_flags",
             ],
             export_static_lib_headers: [
                 "libnativehelper_jvm",
@@ -525,11 +509,6 @@ cc_defaults_for_libandroid_runtime {
             static_libs: [
                 "libbinderthreadstateutils",
                 "libgui_window_info_static",
-                "libbinder",
-                "libbinder_ndk",
-                "libcore_jni_flags_c",
-                "libhidlbase", // libhwbinder is in here
-                "libaconfig_storage_read_api_cc",
             ],
         },
     },
@@ -541,18 +520,53 @@ cc_library_shared {
     target: {
         host: {
             static_libs: [
+                "aconfig_text_flags_c_lib",
+                "aconfig_view_accessibility_flags_c_lib",
+                "libaconfig_storage_read_api_cc",
                 "libbase",
+                "libbinary_parse",
                 "libcutils",
-                "liblog",
-                "libutils",
+                "libdng_sdk",
+                "libft2",
+                "libharfbuzz_ng",
+                "libhwui",
                 "libicui18n",
                 "libicuuc",
                 "libicuuc_stubdata",
+                "libimage_io",
+                "libimage_type_recognition",
+                "libinput",
+                "libjpeg",
+                "libjpegdecoder",
+                "libjpegencoder",
+                "liblog",
+                "libminikin",
+                "libperfetto_c",
+                "libpiex",
+                "libpng",
+                "libsqlite",
+                "libstatssocket-fake",
+                "libstatspull-fake",
+                "libtiff_directory",
+                "libtracing_perfetto",
+                "libultrahdr",
+                "libutils",
+                "libwebp-decode",
+                "libwebp-encode",
+                "libwuffs_mirror_release_c",
+                "libz",
+                "server_configurable_flags",
             ],
             stl: "libc++_static",
         },
         host_linux: {
             version_script: "platform/linux/libandroid_runtime_export.txt",
+            static_libs: [
+                "libbinder",
+                "libbinder_ndk",
+                "libcore_jni_flags_c",
+                "libhidlbase",
+            ],
         },
         darwin: {
             host_ldlibs: [
@@ -578,6 +592,7 @@ cc_library_shared {
 
 cc_library_host_shared {
     name: "libandroid_runtime_ravenwood",
+    stem: "libandroid_runtime",
     defaults: ["libandroid_runtime_defaults"],
     installable: false,
     visibility: ["//frameworks/base/ravenwood"],
@@ -585,11 +600,32 @@ cc_library_host_shared {
         "-D__RAVENWOOD__",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
         "libbase",
+        "libbinder",
+        "libbinder_ndk",
+        "libcore_jni_flags_c",
         "libcutils",
+        "libharfbuzz_ng",
+        "libhidlbase",
+        "libhwui",
+        "libicui18n",
+        "libicuuc",
+        "libimage_io",
+        "libinput",
+        "libjpeg",
         "liblog",
+        "libminikin",
+        "libperfetto_c",
+        "libsqlite",
+        "libtracing_perfetto",
+        "libultrahdr",
         "libutils",
-        "libicu",
+        "libz",
+        "server_configurable_flags",
+    ],
+    static_libs: [
+        "libicuuc_stubdata",
     ],
 }
 
@@ -656,4 +692,9 @@ cc_aconfig_library {
     name: "libcore_jni_flags_c",
     aconfig_declarations: "core_jni_flags",
     host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }

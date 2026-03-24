@@ -27,6 +27,7 @@ import android.content.pm.PackageManagerInternal;
 
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
+import com.android.server.appfunctions.allowlist.SystemAppFunctionAllowlistReader;
 import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.appinteraction.AppInteractionServiceImpl;
 import com.android.server.uri.UriGrantsManagerInternal;
@@ -42,6 +43,11 @@ public class AppFunctionManagerService extends SystemService {
 
     public AppFunctionManagerService(Context context) {
         super(context);
+        AppFunctionAccessServiceInterface appFunctionAccessService = null;
+        if (accessCheckFlagsEnabled()) {
+            appFunctionAccessService =
+                    LocalServices.getService(AppFunctionAccessServiceInterface.class);
+        }
         if (Flags.enableAppInteractionApi()) {
             mAppInteractionService = new AppInteractionServiceImpl(context);
         }
@@ -49,7 +55,7 @@ public class AppFunctionManagerService extends SystemService {
                 new AppFunctionManagerServiceImpl(
                         context,
                         LocalServices.getService(PackageManagerInternal.class),
-                        LocalServices.getService(AppFunctionAccessServiceInterface.class),
+                        appFunctionAccessService,
                         UriGrantsManager.getService(),
                         LocalServices.getService(UriGrantsManagerInternal.class),
                         new AppFunctionsLoggerWrapper(context),
@@ -59,7 +65,8 @@ public class AppFunctionManagerService extends SystemService {
                                 MultiUserDynamicAppFunctionRegistry.getInstance(),
                                 new AppFunctionsMetadataCache(context),
                                 new ServiceConfigImpl()),
-                        LocalServices.getService(ActivityTaskManagerInternal.class));
+                        LocalServices.getService(ActivityTaskManagerInternal.class),
+                        SystemAppFunctionAllowlistReader.getInstance());
     }
 
     @Override
@@ -91,5 +98,10 @@ public class AppFunctionManagerService extends SystemService {
     @Override
     public void onUserStarting(@NonNull TargetUser user) {
         mServiceImpl.onUserStarting(user);
+    }
+
+    private boolean accessCheckFlagsEnabled() {
+        return android.permission.flags.Flags.appFunctionAccessApiEnabled()
+                && android.permission.flags.Flags.appFunctionAccessServiceEnabled();
     }
 }

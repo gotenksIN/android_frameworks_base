@@ -295,6 +295,10 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
                 .shouldForceRotateForCameraCompat();
     }
 
+    boolean shouldIgnoreReqOrientationForCameraCompat(@NonNull ActivityRecord activity) {
+        return isTreatmentEnabledForActivity(activity);
+    }
+
     /**
      * Whether camera compat treatment is applicable for the given activity.
      *
@@ -336,7 +340,8 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
     }
 
     @Override
-    public void onCameraOpened(@NonNull WindowProcessController appProcess,
+    public void onCameraOpened(@NonNull CameraAppInfo cameraAppInfo,
+            @NonNull WindowProcessController appProcess,
             @NonNull Task cameraTask) {
         final ActivityRecord cameraActivity = getTopActivity(cameraTask);
         if (cameraActivity == null) {
@@ -388,7 +393,7 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
     }
 
     @Override
-    public boolean canCameraBeClosed(@NonNull String cameraId, @NonNull Task task) {
+    public boolean canCameraBeClosed(@NonNull CameraAppInfo cameraAppInfo, @NonNull Task task) {
         final ActivityRecord topActivity = getTopActivity(task);
 
         if (topActivity == null) {
@@ -396,7 +401,7 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
         }
 
         synchronized (this) {
-            if (isActivityForCameraIdRefreshing(topActivity, cameraId)) {
+            if (isActivityForCameraIdRefreshing(topActivity, cameraAppInfo.mCameraId)) {
                 ProtoLog.v(WM_DEBUG_CAMERA_COMPAT,
                         "%s: Display id=%d is notified that camera is closed but activity is"
                                 + " still refreshing. Rescheduling an update.",
@@ -408,7 +413,8 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
     }
 
     @Override
-    public void onCameraClosed(@Nullable WindowProcessController appProcess, @Nullable Task task) {
+    public void onCameraClosed(@NonNull CameraAppInfo cameraAppInfo,
+            @Nullable WindowProcessController appProcess, @Nullable Task task) {
         final ActivityRecord topActivity = getTopActivity(task);
         if (topActivity == null) {
             return;

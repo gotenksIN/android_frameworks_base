@@ -21,6 +21,7 @@ import android.content.Context;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.util.Slog;
 
+import com.android.server.am.Flags;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
 /**
@@ -37,6 +38,11 @@ public abstract class ConnectionRecordInternal implements OomAdjusterImpl.Connec
     private boolean mOngoingCalls;
     /** The associated bound service session if created. */
     private BoundServiceSession mBoundServiceSession;
+    /**
+     * The service binding edge from the service client to the host.
+     * This is {@code null} unless {@link Flags#enableCapabilityControllerComputation} is true.
+     */
+    private final ServiceBindingEdge mServiceBindingEdge;
 
     /** Returns the {@link ActivityServiceConnectionsHolder} associated with this connection. */
     public abstract ActivityServiceConnectionsHolder getActivity();
@@ -61,6 +67,12 @@ public abstract class ConnectionRecordInternal implements OomAdjusterImpl.Connec
 
     public ConnectionRecordInternal(long flags) {
         this.mFlags = flags;
+
+        if (Flags.enableCapabilityControllerComputation()) {
+            mServiceBindingEdge = new ServiceBindingEdge(this);
+        } else {
+            mServiceBindingEdge = null;
+        }
     }
 
     public long getFlags() {
@@ -115,6 +127,16 @@ public abstract class ConnectionRecordInternal implements OomAdjusterImpl.Connec
         return updatedFlags != 0;
     }
 
+    /** Checks if this connection is binding to the same process. */
+    public boolean isBindingToSelf() {
+        final ProcessRecordInternal host = getService().getHostProcessInternal();
+        if (host == null) {
+            return false;
+        }
+        // Check if the host process is the same as the client process.
+        return host == getClient();
+    }
+
     public boolean getOngoingCalls() {
         return mOngoingCalls;
     }
@@ -134,6 +156,11 @@ public abstract class ConnectionRecordInternal implements OomAdjusterImpl.Connec
 
     void setBoundServiceSession(BoundServiceSession boundServiceSession) {
         mBoundServiceSession = boundServiceSession;
+    }
+
+    /** This is {@code null} unless {@link Flags#enableCapabilityControllerComputation} is true. */
+    final ServiceBindingEdge getServiceBindingEdge() {
+        return mServiceBindingEdge;
     }
 
     @Override

@@ -98,17 +98,21 @@ import android.companion.virtual.IVirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Insets;
+import android.graphics.PointF;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceState;
@@ -183,6 +187,7 @@ import com.android.internal.util.test.LocalServiceKeeperRule;
 import com.android.modules.utils.testing.ExtendedMockitoRule;
 import com.android.server.DisplayThread;
 import com.android.server.SystemService;
+import com.android.server.UiThread;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.display.DisplayManagerService.CallbackRecord.PendingDisplayEvent;
@@ -314,9 +319,7 @@ public class DisplayManagerServiceTest {
     private int mHdrConversionMode;
 
     private int mPreferredHdrOutputType;
-    private TestLooperManager mPowerLooperManager;
-    private TestLooperManager mDisplayLooperManager;
-    private TestLooperManager mBackgroundLooperManager;
+    private final List<TestLooperManager> mLooperManagers = new ArrayList<>();
     private UserManager mUserManager;
 
     private int[] mAllowedHdrOutputTypes;
@@ -532,13 +535,14 @@ public class DisplayManagerServiceTest {
         when(mContext.getContentResolver()).thenReturn(resolver);
         resolver.addProvider(Settings.AUTHORITY, mFakeSettingsProvider);
         mResources = Mockito.spy(mContext.getResources());
-        mPowerLooperManager = InstrumentationRegistry.getInstrumentation().acquireLooperManager(
-                Looper.getMainLooper());
-        mDisplayLooperManager = InstrumentationRegistry.getInstrumentation().acquireLooperManager(
-                DisplayThread.get().getLooper());
-        mBackgroundLooperManager =
-                InstrumentationRegistry.getInstrumentation().acquireLooperManager(
-                        BackgroundThread.getHandler().getLooper());
+        mLooperManagers.add(InstrumentationRegistry.getInstrumentation().acquireLooperManager(
+                Looper.getMainLooper()));
+        mLooperManagers.add(InstrumentationRegistry.getInstrumentation().acquireLooperManager(
+                DisplayThread.get().getLooper()));
+        mLooperManagers.add(InstrumentationRegistry.getInstrumentation().acquireLooperManager(
+                BackgroundThread.getHandler().getLooper()));
+        mLooperManagers.add(InstrumentationRegistry.getInstrumentation().acquireLooperManager(
+                UiThread.getHandler().getLooper()));
         manageDisplaysPermission(/* granted= */ false);
         when(mContext.getResources()).thenReturn(mResources);
         mUserManager = Mockito.spy(mContext.getSystemService(UserManager.class));
@@ -578,9 +582,9 @@ public class DisplayManagerServiceTest {
             mDisplayManager.stop();
         }
         flushHandlers();
-        mPowerLooperManager.release();
-        mDisplayLooperManager.release();
-        mBackgroundLooperManager.release();
+        for (TestLooperManager tlm : mLooperManagers) {
+            tlm.release();
+        }
     }
 
     private void setUpDisplay() {
@@ -999,6 +1003,57 @@ public class DisplayManagerServiceTest {
         assertEquals(ddi.ownerPackageName, displayInfo.ownerPackageName);
         assertEquals(ddi.uniqueId, displayInfo.uniqueId);
         assertEquals(ddi.renderFrameRate, displayInfo.getRefreshRate(), 0.1f);
+    }
+
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS)
+    @EnableCompatChanges({ActivityInfo.MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS})
+    public void getDisplayInfo_maskPresentationFlagOnInternalDisplay() {
+        assertPresentationFlagMasking(Display.TYPE_INTERNAL, /* shouldBeMasked= */ true);
+    }
+
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS)
+    @DisableCompatChanges({ActivityInfo.MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS})
+    public void getDisplayInfo_noMaskPresentationFlagOnInternalDisplay_overrideDisabled() {
+        assertPresentationFlagMasking(Display.TYPE_INTERNAL, /* shouldBeMasked= */ false);
+    }
+
+    @Test
+    @DisableFlags(com.android.window.flags.Flags.FLAG_MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS)
+    @EnableCompatChanges({ActivityInfo.MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS})
+    public void getDisplayInfo_noMaskPresentationFlagOnInternalDisplay_featureDisabled() {
+        assertPresentationFlagMasking(Display.TYPE_INTERNAL, /* shouldBeMasked= */ false);
+    }
+
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS)
+    @EnableCompatChanges({ActivityInfo.MASK_PRESENTATION_FLAGS_ON_INTERNAL_DISPLAYS})
+    public void getDisplayInfo_noMaskPresentationFlagOnExternalDisplay() {
+        assertPresentationFlagMasking(Display.TYPE_EXTERNAL, /* shouldBeMasked= */ false);
+    }
+
+    private void assertPresentationFlagMasking(int displayType, boolean shouldBeMasked) {
+        mDisplayManager = new DisplayManagerService(mContext, mShortMockedInjector);
+        registerDefaultDisplays(mDisplayManager);
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+        int displayId = Display.DEFAULT_DISPLAY;
+
+        // Force set FLAG_PRESENTATION for testing
+        synchronized (mDisplayManager.getSyncRoot()) {
+            LogicalDisplay display = mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
+                    displayId);
+            DisplayInfo internalInfo = display.getDisplayInfoLocked();
+            internalInfo.type = displayType;
+            internalInfo.flags |= Display.FLAG_PRESENTATION;
+        }
+
+        DisplayInfo info = bs.getDisplayInfo(displayId);
+        if (shouldBeMasked) {
+            assertEquals(0, info.flags & Display.FLAG_PRESENTATION);
+        } else {
+            assertNotEquals(0, info.flags & Display.FLAG_PRESENTATION);
+        }
     }
 
     /**
@@ -4362,7 +4417,9 @@ public class DisplayManagerServiceTest {
         initDisplayPowerController(localService);
         mDisplayManager.windowManagerAndInputReady();
 
-        DisplayTopology topology = mock(DisplayTopology.class);
+        var topology = spy(initDisplayTopology(mDisplayManager, displayManagerBinderService,
+                localService, new FakeDisplayManagerCallback(),
+                /*shouldEmitTopologyChangeEvent=*/ false));
         when(topology.copy()).thenReturn(topology);
         DisplayTopologyGraph graph = mock(DisplayTopologyGraph.class);
         when(topology.getGraph()).thenReturn(graph);
@@ -4456,7 +4513,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testMirrorBuiltInDisplay_inLockTaskMode() {
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
-        when(mMockFlags.isDisplayMirrorInLockTaskModeEnabled()).thenReturn(true);
         when(mMockActivityTaskManagerInternal.getLockTaskModeState())
                 .thenReturn(ActivityManager.LOCK_TASK_MODE_LOCKED);
 
@@ -4470,7 +4526,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testMirrorBuiltInDisplay_isNotInLockTaskMode() {
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
-        when(mMockFlags.isDisplayMirrorInLockTaskModeEnabled()).thenReturn(true);
         when(mMockActivityTaskManagerInternal.getLockTaskModeState())
                 .thenReturn(ActivityManager.LOCK_TASK_MODE_NONE);
 
@@ -4489,7 +4544,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testMirrorBuiltInDisplay_onLockTaskModeChanged() {
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
-        when(mMockFlags.isDisplayMirrorInLockTaskModeEnabled()).thenReturn(true);
         when(mMockActivityTaskManagerInternal.getLockTaskModeState())
                 .thenReturn(ActivityManager.LOCK_TASK_MODE_NONE);
 
@@ -4930,29 +4984,7 @@ public class DisplayManagerServiceTest {
     }
 
     @Test
-    public void testIncludeDefaultDisplayInTopologySwitch_flagDisabled() {
-        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(false);
-        Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
-                0);
-
-        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
-        setFieldValue(mDisplayManager, "mDisplayTopologyCoordinator",
-                mMockDisplayTopologyCoordinator);
-        mDisplayManager.systemReady(/* safeMode= */ false);
-        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isTrue();
-        verify(mMockDisplayTopologyCoordinator, never()).onDisplayRemoved(anyInt());
-
-        Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
-                1);
-        final ContentObserver observer = mDisplayManager.getSettingsObserver();
-        observer.onChange(false, Settings.Secure.getUriFor(INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY));
-        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isTrue();
-        verify(mMockDisplayTopologyCoordinator, never()).onDisplayAdded(any());
-    }
-
-    @Test
     public void testIncludeDefaultDisplayInTopologySwitch_internalDisplayCanHostDesktops() {
-        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(true);
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 0);
 
@@ -4977,7 +5009,6 @@ public class DisplayManagerServiceTest {
 
     @Test
     public void testIncludeDefaultDisplayInTopologySwitch_addDefaultDisplayWhenEnableSwitch() {
-        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(true);
         Settings.Secure.putInt(mContext.getContentResolver(), MIRROR_BUILT_IN_DISPLAY, 0);
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 0);
@@ -5005,7 +5036,6 @@ public class DisplayManagerServiceTest {
 
     @Test
     public void testIncludeDefaultDisplayInTopologySwitch_removeDefaultDisplayWhenDisableSwitch() {
-        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(true);
         Settings.Secure.putInt(mContext.getContentResolver(), MIRROR_BUILT_IN_DISPLAY, 0);
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 1);
@@ -5030,7 +5060,6 @@ public class DisplayManagerServiceTest {
 
     @Test
     public void testIncludeDefaultDisplayInTopologySwitch_systemReadyUpdatesTopology() {
-        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(true);
         Settings.Secure.putInt(mContext.getContentResolver(), MIRROR_BUILT_IN_DISPLAY, 0);
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 0);
@@ -5053,7 +5082,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testIncludeDefaultDisplayInTopologySwitch_mirrorBuiltInDisplay() {
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
-        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(true);
         Settings.Secure.putInt(mContext.getContentResolver(), MIRROR_BUILT_IN_DISPLAY, 1);
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 0);
@@ -5865,8 +5893,8 @@ public class DisplayManagerServiceTest {
     }
 
     private void flushHandlers() {
-        com.android.server.testutils.TestUtils.flushLoopers(mDisplayLooperManager,
-                mPowerLooperManager, mBackgroundLooperManager);
+        com.android.server.testutils.TestUtils.flushLoopers(
+                mLooperManagers.toArray(new TestLooperManager[0]));
     }
 
     private void resetConfigToIgnoreSensorManager() {
@@ -5900,8 +5928,6 @@ public class DisplayManagerServiceTest {
         callback.expectsEvent(TOPOLOGY_CHANGED_EVENT);
         FakeDisplayDevice displayDevice0 =
                 createFakeDisplayDevice(displayManager, new float[]{60f}, Display.TYPE_EXTERNAL);
-        int displayId0 = getDisplayIdForDisplayDevice(displayManager, displayManagerBinderService,
-                displayDevice0);
         flushHandlers();
         if (shouldEmitTopologyChangeEvent) {
             callback.waitForExpectedEvent();
@@ -5927,9 +5953,12 @@ public class DisplayManagerServiceTest {
             callback.waitForNonExpectedEvent();
         }
 
-        var topology = new DisplayTopology();
-        topology.addDisplay(displayId0, 2048, 800, 160);
-        topology.addDisplay(displayId1, 1920, 1080, 160);
+        DisplayTopology topology = displayManagerBinderService.getDisplayTopology();
+        SparseArray<RectF> bounds = topology.getAbsoluteBounds();
+        topology.rearrange(Map.of(
+                bounds.keyAt(0), new PointF(bounds.valueAt(1).left, bounds.valueAt(1).top),
+                bounds.keyAt(1), new PointF(bounds.valueAt(0).left, bounds.valueAt(0).top)
+        ));
         return topology;
     }
 
@@ -6108,16 +6137,17 @@ public class DisplayManagerServiceTest {
         }
 
         @Override
-        public void setUserPreferredDisplayModeLocked(Display.Mode preferredMode) {
+        public boolean setUserPreferredDisplayModeLocked(Display.Mode preferredMode) {
             for (Display.Mode mode : mDisplayDeviceInfo.supportedModes) {
                 if (mode.matchesIfValid(
                         preferredMode.getPhysicalWidth(),
                         preferredMode.getPhysicalHeight(),
                         preferredMode.getRefreshRate())) {
                     mPreferredMode = mode;
-                    break;
+                    return true;
                 }
             }
+            return false;
         }
 
         @Override
@@ -6212,5 +6242,41 @@ public class DisplayManagerServiceTest {
 
         // Verify: onDisplayEvent was NOT called at all
         verify(mockCallback, never()).onDisplayEvent(anyInt(), anyInt());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_CHARGING_EXPERIENCE_BY_DEFAULT)
+    public void testWearChargingExperienceEnabled_hasExpectedDefaultValue() {
+        mDisplayManager = new DisplayManagerService(mContext, mShortMockedInjector);
+        ContentResolver contentResolver = mContext.getContentResolver();
+        // Simulate that WEAR_CHARGING_EXPERIENCE_ENABLED was not set
+        Settings.Global.putString(contentResolver,
+                Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED, null);
+
+        mDisplayManager.onBootPhase(SystemService.PHASE_SYSTEM_SERVICES_READY);
+
+        int expectedValue = mContext.getResources().getBoolean(
+                R.bool.config_wearChargingExperienceEnabled) ? 1 : 0;
+        // Verify that the WEAR_CHARGING_EXPERIENCE_ENABLED value is the default one
+        assertThat(Settings.Global.getInt(contentResolver,
+                Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED, -1)).isEqualTo(
+                expectedValue);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_CHARGING_EXPERIENCE_BY_DEFAULT)
+    public void testWearChargingExperienceEnabled_preservesExistingUserValue() {
+        mDisplayManager = new DisplayManagerService(mContext, mShortMockedInjector);
+        ContentResolver contentResolver = mContext.getContentResolver();
+        int existingUserValue = 0;
+        Settings.Global.putInt(contentResolver,
+                Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED, existingUserValue);
+
+        mDisplayManager.onBootPhase(SystemService.PHASE_SYSTEM_SERVICES_READY);
+
+        // Verify that the WEAR_CHARGING_EXPERIENCE_ENABLED value was NOT overwritten by the default
+        assertThat(Settings.Global.getInt(contentResolver,
+                Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED, -1))
+                .isEqualTo(existingUserValue);
     }
 }

@@ -38,6 +38,7 @@ import java.lang.ref.WeakReference
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -62,13 +63,15 @@ interface ScreenCaptureAppContentRepository {
     /**
      * The currently available app content for the given [packageName] and [user].
      *
-     * Thumbnails will be fetched at the given [thumbnailWidthPx] and [thumbnailHeightPx].
+     * Thumbnails will be fetched at the given [thumbnailWidthPx] and [thumbnailHeightPx]. Icons
+     * will be fetched at the given [iconSizePx].
      */
     fun appContentsFor(
         packageName: String,
         user: UserHandle,
         thumbnailWidthPx: Int,
         thumbnailHeightPx: Int,
+        iconSizePx: Int,
     ): Flow<Result<RawAppContent>>
 }
 
@@ -91,6 +94,7 @@ constructor(
         user: UserHandle,
         thumbnailWidthPx: Int,
         thumbnailHeightPx: Int,
+        iconSizePx: Int,
     ): Flow<Result<RawAppContent>> =
         flow {
                 val intent =
@@ -139,9 +143,12 @@ constructor(
                 emitAll(
                     conflatedCallbackFlow {
                         val serviceConnection =
-                            makeServiceConnection(thumbnailWidthPx, thumbnailHeightPx) {
-                                trySend(it)
-                            }
+                            makeServiceConnection(
+                                producerScope = this,
+                                thumbnailWidthPx,
+                                thumbnailHeightPx,
+                                iconSizePx,
+                            )
                         val bound =
                             context.bindServiceAsUser(
                                 /* service= */ intent,
@@ -153,25 +160,21 @@ constructor(
                         if (!bound) {
                             val errMsg = "Failed to bind service: $packageName"
                             Log.w(TAG, errMsg)
-                            context.unbindService(serviceConnection)
-                            send(Result.failure(IllegalStateException(errMsg)))
+                            trySend(Result.failure(IllegalStateException(errMsg)))
                             close()
                         }
 
-                        awaitClose {
-                            if (bound) {
-                                context.unbindService(serviceConnection)
-                            }
-                        }
+                        awaitClose { context.unbindService(serviceConnection) }
                     }
                 )
             }
             .flowOn(bgContext)
 
     private fun makeServiceConnection(
+        producerScope: ProducerScope<Result<RawAppContent>>,
         thumbnailWidthPx: Int,
         thumbnailHeightPx: Int,
-        onResult: (Result<RawAppContent>) -> Unit,
+        iconSizePx: Int,
     ): ServiceConnection =
         object : ServiceConnection {
             private var callback: IAppContentProjectionCallback? = null
@@ -181,8 +184,8 @@ constructor(
                 if (projectionCallback == null) {
                     val errMsg = "Invalid service IBinder: $service"
                     Log.w(TAG, errMsg)
-                    context.unbindService(this)
-                    onResult(Result.failure(IllegalArgumentException(errMsg)))
+                    producerScope.trySend(Result.failure(IllegalArgumentException(errMsg)))
+                    producerScope.close()
                     return
                 }
                 callback = projectionCallback
@@ -200,7 +203,7 @@ constructor(
 
                     if (appContents == null) return@RemoteCallback
 
-                    onResult(
+                    producerScope.trySend(
                         Result.success(
                             RawAppContent(
                                 contents = appContents,
@@ -216,12 +219,12 @@ constructor(
                             listener,
                             thumbnailWidthPx,
                             thumbnailHeightPx,
-                            0,
-                            0,
+                            iconSizePx,
+                            iconSizePx,
                         )
                     } catch (e: RemoteException) {
                         Log.e(TAG, "App content request failed", e)
-                        onResult(Result.failure(e))
+                        producerScope.trySend(Result.failure(e))
                     }
                 }
             }
@@ -229,8 +232,8 @@ constructor(
             override fun onBindingDied(name: ComponentName?) {
                 val errMsg = "Binding died for $name"
                 Log.w(TAG, errMsg)
-                onResult(Result.failure(IllegalStateException(errMsg)))
-                context.unbindService(this)
+                producerScope.trySend(Result.failure(IllegalStateException(errMsg)))
+                producerScope.close()
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {

@@ -36,8 +36,10 @@ import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
 import static android.media.audio.Flags.roForegroundAudioControl;
 
 import static com.android.server.am.psc.Constants.FOREGROUND_APP_ADJ;
+import static com.android.server.am.psc.OomAdjuster.ALL_CPU_TIME_CAPABILITIES;
 import static com.android.server.am.psc.OomAdjuster.CPU_TIME_REASON_ALLOW_LIST;
 import static com.android.server.am.psc.OomAdjuster.CPU_TIME_REASON_OTHER;
+import static com.android.server.am.psc.OomAdjusterImpl.Connection.CPU_TIME_TRANSMISSION_NONE;
 
 import android.annotation.NonNull;
 import android.app.ActivityManager.ProcessCapability;
@@ -93,7 +95,7 @@ class CapabilityController {
      */
     private static @ProcessCapability int evaluateForegroundServicePolicy(
             @NonNull ProcessEdge edge) {
-        final GraphNode node = edge.getTarget();
+        final ProcessNode node = edge.getTarget();
         if (!node.hasForegroundServices()) {
             return PROCESS_CAPABILITY_NONE;
         }
@@ -115,7 +117,7 @@ class CapabilityController {
      * Gets foreground service capabilities from the node's service record at index {@code index}.
      */
     // LINT.IfChange(getForegroundServiceCapability)
-    private static @ProcessCapability int getForegroundServiceCapability(@NonNull GraphNode node,
+    private static @ProcessCapability int getForegroundServiceCapability(@NonNull ProcessNode node,
             int index) {
         if (!node.isForegroundService(index) || !node.isFgsAllowedWiuForCapabilities(index)) {
             return PROCESS_CAPABILITY_NONE;
@@ -153,7 +155,7 @@ class CapabilityController {
     /** Evaluates process capabilities based on its process state. */
     // LINT.IfChange(evaluateProcStatePolicy)
     private static @ProcessCapability int evaluateProcStatePolicy(@NonNull ProcessEdge edge) {
-        final GraphNode node = edge.getTarget();
+        final ProcessNode node = edge.getTarget();
         final @ProcessState int procState = node.getProcState();
         final @ProcessCapability int networkCapabilities =
                 NetworkPolicyManager.getDefaultProcessNetworkCapabilities(procState);
@@ -201,7 +203,7 @@ class CapabilityController {
     /** Evaluates process CPU time capability and updates CPU time reasons on the process edge. */
     // LINT.IfChange(evaluateCpuTimePolicy)
     private static @ProcessCapability int evaluateCpuTimePolicy(@NonNull ProcessEdge edge) {
-        final GraphNode node = edge.getTarget();
+        final ProcessNode node = edge.getTarget();
         if (node.isCurAllowListed()) {
             edge.addCpuTimeReasons(CPU_TIME_REASON_ALLOW_LIST);
             return PROCESS_CAPABILITY_CPU_TIME;
@@ -235,6 +237,56 @@ class CapabilityController {
     private static @ProcessCapability int evaluateImplicitCpuTimePolicy(@NonNull ProcessEdge edge) {
         return edge.getTarget().hasIntrinsicImplicitCpuTime()
                 ? PROCESS_CAPABILITY_IMPLICIT_CPU_TIME : PROCESS_CAPABILITY_NONE;
+    }
+
+    /**
+     * Evaluates a filter by combining all the policies of a {@link ProviderBindingEdge}.
+     */
+    static @ProcessCapability int evaluateFilter(@NonNull ProviderBindingEdge edge) {
+        return evaluateBfslPolicy(edge) | evaluateCpuTimePolicy(edge);
+    }
+
+    /** Evaluates whether a {@link ProviderBindingEdge} propagates BFSL. */
+    private static @ProcessCapability int evaluateBfslPolicy(@NonNull ProviderBindingEdge unused) {
+        // Always propagate BFSL.
+        return PROCESS_CAPABILITY_BFSL;
+    }
+
+    /** Evaluates whether a {@link ProviderBindingEdge} propagates CPU time capabilities. */
+    private static @ProcessCapability int evaluateCpuTimePolicy(
+            @NonNull ProviderBindingEdge unused) {
+        // Always propagate CPU time capabilities since
+        // ContentProviderConnectionInternal#cpuTimeTransmissionType() always returns
+        // CPU_TIME_TRANSMISSION_NORMAL.
+        return ALL_CPU_TIME_CAPABILITIES;
+    }
+
+    /**
+     * Evaluates a filter by combining all the policies of a {@link ServiceBindingEdge}.
+     */
+    static @ProcessCapability int evaluateFilter(@NonNull ServiceBindingEdge edge) {
+        // TODO: b/476905700 - Add more policies.
+        return evaluateBfslPolicy(edge) | evaluateAudioPolicy(edge) | evaluateCpuTimePolicy(edge);
+    }
+
+    /** Evaluates whether a {@link ServiceBindingEdge} propagates BFSL. */
+    private static @ProcessCapability int evaluateBfslPolicy(@NonNull ServiceBindingEdge unused) {
+        // Always propagate BFSL.
+        return PROCESS_CAPABILITY_BFSL;
+    }
+
+    /** Evaluates whether a {@link ServiceBindingEdge} propagates audio control. */
+    private static @ProcessCapability int evaluateAudioPolicy(@NonNull ServiceBindingEdge unused) {
+        // Always propagate audio control.
+        return PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
+    }
+
+    /** Evaluates whether a {@link ServiceBindingEdge} propagates CPU time capabilities. */
+    private static @ProcessCapability int evaluateCpuTimePolicy(@NonNull ServiceBindingEdge edge) {
+        // LINT.IfChange(getCpuTimeFilterFromTransmissionType)
+        return edge.getCpuTimeTransmissionType() == CPU_TIME_TRANSMISSION_NONE
+                ? PROCESS_CAPABILITY_NONE : ALL_CPU_TIME_CAPABILITIES;
+        // LINT.ThenChange(OomAdjuster.java:getCpuCapabilitiesFromTransmissionType)
     }
 
     /** Performs a partial update from a list of edges. */

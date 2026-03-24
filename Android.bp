@@ -109,6 +109,7 @@ filegroup {
         ":android.hardware.radio.data-V5-java-source",
         ":android.hardware.radio.network-V5-java-source",
         ":android.hardware.radio.voice-V5-java-source",
+        ":android.hardware.security.keymint-V5-java-source",
         ":android.hardware.security.secureclock-V1-java-source",
         ":android.hardware.thermal-V3-java-source",
         ":android.hardware.tv.tuner-V3-java-source",
@@ -117,6 +118,7 @@ filegroup {
         ":android.security.legacykeystore-java-source",
         ":android.security.maintenance-java-source",
         ":android.security.metrics-java-source",
+        ":android.system.keystore2-V6-java-source",
         ":android.hardware.cas-V1-java-source",
         ":credstore_aidl",
         ":dumpstate_aidl",
@@ -149,17 +151,7 @@ filegroup {
         ":statslog-framework-java-gen", // FrameworkStatsLog.java
         ":statslog-hwui-java-gen", // HwuiStatsLog.java
         ":audio_policy_configuration_V7_0",
-    ] + select(release_flag("RELEASE_AIDL_USE_UNFROZEN"), {
-        // TODO(b/462036047): remove switch when HALs are re-frozen
-        true: [
-            ":android.hardware.security.keymint-V5-java-source",
-            ":android.system.keystore2-V6-java-source",
-        ],
-        default: [
-            ":android.hardware.security.keymint-V4-java-source",
-            ":android.system.keystore2-V5-java-source",
-        ],
-    }),
+    ],
 }
 
 java_library {
@@ -287,6 +279,7 @@ soong_config_module_type_import {
 java_defaults {
     name: "framework-minus-apex-defaults",
     defaults: [
+        "android-api-contributor-defaults",
         "framework-aidl-export-defaults",
         "latest_android_hardware_soundtrigger3_java_static",
         "framework-minus-apex-aconfig-libraries",
@@ -443,6 +436,7 @@ java_defaults {
         "modules-utils-os",
         "modules-utils-ravenwood",
         "modules-utils-uieventlogger-interface",
+        "modules-utils-xml",
         "framework-permission-aidl-java",
         "spatializer-aidl-java",
         "audiopolicy-aidl-java",
@@ -794,6 +788,7 @@ filegroup {
         ":framework-non-updatable-sources",
         ":opt-telephony-srcs",
         ":opt-net-voip-srcs",
+        ":modules-utils-xml-shared-srcs",
         "core/java/**/*.logtags",
         "**/package.html",
     ],

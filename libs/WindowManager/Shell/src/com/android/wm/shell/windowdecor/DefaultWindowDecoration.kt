@@ -39,7 +39,6 @@ import android.view.MotionEvent
 import android.view.SurfaceControl
 import android.view.View.OnGenericMotionListener
 import android.view.View.OnLongClickListener
-import android.view.View.OnTouchListener
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY
@@ -64,9 +63,11 @@ import com.android.wm.shell.common.MultiInstanceHelper
 import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.common.SyncTransactionQueue
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
+import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
+import com.android.wm.shell.recents.PerDisplayRecentsTransitionStateListener
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.annotations.ShellMainThreadImmediate
@@ -140,6 +141,7 @@ constructor(
     private val appToWebRepository: AppToWebRepository,
     private val captionVisibilityHelper: CaptionVisibilityHelper,
     private val focusTransitionObserver: FocusTransitionObserver,
+    private val recentsTransitionStateListener: PerDisplayRecentsTransitionStateListener,
     private val windowManagerWrapper: WindowManagerWrapper =
         WindowManagerWrapper(context.getSystemService(WindowManager::class.java)),
     private val surfaceControlBuilderSupplier: () -> SurfaceControl.Builder = {
@@ -156,6 +158,7 @@ constructor(
     private val appHeaderViewHolderFactory: AppHeaderViewHolder.Factory =
         AppHeaderViewHolder.DefaultFactory(),
     val pinnedLayerController: PinnedLayerController?,
+    private val desktopTasksController: DesktopTasksController,
 ) :
     WindowDecoration2<WindowDecorLinearLayout>(
         taskInfo,
@@ -168,7 +171,7 @@ constructor(
         mainScope,
         transitions,
     ) {
-    private lateinit var onTouchListener: OnTouchListener
+    private lateinit var gestureInterceptor: WindowDecorLinearLayout.GestureInterceptor
     private lateinit var onLongClickListener: OnLongClickListener
     private lateinit var onGenericMotionListener: OnGenericMotionListener
     private lateinit var exclusionRegionListener: ExclusionRegionListener
@@ -240,11 +243,10 @@ constructor(
      * corner radius of its task surfaces, so each window decoration should stop updating the corner
      * radius of its task surface during that time.
      */
-    var isRecentsTransitionRunning = false
-        set(running) {
-            field = running
-            captionController?.isRecentsTransitionRunning = running
-        }
+    private val isRecentsTransitionRunning
+        get() =
+            display?.let { recentsTransitionStateListener.isRecentsAnimationActive(it.displayId) }
+                ?: false
 
     /** Adds the [dragResizeListener] which gets notified on the task being drag resized. */
     fun addDragResizeListener(dragResizeListener: DragEventListener?) {
@@ -258,11 +260,11 @@ constructor(
 
     /** Set the listeners for the decorations. */
     fun setListeners(
-        onTouchListener: OnTouchListener,
+        gestureInterceptor: WindowDecorLinearLayout.GestureInterceptor,
         onLongClickListener: OnLongClickListener,
         onGenericMotionListener: OnGenericMotionListener,
     ) {
-        this.onTouchListener = onTouchListener
+        this.gestureInterceptor = gestureInterceptor
         this.onLongClickListener = onLongClickListener
         this.onGenericMotionListener = onGenericMotionListener
     }
@@ -435,10 +437,13 @@ constructor(
                 Trace.endSection()
             }
 
-            decorationContainerSurface?.let {
+            if (DesktopExperienceFlags.ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS.isTrue) {
                 updateDragResizeListenerIfNeeded(oldDecorationSurface)
+            } else {
+                decorationContainerSurface?.let {
+                    updateDragResizeListenerIfNeeded(oldDecorationSurface)
+                }
             }
-
             updateOpenByDefaultFirstRunPromptIfNeeded(configChanged, taskInfo)
         }
 
@@ -570,6 +575,16 @@ constructor(
         // windowing with non-fullscreen bounds
         val shouldUpdateTaskSurfaceOutline = taskInfo.isFreeform && !inFullImmersive
 
+        // Decoration container surface is needed if (1) caption should be attached to task or
+        // (2) task is drag resizable, requiring a DragResizeInputListener
+        val isDecorationSurfaceNeeded =
+            if (DesktopExperienceFlags.ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS.isTrue) {
+                captionType != CaptionController.CaptionType.NO_CAPTION ||
+                    taskInfo.isDragResizable(inFullImmersive)
+            } else {
+                true
+            }
+
         return RelayoutParams(
             runningTaskInfo = taskInfo,
             captionType = captionType,
@@ -591,6 +606,7 @@ constructor(
             shouldSetBackground = shouldSetBackground,
             shouldUpdateTaskSurfaceOutline = shouldUpdateTaskSurfaceOutline,
             inSyncWithTransition = inSyncWithTransition,
+            isDecorationSurfaceNeeded = isDecorationSurfaceNeeded,
         )
     }
 
@@ -716,7 +732,7 @@ constructor(
     @Deprecated("Use shouldShowCaption(taskInfo)")
     private fun shouldShowCaption(taskInfo: RunningTaskInfo, isTaskLocked: Boolean): Boolean {
         var showCaption: Boolean
-        if (DesktopModeFlags.ENABLE_DESKTOP_IMMERSIVE_DRAG_BUGFIX.isTrue && isDragging) {
+        if (isDragging) {
             // If the task is being dragged, the caption should not be hidden so that it continues
             // receiving input
             showCaption = true
@@ -746,13 +762,9 @@ constructor(
         return showCaption
     }
 
-    private fun updateDragResizeListenerIfNeeded(containerSurface: SurfaceControl?) {
+    private fun updateDragResizeListenerIfNeeded(prevContainerSurface: SurfaceControl?) {
         val taskPositionChanged = !taskInfo.positionInParent.equals(taskPositionInParent)
-        if (
-            !taskInfo.isDragResizable(inFullImmersive) ||
-                !taskInfo.isVisibleRequested ||
-                !taskInfo.isFreeform
-        ) {
+        if (!taskInfo.isDragResizable(inFullImmersive)) {
             closeDragResizeListener()
             if (taskPositionChanged) {
                 // We still want to track caption bar's exclusion region on a non-resizeable task.
@@ -760,7 +772,7 @@ constructor(
             }
             return
         }
-        updateDragResizeListener(containerSurface) { geometryChanged ->
+        updateDragResizeListener(prevContainerSurface) { geometryChanged ->
             if (geometryChanged || taskPositionChanged) {
                 updateExclusionRegion()
             }
@@ -768,10 +780,10 @@ constructor(
     }
 
     private fun updateDragResizeListener(
-        containerSurface: SurfaceControl?,
+        prevContainerSurface: SurfaceControl?,
         onUpdateFinished: (Boolean) -> Unit,
     ) {
-        val containerSurfaceChanged = containerSurface != decorationContainerSurface
+        val containerSurfaceChanged = prevContainerSurface != decorationContainerSurface
         if (containerSurfaceChanged) {
             closeDragResizeListener()
         }
@@ -786,12 +798,16 @@ constructor(
                     handler,
                     choreographer,
                     checkNotNull(display?.displayId) { "expected non-null display" },
-                    checkNotNull(decorationContainerSurface),
+                    checkNotNull(decorationContainerSurface) {
+                        "Expected non-null decoration container surface"
+                    },
                     dragPositioningCallback,
                     surfaceControlBuilderSupplier,
                     surfaceControlTransactionSupplier,
                     displayController,
-                )
+                ) {
+                    captionController?.injectMotionEvent(it)
+                }
         val touchSlop = ViewConfiguration.get(decorWindowContext).scaledTouchSlop
         val res = decorWindowContext.resources
         val newGeometry =
@@ -1057,7 +1073,7 @@ constructor(
                     desktopState = desktopState,
                     windowDecorationActions = windowDecorationActions,
                     decorWindowContext = decorWindowContext,
-                    onCaptionTouchListener = onTouchListener,
+                    gestureInterceptor = gestureInterceptor,
                     onLongClickListener = onLongClickListener,
                     onCaptionGenericMotionListener = onGenericMotionListener,
                     appToWebRepository = appToWebRepository,
@@ -1092,8 +1108,12 @@ constructor(
                     desktopState,
                     windowDecorationActions,
                     decorWindowContext,
-                    onTouchListener,
+                    gestureInterceptor,
                     appToWebRepository,
+                    recentsTransitionStateListener,
+                    focusTransitionObserver,
+                    pinnedLayerController,
+                    desktopTasksController,
                 )
             }
 
@@ -1103,7 +1123,7 @@ constructor(
                     windowDecorViewHostSupplier,
                     decorWindowContext,
                     displayController,
-                    onTouchListener = onTouchListener,
+                    onTouchListener = gestureInterceptor,
                     onGenericMotionEventListener = onGenericMotionListener,
                     windowDecorationActions,
                     taskResourceLoader,

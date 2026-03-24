@@ -369,6 +369,14 @@ object KeyGestureTestData {
                 KeyEvent.META_META_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
             ),
+            KeyGestureData(
+                "CONTEXTUAL_SEARCH -> Contextual Search",
+                intArrayOf(KeyEvent.KEYCODE_CONTEXTUAL_SEARCH),
+                KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_CONTEXTUAL_SEARCH,
+                intArrayOf(KeyEvent.KEYCODE_CONTEXTUAL_SEARCH),
+                0,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
         )
 
     // All Key gestures that can be captured by the focused window (and should not happen in
@@ -429,6 +437,18 @@ object KeyGestureTestData {
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
             ),
             KeyGestureData(
+                "META + SHIFT + F23 -> Launch Assistant",
+                intArrayOf(
+                    KeyEvent.KEYCODE_META_LEFT,
+                    KeyEvent.KEYCODE_SHIFT_LEFT,
+                    KeyEvent.KEYCODE_F23,
+                ),
+                KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_ASSISTANT,
+                intArrayOf(KeyEvent.KEYCODE_F23),
+                KeyEvent.META_META_ON or KeyEvent.META_SHIFT_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
+            KeyGestureData(
                 "META + I -> Launch System Settings",
                 intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_I),
                 KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_SYSTEM_SETTINGS,
@@ -465,6 +485,14 @@ object KeyGestureTestData {
                 intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_A),
                 KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_CONTEXTUAL_SEARCH,
                 intArrayOf(KeyEvent.KEYCODE_A),
+                KeyEvent.META_META_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
+            KeyGestureData(
+                "META + G -> Contextual Cursor",
+                intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_G),
+                KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_CONTEXTUAL_CURSOR,
+                intArrayOf(KeyEvent.KEYCODE_G),
                 KeyEvent.META_META_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
             ),

@@ -356,7 +356,7 @@ public class Component extends PaintOperation
      *
      * @return the width in pixels
      */
-    public float minIntrinsicWidth(@Nullable RemoteContext context) {
+    public float minIntrinsicWidth(@NonNull RemoteContext context) {
         return getWidth();
     }
 
@@ -365,7 +365,7 @@ public class Component extends PaintOperation
      *
      * @return the width in pixels
      */
-    public float maxIntrinsicWidth(@Nullable RemoteContext context) {
+    public float maxIntrinsicWidth(@NonNull RemoteContext context) {
         return getWidth();
     }
 
@@ -374,7 +374,7 @@ public class Component extends PaintOperation
      *
      * @return the height in pixels
      */
-    public float minIntrinsicHeight(@Nullable RemoteContext context) {
+    public float minIntrinsicHeight(@NonNull RemoteContext context) {
         return getHeight();
     }
 
@@ -383,7 +383,7 @@ public class Component extends PaintOperation
      *
      * @return the height in pixels
      */
-    public float maxIntrinsicHeight(@Nullable RemoteContext context) {
+    public float maxIntrinsicHeight(@NonNull RemoteContext context) {
         return getHeight();
     }
 
@@ -609,6 +609,18 @@ public class Component extends PaintOperation
         m.setH(mHeight);
     }
 
+    /**
+     * Apply the measurement to the component.
+     * @param m the ComponentMeasure to apply
+     */
+    public void applyMeasure(@NonNull ComponentMeasure m) {
+        mWidth = m.getW();
+        mHeight = m.getH();
+        mX = m.getX();
+        mY = m.getY();
+        mVisibility = m.getVisibility();
+    }
+
     @Override
     public void layout(@NonNull RemoteContext context, @NonNull MeasurePass measure) {
         ComponentMeasure m = measure.get(this);
@@ -643,15 +655,11 @@ public class Component extends PaintOperation
                                     mAnimationSpec.getVisibilityEasingType());
                 }
             } else {
-                mAnimateMeasure.updateTarget(m, context.currentTime);
+                mAnimateMeasure.updateTarget(context, m, context.currentTime);
             }
-        } else {
-            mVisibility = m.getVisibility();
         }
         if (mAnimateMeasure == null) {
-            setWidth(m.getW());
-            setHeight(m.getH());
-            setLayoutPosition(m.getX(), m.getY());
+            applyMeasure(m);
             updateComponentValues(context);
             clearNeedsBoundsAnimation();
         } else {

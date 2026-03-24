@@ -51,6 +51,7 @@ import static org.xmlpull.v1.XmlPullParser.START_TAG;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
@@ -490,6 +491,8 @@ class StorageManagerService extends IStorageManager.Stub
 
     private volatile int mMediaStoreAuthorityAppId = -1;
 
+    private volatile String mMediaStorePackageName;
+
     private volatile int mDownloadsAuthorityAppId = -1;
 
     private volatile int mExternalStorageAuthorityAppId = -1;
@@ -497,6 +500,11 @@ class StorageManagerService extends IStorageManager.Stub
     private volatile int mCurrentUserId = UserHandle.USER_SYSTEM;
 
     private volatile boolean mRemountCurrentUserVolumesOnUnlock = false;
+
+    @GuardedBy("mLock")
+    private boolean mCheckpointReady = false;
+    @GuardedBy("mLock")
+    private List<Runnable> mOnCheckpointSyncCallbacks = null;
 
     private final Installer mInstaller;
 
@@ -581,6 +589,11 @@ class StorageManagerService extends IStorageManager.Stub
             }
             return latch;
         }
+    }
+
+    @VisibleForTesting
+    IVold getVold() {
+        return mVold;
     }
 
     private final Context mContext;
@@ -982,7 +995,7 @@ class StorageManagerService extends IStorageManager.Stub
         configureTranscoding();
 
         // Guard the new feature call with the aflag
-        if (Flags.enableFilesystemConfiguration()) {
+        if (Flags.enableFilesystemConfigurationV2()) {
             Slog.i(TAG, "Filesystem configuration feature is enabled");
             configureFilesystem();
         } else {
@@ -2189,6 +2202,7 @@ class StorageManagerService extends IStorageManager.Stub
         ProviderInfo provider = getProviderInfo(MediaStore.AUTHORITY);
         if (provider != null) {
             mMediaStoreAuthorityAppId = UserHandle.getAppId(provider.getUid());
+            mMediaStorePackageName = provider.packageName;
             sMediaStoreAuthorityProcessName = provider.applicationInfo.processName;
         }
 
@@ -3891,8 +3905,9 @@ class StorageManagerService extends IStorageManager.Stub
         // should never attempt to augment the actual storage volume state,
         // otherwise we risk confusing it with race conditions as users go
         // through various unlocked states
-        final boolean callerIsMediaStore = UserHandle.isSameApp(callingUid,
-                mMediaStoreAuthorityAppId);
+        final boolean callerIsMediaStore = (mMediaStorePackageName != null)
+                && mPmInternal.isSameApp(mMediaStorePackageName, callingUid,
+                        UserHandle.getUserId(callingUid));
 
         // Only Apps with MANAGE_EXTERNAL_STORAGE should call the API with includeSharedProfile
         if (includeSharedProfile) {
@@ -5192,5 +5207,77 @@ class StorageManagerService extends IStorageManager.Stub
                 throw new IOException(e);
             }
         }
+
+        @RequiresPermission(android.Manifest.permission.MOUNT_FORMAT_FILESYSTEMS)
+        @Override
+        public boolean waitForCheckpointReady(Runnable onSyncReady) {
+            return StorageManagerService.this.waitForCheckpointReady(onSyncReady);
+        }
+    }
+
+    @RequiresPermission(android.Manifest.permission.MOUNT_FORMAT_FILESYSTEMS)
+    boolean waitForCheckpointReady(Runnable onSyncReady) {
+        synchronized (mLock) {
+            if (mCheckpointReady) {
+                return false;
+            }
+        }
+
+        try {
+            String cpCommitted = SystemProperties.get("vold.checkpoint_committed", "0");
+            if (!needsCheckpoint() || "1".equals(cpCommitted)) {
+                synchronized (mLock) {
+                    mCheckpointReady = true;
+                }
+                return false;
+            }
+        } catch (RemoteException e) {
+            synchronized (mLock) {
+                mCheckpointReady = true;
+            }
+            return false;
+        }
+
+        synchronized (mLock) {
+            if (mOnCheckpointSyncCallbacks != null) {
+                if (onSyncReady != null) {
+                    mOnCheckpointSyncCallbacks.add(onSyncReady);
+                }
+                return true;
+            }
+
+            mOnCheckpointSyncCallbacks = new ArrayList<>();
+            if (onSyncReady != null) {
+                mOnCheckpointSyncCallbacks.add(onSyncReady);
+            }
+        }
+
+        BackgroundThread.getHandler().post(() -> {
+            try {
+                Slog.i(TAG, "Start syncing storage via vold");
+                getVold().syncStorage();
+            } catch (Exception e) {
+                Slog.w(TAG, "Failed to sync storage", e);
+            }
+            final List<Runnable> callbacks;
+            synchronized (mLock) {
+                mCheckpointReady = true;
+                callbacks = getAndClearCheckpointCallbacksLocked();
+            }
+            if (callbacks != null) {
+                for (Runnable callback : callbacks) {
+                    BackgroundThread.getHandler().post(callback);
+                }
+            }
+        });
+
+        return true;
+    }
+
+    @GuardedBy("mLock")
+    private List<Runnable> getAndClearCheckpointCallbacksLocked() {
+        final List<Runnable> callbacks = mOnCheckpointSyncCallbacks;
+        mOnCheckpointSyncCallbacks = null;
+        return callbacks;
     }
 }

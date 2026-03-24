@@ -22,6 +22,21 @@ import android.os.Bundle
 import androidx.annotation.AnyThread
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import com.android.settingslib.metadata.preferencesapi.ApiPreference
+import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen
+
+/** Indicates how sensitive of the data. */
+@Retention(AnnotationRetention.SOURCE)
+@Target(AnnotationTarget.TYPE)
+annotation class SensitivityLevel {
+    companion object {
+        const val DO_NOT_EXPOSE = 0
+        const val NO_SENSITIVITY = 1
+        const val MUST_PROVIDE_UNDO = 2
+        const val REQUIRES_CONFIRMATION = 3
+        const val DEEP_LINK_ONLY = 4
+    }
+}
 
 /**
  * Interface provides preference metadata (title, summary, icon, etc.).
@@ -65,8 +80,8 @@ interface PreferenceMetadata {
     /**
      * The purpose of the preference. This string should be understandable in English without
      * additional context beyond the rest of the preference definition. It should not just repeat
-     * the name of the preference. For example, if the preference name is "enable airplane mode"
-     * the purpose may be "Controls airplane mode. When enabled this will turn off all wireless
+     * the name of the preference. For example, if the preference name is "enable airplane mode" the
+     * purpose may be "Controls airplane mode. When enabled this will turn off all wireless
      * communications on the device.".
      *
      * When this preference is parameterised, the purpose must be understandable regardless of
@@ -87,6 +102,10 @@ interface PreferenceMetadata {
      */
     val title: Int
         @StringRes get() = 0
+
+    /** The sensitivity level of the preference. */
+    val sensitivityLevel: @SensitivityLevel Int
+        get() = SensitivityLevel.DO_NOT_EXPOSE
 
     /**
      * Preference summary resource id.
@@ -194,9 +213,90 @@ interface PreferenceGroup : PreferenceMetadata {
 
 /** Metadata of preference category. */
 @AnyThread
-open class PreferenceCategory(override val key: String, override val purpose: Int, override val title: Int) : PreferenceGroup {
+open class PreferenceCategory(
+    override val key: String,
+    override val purpose: Int,
+    override val title: Int,
+) : PreferenceGroup {
     override fun tags(context: Context) = arrayOf(UI_ONLY_PREFERENCE)
 }
 
-/** Tag representing a preference that is ui only*/
-const val UI_ONLY_PREFERENCE="ui_only_preference"
+/** Tag representing a preference that is ui only */
+const val UI_ONLY_PREFERENCE = "ui_only_preference"
+
+/**
+ * Tag representing a pure metadata object in a UI screen.
+ *
+ * Marking a preference with this tag will prevent it from being bound to a UI object, thus allowing
+ * for adding pure metadata objects in a fully migrated to the UI screen.
+ */
+const val METADATA_IN_UI="metadata_in_ui"
+
+/** Tag representing a preference that is considered `hero` and must be gettable*/
+const val HERO = "hero"
+
+/** Tag representing a preference that is considered `hero` and must be gettable and settable*/
+const val HERO_SET = "hero_set"
+
+/** Tag representing a preference that is considered `must pass` and must be gettable*/
+const val MUSTPASS = "mustpass"
+
+/** Tag representing a preference that is considered `must pass` and must be gettable and settable*/
+const val MUSTPASS_SET = "mustpass_set"
+
+/** Returns a string describing the preconditions for accessing the preference. */
+fun PreferenceMetadata.accessPreconditionsAsString(context: Context): String? {
+    val preconditions =
+        if (this is ApiPreference<*>) {
+            listOfNotNull(
+                    screenPreconditions?.getDescription(context),
+                    preconditions?.getDescription(context),
+                )
+                .joinToString(", ")
+        } else if (this is PreferencesApiScreen) {
+            screenPreconditions?.getDescription(context) ?: ""
+        } else {
+            ""
+        }
+
+    return if (preconditions.isEmpty()) null else "Preconditions to accessing: $preconditions."
+}
+
+/** Returns a string describing the preconditions for reading the preference. */
+fun PreferenceMetadata.getPreconditionsAsString(context: Context): String? {
+    return (this as? ApiPreference<*>)?.get?.preconditions?.getDescription(context)?.let {
+        "Preconditions to reading: $it."
+    }
+}
+
+/** Returns a string describing the preconditions for writing the preference. */
+fun PreferenceMetadata.setPreconditionsAsString(context: Context): String? {
+    return (this as? ApiPreference<*>)?.set?.preconditions?.getDescription(context)?.let {
+        "Preconditions to writing: $it."
+    }
+}
+
+/** Returns a string describing the warning for writing the preference. */
+fun PreferenceMetadata.setWarningAsString(context: Context): String? {
+    return (this as? ApiPreference<*>)?.set?.warning?.let { warningConfig ->
+        val warningMessage = warningConfig.getWarning(context)
+
+        val preconditionsDescription = when {
+            warningConfig.preconditions != null ->
+                warningConfig.preconditions.getDescription(context)
+
+            warningConfig.valuePreconditions != null ->
+                warningConfig.valuePreconditions.getDescription(context)
+
+            else -> null
+        }
+
+        // Compute the set warning as a string message
+        val conditionalText =
+            preconditionsDescription?.takeIf { it.isNotBlank() }?.let { description ->
+                " if preconditions are met: $description"
+            } ?: ""
+
+        "Warning before writing: $warningMessage (must be shown$conditionalText)."
+    }
+}

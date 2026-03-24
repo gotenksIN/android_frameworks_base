@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.am;
@@ -184,6 +188,7 @@ import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
+import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 import com.android.server.wm.WindowManagerService;
 import com.android.server.wm.WindowProcessController;
@@ -293,6 +298,7 @@ public final class ProcessList extends ProcessListInternal
     // LMK_START_MONITORING
     // LMK_BOOT_COMPLETED
     // LMK_PROCS_PRIO
+    // LMK_UPDATE_LAZY_KILL_FLAG
     static final byte LMK_TARGET = 0;
     static final byte LMK_PROCPRIO = 1;
     static final byte LMK_PROCREMOVE = 2;
@@ -305,6 +311,7 @@ public final class ProcessList extends ProcessListInternal
     static final byte LMK_START_MONITORING = 9; // Start monitoring if delayed earlier
     static final byte LMK_BOOT_COMPLETED = 10;
     static final byte LMK_PROCS_PRIO = 11;  // Batch option for LMK_PROCPRIO
+    static final byte LMK_UPDATE_LAZY_KILL_FLAG = 12;
 
     // Low Memory Killer Daemon command codes.
     // These must be kept in sync with async_event_type definitions in lmkd.h
@@ -834,6 +841,18 @@ public final class ProcessList extends ProcessListInternal
      */
     ImperceptibleKillRunner mImperceptibleKillRunner;
 
+    private PccSandboxManagerInternal mPccSandboxManagerInternal;
+
+    private PccSandboxManagerInternal getPccSandboxManagerInternal() {
+        synchronized (mService) {
+            if (mPccSandboxManagerInternal == null && enablePccFrameworkSupport()) {
+                mPccSandboxManagerInternal = LocalServices.getService(
+                        PccSandboxManagerInternal.class);
+            }
+            return mPccSandboxManagerInternal;
+        }
+    }
+
     ////////////////////  END FIELDS  ////////////////////
 
     ProcessList() {
@@ -1227,17 +1246,6 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
-    // write a process capabilities to the proto
-    private static void writeProcessCapabilitiesListToProto(ProtoOutputStream proto, int cap) {
-        for (int i = 0; i < 32; i++) {
-            final int capability = 1 << i;
-            if ((cap & capability) != 0) {
-                final int protoCapability = ActivityManager.processCapabilityAmToProto(capability);
-                proto.write(ProcessOomProto.Detail.CAPABILITY_FLAGS, protoCapability);
-            }
-        }
-    }
-
     public static void appendRamKb(StringBuilder sb, long ramKb) {
         for (int j = 0, fact = 10; j < 6; j++, fact *= 10) {
             if (ramKb < fact) {
@@ -1320,7 +1328,8 @@ public final class ProcessList extends ProcessListInternal
     public static final int PROC_MEM_CACHED = 4;
     public static final int PROC_MEM_NUM = 5;
 
-    // Map large set of system process states to
+    // Map large set of system process states to memory.
+    // LINT.IfChange(process_state_to_memory)
     private static final int[] sProcStateToProcMem = new int[] {
         PROC_MEM_PERSISTENT,            // ActivityManager.PROCESS_STATE_PERSISTENT
         PROC_MEM_PERSISTENT,            // ActivityManager.PROCESS_STATE_PERSISTENT_UI
@@ -1342,6 +1351,7 @@ public final class ProcessList extends ProcessListInternal
         PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_CACHED_ACTIVITY_CLIENT
         PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_CACHED_RECENT
         PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_CACHED_EMPTY
+        PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_NONEXISTENT
     };
 
     private static final long[] sFirstAwakePssTimes = new long[] {
@@ -1391,6 +1401,7 @@ public final class ProcessList extends ProcessListInternal
         PSS_TEST_SAME_BACKGROUND_INTERVAL,  // PROC_MEM_SERVICE
         PSS_TEST_SAME_BACKGROUND_INTERVAL,  // PROC_MEM_CACHED
     };
+    // LINT.ThenChange()
 
     public static final class ProcStateMemTracker {
         final int[] mHighestMem = new int[PROC_MEM_NUM];
@@ -1544,12 +1555,15 @@ public final class ProcessList extends ProcessListInternal
      * @param pid The process identifier to set.
      * @param uid The uid of the app
      * @param amt Adjustment value -- lmkd allows -1000 to +1000
-     * @param isSystemApp Whether the app is a system app or not.
-     * @param isMainProc Whether the app is a main process or not.
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+     * @param weight Process weight
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
      *
      * {@hide}
      */
-    public static void setOomAdjExt(int pid, int uid, int amt, int isSystemApp, int isMainProc) {
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+    public static void setOomAdjExt(int pid, int uid, int amt, int weight) {
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         // This indicates that the process is not started yet and so no need to proceed further.
         if (pid <= 0) {
             return;
@@ -1558,13 +1572,16 @@ public final class ProcessList extends ProcessListInternal
             return;
 
         long start = SystemClock.elapsedRealtime();
-        ByteBuffer buf = ByteBuffer.allocate(4 * 6);
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+        ByteBuffer buf = ByteBuffer.allocate(4 * 5);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         buf.putInt(LMK_PROCPRIO);
         buf.putInt(pid);
         buf.putInt(uid);
         buf.putInt(amt);
-        buf.putInt(isSystemApp);
-        buf.putInt(isMainProc);
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+        buf.putInt(weight);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         writeLmkd(buf, null);
         long now = SystemClock.elapsedRealtime();
         if ((now-start) > 250) {
@@ -1574,7 +1591,6 @@ public final class ProcessList extends ProcessListInternal
     }
 
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-
     // The max size for PROCS_PRIO cmd in LMKD
     private static final int MAX_PROCS_PRIO_PACKET_SIZE = 3;
 
@@ -1623,27 +1639,33 @@ public final class ProcessList extends ProcessListInternal
      * Set the out-of-memory badness adjustment for a list of processes.
      *
      * @param apps App list to adjust their respective oom score.
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+     * @param weights App weights to be used for the lmkd.
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
      *
      * {@hide}
      */
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-    public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps) {
+    public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps,
+                ArrayList<Integer> weights) {
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
         }
 
-        final int MAX_OOM_ADJ_BATCH_LENGTH = ((4 * 6) * MAX_PROCS_PRIO_PACKET_SIZE) + 4;
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+        final int MAX_OOM_ADJ_BATCH_LENGTH = ((4 * 5) * MAX_PROCS_PRIO_PACKET_SIZE) + 4;
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         ByteBuffer buf = ByteBuffer.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
         int total_procs_in_buf = 0;
         buf.putInt(LMK_PROCS_PRIO);
         for (int i = 0; i < totalApps; i++) {
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            final ProcessRecord app = (ProcessRecord) apps.get(i);
-            final int pid = app.getPid();
-            final int amt = app.getCurAdj();
-            final int uid = app.uid;
+            final int pid = apps.get(i).getPid();
+            final int amt = apps.get(i).getCurAdj();
+            final int uid = apps.get(i).uid;
+            final int weight = weights.get(i);
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
@@ -1653,25 +1675,12 @@ public final class ProcessList extends ProcessListInternal
                 buf.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
                 buf.putInt(LMK_PROCS_PRIO);
             }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            String packageName = app.info.packageName;
-            String processName = app.processName;
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            int isMainProc = 0;
-            int isSystemApp = 0;
-            if (packageName.equals(processName)) {
-                isMainProc = 1;
-            }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            if (app.info.isSystemApp()) {
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-                isSystemApp = 1;
-            }
             buf.putInt(pid);
             buf.putInt(uid);
             buf.putInt(amt);
-            buf.putInt(isSystemApp);
-            buf.putInt(isMainProc);
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+            buf.putInt(weight);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
@@ -1690,6 +1699,23 @@ public final class ProcessList extends ProcessListInternal
         ByteBuffer buf = ByteBuffer.allocate(4 * 2);
         buf.putInt(LMK_PROCREMOVE);
         buf.putInt(pid);
+        writeLmkd(buf, null);
+    }
+
+    /**
+     * Update the Lazy Kill flag for the Low Memory Killer (LMK) daemon.
+     * This function enables or disables the lazy kill mechanism that controls
+     * how aggressively the system terminates processes during memory pressure,
+     * specifically affecting UI process handling.
+     *
+     * @param enable true to enable lazy kill for UI processes, false to disable it
+     *
+     * {@hide}
+     */
+    public static void updateLmkLazyKillFLag(boolean enable) {
+        ByteBuffer buf = ByteBuffer.allocate(4 * 2);
+        buf.putInt(LMK_UPDATE_LAZY_KILL_FLAG);
+        buf.putInt(enable ? 1 : 0);
         writeLmkd(buf, null);
     }
 
@@ -2231,9 +2257,11 @@ public final class ProcessList extends ProcessListInternal
                     + " with non-zero pid:" + app.getPid());
         }
         app.setDisabledCompatChanges(null);
+        app.setEnabledCompatChanges(null);
         app.setLoggableCompatChanges(null);
         if (mPlatformCompat != null) {
             app.setDisabledCompatChanges(mPlatformCompat.getDisabledChanges(app.info));
+            app.setEnabledCompatChanges(mPlatformCompat.getEnabledChanges(app.info));
             app.setLoggableCompatChanges(mPlatformCompat.getLoggableChanges(app.info));
             app.setLogChangeChecksToStatsD(mPlatformCompat.isLogChangeChecksToStatsd());
         }
@@ -2707,7 +2735,8 @@ public final class ProcessList extends ProcessListInternal
                         app.processName, uid, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, null, app.info.packageName,
-                        app.getDisabledCompatChanges(), useDeliQueue, app.getStartSeq(),
+                        app.getDisabledCompatChanges(), app.getEnabledCompatChanges(),
+                        useDeliQueue, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else if (hostingRecord.usesAppZygote()) {
                 final AppZygote appZygote = createAppZygoteForProcessIfNeeded(app);
@@ -2728,7 +2757,8 @@ public final class ProcessList extends ProcessListInternal
                         app.processName, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, app.info.packageName, isTopApp,
-                        app.getDisabledCompatChanges(), useDeliQueue, pkgDataInfoMap,
+                        app.getDisabledCompatChanges(), app.getEnabledCompatChanges(),
+                        useDeliQueue, pkgDataInfoMap,
                         allowlistedAppDataInfoMap, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else {
@@ -2737,7 +2767,8 @@ public final class ProcessList extends ProcessListInternal
                         app.processName, uid, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, invokeWith, app.info.packageName, zygotePolicyFlags,
-                        isTopApp, app.getDisabledCompatChanges(), useDeliQueue, pkgDataInfoMap,
+                        isTopApp, app.getDisabledCompatChanges(), app.getEnabledCompatChanges(),
+                        useDeliQueue, pkgDataInfoMap,
                         allowlistedAppDataInfoMap, bindMountAppsData, bindMountAppStorageDirs,
                         bindOverrideSysprops, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
@@ -2832,10 +2863,29 @@ public final class ProcessList extends ProcessListInternal
             int zygotePolicyFlags, boolean allowWhileBooting, boolean isolated, int isolatedUid,
             boolean isSdkSandbox, int sdkSandboxUid, String sdkSandboxClientAppPackage,
             String abiOverride, String entryPoint, String[] entryPointArgs, Runnable crashHandler) {
+        if (QtiBackgroundManager.getInstance().shouldPreventProcessStart(processName, info)) {
+                return null;
+        }
+
         long startTime = SystemClock.uptimeMillis();
         final long startTimeNs = SystemClock.elapsedRealtimeNanos();
         ProcessRecord app;
         final int uid = hostingRecord.isPcc() ? info.pccUid : info.uid;
+        if (enablePccFrameworkSupport() && Process.isPrivateComputeCoreUid(uid)) {
+            PccSandboxManagerInternal pccSandboxManager = getPccSandboxManagerInternal();
+            if (pccSandboxManager == null) {
+                Slog.wtf(TAG, "PccSandboxManagerInternal is null but PCC framework support"
+                        + " is enabled");
+                return null;
+            }
+            if (!pccSandboxManager.isPccAllowedPackage(info.packageName,
+                    UserHandle.getUserId(uid))) {
+                Slog.w(TAG, "Denying process start for " + info.packageName
+                        + " with PCC UID " + uid + " as it is not an allowed package");
+                return null;
+            }
+        }
+
         if (!isolated) {
             app = getProcessRecordLocked(processName, uid);
             checkSlow(startTime, "startProcess: after getProcessRecord");
@@ -4443,7 +4493,7 @@ public final class ProcessList extends ProcessListInternal
         }
         outInfo.lastTrimLevel = app.mProfile.getTrimMemoryLevel();
         final ProcessRecordInternal state = app;
-        final int procState = state.getCurProcState();
+        final int procState = state.getProcState();
         outInfo.importance = ActivityManager.RunningAppProcessInfo
                                 .procStateToImportanceForTargetSdk(procState, clientTargetSdk);
         if (outInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_BACKGROUND) {
@@ -4618,7 +4668,7 @@ public final class ProcessList extends ProcessListInternal
         pw.print(": ");
         pw.print(makeOomAdjString(proc.getSetAdj(), false));
         pw.print(' ');
-        pw.print(makeProcStateString(proc.getCurProcState()));
+        pw.print(makeProcStateString(proc.getProcState()));
         pw.print(' ');
         ActivityManager.printCapabilitiesSummary(pw, proc.getCurCapability());
         pw.print(' ');
@@ -4943,7 +4993,7 @@ public final class ProcessList extends ProcessListInternal
                 proto.write(ProcessOomProto.SERVICES, true);
             }
             proto.write(ProcessOomProto.STATE,
-                    makeProcStateProtoEnum(state.getCurProcState()));
+                    makeProcStateProtoEnum(state.getProcState()));
             proto.write(ProcessOomProto.TRIM_MEMORY_LEVEL, r.mProfile.getTrimMemoryLevel());
             r.dumpDebug(proto, ProcessOomProto.PROC);
             proto.write(ProcessOomProto.ADJ_TYPE, state.getAdjType());
@@ -4963,16 +5013,8 @@ public final class ProcessList extends ProcessListInternal
             }
             if (inclDetails) {
                 long detailToken = proto.start(ProcessOomProto.DETAIL);
-                proto.write(ProcessOomProto.Detail.MAX_ADJ, state.getMaxAdj());
-                proto.write(ProcessOomProto.Detail.CUR_RAW_ADJ, state.getCurRawAdj());
-                proto.write(ProcessOomProto.Detail.SET_RAW_ADJ, state.getSetRawAdj());
-                proto.write(ProcessOomProto.Detail.CUR_ADJ, state.getCurAdj());
-                proto.write(ProcessOomProto.Detail.SET_ADJ, state.getSetAdj());
-                proto.write(ProcessOomProto.Detail.CURRENT_STATE,
-                        makeProcStateProtoEnum(state.getCurProcState()));
-                proto.write(ProcessOomProto.Detail.SET_STATE,
-                        makeProcStateProtoEnum(state.getSetProcState()));
-                writeProcessCapabilitiesListToProto(proto, state.getCurCapability());
+                state.writeDetailToProto(proto);
+
                 proto.write(ProcessOomProto.Detail.LAST_PSS, DebugUtils.sizeValueToString(
                         r.mProfile.getLastPss() * BYTES_IN_KB, new StringBuilder()));
                 proto.write(ProcessOomProto.Detail.LAST_SWAP_PSS, DebugUtils.sizeValueToString(
@@ -4981,9 +5023,6 @@ public final class ProcessList extends ProcessListInternal
                 // AppProfiler is no longer collecting PSS.
                 proto.write(ProcessOomProto.Detail.LAST_CACHED_PSS, DebugUtils.sizeValueToString(
                         r.mProfile.getLastCachedPss() * BYTES_IN_KB, new StringBuilder()));
-                proto.write(ProcessOomProto.Detail.CACHED, state.isCached());
-                proto.write(ProcessOomProto.Detail.EMPTY, state.isEmpty());
-                proto.write(ProcessOomProto.Detail.HAS_ABOVE_CLIENT, psr.isHasAboveClient());
 
                 if (state.getSetProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
                     long lastCpuTime = r.mProfile.mLastCpuTime.get();
@@ -5051,7 +5090,7 @@ public final class ProcessList extends ProcessListInternal
             } else {
                 foreground = ' ';
             }
-            String procState = makeProcStateString(state.getCurProcState());
+            String procState = makeProcStateString(state.getProcState());
             pw.print(prefix);
             pw.print(r.isPersistent() ? persistentLabel : normalLabel);
             pw.print(" #");
@@ -5110,7 +5149,7 @@ public final class ProcessList extends ProcessListInternal
                 pw.print(" set="); pw.println(state.getSetAdj());
                 pw.print(prefix);
                 pw.print("    ");
-                pw.print("state: cur="); pw.print(makeProcStateString(state.getCurProcState()));
+                pw.print("state: cur="); pw.print(makeProcStateString(state.getProcState()));
                 pw.print(" set="); pw.print(makeProcStateString(state.getSetProcState()));
                 // These values won't be collected if the flag is enabled.
                 if (service.mAppProfiler.isProfilingPss()) {
@@ -5131,7 +5170,7 @@ public final class ProcessList extends ProcessListInternal
                 pw.print("    ");
                 pw.print("cached="); pw.print(state.isCached());
                 pw.print(" empty="); pw.print(state.isEmpty());
-                pw.print(" hasAboveClient="); pw.println(psr.isHasAboveClient());
+                pw.print(" hasAboveClient="); pw.println(psr.hasBindAboveClient());
 
                 if (state.getSetProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
                     long lastCpuTime = r.mProfile.mLastCpuTime.get();

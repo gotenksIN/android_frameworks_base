@@ -401,13 +401,6 @@ public final class ViewRootImpl implements ViewParent,
      */
     private static final boolean MT_RENDERER_AVAILABLE = true;
 
-
-    /**
-     * Allow enabling IPC rendering on a per-package basis for debugging.
-     * Use a comma-separated list of packages.
-     */
-    private static final String IPC_RENDERING_PACKAGES =
-            SystemProperties.get("viewroot.ipc_rendering_packages", "");
     private boolean mIpcRenderingEnabled = false;
     private boolean mPerfHintSessionDisabled = false;
 
@@ -571,7 +564,7 @@ public final class ViewRootImpl implements ViewParent,
      * target SDK versions.
      */
     private static boolean sCompatibilityDone = false;
-    private static int sCalledFromWrongThreadCount = 0;
+    private static boolean sCalledFromWrongThreadLogged = false;
 
     /**
      * Always assign focus if a focusable View is available.
@@ -604,6 +597,10 @@ public final class ViewRootImpl implements ViewParent,
     final TypedValue mTmpValue = new TypedValue();
 
     final Thread mThread;
+
+    /** The throwable with the stack trace filled when this ViewRootImpl was initialized. */
+    @Nullable
+    private final Throwable mInitStack;
 
     final WindowLeaked mLocation;
 
@@ -985,6 +982,8 @@ public final class ViewRootImpl implements ViewParent,
      */
     boolean mScrollMayChange;
 
+    boolean mImmediateScrolling = false;
+
     /**
      * The soft input mode for this window, as specified by
      * {@link WindowManager.LayoutParams#softInputMode}.
@@ -1268,6 +1267,8 @@ public final class ViewRootImpl implements ViewParent,
     private int mFrameRateCategoryLowCount = 0;
 
     private CornerRadii mCornerRadii = new CornerRadii();
+    private boolean mCornerRadiiDirty = false;
+    private RectF mLastSetClientDrawnRadiiBounds = new RectF();
 
     /*
      * the variables below are used to determine whther a dVRR feature should be enabled
@@ -1328,12 +1329,14 @@ public final class ViewRootImpl implements ViewParent,
                     }
                     // Post to main thread
                     mHandler.post(() -> {
+                        Trace.instant(TRACE_TAG_VIEW, "mCornerRadiiCallback post to main thread");
                         CornerRadii newCornerRadii = new CornerRadii();
                         newCornerRadii.topLeft = cornerRadii[0];
                         newCornerRadii.topRight = cornerRadii[1];
                         newCornerRadii.bottomLeft = cornerRadii[2];
                         newCornerRadii.bottomRight = cornerRadii[3];
                         mCornerRadii = newCornerRadii;
+                        mCornerRadiiDirty = true;
                         invalidate();
                     });
                 }
@@ -1399,6 +1402,7 @@ public final class ViewRootImpl implements ViewParent,
         final String name = DisplayProperties.debug_vri_package().orElse(null);
         mExtraDisplayListenerLogging = !TextUtils.isEmpty(name) && name.equals(mBasePackageName);
         mThread = Thread.currentThread();
+        mInitStack = Build.isDebuggable() ? new Throwable("Created") : null;
         mLocation = new WindowLeaked(null);
         mWidth = -1;
         mHeight = -1;
@@ -1656,6 +1660,12 @@ public final class ViewRootImpl implements ViewParent,
                 }
                 // Keep track of the actual window flags supplied by the client.
                 mClientWindowLayoutFlags = attrs.flags;
+
+                if ((attrs.privateFlags
+                        & WindowManager.LayoutParams.PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY) != 0) {
+                    // Disable IPC Rendering
+                    mIpcRenderingEnabled = false;
+                }
 
                 adjustLayoutInDisplayCutoutMode(attrs);
                 setAccessibilityFocus(null, null);
@@ -2152,12 +2162,15 @@ public final class ViewRootImpl implements ViewParent,
             // sRendererDisabled will be set.  In addition, the system process
             // itself should never do accelerated rendering.  In that case, both
             // sRendererDisabled and sSystemRendererDisabled are set.  When
-            // sSystemRendererDisabled is set, PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED
+            // sSystemRendererDisabled is set, RENDERING_HINT_FORCE_HARDWARE_ACCELERATED
             // can be used by code on the system process to escape that and enable
             // HW accelerated drawing.  (This is basically for the lock screen.)
 
-            final boolean forceHwAccelerated = (attrs.privateFlags &
-                    WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED) != 0;
+            final boolean forceHwAccelerated =
+                    (attrs.renderingHints
+                                    & WindowManager.LayoutParams
+                                            .RENDERING_HINT_FORCE_HARDWARE_ACCELERATED)
+                            != 0;
 
             if (ThreadedRenderer.sRendererEnabled || forceHwAccelerated) {
                 if (mAttachInfo.mThreadedRenderer != null) {
@@ -2241,9 +2254,7 @@ public final class ViewRootImpl implements ViewParent,
 
     /** Set whether this ViewRootImpl is allowed to enable force invert (expanded dark theme). */
     public void setForceInvertAllowed(boolean allowed) {
-        if (android.view.accessibility.Flags.disableEdtForAutofillInlineView()) {
-            mForceInvertAllowed = allowed;
-        }
+        mForceInvertAllowed = allowed;
     }
 
     private @ForceDarkType.ForceDarkTypeDef int determineForceInvertDarkOverride(
@@ -2287,11 +2298,11 @@ public final class ViewRootImpl implements ViewParent,
         final boolean shouldDisablePerfHint = mIsDisablingViewAnimationsRequested;
 
         if (shouldDisablePerfHint) {
-            mWindowAttributes.privateFlags |=
-                    WindowManager.LayoutParams.PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT;
+            mWindowAttributes.renderingHints |=
+                    WindowManager.LayoutParams.RENDERING_HINT_DISABLE_PERFORMANCE_HINT;
         } else {
-            mWindowAttributes.privateFlags &=
-                    ~WindowManager.LayoutParams.PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT;
+            mWindowAttributes.renderingHints &=
+                    ~WindowManager.LayoutParams.RENDERING_HINT_DISABLE_PERFORMANCE_HINT;
         }
         updatePerformanceHintSession();
     }
@@ -3022,8 +3033,10 @@ public final class ViewRootImpl implements ViewParent,
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.updateRenderTargetSize(mSurfaceSize.x, mSurfaceSize.y);
         }
-        // TODO(b/483110996): Avoid calling this when using IPC rendering.
-        updateBlastSurfaceIfNeeded();
+
+        if (!mIpcRenderingEnabled) {
+            updateBlastSurfaceIfNeeded();
+        }
 
         mRenderTargetIsValid = true;
     }
@@ -3732,10 +3745,47 @@ public final class ViewRootImpl implements ViewParent,
             mAttachInfo.mContentInsets.set(mLastWindowInsets.getSystemWindowInsets().toRect());
             mAttachInfo.mStableInsets.set(mLastWindowInsets.getStableInsets().toRect());
             mAttachInfo.mVisibleInsets.set(mInsetsController.calculateVisibleInsets(
-                    mWindowAttributes.type, config.windowConfiguration.getActivityType(),
-                    mWindowAttributes.softInputMode, mWindowAttributes.flags).toRect());
+                    mInsetsController.getState(), mWindowAttributes.type,
+                    config.windowConfiguration.getActivityType(), mWindowAttributes.softInputMode,
+                    mWindowAttributes.flags, 0 /* ignoringTypes */).toRect());
         }
         return mLastWindowInsets;
+    }
+
+    @Nullable
+    public WindowInsets dispatchWindowInsetsAnimationProgress(@NonNull WindowInsets insets,
+            @NonNull InsetsState state, @NonNull List<WindowInsetsAnimation> runningAnimations,
+            boolean hasUserAnimation, boolean hasResizeAnimation, boolean hasAnimationCallback,
+            @InsetsType int hidingTypes) {
+        if (mView == null) {
+            // The view has already detached from window.
+            return null;
+        }
+        if (InsetsController.DEBUG) {
+            for (WindowInsetsAnimation anim : runningAnimations) {
+                Log.d(mTag, "windowInsetsAnimation progress: " + anim.getInterpolatedFraction());
+            }
+        }
+        final boolean handlesAnimation =
+                hasUserAnimation || hasResizeAnimation || hasAnimationCallback;
+        if (com.android.window.flags.Flags.syncedInsetsAnimation() && !handlesAnimation) {
+            // will not include IME insets, if softInputMode is different from adjustResize
+            mAttachInfo.mContentInsets.set(insets.getSystemWindowInsets().toRect());
+            mAttachInfo.mStableInsets.set(insets.getStableInsets().toRect());
+
+            // Don't let the hiding types change mScrollY if it is already 0.
+            // This is to prevent the redundant scrolling animation.
+            @InsetsType final int ignoringTypes = mScrollY == 0 ? hidingTypes : 0;
+            mAttachInfo.mVisibleInsets.set(
+                    mInsetsController.calculateVisibleInsets(state, mWindowAttributes.type,
+                            getConfiguration().windowConfiguration.getActivityType(),
+                            mWindowAttributes.softInputMode, mWindowAttributes.flags,
+                            ignoringTypes).toRect());
+            mScrollMayChange = true;
+            mImmediateScrolling = true;
+            return null;
+        }
+        return mView.dispatchWindowInsetsAnimationProgress(insets, runningAnimations);
     }
 
     public void dispatchApplyInsets(View host) {
@@ -4785,6 +4835,7 @@ public final class ViewRootImpl implements ViewParent,
 
         mIsInTraversal = false;
         mRelayoutRequested = false;
+        mImmediateScrolling = false;
 
         if (!cancelAndRedraw) {
             mReportNextDraw = false;
@@ -5085,15 +5136,23 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
         Trace.instant(TRACE_TAG_VIEW, "setClientDrawnCornerRadii: radii" + mCornerRadii);
-        if (!mCornerRadii.isEmpty()) {
-            applyOpacity(false);
-        }
         RectF bounds = threadedRenderer.setCornerRadius(mCornerRadii);
-        applyTransactionOnDraw(mTransaction
-                .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
-                                mCornerRadii.topRight, mCornerRadii.bottomLeft,
-                                mCornerRadii.bottomRight,
-                                bounds));
+        if (mCornerRadiiDirty || !mLastSetClientDrawnRadiiBounds.equals(bounds)) {
+            // Reset opacity if we are expecting clipping and surface was opaque before.
+            if (!mCornerRadii.isEmpty() && mIsSurfaceOpaque) {
+                applyOpacity(false);
+            }
+            // We should update the SurfaceControl only if the corner radii or bounds have
+            // changed. Otherwise, SurfaceFlinger will continue using the previous
+            // radii and bounds.
+            applyTransactionOnDraw(mTransaction
+                    .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
+                                    mCornerRadii.topRight, mCornerRadii.bottomLeft,
+                                    mCornerRadii.bottomRight,
+                                    bounds));
+            mCornerRadiiDirty = false;
+            mLastSetClientDrawnRadiiBounds.set(bounds);
+        }
     }
 
     private void handleWindowFocusChanged() {
@@ -6021,7 +6080,7 @@ public final class ViewRootImpl implements ViewParent,
     private boolean draw(boolean fullRedrawNeeded, @Nullable SurfaceSyncGroup activeSyncGroup,
             boolean syncBuffer) {
         Surface surface = mSurface;
-        if (!surface.isValid()) {
+        if (!mRenderTargetIsValid) {
             return false;
         }
 
@@ -6595,7 +6654,7 @@ public final class ViewRootImpl implements ViewParent,
         mInvalidateRootRequested = true;
     }
 
-    boolean scrollToRectOrFocus(Rect rectangle, boolean immediate) {
+    boolean scrollToRectOrFocus(Rect rectangle, boolean forceImmediate) {
         if (mImeBackAnimationController.isAnimationInProgress()) {
             // IME predictive back animation is currently in progress which means that scrollY is
             // currently controlled by ImeBackAnimationController.
@@ -6708,6 +6767,7 @@ public final class ViewRootImpl implements ViewParent,
         if (scrollY != mScrollY) {
             if (DEBUG_INPUT_RESIZE) Log.v(mTag, "Pan scroll changed: old="
                     + mScrollY + " , new=" + scrollY);
+            final boolean immediate = forceImmediate || mImmediateScrolling;
             if (!immediate) {
                 if (mScroller == null) {
                     mScroller = new Scroller(mView.getContext());
@@ -7534,7 +7594,7 @@ public final class ViewRootImpl implements ViewParent,
                     break;
                 }
                 case MSG_TOUCH_BOOST_TIMEOUT:
-                    /**
+                    /*
                      * Lower the frame rate after the boosting period (FRAME_RATE_TOUCH_BOOST_TIME).
                      */
                     mIsFrameRateBoosting = false;
@@ -8679,7 +8739,7 @@ public final class ViewRootImpl implements ViewParent,
                 }
                 setPreferredFrameRateCategory(mLastPreferredFrameRateCategory);
             }
-            /**
+            /*
              * We want to lower the refresh rate when MotionEvent.ACTION_UP,
              * MotionEvent.ACTION_CANCEL is detected.
              * Not using ACTION_MOVE to avoid checking and sending messages too frequently.
@@ -10239,10 +10299,18 @@ public final class ViewRootImpl implements ViewParent,
                 // resizing to a larger size).
                 mTransaction.setWindowCrop(mSurfaceControl,
                         mWinFrameInScreen.width(), mWinFrameInScreen.height());
-            } else if (!HardwareRenderer.isDrawingEnabled()) {
-                // When drawing is disabled the window layer won't have a valid buffer.
-                // Set a window crop so input can get delivered to the window.
-                mTransaction.setWindowCrop(mSurfaceControl, mSurfaceSize.x, mSurfaceSize.y).apply();
+            } else {
+                if (!HardwareRenderer.isDrawingEnabled()) {
+                    // When drawing is disabled the window layer won't have a valid buffer.
+                    // Set a window crop so input can get delivered to the window.
+                    mTransaction.setWindowCrop(mSurfaceControl, mSurfaceSize.x, mSurfaceSize.y)
+                            .apply();
+                } else if (!mPendingDragResizing) {
+                    // During the fluid resizing, the temporary crop bounds set on VRI.
+                    // The clean up is necessary here since the crop would break window content
+                    // if windowing mode change.
+                    mTransaction.setWindowCrop(mSurfaceControl, null);
+                }
             }
         }
 
@@ -12008,7 +12076,7 @@ public final class ViewRootImpl implements ViewParent,
         return new CalledFromWrongThreadException(
                 "Only the original thread that created a view hierarchy can touch its views."
                         + " Expected: " + mThread.getName()
-                        + " Calling: " + Thread.currentThread().getName());
+                        + " Calling: " + Thread.currentThread().getName(), mInitStack);
     }
 
     /**
@@ -12037,11 +12105,11 @@ public final class ViewRootImpl implements ViewParent,
         if (mEnforceThreadChecksCompat) {
             throwCalledFromWrongThreadException();
         } else {
-            // Log the issue, but not too many times per process.
-            // Note that this counter is not atomic, so it's possible we log more than the requisite
-            // times per process lifetime. That's fine because the precise number of logs isn't
-            // important so long as we eventually stop logging.
-            if (++sCalledFromWrongThreadCount <= 10) {
+            // Log the issue, but at most once per process, since WTF logs are expensive.
+            // Note that this is potentially racy, but considered benign.
+            // If two or more threads race to log, it's not much of a concern.
+            if (!sCalledFromWrongThreadLogged) {
+                sCalledFromWrongThreadLogged = true;
                 final CalledFromWrongThreadException e = newCalledFromWrongThreadException();
                 Log.wtf(
                         TAG,
@@ -12816,6 +12884,11 @@ public final class ViewRootImpl implements ViewParent,
         public CalledFromWrongThreadException(String msg) {
             super(msg);
         }
+
+        @UnsupportedAppUsage
+        public CalledFromWrongThreadException(String msg, @Nullable Throwable cause) {
+            super(msg, cause);
+        }
     }
 
     static HandlerActionQueue getRunQueue() {
@@ -13310,7 +13383,8 @@ public final class ViewRootImpl implements ViewParent,
         public void runOrPost(View source, int changeType) {
             if (mLooper != Looper.myLooper()) {
                 CalledFromWrongThreadException e = new CalledFromWrongThreadException("Only the "
-                        + "original thread that created a view hierarchy can touch its views.");
+                        + "original thread that created a view hierarchy can touch its views.",
+                        mInitStack);
                 // TODO: Throw the exception
                 Log.e(TAG, "Accessibility content change on non-UI thread. Future Android "
                         + "versions will throw an exception.", e);
@@ -14581,7 +14655,8 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean useIpcRendering() {
-        if (IPC_RENDERING_PACKAGES.contains(mBasePackageName)) {
+        if (SystemProperties.get("viewroot.ipc_rendering_packages", "")
+                        .contains(mBasePackageName)) {
             return true;
         }
         return false;

@@ -44,8 +44,9 @@ import android.content.Intent;
 import android.os.IBinder;
 import android.platform.test.annotations.Presubmit;
 
-import com.android.server.am.psc.ProcessStateValidator;
-import com.android.server.am.psc.ProcessStateValidatorTemplate;
+import com.android.server.am.psc.MockUtils;
+import com.android.server.am.psc.ProcessImportanceAssert;
+import com.android.server.am.psc.ProcessImportanceExpectations;
 
 import org.junit.After;
 import org.junit.Before;
@@ -86,27 +87,29 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
         super.tearDown();
     }
 
-    // Below is a a set of under constrained validator templates that only have the upper bounds
-    // set for the importance values. They can be used with ProcessStateValidator#create to
-    // create a validator that validates a process satisfies all provided constraints.
-    // ProcessStateValidator#clamp should be used to fully constrain the resultant validator.
-    private static final ProcessStateValidatorTemplate EXECUTING_STATE_VALIDATOR_TEMPLATE =
-            new ProcessStateValidator()
-                    .expectedProcStateAtMost(PROCESS_STATE_SERVICE)
-                    .expectedOomAdjScoreAtMost(FOREGROUND_APP_ADJ)
-                    .expectedFreezability(false);
+    // The expected importance values for a service in the executing state.
+    private static final ProcessImportanceExpectations EXECUTING_SERVICE_EXPECTATIONS =
+            new ProcessImportanceExpectations.Builder()
+                    .setProcState(PROCESS_STATE_SERVICE)
+                    .setOomAdjScore(FOREGROUND_APP_ADJ)
+                    .setFreezability(false)
+                    .build();
 
-    private static final ProcessStateValidatorTemplate FOREGROUND_SERVICE_VALIDATOR_TEMPLATE =
-            new ProcessStateValidator()
-                    .expectedProcStateAtMost(PROCESS_STATE_FOREGROUND_SERVICE)
-                    .expectedOomAdjScoreAtMost(PERCEPTIBLE_APP_ADJ)
-                    .expectedFreezability(false);
+    // The expected importance values for a foreground service.
+    private static final ProcessImportanceExpectations FOREGROUND_SERVICE_EXPECTATIONS =
+            new ProcessImportanceExpectations.Builder()
+                    .setProcState(PROCESS_STATE_FOREGROUND_SERVICE)
+                    .setOomAdjScore(PERCEPTIBLE_APP_ADJ)
+                    .setFreezability(false)
+                    .build();
 
-    private static final ProcessStateValidatorTemplate BACKGROUND_SERVICE_VALIDATOR_TEMPLATE =
-            new ProcessStateValidator()
-                    .expectedProcStateAtMost(PROCESS_STATE_SERVICE)
-                    .expectedOomAdjScoreAtMost(SERVICE_ADJ)
-                    .expectedFreezability(false);
+    // The expected importance values for a background service.
+    private static final ProcessImportanceExpectations BACKGROUND_SERVICE_EXPECTATIONS =
+            new ProcessImportanceExpectations.Builder()
+                    .setProcState(PROCESS_STATE_SERVICE)
+                    .setOomAdjScore(SERVICE_ADJ)
+                    .setFreezability(false)
+                    .build();
 
     @Test
     public void startService() throws Exception {
@@ -121,26 +124,23 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
                 .setAppThread(serviceThread)
                 .build();
 
-        ProcessStateValidator bgServiceValidator =
-                ProcessStateValidator.create(BACKGROUND_SERVICE_VALIDATOR_TEMPLATE).clamp();
-
-        // While in the executing state, the process can have the elevated importance.
-        ProcessStateValidator executingStateValidator = ProcessStateValidator.create(
-                BACKGROUND_SERVICE_VALIDATOR_TEMPLATE, EXECUTING_STATE_VALIDATOR_TEMPLATE).clamp();
-
         ServiceLifecycleArgs createServiceArgs = new ServiceLifecycleArgs();
         doAnswer((invocation) -> {
             createServiceArgs.token = invocation.getArgument(0);
             // scheduleCreateService will be called while in the executing state.
-            executingStateValidator.validate(proc);
+            ProcessImportanceAssert.assertThat(proc)
+                    .matchesIntersection(BACKGROUND_SERVICE_EXPECTATIONS,
+                            EXECUTING_SERVICE_EXPECTATIONS);
             return null;
         }).when(serviceThread).scheduleCreateService(any(), any(), any(), anyInt());
 
         ServiceLifecycleArgs serviceArgsArgs = new ServiceLifecycleArgs();
         doAnswer((invocation) -> {
-            executingStateValidator.validate(proc);
-            // scheduleServiceArgs will be called while in the executing state.
             serviceArgsArgs.token = invocation.getArgument(0);
+            // scheduleServiceArgs will be called while in the executing state.
+            ProcessImportanceAssert.assertThat(proc)
+                    .matchesIntersection(BACKGROUND_SERVICE_EXPECTATIONS,
+                            EXECUTING_SERVICE_EXPECTATIONS);
             return null;
         }).when(serviceThread).scheduleServiceArgs(any(), any());
 
@@ -166,7 +166,7 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
         mAms.serviceDoneExecuting(createServiceArgs.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
         mAms.serviceDoneExecuting(serviceArgsArgs.token, SERVICE_DONE_EXECUTING_START, 0, 0);
 
-        bgServiceValidator.validate(proc);
+        ProcessImportanceAssert.assertThat(proc).matches(BACKGROUND_SERVICE_EXPECTATIONS);
     }
 
     @Test
@@ -187,18 +187,13 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
                 TEST_APP1_UID);
         createAndStartService(proc, serviceIntent, serviceThread);
 
-        ProcessStateValidator bgServiceValidator =
-                ProcessStateValidator.create(BACKGROUND_SERVICE_VALIDATOR_TEMPLATE).clamp();
-
-        // While in the executing state, the process can have the elevated importance.
-        ProcessStateValidator executingStateValidator = ProcessStateValidator.create(
-                BACKGROUND_SERVICE_VALIDATOR_TEMPLATE, EXECUTING_STATE_VALIDATOR_TEMPLATE).clamp();
-
         ServiceLifecycleArgs serviceArgsArgs = new ServiceLifecycleArgs();
         doAnswer((invocation) -> {
-            executingStateValidator.validate(proc);
-            // scheduleServiceArgs will be called while in the executing state.
             serviceArgsArgs.token = invocation.getArgument(0);
+            // scheduleServiceArgs will be called while in the executing state.
+            ProcessImportanceAssert.assertThat(proc)
+                    .matchesIntersection(BACKGROUND_SERVICE_EXPECTATIONS,
+                            EXECUTING_SERVICE_EXPECTATIONS);
             return null;
         }).when(serviceThread).scheduleServiceArgs(any(), any());
 
@@ -221,7 +216,7 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
 
         mAms.serviceDoneExecuting(serviceArgsArgs.token, SERVICE_DONE_EXECUTING_START, 0, 0);
 
-        bgServiceValidator.validate(proc);
+        ProcessImportanceAssert.assertThat(proc).matches(BACKGROUND_SERVICE_EXPECTATIONS);
     }
 
     @Test
@@ -245,20 +240,13 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
                 .setAppThread(serviceThread)
                 .build();
 
-        // While the process is bound by an FGS with BIND_IMPORTANT it should have the importance
-        // of an FGS.
-        ProcessStateValidator boundStateValidator =
-                ProcessStateValidator.create(FOREGROUND_SERVICE_VALIDATOR_TEMPLATE).clamp();
-
-        // While in the executing state, the process can have the elevated importance.
-        ProcessStateValidator executingStateValidator = ProcessStateValidator.create(
-                FOREGROUND_SERVICE_VALIDATOR_TEMPLATE, EXECUTING_STATE_VALIDATOR_TEMPLATE).clamp();
-
         ServiceLifecycleArgs createServiceArgs = new ServiceLifecycleArgs();
         doAnswer((invocation) -> {
             createServiceArgs.token = invocation.getArgument(0);
             // scheduleCreateService will be called while in the executing state.
-            executingStateValidator.validate(serviceProc);
+            ProcessImportanceAssert.assertThat(serviceProc)
+                    .matchesIntersection(FOREGROUND_SERVICE_EXPECTATIONS,
+                            EXECUTING_SERVICE_EXPECTATIONS);
             return null;
         }).when(serviceThread).scheduleCreateService(any(), any(), any(), anyInt());
 
@@ -267,7 +255,9 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
             bindServiceArgs.token = invocation.getArgument(0);
             bindServiceArgs.bindToken = invocation.getArgument(1);
             // scheduleBindService will be called while in the executing state.
-            executingStateValidator.validate(serviceProc);
+            ProcessImportanceAssert.assertThat(serviceProc)
+                    .matchesIntersection(FOREGROUND_SERVICE_EXPECTATIONS,
+                            EXECUTING_SERVICE_EXPECTATIONS);
             return null;
         }).when(serviceThread).scheduleBindService(any(), any(), any(), anyBoolean(), anyInt(),
                 anyLong());
@@ -298,7 +288,7 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
         mAms.publishService(bindServiceArgs.token, bindServiceArgs.bindToken, mock(IBinder.class));
 
         // The service should now only be as important as it's binding allows it.
-        boundStateValidator.validate(serviceProc);
+        ProcessImportanceAssert.assertThat(serviceProc).matches(FOREGROUND_SERVICE_EXPECTATIONS);
     }
 
     @Test
@@ -331,25 +321,19 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
 
         makeForegroundService(clientProc);
 
-        // While in the executing state, the process can have the elevated importance.
-        ProcessStateValidator executingStateValidator = ProcessStateValidator.create(
-                FOREGROUND_SERVICE_VALIDATOR_TEMPLATE, EXECUTING_STATE_VALIDATOR_TEMPLATE).clamp();
-
-        // While the process is bound by an FGS with BIND_IMPORTANT it should have the importance
-        // of an FGS.
-        ProcessStateValidator boundStateValidator =
-                ProcessStateValidator.create(FOREGROUND_SERVICE_VALIDATOR_TEMPLATE).clamp();
-
         ServiceLifecycleArgs bindServiceArgs = new ServiceLifecycleArgs();
         doAnswer((invocation) -> {
             bindServiceArgs.token = invocation.getArgument(0);
             bindServiceArgs.bindToken = invocation.getArgument(1);
             if (Flags.pscBatchServiceUpdates()) {
-                executingStateValidator.validate(serviceProc);
+                ProcessImportanceAssert.assertThat(serviceProc)
+                        .matchesIntersection(FOREGROUND_SERVICE_EXPECTATIONS,
+                                EXECUTING_SERVICE_EXPECTATIONS);
             } else {
                 // Legacy behavior incorrectly skips triggering an update after putting a bound
                 // service in the executing state.
-                boundStateValidator.validate(serviceProc);
+                ProcessImportanceAssert.assertThat(serviceProc)
+                        .matches(FOREGROUND_SERVICE_EXPECTATIONS);
             }
             return null;
         }).when(serviceThread).scheduleBindService(any(), any(), any(), anyBoolean(), anyInt(),
@@ -379,7 +363,7 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
         // Finish the bindService callback.
         mAms.publishService(bindServiceArgs.token, bindServiceArgs.bindToken, mock(IBinder.class));
 
-        boundStateValidator.validate(serviceProc);
+        ProcessImportanceAssert.assertThat(serviceProc).matches(FOREGROUND_SERVICE_EXPECTATIONS);
     }
 
     // Create and start a service and then finish executing the lifecycle events.
@@ -413,16 +397,16 @@ public class ServiceLifecycleImportanceTest extends BaseServiceTest {
 
     /** Set proc's importance state as if it was an FGS that has already been evaluated by PSC. */
     private void makeForegroundService(ProcessRecord proc) {
-        proc.setCurRawProcState(PROCESS_STATE_FOREGROUND_SERVICE);
-        proc.setCurProcState(PROCESS_STATE_FOREGROUND_SERVICE);
-        proc.setSetProcState(PROCESS_STATE_FOREGROUND_SERVICE);
+        MockUtils.setCurRawProcState(proc, PROCESS_STATE_FOREGROUND_SERVICE);
+        MockUtils.setCurProcState(proc, PROCESS_STATE_FOREGROUND_SERVICE);
+        MockUtils.setSetProcState(proc, PROCESS_STATE_FOREGROUND_SERVICE);
 
-        proc.setCurRawAdj(PERCEPTIBLE_APP_ADJ);
-        proc.setCurAdj(PERCEPTIBLE_APP_ADJ);
-        proc.setSetAdj(PERCEPTIBLE_APP_ADJ);
+        MockUtils.setCurRawAdj(proc, PERCEPTIBLE_APP_ADJ);
+        MockUtils.setCurAdj(proc, PERCEPTIBLE_APP_ADJ);
+        MockUtils.setSetAdj(proc, PERCEPTIBLE_APP_ADJ);
 
-        proc.setCurCapability(PROCESS_CAPABILITY_ALL);
-        proc.setSetCapability(PROCESS_CAPABILITY_ALL);
+        MockUtils.setCurCapability(proc, PROCESS_CAPABILITY_ALL);
+        MockUtils.setSetCapability(proc, PROCESS_CAPABILITY_ALL);
     }
 
     // Simple data object for caching the args the app thread receives from service lifecycle events

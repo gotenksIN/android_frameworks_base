@@ -16,12 +16,15 @@
 
 package android.service.personalcontext.embedded;
 
+import static android.service.personalcontext.embedded.InsightSurfaceSessionException.ERROR_FAILED_TO_CREATE_SESSION;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -30,9 +33,10 @@ import android.content.res.Resources;
 import android.graphics.Color;
 import android.os.RemoteException;
 import android.service.personalcontext.PersonalContextManager;
-import android.service.personalcontext.hint.BundleHint;
+import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.view.Display;
+import android.view.SurfaceControl;
 import android.view.SurfaceControlViewHost.SurfacePackage;
 import android.view.View;
 
@@ -46,7 +50,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 @SmallTest
@@ -60,8 +66,8 @@ public class InsightSurfaceClientTest {
     @Mock private PersonalContextManager mPersonalContextManager;
     @Mock private InsightSurfaceClient.ClientCallback mClientCallbacks;
     @Mock private IInsightSurfaceSession mSession;
+    @Mock private SurfaceControl mSurfaceControl;
     private final Executor mExecutor = Runnable::run;
-    private final BundleHint mHint = new BundleHint.Builder().build();
     private InsightSurfaceClient mClient;
 
     @Before
@@ -71,13 +77,14 @@ public class InsightSurfaceClientTest {
         when(mContext.getDisplay()).thenReturn(mDisplay);
         when(mContext.getResources()).thenReturn(mResources);
         when(mResources.getConfiguration()).thenReturn(mConfiguration);
+        when(mSurfacePackage.getSurfaceControl()).thenReturn(mSurfaceControl);
+        when(mSurfaceControl.isSameSurface(mSurfaceControl)).thenReturn(true);
 
         when(mContext.getSystemService(PersonalContextManager.class))
                 .thenReturn(mPersonalContextManager);
 
         mClient =
                 new InsightSurfaceClient.Builder(mContext)
-                        .addHint(mHint)
                         .build();
     }
 
@@ -87,7 +94,7 @@ public class InsightSurfaceClientTest {
         final ArgumentCaptor<InsightSurfaceClientInfo> clientInfoCaptor =
                 ArgumentCaptor.forClass(InsightSurfaceClientInfo.class);
         verify(mPersonalContextManager).registerInsightSurfaceClient(
-                clientInfoCaptor.capture(), eq(List.of(mHint)));
+                clientInfoCaptor.capture());
 
         final IInsightSurfaceClient client = clientInfoCaptor.getValue().getClient();
         client.onSurfaceCreated(mSurfacePackage, mSession);
@@ -99,8 +106,7 @@ public class InsightSurfaceClientTest {
         mClient.register(mExecutor, mClientCallbacks);
         final ArgumentCaptor<InsightSurfaceClientInfo> clientInfoCaptor =
                 ArgumentCaptor.forClass(InsightSurfaceClientInfo.class);
-        verify(mPersonalContextManager).registerInsightSurfaceClient(
-                clientInfoCaptor.capture(), eq(List.of(mHint)));
+        verify(mPersonalContextManager).registerInsightSurfaceClient(clientInfoCaptor.capture());
 
         final IInsightSurfaceClient client = clientInfoCaptor.getValue().getClient();
         client.onSurfaceCreated(mSurfacePackage, mSession);
@@ -122,7 +128,6 @@ public class InsightSurfaceClientTest {
         final InsightSurfaceClient client =
                 new InsightSurfaceClient.Builder(mContext).build();
 
-        assertThat(client.getHints()).isEmpty();
         assertThat(client.getReceivers()).isEmpty();
     }
 
@@ -201,25 +206,14 @@ public class InsightSurfaceClientTest {
     }
 
     @Test
-    public void testInsightSurfaceClientCreation_withThemeResourceName() {
-        final String themeResourceName = "theme";
+    public void testInsightSurfaceClientCreation_withThemeResourceId() {
+        final int themeResourceId = 7;
         final InsightSurfaceClient client =
                 new InsightSurfaceClient.Builder(mContext)
-                        .setThemeResourceName(themeResourceName)
+                        .setThemeResourceId(themeResourceId)
                         .build();
 
-        assertThat(client.getThemeResourceName()).isEqualTo(themeResourceName);
-    }
-
-    @Test
-    public void testInsightSurfaceClientCreation_withHint() {
-        final BundleHint hint = new BundleHint.Builder().build();
-
-        final InsightSurfaceClient client =
-                new InsightSurfaceClient.Builder(mContext)
-                        .addHint(hint).build();
-
-        assertThat(client.getHints()).containsExactly(hint);
+        assertThat(client.getThemeResourceId()).isEqualTo(themeResourceId);
     }
 
     @Test
@@ -259,5 +253,56 @@ public class InsightSurfaceClientTest {
         mClient.register(null, mClientCallbacks);
         mClient.getClientInfo().getClient().onSizeChanged(0, 0);
         assertThat(executorCalled[0]).isTrue();
+    }
+
+    @Test
+    public void testCallbackNotInvokedAfterUnregister_raceCondition() throws RemoteException {
+        // Use a custom executor that captures the runnable instead of executing it immediately.
+        // This allows us to simulate a race condition where unregister() is called after a
+        // callback has been scheduled but before it has been executed.
+        final List<Runnable> capturedRunnables = new ArrayList<>();
+        final Executor delayedExecutor = capturedRunnables::add;
+
+        // Register the client with the delayed executor.
+        mClient.register(delayedExecutor, mClientCallbacks);
+
+        // Trigger a callback. This will schedule a runnable on our delayedExecutor.
+        mClient.getClientInfo().getClient().onSizeChanged(100, 200);
+
+        // At this point, the callback has been scheduled but not executed.
+        assertThat(capturedRunnables).hasSize(1);
+        verifyNoInteractions(mClientCallbacks);
+
+        // Now, unregister the client. This should nullify the internal callbacks object.
+        mClient.unregister();
+
+        // Finally, execute the captured runnable.
+        capturedRunnables.get(0).run();
+
+        // Verify that the callback was NOT invoked because the client was unregistered before
+        // the callback runnable was executed. This tests the null-check inside the executor's
+        // runnable.
+        verifyNoInteractions(mClientCallbacks);
+    }
+
+    @Test
+    public void testPublishHints() {
+        final InsightSurfaceClient client = new InsightSurfaceClient.Builder(mContext).build();
+        final Set<ContextHint> hints = Set.of(mock(ContextHint.class));
+
+        client.publishHints(hints);
+        client.register(null, mClientCallbacks);
+        client.getClientInfo().onRegistered();
+
+        verify(mPersonalContextManager).publishInsightSurfaceHints(
+                eq(hints), any(InsightSurfaceClientInfo.class));
+    }
+
+    @Test
+    public void testVisualizationErrorCallsOnError() {
+        mClient.register(Runnable::run, mClientCallbacks);
+        mClient.publishHints(Set.of(mock(ContextHint.class)));
+        mClient.getClientInfo().onVisualizationError(ERROR_FAILED_TO_CREATE_SESSION);
+        verify(mClientCallbacks).onError(any());
     }
 }

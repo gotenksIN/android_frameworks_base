@@ -442,14 +442,13 @@ public class SupervisionService extends ISupervisionManager.Stub {
             policy.incrementVersion();
             getUserDataLocked(userId).policies.add(policy);
             mSupervisionSettings.saveUserData();
+            SupervisionManager.invalidateGetPoliciesCache();
         }
 
         executeOnServiceThread(
                 () -> {
-                    SupervisionManager.invalidateGetPoliciesCache();
                     applyPolicy(userId, policy);
-                    dispatchSupervisionAppServiceEvent(
-                            userId, listener -> listener.onPolicyChanged(policy));
+                    dispatchSupervisionEvent(userId, listener -> listener.onPolicyChanged(policy));
                 });
     }
 
@@ -480,6 +479,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
             }
             data.policies.clear();
             mSupervisionSettings.saveUserData();
+            SupervisionManager.invalidateGetPoliciesCache();
         }
     }
 
@@ -501,6 +501,15 @@ public class SupervisionService extends ISupervisionManager.Stub {
             case PackageUsagePolicy.TYPE_ALLOWED -> {
                 setApplicationHiddenForUser(userId, packageName, false);
                 enablePendingNotificationStateLocked(userId, policy);
+            }
+            case PackageUsagePolicy.TYPE_TIME_LIMIT -> {
+                if (Flags.enableSupervisionPackageUsageApis()) {
+                    setApplicationHiddenForUser(userId, packageName, false);
+                    Slogf.w(
+                            SupervisionLog.TAG,
+                            "Time usage limit policy not implemented yet for package: %s",
+                            packageName);
+                }
             }
             default ->
                     Slogf.w(
@@ -583,8 +592,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     private void validatePackageUsagePolicy(@NonNull PackageUsagePolicy policy) {
         if (policy.getPackageName().isEmpty()
                 || policy.getPackageName().length() > MAX_PACKAGE_NAME_LENGTH
-                || (policy.getType() != PackageUsagePolicy.TYPE_BLOCKED
-                        && policy.getType() != PackageUsagePolicy.TYPE_ALLOWED)) {
+                || !PackageUsagePolicy.isTypeValid(policy.getType())) {
             throw new IllegalArgumentException("Invalid package policy");
         }
     }
@@ -663,26 +671,32 @@ public class SupervisionService extends ISupervisionManager.Stub {
         if (!Flags.enableSupervisionSettingsUiUpdates()) {
             return List.of();
         }
-        List<UserInfo> users = mInjector
-                .getUserManagerInternal()
-                .getUsers(UserManagerInternal.USER_FILTER_WITH_ALL_COMPLETE_USERS);
-        return users.stream().filter(userInfo -> {
-            if (!isSupervisionEnabledForUser(userInfo.id)) {
-                return false;
-            }
-            // Get active supervision role holders for this user.
-            List<String> roleHolders =
-                    mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userInfo.id));
-            // Get all packages that have a supervision approval activity for this user.
-            List<String> packagesWithSupervisionApprovalActivities =
-                    querySupervisionApprovalActivities(userInfo.id)
-                            .stream()
-                            .map(resolveInfo -> resolveInfo.activityInfo.packageName)
-                            .toList();
-            return roleHolders.isEmpty() || roleHolders
-                    .stream()
-                    .anyMatch(pkg -> !packagesWithSupervisionApprovalActivities.contains(pkg));
-        }).toList();
+        List<UserInfo> users =
+                mInjector
+                        .getUserManagerInternal()
+                        .getUsers(UserManagerInternal.USER_FILTER_WITH_ALL_COMPLETE_USERS);
+        return users.stream().filter(this::doesUserRequirePlatformCredential).toList();
+    }
+
+    /**
+     * Returns true if the user requires a platform credential.
+     *
+     * <p>A user requires a platform credential if they have supervision enabled and there is no
+     * supervision approval activity for the user.
+     */
+    private boolean doesUserRequirePlatformCredential(UserInfo userInfo) {
+        if (!isSupervisionEnabledForUser(userInfo.id)) {
+            return false;
+        }
+        List<String> roleHolders =
+                mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userInfo.id));
+        List<String> packagesWithSupervisionApprovalActivities =
+                querySupervisionApprovalActivities(userInfo.id).stream()
+                        .map(resolveInfo -> resolveInfo.activityInfo.packageName)
+                        .toList();
+        return roleHolders.isEmpty()
+                || roleHolders.stream()
+                        .anyMatch(pkg -> !packagesWithSupervisionApprovalActivities.contains(pkg));
     }
 
     /**
@@ -693,8 +707,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     private boolean hasNonTestDefaultUsers() {
         UserManagerInternal userManager = mInjector.getUserManagerInternal();
         // Headless system user mode has two default users: system and main/primary users.
-        int numOfDefaultUsers = userManager.isHeadlessSystemUserMode()
-                ? 2 : 1;
+        int numOfDefaultUsers = userManager.isHeadlessSystemUserMode() ? 2 : 1;
         List<UserInfo> users = userManager.getUsers(true);
         return users.stream().filter(user -> !user.isForTesting()).count() > numOfDefaultUsers;
     }
@@ -727,8 +740,8 @@ public class SupervisionService extends ISupervisionManager.Stub {
             pw.println("SupervisionService state:");
             pw.increaseIndent();
 
-            pw.println("bypassingRoleQualification: "
-                    + mAllowBypassingSupervisionRoleQualification);
+            pw.println(
+                    "bypassingRoleQualification: " + mAllowBypassingSupervisionRoleQualification);
             pw.println();
 
             List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(false);
@@ -845,8 +858,8 @@ public class SupervisionService extends ISupervisionManager.Stub {
                             userId, listener -> listener.onSetSupervisionEnabled(userId, false));
                     if (Flags.appBindingServiceRework()) {
                         Objects.requireNonNull(mInjector.getAppBindingService())
-                                .unbindAndRemoveInvalidConnections(userId,
-                                        SupervisionAppServiceFinder.class);
+                                .unbindAndRemoveInvalidConnections(
+                                        userId, SupervisionAppServiceFinder.class);
                     }
                     clearAllDevicePoliciesAndSuspendedPackages(userId);
                     clearAllPolicies(userId);
@@ -936,27 +949,34 @@ public class SupervisionService extends ISupervisionManager.Stub {
         abs.dispatchAppServiceEvent(
                 SupervisionAppServiceFinder.class,
                 userId,
-                connection -> {
-                    ISupervisionListener binder =
-                            (ISupervisionListener) connection.getServiceBinder();
-                    String target = connection.getPackageName();
-                    if (binder == null) {
-                        if (DEBUG) {
-                            Slogf.i(
-                                    SupervisionLog.TAG,
-                                    "Failed to connect to SupervisionAppService in %s",
-                                    target);
-                        }
-                    } else {
-                        if (DEBUG) {
-                            Slogf.i(
-                                    SupervisionLog.TAG,
-                                    "Connected to SupervisionAppService in %s",
-                                    target);
-                        }
-                        action.accept(binder);
-                    }
-                });
+                connection -> onAppServiceConnection(connection, action));
+    }
+
+    private void onAppServiceConnection(AppServiceConnection connection,
+            @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> action) {
+        if (Flags.enableTimeoutInDispatchAppServiceEvent() &&
+                (connection == null || !connection.isConnected())) {
+            return;
+        }
+        ISupervisionListener binder =
+                (ISupervisionListener) connection.getServiceBinder();
+        String target = connection.getPackageName();
+        if (binder == null) {
+            if (DEBUG) {
+                Slogf.i(
+                        SupervisionLog.TAG,
+                        "Failed to connect to SupervisionAppService in %s",
+                        target);
+            }
+        } else {
+            if (DEBUG) {
+                Slogf.i(
+                        SupervisionLog.TAG,
+                        "Connected to SupervisionAppService in %s",
+                        target);
+            }
+            action.accept(binder);
+        }
     }
 
     private void clearAllDevicePoliciesAndSuspendedPackages(@UserIdInt int userId) {

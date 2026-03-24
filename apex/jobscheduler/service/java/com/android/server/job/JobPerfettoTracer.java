@@ -16,8 +16,7 @@
 
 package com.android.server.job;
 
-import android.os.PerfettoTrace;
-import android.os.PerfettoTrackEventExtra;
+import android.os.PerfettoCategories;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.dev.perfetto.sdk.PerfettoTrackEventBuilder;
@@ -36,12 +35,7 @@ public abstract class JobPerfettoTracer {
      * Creates a new instance of the appropriate {@link JobPerfettoTracer} implementation.
      */
     public static JobPerfettoTracer create() {
-        if (!Flags.usePerfettoSdkForTracing()) {
-            return new JobPerfettoTracerNoOp();
-        }
-        return PerfettoTrace.IS_USE_SDK_TRACING_API_V3
-                ? new JobPerfettoTracer.JobPerfettoTracerV3()
-                : new JobPerfettoTracer.JobPerfettoTracerLegacy();
+        return new JobPerfettoTracer.JobPerfettoTracerV3();
     }
 
     /**
@@ -72,29 +66,10 @@ public abstract class JobPerfettoTracer {
      */
     @VisibleForTesting
     protected boolean isTraceEnabled() {
-        return PerfettoTrace.isJobSchedulerCategoryEnabled();
-    }
-
-    static final class JobPerfettoTracerNoOp extends JobPerfettoTracer {
-        @Override
-        public JobPerfettoTracer startEvent(String eventName) {
-            return this;
+        if (android.os.Flags.perfettoSdkTracingV3()) {
+            return PerfettoCategories.JOB_SCHEDULER_CATEGORY.isEnabled();
         }
-
-        @Override
-        public JobPerfettoTracer addField(long fieldId, long value) {
-            return this;
-        }
-
-        @Override
-        public void emit() {
-            // No-op
-        }
-
-        @Override
-        protected boolean isTraceEnabled() {
-            return false;
-        }
+        return false;
     }
 
     static final class JobPerfettoTracerV3 extends JobPerfettoTracer {
@@ -104,33 +79,7 @@ public abstract class JobPerfettoTracer {
         public JobPerfettoTracer startEvent(String eventName) {
             mBuilder =
                     com.android.internal.dev.perfetto.sdk.PerfettoTrace.instant(
-                                    PerfettoTrace.JOB_SCHEDULER_CATEGORY_V3,
-                                    eventName)
-                            .beginProto()
-                            .beginNested(JOB_SCHEDULER_JOB_FIELD_ID);
-            return this;
-        }
-
-        @Override
-        public JobPerfettoTracer addField(long fieldId, long value) {
-            mBuilder.addField(fieldId, value);
-            return this;
-        }
-
-        @Override
-        public void emit() {
-            mBuilder.endNested().endProto().emit();
-        }
-    }
-
-    static final class JobPerfettoTracerLegacy extends JobPerfettoTracer {
-        private PerfettoTrackEventExtra.Builder mBuilder;
-
-        @Override
-        public JobPerfettoTracer startEvent(String eventName) {
-            mBuilder =
-                    PerfettoTrace.instant(
-                                    PerfettoTrace.JOB_SCHEDULER_CATEGORY,
+                                    PerfettoCategories.JOB_SCHEDULER_CATEGORY,
                                     eventName)
                             .beginProto()
                             .beginNested(JOB_SCHEDULER_JOB_FIELD_ID);

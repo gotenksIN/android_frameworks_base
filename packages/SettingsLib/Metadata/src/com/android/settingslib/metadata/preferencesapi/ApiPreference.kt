@@ -17,9 +17,12 @@
 package com.android.settingslib.metadata.preferencesapi
 
 import android.content.Context
+import android.os.Process
+import android.os.UserHandle
 import android.provider.Settings
+import android.util.Log
 import androidx.annotation.StringRes
-import com.android.settingslib.utils.applications.AppUtils
+import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.datastore.KeyValueStore
 import com.android.settingslib.datastore.NoOpKeyedObservable
 import com.android.settingslib.datastore.Permissions
@@ -27,13 +30,18 @@ import com.android.settingslib.datastore.and
 import com.android.settingslib.datastore.or
 import com.android.settingslib.metadata.PersistentPreference
 import com.android.settingslib.metadata.ReadWritePermit
+import com.android.settingslib.metadata.ValidatedKeyParameters
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageAlreadyDefined
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleDefines
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageWrongOrder
-import com.android.settingslib.metadata.ValidatedKeyParameters
+import com.android.settingslib.metadata.preferencesapi.multiusers.PreferenceTarget
 import com.android.settingslib.metadata.preferencesapi.preconditions.Allowed
 import com.android.settingslib.metadata.preferencesapi.preconditions.ApiPreconditions
 import com.android.settingslib.metadata.preferencesapi.preconditions.Disallowed
 import com.android.settingslib.metadata.preferencesapi.types.ApiType
+import com.android.settingslib.metadata.preferencesapi.types.CustomEnum
+import com.android.settingslib.metadata.preferencesapi.types.EnumApi
+import com.android.settingslib.utils.applications.AppUtils
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -42,12 +50,16 @@ import kotlinx.coroutines.runBlocking
  * operations, ensuring that each operation has a consistent and secure context to run in.
  *
  * @property context The application context, used for accessing system services and resources.
+ * @property userId The user id of the user to which the preference belongs.
+ * @property userHandle The user handle of the user to which the preference belongs.
  * @property parameters A map of validated key-value pairs that can be used to parameterize
  *   the behavior of the preference. These parameters are derived from the preference screen's
  *   configuration and are guaranteed to be valid.
  */
 class ApiOperationContext(
     val context: Context,
+    val userId: Int = Process.myUserHandle().hashCode(),
+    val userHandle: UserHandle = Process.myUserHandle(),
     val parameters: ValidatedKeyParameters
 )
 
@@ -118,11 +130,52 @@ class ValuePreconditionsConfig<V : Any> private constructor(
         resolveString(context, descriptionRes, description)
 }
 
+/**
+ * Configuration of the [ApiPreference] set operation's warning. If preconditions are defined,
+ * warning is triggered based on them.
+ */
+class WarningConfig<V : Any> private constructor(
+    @StringRes val warningRes: Int?,
+    val warning: String?,
+    val preconditions: PreconditionsConfig?,
+    val valuePreconditions: ValuePreconditionsConfig<V>?,
+) {
+    init {
+        require(warningRes != null || warning != null)
+    }
+
+    constructor(
+        @StringRes warning: Int,
+        preconditions: PreconditionsConfig? = null,
+        valuePreconditions: ValuePreconditionsConfig<V>? = null,
+    ) : this(
+        warningRes = warning,
+        warning = null,
+        preconditions = preconditions,
+        valuePreconditions = valuePreconditions
+    )
+
+    constructor(
+        warning: String,
+        preconditions: PreconditionsConfig? = null,
+        valuePreconditions: ValuePreconditionsConfig<V>? = null,
+    ) : this(
+        warningRes = null,
+        warning = warning,
+        preconditions = preconditions,
+        valuePreconditions = valuePreconditions
+    )
+
+    /** Get the warning message as a string using the provided context. */
+    fun getWarning(context: Context): String = resolveString(context, warningRes, warning)
+}
+
 /** Configuration of the [ApiPreference] set. */
 class SetConfig<V : Any>(
     val permissions: Permissions? = null,
     val preconditions: PreconditionsConfig? = null,
     val valuePreconditions: ValuePreconditionsConfig<V>? = null,
+    val warning: WarningConfig<V>? = null,
     val execute: (suspend ApiOperationContext.(V) -> Unit)
 )
 
@@ -132,9 +185,17 @@ class SetConfig<V : Any>(
  * produced when an Engineer in a partner team migrates their preference to Catalyst using the 2026
  * "Lightweight" way. It sets suitable defaults, and converts between the code we are asking
  * partner teams to write and the methods which Catalyst expects.
+ *
+ * @property flagConfig Flag configuration for the preference.
+ * @property appliesTo The [PreferenceTarget] to which the preference applies.
  */
-abstract class ApiPreference<V : Any>(val flagConfig: FlagConfig?) : PersistentPreference<V> {
+abstract class ApiPreference<V : Any>(
+    val flagConfig: FlagConfig?,
+    val appliesTo: PreferenceTarget
+) : PersistentPreference<V> {
     companion object {
+        private const val TAG = "ApiPreference"
+
         private const val VALUE_TYPE_MISMATCH_ERROR = "Value type mismatch. Expected %s, got %s"
 
         private fun buildValueTypeMismatchError(expected: Class<*>, actual: Class<*>) =
@@ -175,7 +236,7 @@ abstract class ApiPreference<V : Any>(val flagConfig: FlagConfig?) : PersistentP
      * @return An initialized [ApiOperationContext] instance.
      */
     private fun getApiOperationContext(context: Context) =
-        ApiOperationContext(context, cachedKeyParameters)
+        ApiOperationContext(context = context, parameters = cachedKeyParameters)
 
     /**
      * Evaluates preconditions in order: screen-level, common, and operation-specific.
@@ -189,14 +250,26 @@ abstract class ApiPreference<V : Any>(val flagConfig: FlagConfig?) : PersistentP
         val operationContext: ApiOperationContext by lazy { getApiOperationContext(context) }
 
         screenPreconditions?.check(operationContext)?.let {
+            if (it is Disallowed) {
+                Log.d(TAG, "Screen precondition failed: ${it.getReason(context)}")
+            }
+
             if (it != Allowed) return it
         }
 
         preconditions?.check(operationContext)?.let {
+            if (it is Disallowed) {
+                Log.d(TAG, "Preference precondition failed: ${it.getReason(context)}")
+            }
+
             if (it != Allowed) return it
         }
 
         operationPreconditions?.check(operationContext)?.let {
+            if (it is Disallowed) {
+                Log.d(TAG, "Operation precondition failed: ${it.getReason(context)}")
+            }
+
             if (it != Allowed) return it
         }
 
@@ -288,6 +361,16 @@ abstract class ApiPreference<V : Any>(val flagConfig: FlagConfig?) : PersistentP
      */
     abstract val getScreenParameters: () -> ValidatedKeyParameters?
 
+    /**
+     * A function that returns the key parameters schema for the preference.
+    */
+    abstract val getParametersSchema: () -> KeyParametersSchema?
+
+    /**
+     * A function that returns the validated key parameters for the preference.
+     */
+    abstract val getParameters: () -> ValidatedKeyParameters?
+
     /** Preference's permission on the screen level. */
     abstract val screenPermissions: Permissions?
 
@@ -311,6 +394,144 @@ abstract class ApiPreference<V : Any>(val flagConfig: FlagConfig?) : PersistentP
     abstract val type: ApiType<V>
 }
 
+/**
+ * Warning configuration builder for an [ApiPreference] set operation. The warning message can be
+ * triggered in two ways:
+ * * always triggered if using just a warning message;
+ * * conditionally triggered by using preconditions or value preconditions before the warning
+ * message.
+ *
+ * ```
+ * warning {
+ *     warn("Foo warning")
+ * }
+ * ```
+ *
+ * or
+ *
+ * ```
+ * warning {
+ *     preconditions("Foo description") { ... }
+ *     warn("Bar warning")
+ * }
+ * ```
+ *
+ * or
+ *
+ * ```
+ * warning {
+ *     valuePreconditions("Foo description") { value -> ... }
+ *     warn("Bar warning")
+ * }
+ * ```
+ */
+@ApiPreferenceDsl
+class WarningConfigBuilder<V : Any> {
+    private var preconditionsConfig: PreconditionsConfig? = null
+    private var valuePreconditionsConfig: ValuePreconditionsConfig<V>? = null
+    private var warning: String? = null
+    private var warningRes: Int? = null
+
+    /**
+     * Defines a precondition check that will trigger the warning in case of [Allowed], with a
+     * string resource description.
+     */
+    fun preconditions(
+        @StringRes description: Int,
+        lambda: suspend ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    /**
+     * Defines a precondition check that will trigger the warning in case of [Allowed], with a
+     * string description.
+     */
+    fun preconditions(
+        description: String,
+        lambda: suspend ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    private fun setPreconditions(config: PreconditionsConfig) {
+        if (preconditionsConfig != null || valuePreconditionsConfig != null) {
+            error(getExceptionMessageAlreadyDefined("preconditions or valuePreconditions"))
+        }
+
+        if (warning != null || warningRes != null) {
+            error(getExceptionMessageWrongOrder("preconditions"))
+        }
+
+        preconditionsConfig = config
+    }
+
+    /**
+     * Defines a precondition check that will trigger the warning in case of [Allowed], with a
+     * string resource description.
+     */
+    fun valuePreconditions(
+        @StringRes description: Int,
+        lambda: suspend ApiOperationContext.(V) -> ApiPreconditions
+    ) {
+        setValuePreconditions(ValuePreconditionsConfig(description, lambda))
+    }
+
+    /**
+     * Defines a precondition check that will trigger the warning in case of [Allowed], with a
+     * string description.
+     */
+    fun valuePreconditions(
+        description: String,
+        lambda: suspend ApiOperationContext.(V) -> ApiPreconditions
+    ) {
+        setValuePreconditions(ValuePreconditionsConfig(description, lambda))
+    }
+
+    private fun setValuePreconditions(config: ValuePreconditionsConfig<V>) {
+        if (preconditionsConfig != null || valuePreconditionsConfig != null) {
+            error(getExceptionMessageAlreadyDefined("preconditions or valuePreconditions"))
+        }
+
+        if (warning != null || warningRes != null) {
+            error(getExceptionMessageWrongOrder("valuePreconditions"))
+        }
+
+        valuePreconditionsConfig = config
+    }
+
+    /**
+     * Sets the warning message as a string resource to display when triggered before setting a
+     * value.
+     */
+    fun warn(@StringRes message: Int) {
+        if (warning != null || warningRes != null) {
+            error(getExceptionMessageMultipleDefines("warn"))
+        }
+        warningRes = message
+    }
+
+    /** Sets the warning message as a string to display when triggered before setting a value. */
+    fun warn(message: String) {
+        if (warning != null || warningRes != null) {
+            error(getExceptionMessageMultipleDefines("warn"))
+        }
+        warning = message
+    }
+
+    internal fun build(): WarningConfig<V> {
+        return when {
+            warning != null ->
+                WarningConfig(warning = warning!!, preconditions = preconditionsConfig, valuePreconditions = valuePreconditionsConfig)
+
+            warningRes != null ->
+                WarningConfig(warning = warningRes!!, preconditions = preconditionsConfig, valuePreconditions = valuePreconditionsConfig)
+
+            else -> error("warning 'warn' block is required")
+        }
+    }
+}
+
 @DslMarker
 internal annotation class ApiPreferenceDsl
 
@@ -327,7 +548,7 @@ internal annotation class ApiPreferenceDsl
  * ```
  */
 @ApiPreferenceDsl
-class GetConfigBuilder<V : Any> {
+class GetConfigBuilder<V : Any>(private val type: ApiType<V>) {
     private var permissionsConfig: Permissions? = null
     private var preconditionsConfig: PreconditionsConfig? = null
     private var executeBlock: (suspend ApiOperationContext.() -> V)? = null
@@ -405,6 +626,24 @@ class GetConfigBuilder<V : Any> {
         executeBlock = lambda
     }
 
+    /**
+     * Declare the execute block of the get.
+     *
+     *
+     * This is used for enum types as an alternative to the `execute` block.
+     */
+    fun executeEnum(lambda: suspend ApiOperationContext.() -> EnumApi<V>) {
+        if (executeBlock != null) {
+            error(getExceptionMessageMultipleDefines("executeEnum"))
+        }
+
+        if (type !is CustomEnum<V, *>) {
+            error("executeEnum is only supported for CustomEnum types")
+        }
+
+        executeBlock = { lambda().asApiValue }
+    }
+
     internal fun build(): GetConfig<V> {
         return GetConfig(
             permissions = permissionsConfig,
@@ -427,10 +666,11 @@ class GetConfigBuilder<V : Any> {
  * ```
  */
 @ApiPreferenceDsl
-class SetConfigBuilder<V : Any> {
+class SetConfigBuilder<V : Any>(private val type: ApiType<V>) {
     private var permissionsConfig: Permissions? = null
     private var preconditionsConfig: PreconditionsConfig? = null
     private var valuePreconditionsConfig: ValuePreconditionsConfig<V>? = null
+    private var warningConfig: WarningConfig<V>? = null
     private var executeBlock: (suspend ApiOperationContext.(V) -> Unit)? = null
 
     /** Sets permissions for the set. */
@@ -439,7 +679,7 @@ class SetConfigBuilder<V : Any> {
             error(getExceptionMessageMultipleDefines("permissions"))
         }
 
-        if (preconditionsConfig != null || valuePreconditionsConfig != null || executeBlock != null) {
+        if (preconditionsConfig != null || valuePreconditionsConfig != null || warningConfig != null || executeBlock != null) {
             error(getExceptionMessageWrongOrder("permissions"))
         }
 
@@ -487,7 +727,7 @@ class SetConfigBuilder<V : Any> {
             error(getExceptionMessageMultipleDefines("preconditions"))
         }
 
-        if (valuePreconditionsConfig != null || executeBlock != null) {
+        if (valuePreconditionsConfig != null || warningConfig != null || executeBlock != null) {
             error(getExceptionMessageWrongOrder("preconditions"))
         }
 
@@ -521,11 +761,26 @@ class SetConfigBuilder<V : Any> {
             error(getExceptionMessageMultipleDefines("valuePreconditions"))
         }
 
-        if (executeBlock != null) {
+        if (warningConfig != null || executeBlock != null) {
             error(getExceptionMessageWrongOrder("valuePreconditions"))
         }
 
         valuePreconditionsConfig = config
+    }
+
+    /** Defines a warning to be triggered before setting the value. */
+    fun warning(lambda: WarningConfigBuilder<V>.() -> Unit) {
+        if (warningConfig != null) {
+            error(getExceptionMessageMultipleDefines("warning"))
+        }
+
+        if (executeBlock != null) {
+            error(getExceptionMessageWrongOrder("warning"))
+        }
+
+        val builder = WarningConfigBuilder<V>()
+        builder.lambda()
+        warningConfig = builder.build()
     }
 
     /** Declare the execute block of the set. */
@@ -537,11 +792,29 @@ class SetConfigBuilder<V : Any> {
         executeBlock = lambda
     }
 
+    /**
+     * Declare the execute block of the set.
+     *
+     * This is used for enum types as an alternative to the `execute` block.
+     */
+    fun executeEnum(lambda: suspend ApiOperationContext.(EnumApi<V>) -> Unit) {
+        if (executeBlock != null) {
+            error(getExceptionMessageMultipleDefines("execute"))
+        }
+        if (type !is CustomEnum<V, *>) {
+            error("executeEnum is only supported for CustomEnum types")
+        }
+
+        executeBlock =
+            { value -> lambda(type.fromApiValue(value) ?: error("Invalid enum value: $value")) }
+    }
+
     internal fun build(): SetConfig<V> {
         return SetConfig(
             permissions = permissionsConfig,
             preconditions = preconditionsConfig,
             valuePreconditions = valuePreconditionsConfig,
+            warning = warningConfig,
             execute = executeBlock ?: error("Set 'execute' block is required")
         )
     }
@@ -568,16 +841,19 @@ class ApiPreferenceConfigBuilder<V : Any>(
     val key: String,
     @StringRes val purpose: Int,
     val type: ApiType<V>,
-    val valueType: Class<V>,
+    val appliesTo: PreferenceTarget,
     val screenPermissions: Permissions?,
     val screenPreconditions: PreconditionsConfig?,
+    val getScreenParameterSchema: () -> KeyParametersSchema?,
     val getScreenParameters: () -> ValidatedKeyParameters?
 ) {
     private var flagConfig: FlagConfig? = null
     private var permissionsConfig: Permissions? = null
     private var preconditionsConfig: PreconditionsConfig? = null
+    private var tagsList: List<String>? = null
     private var getConfig: GetConfig<V>? = null
     private var setConfig: SetConfig<V>? = null
+    private val valueType: Class<V> = type.getType()
 
     /**
      * Build the [FlagConfig] from the given block.
@@ -587,7 +863,7 @@ class ApiPreferenceConfigBuilder<V : Any>(
             error(getExceptionMessageMultipleDefines("flag"))
         }
 
-        if (permissionsConfig != null || preconditionsConfig != null || getConfig != null || setConfig != null) {
+        if (permissionsConfig != null || preconditionsConfig != null || tagsList != null || getConfig != null || setConfig != null) {
             error(getExceptionMessageWrongOrder("flag"))
         }
 
@@ -597,6 +873,21 @@ class ApiPreferenceConfigBuilder<V : Any>(
             }
             lambda()
         }
+    }
+
+    /**
+     * Sets tags.
+     */
+    fun tags(vararg tags: String) {
+        if (tagsList != null) {
+            error(getExceptionMessageMultipleDefines("tags"))
+        }
+
+        if (getConfig != null || setConfig != null) {
+            error(getExceptionMessageWrongOrder("tags"))
+        }
+
+        tagsList = tags.toList()
     }
 
     /**
@@ -673,7 +964,7 @@ class ApiPreferenceConfigBuilder<V : Any>(
             error(getExceptionMessageWrongOrder("get"))
         }
 
-        val builder = GetConfigBuilder<V>()
+        val builder = GetConfigBuilder<V>(type)
         builder.lambda()
         getConfig = builder.build()
     }
@@ -686,23 +977,29 @@ class ApiPreferenceConfigBuilder<V : Any>(
             error(getExceptionMessageMultipleDefines("set"))
         }
 
-        val builder = SetConfigBuilder<V>()
+        val builder = SetConfigBuilder<V>(type)
         builder.lambda()
         setConfig = builder.build()
     }
 
     /** Create an instance of [ApiPreference] from its configuration. */
-    fun build() = object : ApiPreference<V>(flagConfig) {
+    fun build() = object : ApiPreference<V>(flagConfig, appliesTo) {
         override val screenPermissions = this@ApiPreferenceConfigBuilder.screenPermissions
         override val screenPreconditions = this@ApiPreferenceConfigBuilder.screenPreconditions
         override val permissions: Permissions? = permissionsConfig
         override val preconditions: PreconditionsConfig? = preconditionsConfig
+        override fun tags(context: Context): Array<String> =
+            (tagsList?.toTypedArray() ?: emptyArray()) + "api-first"
+
         override val get: GetConfig<V> = getConfig ?: error("'get' block is required")
         override val set: SetConfig<V>? = setConfig
         override val type: ApiType<V> = this@ApiPreferenceConfigBuilder.type
         override val valueType: Class<V> = this@ApiPreferenceConfigBuilder.valueType
         override val key: String = this@ApiPreferenceConfigBuilder.key
         override val purpose: Int = this@ApiPreferenceConfigBuilder.purpose
-        override val getScreenParameters: () -> ValidatedKeyParameters? = this@ApiPreferenceConfigBuilder.getScreenParameters
+        override val getScreenParameters: () -> ValidatedKeyParameters? =
+            this@ApiPreferenceConfigBuilder.getScreenParameters
+        override val getParametersSchema: () -> KeyParametersSchema? = this@ApiPreferenceConfigBuilder.getScreenParameterSchema
+        override val getParameters: () -> ValidatedKeyParameters? = this@ApiPreferenceConfigBuilder.getScreenParameters
     }
 }

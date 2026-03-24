@@ -14,6 +14,7 @@ package android {
     field public static final String ACCESS_CHECKIN_PROPERTIES = "android.permission.ACCESS_CHECKIN_PROPERTIES";
     field public static final String ACCESS_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION";
     field public static final String ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION";
+    field @FlaggedApi("com.android.hardware.input.hid_api") public static final String ACCESS_HID = "android.permission.ACCESS_HID";
     field @FlaggedApi("android.multiuser.enable_permission_to_access_hidden_profiles") public static final String ACCESS_HIDDEN_PROFILES = "android.permission.ACCESS_HIDDEN_PROFILES";
     field @FlaggedApi("android.provider.launcher_data_access") public static final String ACCESS_LAUNCHER_DATA = "android.permission.ACCESS_LAUNCHER_DATA";
     field @FlaggedApi("android.permission.flags.access_local_network_permission_enabled") public static final String ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK";
@@ -41,7 +42,6 @@ package android {
     field public static final String BIND_COMPANION_DEVICE_SERVICE = "android.permission.BIND_COMPANION_DEVICE_SERVICE";
     field public static final String BIND_CONDITION_PROVIDER_SERVICE = "android.permission.BIND_CONDITION_PROVIDER_SERVICE";
     field @FlaggedApi("android.permission.flags.content_restriction_role_enabled") public static final String BIND_CONTENT_RESTRICTION_SERVICE = "android.permission.BIND_CONTENT_RESTRICTION_SERVICE";
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_CONTEXT_COMPONENT_SERVICE = "android.permission.BIND_CONTEXT_COMPONENT_SERVICE";
     field public static final String BIND_CONTROLS = "android.permission.BIND_CONTROLS";
     field public static final String BIND_CREDENTIAL_PROVIDER_SERVICE = "android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE";
     field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final String BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE = "android.permission.BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE";
@@ -49,7 +49,6 @@ package android {
     field public static final String BIND_DREAM_SERVICE = "android.permission.BIND_DREAM_SERVICE";
     field public static final String BIND_INCALL_SERVICE = "android.permission.BIND_INCALL_SERVICE";
     field public static final String BIND_INPUT_METHOD = "android.permission.BIND_INPUT_METHOD";
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_INSIGHT_RENDERER_SERVICE = "android.permission.BIND_INSIGHT_RENDERER_SERVICE";
     field public static final String BIND_MIDI_DEVICE_SERVICE = "android.permission.BIND_MIDI_DEVICE_SERVICE";
     field public static final String BIND_NFC_SERVICE = "android.permission.BIND_NFC_SERVICE";
     field public static final String BIND_NOTIFICATION_LISTENER_SERVICE = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE";
@@ -89,7 +88,6 @@ package android {
     field public static final String CHANGE_COMPONENT_ENABLED_STATE = "android.permission.CHANGE_COMPONENT_ENABLED_STATE";
     field public static final String CHANGE_CONFIGURATION = "android.permission.CHANGE_CONFIGURATION";
     field public static final String CHANGE_NETWORK_STATE = "android.permission.CHANGE_NETWORK_STATE";
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String CHANGE_PERSONAL_CONTEXT_MODE = "android.permission.CHANGE_PERSONAL_CONTEXT_MODE";
     field public static final String CHANGE_WIFI_MULTICAST_STATE = "android.permission.CHANGE_WIFI_MULTICAST_STATE";
     field public static final String CHANGE_WIFI_STATE = "android.permission.CHANGE_WIFI_STATE";
     field public static final String CLEAR_APP_CACHE = "android.permission.CLEAR_APP_CACHE";
@@ -184,6 +182,7 @@ package android {
     field public static final String MANAGE_DEVICE_POLICY_INSTALL_UNKNOWN_SOURCES = "android.permission.MANAGE_DEVICE_POLICY_INSTALL_UNKNOWN_SOURCES";
     field public static final String MANAGE_DEVICE_POLICY_KEEP_UNINSTALLED_PACKAGES = "android.permission.MANAGE_DEVICE_POLICY_KEEP_UNINSTALLED_PACKAGES";
     field public static final String MANAGE_DEVICE_POLICY_KEYGUARD = "android.permission.MANAGE_DEVICE_POLICY_KEYGUARD";
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_keyguard_status") public static final String MANAGE_DEVICE_POLICY_KEYGUARD_STATUS = "android.permission.MANAGE_DEVICE_POLICY_KEYGUARD_STATUS";
     field public static final String MANAGE_DEVICE_POLICY_LOCALE = "android.permission.MANAGE_DEVICE_POLICY_LOCALE";
     field public static final String MANAGE_DEVICE_POLICY_LOCATION = "android.permission.MANAGE_DEVICE_POLICY_LOCATION";
     field public static final String MANAGE_DEVICE_POLICY_LOCK = "android.permission.MANAGE_DEVICE_POLICY_LOCK";
@@ -575,7 +574,7 @@ package android {
     field public static final int backgroundTint = 16843883; // 0x101046b
     field public static final int backgroundTintMode = 16843884; // 0x101046c
     field public static final int backupAgent = 16843391; // 0x101027f
-    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final int backupAgentProcess;
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final int backupAgentProcess = 16844470; // 0x10106b6
     field public static final int backupInForeground = 16844058; // 0x101051a
     field public static final int banner = 16843762; // 0x10103f2
     field public static final int baseline = 16843548; // 0x101031c
@@ -1002,7 +1001,6 @@ package android {
     field public static final int htmlDescription = 16844299; // 0x101060b
     field public static final int hyphenationFrequency = 16843998; // 0x10104de
     field public static final int icon = 16842754; // 0x1010002
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final int iconColor;
     field @Deprecated public static final int iconPreview = 16843337; // 0x1010249
     field public static final int iconSpaceReserved = 16844129; // 0x1010561
     field public static final int iconTint = 16844126; // 0x101055e
@@ -1257,7 +1255,7 @@ package android {
     field public static final int multiprocess = 16842771; // 0x1010013
     field public static final int name = 16842755; // 0x1010003
     field public static final int nativeHeapZeroInitialized = 16844325; // 0x1010625
-    field @FlaggedApi("android.os.native_framework_prototype") public static final int nativeService;
+    field @FlaggedApi("android.os.native_framework_prototype") public static final int nativeService = 16844462; // 0x10106ae
     field @Deprecated public static final int navigationBarColor = 16843858; // 0x1010452
     field @Deprecated public static final int navigationBarDividerColor = 16844141; // 0x101056d
     field public static final int navigationContentDescription = 16843969; // 0x10104c1
@@ -1378,7 +1376,7 @@ package android {
     field public static final int previewLayout = 16844327; // 0x1010627
     field public static final int primaryContentAlpha = 16844114; // 0x1010552
     field public static final int priority = 16842780; // 0x101001c
-    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final int privateComputeCore;
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final int privateComputeCore = 16844469; // 0x10106b5
     field public static final int privateImeOptions = 16843299; // 0x1010223
     field public static final int process = 16842769; // 0x1010011
     field public static final int progress = 16843063; // 0x1010137
@@ -1553,7 +1551,7 @@ package android {
     field public static final int sharedUserMaxSdkVersion = 16844365; // 0x101064d
     field public static final int shell = 16844180; // 0x1010594
     field @FlaggedApi("com.android.text.flags.use_bounds_for_width") public static final int shiftDrawingOffsetForStartOverhang = 16844450; // 0x10106a2
-    field @FlaggedApi("android.view.inputmethod.ime_subtype_short_label") public static final int shortLabel;
+    field @FlaggedApi("android.view.inputmethod.ime_subtype_short_label") public static final int shortLabel = 16844468; // 0x10106b4
     field public static final int shortcutDisabledMessage = 16844075; // 0x101052b
     field public static final int shortcutId = 16844072; // 0x1010528
     field public static final int shortcutLongLabel = 16844074; // 0x101052a
@@ -1661,8 +1659,6 @@ package android {
     field public static final int subtypeLocale = 16843673; // 0x1010399
     field public static final int suggestActionMsg = 16843228; // 0x10101dc
     field public static final int suggestActionMsgColumn = 16843229; // 0x10101dd
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final int suggestionBackgroundColor;
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final int suggestionCornerRadius;
     field public static final int suggestionRowLayout = 16843910; // 0x1010486
     field public static final int summary = 16843241; // 0x10101e9
     field public static final int summaryColumn = 16843426; // 0x10102a2
@@ -1877,9 +1873,9 @@ package android {
     field public static final int useLevel = 16843167; // 0x101019f
     field @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public static final int useLocalePreferredLineHeightForMinimum = 16844445; // 0x101069d
     field public static final int userVisible = 16843409; // 0x1010291
-    field @FlaggedApi("android.service.voice.flags.enable_assist_resource_attributes") public static final int usesAssistData;
-    field @FlaggedApi("android.service.voice.flags.enable_assist_resource_attributes") public static final int usesAssistScreenshots;
-    field @FlaggedApi("android.service.voice.flags.enable_assist_resource_attributes") public static final int usesAssistStructureScreenContent;
+    field @FlaggedApi("android.service.voice.flags.enable_assist_resource_attributes") public static final int usesAssistData = 16844465; // 0x10106b1
+    field @FlaggedApi("android.service.voice.flags.enable_assist_resource_attributes") public static final int usesAssistScreenshots = 16844466; // 0x10106b2
+    field @FlaggedApi("android.service.voice.flags.enable_assist_resource_attributes") public static final int usesAssistStructureScreenContent = 16844467; // 0x10106b3
     field @Deprecated @FlaggedApi("android.security.deprecate_uses_cleartext_traffic2") public static final int usesCleartextTraffic = 16844012; // 0x10104ec
     field public static final int usesPermissionFlags = 16844356; // 0x1010644
     field public static final int value = 16842788; // 0x1010024
@@ -2004,8 +2000,8 @@ package android {
     field public static final int yesNoPreferenceStyle = 16842896; // 0x1010090
     field public static final int zAdjustment = 16843201; // 0x10101c1
     field public static final int zygotePreloadName = 16844189; // 0x101059d
-    field @FlaggedApi("android.os.native_app_zygote") public static final int zygotePreloadNativeFunc;
-    field @FlaggedApi("android.os.native_app_zygote") public static final int zygotePreloadNativeLib;
+    field @FlaggedApi("android.os.native_app_zygote") public static final int zygotePreloadNativeFunc = 16844464; // 0x10106b0
+    field @FlaggedApi("android.os.native_app_zygote") public static final int zygotePreloadNativeLib = 16844463; // 0x10106af
   }
 
   public static final class R.bool {
@@ -2099,15 +2095,15 @@ package android {
     field public static final int system_error_container_dark = 17170597; // 0x10600a5
     field public static final int system_error_container_light = 17170554; // 0x106007a
     field public static final int system_error_dark = 17170595; // 0x10600a3
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_error_dim_dark;
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_error_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_error_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_error_dim_light;
     field public static final int system_error_light = 17170552; // 0x1060078
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_on_surface_dark;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_on_surface_light;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_primary_dark;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_primary_light;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_surface_dark;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_surface_light;
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_on_surface_dark = 17170648; // 0x10600d8
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_on_surface_light = 17170642; // 0x10600d2
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_primary_dark = 17170649; // 0x10600d9
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_primary_light = 17170643; // 0x10600d3
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_surface_dark = 17170650; // 0x10600da
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_inverse_surface_light = 17170644; // 0x10600d4
     field public static final int system_neutral1_0 = 17170461; // 0x106001d
     field public static final int system_neutral1_10 = 17170462; // 0x106001e
     field public static final int system_neutral1_100 = 17170464; // 0x1060020
@@ -2144,13 +2140,21 @@ package android {
     field public static final int system_on_primary_container_light = 17170527; // 0x106005f
     field public static final int system_on_primary_dark = 17170572; // 0x106008c
     field public static final int system_on_primary_fixed = 17170614; // 0x10600b6
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_primary_fixed_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_primary_fixed_light;
     field public static final int system_on_primary_fixed_variant = 17170615; // 0x10600b7
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_primary_fixed_variant_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_primary_fixed_variant_light;
     field public static final int system_on_primary_light = 17170529; // 0x1060061
     field public static final int system_on_secondary_container_dark = 17170574; // 0x106008e
     field public static final int system_on_secondary_container_light = 17170531; // 0x1060063
     field public static final int system_on_secondary_dark = 17170576; // 0x1060090
     field public static final int system_on_secondary_fixed = 17170618; // 0x10600ba
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_secondary_fixed_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_secondary_fixed_light;
     field public static final int system_on_secondary_fixed_variant = 17170619; // 0x10600bb
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_secondary_fixed_variant_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_secondary_fixed_variant_light;
     field public static final int system_on_secondary_light = 17170533; // 0x1060065
     field public static final int system_on_surface_dark = 17170584; // 0x1060098
     field public static final int system_on_surface_disabled = 17170627; // 0x10600c3
@@ -2161,15 +2165,19 @@ package android {
     field public static final int system_on_tertiary_container_light = 17170535; // 0x1060067
     field public static final int system_on_tertiary_dark = 17170580; // 0x1060094
     field public static final int system_on_tertiary_fixed = 17170622; // 0x10600be
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_tertiary_fixed_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_tertiary_fixed_light;
     field public static final int system_on_tertiary_fixed_variant = 17170623; // 0x10600bf
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_tertiary_fixed_variant_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_on_tertiary_fixed_variant_light;
     field public static final int system_on_tertiary_light = 17170537; // 0x1060069
     field public static final int system_outline_dark = 17170594; // 0x10600a2
     field public static final int system_outline_disabled = 17170628; // 0x10600c4
     field public static final int system_outline_light = 17170551; // 0x1060077
     field public static final int system_outline_variant_dark = 17170625; // 0x10600c1
     field public static final int system_outline_variant_light = 17170624; // 0x10600c0
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_palette_key_color_error_dark;
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_palette_key_color_error_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_palette_key_color_error_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_palette_key_color_error_light;
     field public static final int system_palette_key_color_neutral_dark = 17170610; // 0x10600b2
     field public static final int system_palette_key_color_neutral_light = 17170567; // 0x1060087
     field public static final int system_palette_key_color_neutral_variant_dark = 17170611; // 0x10600b3
@@ -2183,23 +2191,31 @@ package android {
     field public static final int system_primary_container_dark = 17170569; // 0x1060089
     field public static final int system_primary_container_light = 17170526; // 0x106005e
     field public static final int system_primary_dark = 17170571; // 0x106008b
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_primary_dim_dark;
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_primary_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_primary_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_primary_dim_light;
     field public static final int system_primary_fixed = 17170612; // 0x10600b4
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_primary_fixed_dark;
     field public static final int system_primary_fixed_dim = 17170613; // 0x10600b5
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_primary_fixed_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_primary_fixed_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_primary_fixed_light;
     field public static final int system_primary_light = 17170528; // 0x1060060
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_scrim_dark;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_scrim_light;
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_scrim_dark = 17170651; // 0x10600db
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_scrim_light = 17170645; // 0x10600d5
     field public static final int system_secondary_container_dark = 17170573; // 0x106008d
     field public static final int system_secondary_container_light = 17170530; // 0x1060062
     field public static final int system_secondary_dark = 17170575; // 0x106008f
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_secondary_dim_dark;
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_secondary_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_secondary_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_secondary_dim_light;
     field public static final int system_secondary_fixed = 17170616; // 0x10600b8
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_secondary_fixed_dark;
     field public static final int system_secondary_fixed_dim = 17170617; // 0x10600b9
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_secondary_fixed_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_secondary_fixed_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_secondary_fixed_light;
     field public static final int system_secondary_light = 17170532; // 0x1060064
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_shadow_dark;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_shadow_light;
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_shadow_dark = 17170652; // 0x10600dc
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_shadow_light = 17170646; // 0x10600d6
     field public static final int system_surface_bright_dark = 17170590; // 0x106009e
     field public static final int system_surface_bright_light = 17170547; // 0x1060073
     field public static final int system_surface_container_dark = 17170587; // 0x106009b
@@ -2217,17 +2233,21 @@ package android {
     field public static final int system_surface_dim_light = 17170548; // 0x1060074
     field public static final int system_surface_disabled = 17170626; // 0x10600c2
     field public static final int system_surface_light = 17170540; // 0x106006c
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_surface_tint_dark;
-    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_surface_tint_light;
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_surface_tint_dark = 17170653; // 0x10600dd
+    field @FlaggedApi("android.os.material_colors_10_2024") public static final int system_surface_tint_light = 17170647; // 0x10600d7
     field public static final int system_surface_variant_dark = 17170592; // 0x10600a0
     field public static final int system_surface_variant_light = 17170549; // 0x1060075
     field public static final int system_tertiary_container_dark = 17170577; // 0x1060091
     field public static final int system_tertiary_container_light = 17170534; // 0x1060066
     field public static final int system_tertiary_dark = 17170579; // 0x1060093
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_tertiary_dim_dark;
-    field @FlaggedApi("android.os.material_colors_2025_03") public static final int system_tertiary_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_tertiary_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_tertiary_dim_light;
     field public static final int system_tertiary_fixed = 17170620; // 0x10600bc
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_tertiary_fixed_dark;
     field public static final int system_tertiary_fixed_dim = 17170621; // 0x10600bd
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_tertiary_fixed_dim_dark;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_tertiary_fixed_dim_light;
+    field @FlaggedApi("android.os.material_colors_2026_03") public static final int system_tertiary_fixed_light;
     field public static final int system_tertiary_light = 17170536; // 0x1060068
     field public static final int system_text_hint_inverse_dark = 17170606; // 0x10600ae
     field public static final int system_text_hint_inverse_light = 17170563; // 0x1060083
@@ -4857,7 +4877,6 @@ package android.app {
     method public boolean isLowRamDevice();
     method @Deprecated public static boolean isRunningInTestHarness();
     method public static boolean isRunningInUserTestHarness();
-    method @FlaggedApi("com.android.window.flags.enable_is_task_move_allowed_on_display_api") public boolean isTaskMoveAllowedOnDisplay(int);
     method public static boolean isUserAMonkey();
     method @RequiresPermission(android.Manifest.permission.KILL_BACKGROUND_PROCESSES) public void killBackgroundProcesses(String);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int);
@@ -5241,7 +5260,7 @@ package android.app {
     ctor public AppComponentFactory();
     method @NonNull public android.app.Activity instantiateActivity(@NonNull ClassLoader, @NonNull String, @Nullable android.content.Intent) throws java.lang.ClassNotFoundException, java.lang.IllegalAccessException, java.lang.InstantiationException;
     method @NonNull public android.app.Application instantiateApplication(@NonNull ClassLoader, @NonNull String) throws java.lang.ClassNotFoundException, java.lang.IllegalAccessException, java.lang.InstantiationException;
-    method @FlaggedApi("android.app.custom_backupagent_instantiation") @NonNull public android.app.backup.BackupAgent instantiateBackupAgent(@NonNull ClassLoader, @NonNull String) throws java.lang.ClassNotFoundException, java.lang.IllegalAccessException, java.lang.InstantiationException;
+    method @FlaggedApi("android.app.custom_backupagent_creation") @NonNull public android.app.backup.BackupAgent instantiateBackupAgent(@NonNull ClassLoader, @NonNull String) throws java.lang.ClassNotFoundException, java.lang.IllegalAccessException, java.lang.InstantiationException;
     method @NonNull public ClassLoader instantiateClassLoader(@NonNull ClassLoader, @NonNull android.content.pm.ApplicationInfo);
     method @NonNull public android.content.ContentProvider instantiateProvider(@NonNull ClassLoader, @NonNull String) throws java.lang.ClassNotFoundException, java.lang.IllegalAccessException, java.lang.InstantiationException;
     method @NonNull public android.content.BroadcastReceiver instantiateReceiver(@NonNull ClassLoader, @NonNull String, @Nullable android.content.Intent) throws java.lang.ClassNotFoundException, java.lang.IllegalAccessException, java.lang.InstantiationException;
@@ -6931,21 +6950,13 @@ package android.app {
   }
 
   @FlaggedApi("android.app.bridged_notifications") public static final class Notification.BridgedNotificationMetadata implements android.os.Parcelable {
-    ctor public Notification.BridgedNotificationMetadata(int, @NonNull String, @NonNull String, @NonNull String, @NonNull android.graphics.drawable.Icon);
+    ctor public Notification.BridgedNotificationMetadata(@NonNull String, @NonNull String, @NonNull String, @NonNull android.graphics.drawable.Icon);
     method public int describeContents();
     method @NonNull public android.graphics.drawable.Icon getAppIcon();
     method @NonNull public String getChannelId();
     method @NonNull public String getOriginDeviceName();
-    method public int getOriginDeviceType();
     method @NonNull public String getPackageName();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int BRIDGED_METADATA_TYPE_LAPTOP = 3; // 0x3
-    field public static final int BRIDGED_METADATA_TYPE_PHONE = 1; // 0x1
-    field public static final int BRIDGED_METADATA_TYPE_TABLET = 2; // 0x2
-    field public static final int BRIDGED_METADATA_TYPE_TV = 5; // 0x5
-    field public static final int BRIDGED_METADATA_TYPE_UNKNOWN = 0; // 0x0
-    field public static final int BRIDGED_METADATA_TYPE_WATCH = 4; // 0x4
-    field public static final int BRIDGED_METADATA_TYPE_XR = 6; // 0x6
     field @NonNull public static final android.os.Parcelable.Creator<android.app.Notification.BridgedNotificationMetadata> CREATOR;
   }
 
@@ -8467,6 +8478,7 @@ package android.app.admin {
     field public static final String CAMERA_DISABLED_POLICY = "cameraDisabled";
     field @FlaggedApi("android.app.admin.flags.common_criteria_mode_coexistence") public static final String COMMON_CRITERIA_MODE_POLICY = "commonCriteriaMode";
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String CONTENT_PROTECTION_POLICY = "contentProtection";
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final String CONTENT_RESTRICTION_APPS_POLICY = "contentRestrictionApps";
     field @FlaggedApi("android.app.admin.flags.cross_profile_widget_provider_bulk_apis") public static final String CROSS_PROFILE_WIDGET_PROVIDER_POLICY = "crossProfileWidgetProvider";
     field public static final String KEYGUARD_DISABLED_FEATURES_POLICY = "keyguardDisabledFeatures";
     field public static final String LOCK_TASK_POLICY = "lockTask";
@@ -8583,7 +8595,7 @@ package android.app.admin {
     method @Nullable public java.util.List<java.lang.String> getPermittedCrossProfileNotificationListeners(@NonNull android.content.ComponentName);
     method @Nullable @RequiresPermission(value=android.Manifest.permission.MANAGE_DEVICE_POLICY_INPUT_METHODS, conditional=true) public java.util.List<java.lang.String> getPermittedInputMethods(@Nullable android.content.ComponentName);
     method public int getPersonalAppsSuspendedReasons(@NonNull android.content.ComponentName);
-    method @FlaggedApi("android.app.admin.flags.policy_streamlining") public <T> T getPolicy(@NonNull android.app.admin.PolicyIdentifier<T>, int);
+    method @FlaggedApi("android.app.admin.flags.policy_streamlining") @Nullable public <T> T getPolicy(@NonNull android.app.admin.PolicyIdentifier<T>, int);
     method @NonNull public java.util.List<android.app.admin.PreferentialNetworkServiceConfig> getPreferentialNetworkServiceConfigs();
     method @RequiresPermission(value=android.Manifest.permission.MANAGE_DEVICE_POLICY_LOCK_CREDENTIALS, conditional=true) public int getRequiredPasswordComplexity();
     method public long getRequiredStrongAuthTimeout(@Nullable android.content.ComponentName);
@@ -8639,6 +8651,7 @@ package android.app.admin {
     method public static boolean isMtePolicyEnforced();
     method public boolean isNetworkLoggingEnabled(@Nullable android.content.ComponentName);
     method public boolean isOrganizationOwnedDeviceWithManagedProfile();
+    method @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS, "android.permission.WRITE_EMBEDDED_SUBSCRIPTIONS"}, conditional=true) public boolean isOutgoingTransferAllowedForSubscription(int);
     method public boolean isOverrideApnEnabled(@NonNull android.content.ComponentName);
     method @RequiresPermission(value=android.Manifest.permission.MANAGE_DEVICE_POLICY_PACKAGE_STATE, conditional=true) public boolean isPackageSuspended(@Nullable android.content.ComponentName, String) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean isPreferentialNetworkServiceEnabled();
@@ -9070,13 +9083,27 @@ package android.app.admin {
   }
 
   @FlaggedApi("android.app.admin.flags.policy_streamlining") public final class PolicyIdentifier<T> {
+    ctor public PolicyIdentifier(@NonNull String);
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> AUTO_TIME;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED = 3; // 0x3
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED_UNENFORCED = 1; // 0x1
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_ENABLED = 4; // 0x4
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_ENABLED_UNENFORCED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_USER_CHOICE = 0; // 0x0
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> AUTO_TIME_ZONE;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_DISABLED = 3; // 0x3
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_DISABLED_UNENFORCED = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_ENABLED = 4; // 0x4
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_ENABLED_UNENFORCED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time_zone") public static final int AUTO_TIME_ZONE_USER_CHOICE = 0; // 0x0
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.util.List<java.lang.String>> CONTENT_RESTRICTION_APPS;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_easter_eggs") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> EASTER_EGGS;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_easter_eggs") public static final int EASTER_EGGS_ALLOWED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_easter_eggs") public static final int EASTER_EGGS_DISALLOWED = 1; // 0x1
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.String> LOCKSCREEN_MESSAGE;
+    field @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") public static final int MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") public static final int MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.managed_esim_outgoing_transfer_policy") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> MANAGED_ESIM_OUTGOING_TRANSFER_POLICY;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> SCREEN_CAPTURE;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") public static final int SCREEN_CAPTURE_ALLOWED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") public static final int SCREEN_CAPTURE_DISALLOWED = 1; // 0x1
@@ -9796,8 +9823,11 @@ package android.app.contentrestriction {
   }
 
   @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionManager {
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") @NonNull public android.content.Intent createContentRestrictedIntent(@NonNull android.content.LocusId);
     method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public boolean isContentRestrictionEnabled();
-    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void requestClassification(@NonNull android.app.contentrestriction.ClassifiableContent, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void requestClassification(@NonNull android.app.contentrestriction.ClassifiableContent, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
+    field public static final String ACTION_SHOW_RESTRICTED_CONTENT_DETAILS = "android.app.contentrestriction.action.SHOW_RESTRICTED_CONTENT_DETAILS";
+    field public static final String EXTRA_CONTENT_LOCUS_ID = "android.app.contentrestriction.extra.CONTENT_LOCUS_ID";
   }
 
 }
@@ -10484,7 +10514,7 @@ package android.app.usage {
     method public String getClassName();
     method public android.content.res.Configuration getConfiguration();
     method public int getEventType();
-    method @FlaggedApi("android.app.usage.user_interaction_type_api") @NonNull public android.os.PersistableBundle getExtras();
+    method @NonNull public android.os.PersistableBundle getExtras();
     method public String getPackageName();
     method public String getShortcutId();
     method public long getTimeStamp();
@@ -10508,7 +10538,7 @@ package android.app.usage {
     field public static final int USER_INTERACTION = 7; // 0x7
   }
 
-  @FlaggedApi("android.app.usage.filter_based_event_query_api") public final class UsageEventsQuery implements android.os.Parcelable {
+  public final class UsageEventsQuery implements android.os.Parcelable {
     method public int describeContents();
     method public long getBeginTimeMillis();
     method public long getEndTimeMillis();
@@ -10549,11 +10579,11 @@ package android.app.usage {
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.ConfigurationStats> queryConfigurations(int, long, long);
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.EventStats> queryEventStats(int, long, long);
     method @Deprecated @FlaggedApi("android.app.usage.deprecate_old_query_events_api") @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(long, long);
-    method @FlaggedApi("android.app.usage.filter_based_event_query_api") @Nullable @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(@NonNull android.app.usage.UsageEventsQuery);
+    method @Nullable @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(@NonNull android.app.usage.UsageEventsQuery);
     method public android.app.usage.UsageEvents queryEventsForSelf(long, long);
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.UsageStats> queryUsageStats(int, long, long);
-    field @FlaggedApi("android.app.usage.user_interaction_type_api") public static final String EXTRA_EVENT_ACTION = "android.app.usage.extra.EVENT_ACTION";
-    field @FlaggedApi("android.app.usage.user_interaction_type_api") public static final String EXTRA_EVENT_CATEGORY = "android.app.usage.extra.EVENT_CATEGORY";
+    field public static final String EXTRA_EVENT_ACTION = "android.app.usage.extra.EVENT_ACTION";
+    field public static final String EXTRA_EVENT_CATEGORY = "android.app.usage.extra.EVENT_CATEGORY";
     field public static final int INTERVAL_BEST = 4; // 0x4
     field public static final int INTERVAL_DAILY = 0; // 0x0
     field public static final int INTERVAL_MONTHLY = 2; // 0x2
@@ -11889,6 +11919,7 @@ package android.content {
     field public static final String CONNECTIVITY_SERVICE = "connectivity";
     field public static final String CONSUMER_IR_SERVICE = "consumer_ir";
     field @FlaggedApi("android.provider.user_keys") public static final String CONTACT_KEYS_SERVICE = "contact_keys";
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final String CONTENT_RESTRICTION_SERVICE = "content_restriction";
     field public static final int CONTEXT_IGNORE_SECURITY = 2; // 0x2
     field public static final int CONTEXT_INCLUDE_CODE = 1; // 0x1
     field public static final int CONTEXT_RESTRICTED = 4; // 0x4
@@ -12388,6 +12419,7 @@ package android.content {
     field public static final String ACTION_GTALK_SERVICE_CONNECTED = "android.intent.action.GTALK_CONNECTED";
     field public static final String ACTION_GTALK_SERVICE_DISCONNECTED = "android.intent.action.GTALK_DISCONNECTED";
     field public static final String ACTION_HEADSET_PLUG = "android.intent.action.HEADSET_PLUG";
+    field @FlaggedApi("android.timezone.flags.enable_home_time_zone_api") public static final String ACTION_HOME_TIME_ZONE_CHANGED = "android.intent.action.HOME_TIME_ZONE_CHANGED";
     field public static final String ACTION_INPUT_METHOD_CHANGED = "android.intent.action.INPUT_METHOD_CHANGED";
     field public static final String ACTION_INSERT = "android.intent.action.INSERT";
     field public static final String ACTION_INSERT_OR_EDIT = "android.intent.action.INSERT_OR_EDIT";
@@ -12440,7 +12472,6 @@ package android.content {
     field public static final String ACTION_PACKAGE_UNSTOPPED = "android.intent.action.PACKAGE_UNSTOPPED";
     field public static final String ACTION_PACKAGE_VERIFIED = "android.intent.action.PACKAGE_VERIFIED";
     field public static final String ACTION_PASTE = "android.intent.action.PASTE";
-    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String ACTION_PERSONAL_CONTEXT_MODE_CHANGED = "android.intent.action.PERSONAL_CONTEXT_MODE_CHANGED";
     field public static final String ACTION_PICK = "android.intent.action.PICK";
     field public static final String ACTION_PICK_ACTIVITY = "android.intent.action.PICK_ACTIVITY";
     field public static final String ACTION_POWER_CONNECTED = "android.intent.action.ACTION_POWER_CONNECTED";
@@ -12592,6 +12623,7 @@ package android.content {
     field public static final String EXTRA_END_TIME = "android.intent.extra.END_TIME";
     field public static final String EXTRA_EXCLUDE_COMPONENTS = "android.intent.extra.EXCLUDE_COMPONENTS";
     field public static final String EXTRA_FROM_STORAGE = "android.intent.extra.FROM_STORAGE";
+    field @FlaggedApi("android.timezone.flags.enable_home_time_zone_api") public static final String EXTRA_HOME_TIME_ZONE_ID = "android.intent.extra.HOME_TIME_ZONE_ID";
     field public static final String EXTRA_HTML_TEXT = "android.intent.extra.HTML_TEXT";
     field public static final String EXTRA_INDEX = "android.intent.extra.INDEX";
     field public static final String EXTRA_INITIAL_INTENTS = "android.intent.extra.INITIAL_INTENTS";
@@ -21793,6 +21825,7 @@ package android.hardware.display {
     field public static final int BRIGHTNESS_UNIT_PERCENTAGE = 1; // 0x1
     field @FlaggedApi("com.android.server.display.feature.flags.display_category_built_in") public static final String DISPLAY_CATEGORY_BUILT_IN_DISPLAYS = "android.hardware.display.category.BUILT_IN_DISPLAYS";
     field public static final String DISPLAY_CATEGORY_PRESENTATION = "android.hardware.display.category.PRESENTATION";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String DISPLAY_CATEGORY_XR_PROJECTED = "android.hardware.display.category.XR_PROJECTED";
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_ADDED = 1L; // 0x1L
     field public static final long EVENT_TYPE_DISPLAY_BRIGHTNESS = 32L; // 0x20L
     field @FlaggedApi("com.android.server.display.feature.flags.display_listener_performance_improvements") public static final long EVENT_TYPE_DISPLAY_CHANGED = 4L; // 0x4L
@@ -21855,9 +21888,9 @@ package android.hardware.display {
 
   public final class VirtualDisplayConfig implements android.os.Parcelable {
     method public int describeContents();
-    method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @FloatRange(from=0.0f, to=1.0f) public float getDefaultBrightness();
+    method @FloatRange(from=0.0f, to=1.0f) public float getDefaultBrightness();
     method public int getDensityDpi();
-    method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @FloatRange(from=0.0f, to=1.0f) public float getDimBrightness();
+    method @FloatRange(from=0.0f, to=1.0f) public float getDimBrightness();
     method @NonNull public java.util.Set<java.lang.String> getDisplayCategories();
     method public int getFlags();
     method public int getHeight();
@@ -21869,7 +21902,7 @@ package android.hardware.display {
     field @NonNull public static final android.os.Parcelable.Creator<android.hardware.display.VirtualDisplayConfig> CREATOR;
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") public static interface VirtualDisplayConfig.BrightnessListener {
+  public static interface VirtualDisplayConfig.BrightnessListener {
     method public void onBrightnessChanged(@FloatRange(from=0.0f, to=1.0f) float);
   }
 
@@ -21877,13 +21910,21 @@ package android.hardware.display {
     ctor public VirtualDisplayConfig.Builder(@NonNull String, @IntRange(from=1) int, @IntRange(from=1) int, @IntRange(from=1) int);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder addDisplayCategory(@NonNull String);
     method @NonNull public android.hardware.display.VirtualDisplayConfig build();
-    method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setBrightnessListener(@NonNull java.util.concurrent.Executor, @NonNull android.hardware.display.VirtualDisplayConfig.BrightnessListener);
-    method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDefaultBrightness(@FloatRange(from=0.0f, to=1.0f) float);
-    method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDimBrightness(@FloatRange(from=0.0f, to=1.0f) float);
+    method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setBrightnessListener(@NonNull java.util.concurrent.Executor, @NonNull android.hardware.display.VirtualDisplayConfig.BrightnessListener);
+    method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDefaultBrightness(@FloatRange(from=0.0f, to=1.0f) float);
+    method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDimBrightness(@FloatRange(from=0.0f, to=1.0f) float);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDisplayCategories(@NonNull java.util.Set<java.lang.String>);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setFlags(int);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setRequestedRefreshRate(@FloatRange(from=0.0f) float);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setSurface(@Nullable android.view.Surface);
+  }
+
+}
+
+package android.hardware.hid {
+
+  @FlaggedApi("com.android.hardware.input.hid_api") public final class HidManager {
+    method public boolean canEnumerateDevices();
   }
 
 }
@@ -34980,7 +35021,7 @@ package android.os {
     field public static final int BAKLAVA = 36; // 0x24
     field public static final int BASE = 1; // 0x1
     field public static final int BASE_1_1 = 2; // 0x2
-    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 10000; // 0x2710
+    field public static final int CINNAMON_BUN = 37; // 0x25
     field public static final int CUPCAKE = 3; // 0x3
     field public static final int CUR_DEVELOPMENT = 10000; // 0x2710
     field public static final int DONUT = 4; // 0x4
@@ -35022,7 +35063,7 @@ package android.os {
     field public static final int BAKLAVA_1 = 3600001; // 0x36ee81
     field public static final int BASE = 100000; // 0x186a0
     field public static final int BASE_1_1 = 200000; // 0x30d40
-    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 1000000000; // 0x3b9aca00
+    field public static final int CINNAMON_BUN = 3700000; // 0x387520
     field public static final int CUPCAKE = 300000; // 0x493e0
     field public static final int DONUT = 400000; // 0x61a80
     field public static final int ECLAIR = 500000; // 0x7a120
@@ -36235,7 +36276,7 @@ package android.os {
     method public int describeContents();
     method @NonNull public static android.os.SharedMemory fromFileDescriptor(@NonNull android.os.ParcelFileDescriptor);
     method public int getSize();
-    method @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public boolean isRegionReadOnly();
+    method @FlaggedApi("com.android.libcore.enable_pcc_framework_support") public boolean isRegionReadOnly();
     method @NonNull public java.nio.ByteBuffer map(int, int, int) throws android.system.ErrnoException;
     method @NonNull public java.nio.ByteBuffer mapReadOnly() throws android.system.ErrnoException;
     method @NonNull public java.nio.ByteBuffer mapReadWrite() throws android.system.ErrnoException;
@@ -36886,6 +36927,7 @@ package android.os.storage {
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class FileManager {
     method @NonNull public android.os.storage.operations.FileOperationEnqueueResult enqueueOperation(@NonNull android.os.storage.operations.FileOperationRequest);
     method @Nullable public android.os.storage.operations.FileOperationResult fetchResult(@NonNull String);
+    method public static int getMaxReportedFailures();
     method public void registerCompletionListener(@NonNull String);
     method public void unregisterCompletionListener(@NonNull String);
     field public static final String ACTION_FILE_OPERATION_COMPLETED = "android.os.storage.action.FILE_OPERATION_COMPLETED";
@@ -36970,7 +37012,6 @@ package android.os.storage {
 package android.os.storage.operations {
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class FileOperationEnqueueResult implements android.os.Parcelable {
-    ctor public FileOperationEnqueueResult(int);
     method public int describeContents();
     method public int getErrorCode();
     method @Nullable public String getRequestId();
@@ -36984,6 +37025,7 @@ package android.os.storage.operations {
     method public int getMode();
     method @NonNull public android.os.storage.operations.sources.OperationSource getSource();
     method @Nullable public android.os.storage.operations.targets.OperationTarget getTarget();
+    method public boolean shouldRegisterCompletionListener();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.os.storage.operations.FileOperationRequest> CREATOR;
     field public static final int OPERATION_COPY = 2; // 0x2
@@ -36993,8 +37035,9 @@ package android.os.storage.operations {
   public static final class FileOperationRequest.Builder {
     ctor public FileOperationRequest.Builder(int);
     method @NonNull public android.os.storage.operations.FileOperationRequest build();
+    method @NonNull public android.os.storage.operations.FileOperationRequest.Builder setRegisterCompletionListener(boolean);
     method @NonNull public android.os.storage.operations.FileOperationRequest.Builder setSource(@NonNull android.os.storage.operations.sources.OperationSource);
-    method @NonNull public android.os.storage.operations.FileOperationRequest.Builder setTarget(@Nullable android.os.storage.operations.targets.OperationTarget);
+    method @NonNull public android.os.storage.operations.FileOperationRequest.Builder setTarget(@NonNull android.os.storage.operations.targets.OperationTarget);
   }
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class FileOperationResult implements android.os.Parcelable {
@@ -37002,7 +37045,6 @@ package android.os.storage.operations {
     method public int getErrorCode();
     method @Nullable public String getErrorMessage();
     method @NonNull public java.util.List<java.lang.String> getFailedPaths();
-    method public static int getMaxReportedFailures();
     method @NonNull public String getRequestId();
     method @NonNull public android.os.storage.operations.sources.OperationSource getSource();
     method public int getStatus();
@@ -37012,6 +37054,7 @@ package android.os.storage.operations {
     field public static final int ERROR_BUSY = 1; // 0x1
     field public static final int ERROR_DISK_FULL = 6; // 0x6
     field public static final int ERROR_INVALID_REQUEST = 2; // 0x2
+    field public static final int ERROR_NONE = -1; // 0xffffffff
     field public static final int ERROR_PERMISSION_DENIED = 5; // 0x5
     field public static final int ERROR_UNKNOWN = 0; // 0x0
     field public static final int ERROR_UNSUPPORTED_SOURCE = 3; // 0x3
@@ -37029,14 +37072,11 @@ package android.os.storage.operations.sources {
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class AppDataFileSource extends android.os.storage.operations.sources.OperationSource {
     ctor public AppDataFileSource(@NonNull java.io.File);
-    method public int describeContents();
     method @NonNull public java.io.File getFile();
     method @NonNull public String toString();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.os.storage.operations.sources.AppDataFileSource> CREATOR;
   }
 
-  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public abstract class OperationSource implements android.os.Parcelable {
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public abstract class OperationSource {
     method @NonNull public abstract String toString();
   }
 
@@ -37044,17 +37084,14 @@ package android.os.storage.operations.sources {
 
 package android.os.storage.operations.targets {
 
-  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public abstract class OperationTarget implements android.os.Parcelable {
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public abstract class OperationTarget {
     method @NonNull public abstract String toString();
   }
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class PccTarget extends android.os.storage.operations.targets.OperationTarget {
     ctor public PccTarget();
     ctor public PccTarget(@NonNull String);
-    method public int describeContents();
     method @NonNull public String toString();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.os.storage.operations.targets.PccTarget> CREATOR;
   }
 
 }
@@ -44213,525 +44250,6 @@ package android.service.persistentdata {
 
 }
 
-package android.service.personalcontext {
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public interface ComponentIdProvider {
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class PersonalContextManager {
-    method @RequiresPermission(android.Manifest.permission.QUERY_ALL_PACKAGES) public boolean isPersonalContextModeEnabled(@NonNull String);
-    method public void publishTriggeringHint(@NonNull android.service.personalcontext.insight.interaction.ReturnHintReport, @NonNull java.util.List<android.service.personalcontext.hint.ContextHint>);
-    method public void reportUserFeedback(@NonNull android.service.personalcontext.insight.ContextInsight, @Nullable android.os.Bundle);
-    method public void showAttribution(@NonNull android.service.personalcontext.insight.ContextInsight);
-    field public static final String ACTION_PERSONAL_CONTEXT_ENABLED_CHANGED = "android.service.personalcontext.action.PERSONAL_CONTEXT_ENABLED_CHANGED";
-    field public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RenderToken implements java.lang.Comparable<android.service.personalcontext.RenderToken> android.os.Parcelable {
-    method public int compareTo(@NonNull android.service.personalcontext.RenderToken);
-    method public int describeContents();
-    method @NonNull public java.util.UUID getRendererComponentId();
-    method @Nullable public String getTag();
-    method @NonNull public java.util.UUID getTokenId();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.RenderToken> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class Token implements android.os.Parcelable {
-    method public int describeContents();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.Token> CREATOR;
-  }
-
-}
-
-package android.service.personalcontext.hint {
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public class AutofillInlineRequestHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public android.content.ComponentName getActivityComponent();
-    method @NonNull public android.view.autofill.AutofillValue getAutofillValue();
-    method @Nullable public android.service.autofill.FillEventHistory getFillEventHistory();
-    method @NonNull public android.view.autofill.AutofillId getFocusedId();
-    method @NonNull public android.view.inputmethod.InlineSuggestionsRequest getInlineSuggestionsRequest();
-    method @NonNull public java.time.Instant getRequestTimestamp();
-    method public int getSessionId();
-    method public int getTaskId();
-  }
-
-  public static final class AutofillInlineRequestHint.Builder {
-    ctor public AutofillInlineRequestHint.Builder();
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint build();
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setActivityComponent(@NonNull android.content.ComponentName);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setAugmentedAutofillManagerClient(@NonNull android.os.IBinder);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setAutofillValue(@NonNull android.view.autofill.AutofillValue);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setFillEventHistory(@Nullable android.service.autofill.FillEventHistory);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setFocusedId(@NonNull android.view.autofill.AutofillId);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setInlineSuggestionsRequest(@NonNull android.view.inputmethod.InlineSuggestionsRequest);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setRequestTimestamp(@NonNull java.time.Instant);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setSessionId(int);
-    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setTaskId(int);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public android.os.Bundle getDataBundle();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class BundleHint.Builder {
-    ctor public BundleHint.Builder();
-    method @NonNull public android.service.personalcontext.hint.BundleHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.BundleHint build();
-    method @NonNull public android.service.personalcontext.hint.BundleHint.Builder setDataBundle(@NonNull android.os.Bundle);
-    method @NonNull public android.service.personalcontext.hint.BundleHint.Builder setHintTypeName(@Nullable String);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class CallHint extends android.service.personalcontext.hint.ContextHint {
-    method public int getModality();
-    method @NonNull public java.util.Set<android.app.Person> getParticipants();
-    field public static final int MODALITY_AUDIO = 1; // 0x1
-    field public static final int MODALITY_UNKNOWN = -1; // 0xffffffff
-    field public static final int MODALITY_VIDEO = 2; // 0x2
-  }
-
-  public static final class CallHint.Builder {
-    ctor public CallHint.Builder(int, @NonNull java.util.Set<android.app.Person>);
-    method @NonNull public android.service.personalcontext.hint.CallHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.CallHint build();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class CapturedText implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public String getResourceId();
-    method @NonNull public String getViewId();
-    method @NonNull public android.graphics.Rect getViewNodeBoundingBox();
-    method @NonNull public String getViewNodeDescription();
-    method @Nullable public java.time.Instant getViewNodeLastSeen();
-    method @NonNull public java.time.Instant getViewNodeLastUpdated();
-    method @NonNull public String getViewNodeText();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.CapturedText> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class CapturedText.Builder {
-    ctor public CapturedText.Builder();
-    method @NonNull public android.service.personalcontext.hint.CapturedText build();
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setResourceId(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setViewId(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setViewNodeBoundingBox(@NonNull android.graphics.Rect);
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setViewNodeDescription(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setViewNodeLastSeen(@Nullable java.time.Instant);
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setViewNodeLastUpdated(@NonNull java.time.Instant);
-    method @NonNull public android.service.personalcontext.hint.CapturedText.Builder setViewNodeText(@NonNull String);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ChatMessageContentCaptureData implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public android.view.autofill.AutofillId getAutofillId();
-    method @NonNull public String getRawParsedDateString();
-    method @NonNull public String getRawParsedTimeString();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.ChatMessageContentCaptureData> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ChatMessageContentCaptureData.Builder {
-    ctor public ChatMessageContentCaptureData.Builder();
-    method @NonNull public android.service.personalcontext.hint.ChatMessageContentCaptureData build();
-    method @NonNull public android.service.personalcontext.hint.ChatMessageContentCaptureData.Builder setAutofillId(@NonNull android.view.autofill.AutofillId);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageContentCaptureData.Builder setRawParsedDateString(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageContentCaptureData.Builder setRawParsedTimeString(@NonNull String);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ChatMessageData implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public String getAuthor();
-    method @Nullable public android.service.personalcontext.hint.ChatMessageContentCaptureData getContentCaptureData();
-    method @Nullable public String getContentDescription();
-    method @NonNull public java.time.Instant getReferenceTime();
-    method @NonNull public String getText();
-    method public boolean isOutgoingMessage();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.ChatMessageData> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ChatMessageData.Builder {
-    ctor public ChatMessageData.Builder();
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData build();
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData.Builder setAuthor(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData.Builder setContentCaptureData(@NonNull android.service.personalcontext.hint.ChatMessageContentCaptureData);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData.Builder setContentDescription(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData.Builder setOutgoingMessage(boolean);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData.Builder setReferenceTime(@NonNull java.time.Instant);
-    method @NonNull public android.service.personalcontext.hint.ChatMessageData.Builder setText(@NonNull String);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContentCaptureConversationEvent {
-    method @NonNull public java.time.Instant getClientEventTimestamp();
-    method @NonNull public String getConversationSessionId();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ContentCaptureConversationEvent.ConversationEnterEvent extends android.service.personalcontext.hint.ContentCaptureConversationEvent {
-    ctor public ContentCaptureConversationEvent.ConversationEnterEvent(@NonNull String, @NonNull java.time.Instant, @NonNull java.time.Instant);
-    method @NonNull public java.time.Instant getConversationEnterTimestamp();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ContentCaptureConversationEvent.ConversationExitEvent extends android.service.personalcontext.hint.ContentCaptureConversationEvent {
-    ctor public ContentCaptureConversationEvent.ConversationExitEvent(@NonNull String, @NonNull java.time.Instant, @NonNull java.time.Instant);
-    method @NonNull public java.time.Instant getConversationExitTimestamp();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ContentCaptureConversationEvent.ConversationProcessingEvent extends android.service.personalcontext.hint.ContentCaptureConversationEvent {
-    ctor public ContentCaptureConversationEvent.ConversationProcessingEvent(@NonNull String, @NonNull java.time.Instant, @NonNull java.time.Instant, @NonNull android.view.autofill.AutofillId);
-    method @NonNull public android.view.autofill.AutofillId getMessageAutofillId();
-    method @NonNull public java.time.Instant getStartProcessingTimestamp();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ContentCaptureConversationEvent.ConversationUpdateEvent extends android.service.personalcontext.hint.ContentCaptureConversationEvent {
-    ctor public ContentCaptureConversationEvent.ConversationUpdateEvent(@NonNull String, @NonNull java.time.Instant, @NonNull java.time.Instant, @NonNull android.service.personalcontext.hint.ConversationData);
-    method @NonNull public android.service.personalcontext.hint.ConversationData getConversationData();
-    method @NonNull public java.time.Instant getConversationUpdateTimestamp();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ContentCaptureConversationHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public android.service.personalcontext.hint.ContentCaptureConversationEvent getConversationEvent();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ContentCaptureConversationHint.Builder {
-    ctor public ContentCaptureConversationHint.Builder(@NonNull android.service.personalcontext.hint.ContentCaptureConversationEvent);
-    method @NonNull public android.service.personalcontext.hint.ContentCaptureConversationHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.ContentCaptureConversationHint build();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextHint {
-    method @NonNull public final java.time.Instant getCreationTime();
-    method @NonNull public final java.util.UUID getHintId();
-    method @NonNull public String getHintTypeName();
-    method @NonNull public final java.util.Set<android.service.personalcontext.Token> getTokens();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ContextHintWithSignature {
-    method @NonNull public java.util.Set<android.service.personalcontext.hint.ContextHintWithSignature> getAttributionHints();
-    method @NonNull public android.service.personalcontext.hint.ContextHint getContextHint();
-    method @Nullable public String getOriginatingPackage();
-    method @NonNull public java.util.Set<android.service.personalcontext.RenderToken> getRenderTokens();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ConversationData implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public java.util.List<android.service.personalcontext.hint.ChatMessageData> getChatMessages();
-    method @NonNull public android.content.ComponentName getComponentName();
-    method @NonNull public String getConversationTitle();
-    method @Nullable public android.view.autofill.AutofillId getInputBoxAutofillId();
-    method @NonNull public String getInputBoxText();
-    method @NonNull public java.time.Instant getProcessingEndTimestamp();
-    method @NonNull public java.time.Instant getProcessingStartTimestamp();
-    method public boolean hasNewMessage();
-    method public boolean isKeyboardShown();
-    method public boolean isLastMessageFromTheUser();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.ConversationData> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ConversationData.Builder {
-    ctor public ConversationData.Builder();
-    method @NonNull public android.service.personalcontext.hint.ConversationData build();
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setChatMessages(@NonNull java.util.List<android.service.personalcontext.hint.ChatMessageData>);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setComponentName(@NonNull android.content.ComponentName);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setConversationTitle(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setHasNewMessage(boolean);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setInputBoxAutofillId(@Nullable android.view.autofill.AutofillId);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setInputBoxText(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setKeyboardShown(boolean);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setLastMessageFromTheUser(boolean);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setProcessingEndTimestamp(@NonNull java.time.Instant);
-    method @NonNull public android.service.personalcontext.hint.ConversationData.Builder setProcessingStartTimestamp(@NonNull java.time.Instant);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class HintInvalidationHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public java.util.UUID getInvalidatedHintId();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class HintInvalidationHint.Builder {
-    ctor public HintInvalidationHint.Builder(@NonNull java.util.UUID);
-    ctor public HintInvalidationHint.Builder(@NonNull android.service.personalcontext.hint.ContextHint);
-    method @NonNull public android.service.personalcontext.hint.HintInvalidationHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.HintInvalidationHint build();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightReferenceHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public java.util.UUID getInsightId();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class MessagesHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public java.util.List<android.service.personalcontext.hint.ChatMessageData> getChatMessages();
-    method @NonNull public String getPackageName();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class MessagesHint.Builder {
-    ctor public MessagesHint.Builder(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.MessagesHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.MessagesHint build();
-    method @NonNull public android.service.personalcontext.hint.MessagesHint.Builder setChatMessages(@NonNull java.util.List<android.service.personalcontext.hint.ChatMessageData>);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class NotificationEvent {
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationEvent.NotificationEnqueuedEvent extends android.service.personalcontext.hint.NotificationEvent {
-    ctor public NotificationEvent.NotificationEnqueuedEvent(@NonNull android.service.notification.StatusBarNotification, @NonNull android.app.NotificationChannel, @NonNull android.service.notification.NotificationListenerService.RankingMap);
-    method public int getEventType();
-    method @NonNull public android.app.NotificationChannel getNotificationChannel();
-    method @NonNull public android.service.notification.NotificationListenerService.RankingMap getRankingMap();
-    method @NonNull public android.service.notification.StatusBarNotification getStatusBarNotification();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationEvent.NotificationRemovedEvent extends android.service.personalcontext.hint.NotificationEvent {
-    ctor public NotificationEvent.NotificationRemovedEvent(@NonNull android.service.notification.StatusBarNotification, @NonNull android.service.notification.NotificationListenerService.RankingMap, int);
-    method public int getEventType();
-    method @NonNull public android.service.notification.NotificationListenerService.RankingMap getRankingMap();
-    method public int getReason();
-    method @NonNull public android.service.notification.StatusBarNotification getStatusBarNotification();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class NotificationHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public android.service.personalcontext.hint.NotificationEvent getNotificationEvent();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationHint.Builder {
-    ctor public NotificationHint.Builder(@NonNull android.service.personalcontext.hint.NotificationEvent);
-    method @NonNull public android.service.personalcontext.hint.NotificationHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.NotificationHint build();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RecentViewHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public java.util.List<android.service.personalcontext.hint.CapturedText> getCapturedTexts();
-    method @Nullable public String getLocusId();
-    method @NonNull public android.content.ComponentName getSourceAppActivityComponentName();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class RecentViewHint.Builder {
-    ctor public RecentViewHint.Builder();
-    method @NonNull public android.service.personalcontext.hint.RecentViewHint.Builder addCapturedText(@NonNull android.service.personalcontext.hint.CapturedText);
-    method @NonNull public android.service.personalcontext.hint.RecentViewHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.RecentViewHint build();
-    method @NonNull public android.service.personalcontext.hint.RecentViewHint.Builder setLocusId(@Nullable String);
-    method @NonNull public android.service.personalcontext.hint.RecentViewHint.Builder setSourceAppActivityComponentName(@NonNull android.content.ComponentName);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public class TextClassificationHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public String getSessionId();
-    method @NonNull public android.view.textclassifier.TextClassification.Request getTextClassificationRequest();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class TextClassificationHint.Builder {
-    ctor public TextClassificationHint.Builder(@NonNull android.view.textclassifier.TextClassification.Request, @NonNull String);
-    method @NonNull public android.service.personalcontext.hint.TextClassificationHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.TextClassificationHint build();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class UserInputHint extends android.service.personalcontext.hint.ContextHint {
-    method @NonNull public android.content.ComponentName getSourceAppActivityComponentName();
-    method @NonNull public android.service.personalcontext.hint.UserInputText getUserInputText();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class UserInputHint.Builder {
-    ctor public UserInputHint.Builder(@NonNull android.service.personalcontext.hint.UserInputText);
-    method @NonNull public android.service.personalcontext.hint.UserInputHint.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.hint.UserInputHint build();
-    method @NonNull public android.service.personalcontext.hint.UserInputHint.Builder setSourceAppActivityComponentName(@NonNull android.content.ComponentName);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class UserInputText implements android.os.Parcelable {
-    method public int describeContents();
-    method public int getFieldType();
-    method @NonNull public String getText();
-    method public int getUserInputTextSource();
-    method @NonNull public android.graphics.Rect getViewNodeBoundingBox();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.UserInputText> CREATOR;
-    field public static final int FIELD_TYPE_SEARCH_BOX = 1; // 0x1
-    field public static final int FIELD_TYPE_UNKNOWN = 0; // 0x0
-    field public static final int USER_INPUT_TEXT_SOURCE_CLICKED = 3; // 0x3
-    field public static final int USER_INPUT_TEXT_SOURCE_INFERRED = 2; // 0x2
-    field public static final int USER_INPUT_TEXT_SOURCE_TYPED = 1; // 0x1
-    field public static final int USER_INPUT_TEXT_SOURCE_UNKNOWN = 0; // 0x0
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class UserInputText.Builder {
-    ctor public UserInputText.Builder();
-    method @NonNull public android.service.personalcontext.hint.UserInputText build();
-    method @NonNull public android.service.personalcontext.hint.UserInputText.Builder setFieldType(int);
-    method @NonNull public android.service.personalcontext.hint.UserInputText.Builder setText(@NonNull String);
-    method @NonNull public android.service.personalcontext.hint.UserInputText.Builder setUserInputTextSource(int);
-    method @NonNull public android.service.personalcontext.hint.UserInputText.Builder setViewNodeBoundingBox(@NonNull android.graphics.Rect);
-  }
-
-}
-
-package android.service.personalcontext.insight {
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ActionableInsight extends android.service.personalcontext.insight.ContextInsight {
-    method @NonNull public android.service.personalcontext.insight.interaction.ReturnHintReport createReturnHintReport();
-    method @NonNull public android.service.personalcontext.insight.InsightActionDetails getActionDetails();
-    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails getDisplayDetails();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class ActionableInsight.Builder {
-    ctor public ActionableInsight.Builder(@NonNull android.service.personalcontext.insight.InsightActionDetails, @NonNull android.service.personalcontext.insight.InsightDisplayDetails);
-    method @NonNull public android.service.personalcontext.insight.ActionableInsight.Builder addOriginHint(@NonNull android.service.personalcontext.hint.ContextHintWithSignature);
-    method @NonNull public android.service.personalcontext.insight.ActionableInsight.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.insight.ActionableInsight build();
-    method @NonNull public android.service.personalcontext.insight.ActionableInsight.Builder setUserFeedbackRequest(@Nullable android.service.personalcontext.insight.interaction.FeedbackRequest);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleInsight extends android.service.personalcontext.insight.ContextInsight {
-    method @NonNull public android.os.Bundle getDataBundle();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class BundleInsight.Builder {
-    ctor public BundleInsight.Builder();
-    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder addOriginHint(@NonNull android.service.personalcontext.hint.ContextHintWithSignature);
-    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.insight.BundleInsight build();
-    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder setDataBundle(@NonNull android.os.Bundle);
-    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder setInsightTypeName(@Nullable String);
-    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder setUserFeedbackRequest(@Nullable android.service.personalcontext.insight.interaction.FeedbackRequest);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextInsight {
-    method @NonNull public final java.time.Instant getCreationTime();
-    method @NonNull public final java.util.UUID getInsightId();
-    method @NonNull public String getInsightTypeName();
-    method @NonNull public java.util.Set<android.service.personalcontext.hint.ContextHintWithSignature> getOriginHints();
-    method @NonNull public java.util.Set<android.service.personalcontext.Token> getTokens();
-    method @Nullable public android.service.personalcontext.insight.interaction.FeedbackRequest getUserFeedbackRequest();
-    method public boolean hasAttribution();
-    method public void reportEvent(@NonNull android.content.Context, int, @NonNull android.service.personalcontext.RenderToken, @Nullable android.os.Bundle);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class DisplayInsight extends android.service.personalcontext.insight.ContextInsight {
-    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails getDetails();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class DisplayInsight.Builder {
-    ctor public DisplayInsight.Builder(@NonNull android.service.personalcontext.insight.InsightDisplayDetails);
-    method @NonNull public android.service.personalcontext.insight.DisplayInsight.Builder addOriginHint(@NonNull android.service.personalcontext.hint.ContextHintWithSignature);
-    method @NonNull public android.service.personalcontext.insight.DisplayInsight.Builder addToken(@NonNull android.service.personalcontext.Token);
-    method @NonNull public android.service.personalcontext.insight.DisplayInsight build();
-    method @NonNull public android.service.personalcontext.insight.DisplayInsight.Builder setUserFeedbackRequest(@Nullable android.service.personalcontext.insight.interaction.FeedbackRequest);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class HintInvalidationInsight extends android.service.personalcontext.insight.ContextInsight {
-    method @NonNull public java.util.UUID getInvalidatedHintId();
-    method public boolean isHintInvalidated(@NonNull android.service.personalcontext.hint.ContextHintWithSignature);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightActionDetails implements android.os.Parcelable {
-    method @Nullable public android.content.Intent createActionIntent();
-    method public int describeContents();
-    method public int getActionTypes();
-    method @Nullable public android.app.RemoteAction getRemoteAction();
-    method public boolean hasActionType(int);
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int ACTION_TYPE_INTENT = 1; // 0x1
-    field public static final int ACTION_TYPE_REMOTE_ACTION = 2; // 0x2
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.InsightActionDetails> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class InsightActionDetails.Builder {
-    ctor public InsightActionDetails.Builder();
-    method @NonNull public android.service.personalcontext.insight.InsightActionDetails build();
-    method @NonNull public android.service.personalcontext.insight.InsightActionDetails.Builder setIntent(@NonNull android.content.Intent);
-    method @NonNull public android.service.personalcontext.insight.InsightActionDetails.Builder setRemoteAction(@NonNull android.app.RemoteAction);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightCollection extends android.service.personalcontext.insight.ContextInsight implements java.lang.Iterable<android.service.personalcontext.insight.ContextInsight> {
-    method @NonNull public java.util.List<android.service.personalcontext.insight.ContextInsight> getInsights();
-    method @NonNull public java.util.Iterator<android.service.personalcontext.insight.ContextInsight> iterator();
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class InsightCollection.Builder {
-    ctor public InsightCollection.Builder();
-    ctor public InsightCollection.Builder(@NonNull java.util.Collection<android.service.personalcontext.insight.ContextInsight>);
-    method @NonNull public android.service.personalcontext.insight.InsightCollection.Builder addInsight(@NonNull android.service.personalcontext.insight.ContextInsight);
-    method @NonNull public android.service.personalcontext.insight.InsightCollection build();
-    method @NonNull public android.service.personalcontext.insight.InsightCollection.Builder setUserFeedbackRequest(@Nullable android.service.personalcontext.insight.interaction.FeedbackRequest);
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightDisplayDetails implements android.os.Parcelable {
-    method public int describeContents();
-    method @Nullable public CharSequence getContentDescription();
-    method @Nullable public android.graphics.drawable.Icon getIcon();
-    method @Nullable public CharSequence getSubtitle();
-    method @Nullable public CharSequence getTitle();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.InsightDisplayDetails> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class InsightDisplayDetails.Builder {
-    ctor public InsightDisplayDetails.Builder(@NonNull CharSequence);
-    ctor public InsightDisplayDetails.Builder(@NonNull android.graphics.drawable.Icon);
-    ctor public InsightDisplayDetails.Builder(@NonNull CharSequence, @NonNull android.graphics.drawable.Icon);
-    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails build();
-    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails.Builder setContentDescription(@Nullable CharSequence);
-    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails.Builder setSubtitle(@Nullable CharSequence);
-  }
-
-}
-
-package android.service.personalcontext.insight.interaction {
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class AttributionDetails implements android.os.Parcelable {
-    ctor public AttributionDetails(@NonNull java.util.Collection<android.service.personalcontext.insight.interaction.AttributionDetails.AttributionLine>);
-    method public int describeContents();
-    method @NonNull public java.util.List<android.service.personalcontext.insight.interaction.AttributionDetails.AttributionLine> getLines();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.interaction.AttributionDetails> CREATOR;
-  }
-
-  public static final class AttributionDetails.AttributionLine implements android.os.Parcelable {
-    ctor public AttributionDetails.AttributionLine(@Nullable CharSequence, @Nullable android.graphics.drawable.Icon, @Nullable CharSequence, @Nullable CharSequence);
-    method public int describeContents();
-    method @Nullable public CharSequence getContentDescription();
-    method @Nullable public android.graphics.drawable.Icon getIcon();
-    method @Nullable public CharSequence getSubtitle();
-    method @Nullable public CharSequence getTitle();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.interaction.AttributionDetails.AttributionLine> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class FeedbackRequest implements android.os.Parcelable {
-    ctor public FeedbackRequest(@NonNull java.util.Collection<android.service.personalcontext.insight.interaction.FeedbackRequest.FeedbackField>);
-    method public int describeContents();
-    method @NonNull public java.util.List<android.service.personalcontext.insight.interaction.FeedbackRequest.FeedbackField> getFields();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int APPROVAL_VALUE_APPROVE = 1; // 0x1
-    field public static final int APPROVAL_VALUE_DISAPPROVE = 2; // 0x2
-    field public static final int APPROVAL_VALUE_UNKNOWN = 0; // 0x0
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.interaction.FeedbackRequest> CREATOR;
-    field public static final int FEEDBACK_TYPE_APPROVAL = 1; // 0x1
-    field public static final int FEEDBACK_TYPE_DESCRIPTION = 2; // 0x2
-    field public static final int FEEDBACK_TYPE_UNKNOWN = 0; // 0x0
-  }
-
-  public static final class FeedbackRequest.FeedbackField implements android.os.Parcelable {
-    ctor public FeedbackRequest.FeedbackField(int, @NonNull String, @NonNull CharSequence, @Nullable CharSequence);
-    method public int describeContents();
-    method @Nullable public CharSequence getDescription();
-    method @NonNull public String getKey();
-    method @NonNull public CharSequence getTitle();
-    method public int getType();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.interaction.FeedbackRequest.FeedbackField> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ReturnHintReport implements android.os.Parcelable {
-    method public int describeContents();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.interaction.ReturnHintReport> CREATOR;
-  }
-
-}
-
 package android.service.quickaccesswallet {
 
   public interface GetWalletCardsCallback {
@@ -46062,6 +45580,7 @@ package android.telephony {
     field public static final String KEY_ALLOW_MERGE_WIFI_CALLS_WHEN_VOWIFI_OFF_BOOL = "allow_merge_wifi_calls_when_vowifi_off_bool";
     field public static final String KEY_ALLOW_NON_EMERGENCY_CALLS_IN_ECM_BOOL = "allow_non_emergency_calls_in_ecm_bool";
     field public static final String KEY_ALLOW_VIDEO_CALLING_FALLBACK_BOOL = "allow_video_calling_fallback_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_vt_call_low_battery_config") public static final String KEY_ALLOW_VIDEO_CALL_IN_LOW_BATTERY_BOOL = "allow_video_call_in_low_battery_bool";
     field public static final String KEY_ALWAYS_SHOW_DATA_RAT_ICON_BOOL = "always_show_data_rat_icon_bool";
     field @Deprecated public static final String KEY_ALWAYS_SHOW_EMERGENCY_ALERT_ONOFF_BOOL = "always_show_emergency_alert_onoff_bool";
     field public static final String KEY_ALWAYS_SHOW_PRIMARY_SIGNAL_BAR_IN_OPPORTUNISTIC_NETWORK_BOOLEAN = "always_show_primary_signal_bar_in_opportunistic_network_boolean";
@@ -49649,15 +49168,15 @@ package android.telephony.ims {
     method public int describeContents();
     method public int getAttributeFlags();
     method @NonNull public java.util.Set<java.lang.String> getFeatureTags();
-    method @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public boolean getFlagRegistrationTypeEmergency();
-    method @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public boolean getFlagVirtualRegistrationForEmergencyCall();
+    method public boolean getFlagRegistrationTypeEmergency();
+    method public boolean getFlagVirtualRegistrationForEmergencyCall();
     method @FlaggedApi("com.android.internal.telephony.flags.pcscf_address") @Nullable public String getPcscfAddress();
     method @Nullable public android.telephony.ims.SipDetails getSipDetails();
     method public int getTransportType();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field public static final int ATTR_EPDG_OVER_CELL_INTERNET = 1; // 0x1
-    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_REGISTRATION_TYPE_EMERGENCY = 2; // 0x2
-    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_VIRTUAL_FOR_ANONYMOUS_EMERGENCY_CALL = 4; // 0x4
+    field public static final int ATTR_REGISTRATION_TYPE_EMERGENCY = 2; // 0x2
+    field public static final int ATTR_VIRTUAL_FOR_ANONYMOUS_EMERGENCY_CALL = 4; // 0x4
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.ims.ImsRegistrationAttributes> CREATOR;
   }
 
@@ -53909,6 +53428,8 @@ package android.view {
     field public static final int KEYCODE_CLOSE = 321; // 0x141
     field public static final int KEYCODE_COMMA = 55; // 0x37
     field public static final int KEYCODE_CONTACTS = 207; // 0xcf
+    field @FlaggedApi("com.android.hardware.input.enable_new_26q2_keycodes") public static final int KEYCODE_CONTEXTUAL_INSERT = 340; // 0x154
+    field @FlaggedApi("com.android.hardware.input.enable_new_26q2_keycodes") public static final int KEYCODE_CONTEXTUAL_SEARCH = 339; // 0x153
     field public static final int KEYCODE_COPY = 278; // 0x116
     field public static final int KEYCODE_CTRL_LEFT = 113; // 0x71
     field public static final int KEYCODE_CTRL_RIGHT = 114; // 0x72
@@ -54875,7 +54396,7 @@ package android.view {
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getDesiredMaxRate();
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getDesiredMinRate();
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public float getFixedSourceRate();
-    field @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static final android.view.Surface.FrameRateParams IGNORE;
+    field @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") @NonNull public static final android.view.Surface.FrameRateParams IGNORE;
   }
 
   @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public static final class Surface.FrameRateParams.Builder {

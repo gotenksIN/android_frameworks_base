@@ -21,6 +21,7 @@ import android.app.trust.TrustManager;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.PowerManager;
+import android.uilatencystats.UiLatencyStatsManager;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.UiEventLogger;
@@ -66,6 +67,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionBootInteractor;
 import com.android.systemui.keyguard.domain.interactor.StartKeyguardTransitionModule;
+import com.android.systemui.keyguard.ui.binder.KeyguardChipbarViewBinder;
 import com.android.systemui.keyguard.ui.binder.SideFpsProgressBarViewBinder;
 import com.android.systemui.keyguard.ui.transitions.BlurConfig;
 import com.android.systemui.keyguard.ui.transitions.DeviceEntryIconTransitionModule;
@@ -75,6 +77,7 @@ import com.android.systemui.log.SessionTracker;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.process.ProcessWrapper;
 import com.android.systemui.res.R;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeDisplayAware;
@@ -103,9 +106,10 @@ import dagger.Provides;
 import dagger.multibindings.ClassKey;
 import dagger.multibindings.IntoMap;
 
-import java.util.concurrent.Executor;
-
 import kotlinx.coroutines.CoroutineScope;
+
+import java.util.Optional;
+import java.util.concurrent.Executor;
 
 /**
  * Dagger Module providing keyguard.
@@ -191,7 +195,9 @@ public interface KeyguardModule {
             KeyguardTransitionBootInteractor transitionBootInteractor,
             Lazy<CommunalSceneInteractor> communalSceneInteractor,
             Lazy<CommunalSettingsInteractor> communalSettingsInteractor,
-            WindowManagerOcclusionManager windowManagerOcclusionManager) {
+            WindowManagerOcclusionManager windowManagerOcclusionManager,
+            Optional<UiLatencyStatsManager> uiLatencyStatsManager,
+            Lazy<SceneInteractor> sceneInteractor) {
         return new KeyguardViewMediator(
                 context,
                 uiEventLogger,
@@ -244,7 +250,9 @@ public interface KeyguardModule {
                 transitionBootInteractor,
                 communalSceneInteractor,
                 communalSettingsInteractor,
-                windowManagerOcclusionManager);
+                windowManagerOcclusionManager,
+                uiLatencyStatsManager,
+                sceneInteractor);
     }
 
     /** */
@@ -296,4 +304,10 @@ public interface KeyguardModule {
     @IntoMap
     @ClassKey(KeyguardLoggerStartable.class)
     CoreStartable keyguardLoggerStartable(KeyguardLoggerStartable impl);
+
+    /***/
+    @Binds
+    @IntoMap
+    @ClassKey(KeyguardChipbarViewBinder.class)
+    CoreStartable keyguardChipbarViewBinder(KeyguardChipbarViewBinder impl);
 }

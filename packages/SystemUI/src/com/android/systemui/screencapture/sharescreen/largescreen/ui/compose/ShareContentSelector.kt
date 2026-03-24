@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
@@ -60,10 +61,13 @@ import com.android.systemui.screencapture.sharescreen.ui.viewmodel.ScreenCapture
 @Composable
 fun ShareContentSelector(shareScreenViewModel: ScreenCaptureShareScreenViewModel) {
     val targetsViewModel = shareScreenViewModel.currentTargetsModel
+    val hasIcons = targetsViewModel !is DisplaysViewModel
+    val listWidth = if (hasIcons) 250.dp else 214.dp
+    val dialogWidth = if (hasIcons) 524.dp else 488.dp
 
     Surface(color = MaterialTheme.colorScheme.surfaceBright, shape = RoundedCornerShape(20.dp)) {
         Column(
-            modifier = Modifier.width(560.dp).padding(horizontal = 10.dp, vertical = 14.dp),
+            modifier = Modifier.width(dialogWidth).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val selectedItem by targetsViewModel.selectedTarget
@@ -79,18 +83,15 @@ fun ShareContentSelector(shareScreenViewModel: ScreenCaptureShareScreenViewModel
                             else -> throw IllegalArgumentException("Unknown TargetsViewModel type")
                         }
                     ),
-                modifier = Modifier.padding(start = 8.dp, end = 8.dp).height(24.dp).fillMaxWidth(),
+                modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium,
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp),
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 // The sharing content item list.
-                ShareContentList(viewModel = targetsViewModel)
+                ShareContentList(viewModel = targetsViewModel, modifier = Modifier.width(listWidth))
                 ItemPreview(
                     preview = selectedItem?.thumbnail?.getOrNull()?.asImageBitmap(),
-                    modifier = Modifier.weight(1f).height(140.dp).width(230.dp),
+                    modifier = Modifier.height(140.dp).width(230.dp),
                     itemSelected = selectedItem != null,
                     text =
                         stringResource(
@@ -142,7 +143,8 @@ private fun ItemPreview(
             Text(
                 text = text,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(textAlign = TextAlign.Center),
+                modifier = Modifier.padding(horizontal = 52.dp),
             )
         }
     }
@@ -162,7 +164,7 @@ private fun DisclaimerText(targetsViewModel: TargetsViewModel, requestingAppName
                 requestingAppName,
             ),
         style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier.padding(start = 8.dp, end = 8.dp).fillMaxWidth(),
+        modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth(),
     )
 }
 
@@ -179,7 +181,7 @@ private fun AudioSwitch(targetsViewModel: TargetsViewModel) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp).height(24.dp).fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         LoadingIcon(
             icon =

@@ -115,7 +115,9 @@ public final class ComputerControlSession implements AutoCloseable {
     public static final int ERROR_DEVICE_LOCKED = 2;
 
     /**
-     * Error code indicating that the user did not approve the creation of a new session.
+     * Error code indicating that the caller does not have permission to create a session, which is
+     * possible if the user did not approve the creation of a new session, or if the caller is not
+     * in foreground.
      */
     public static final int ERROR_PERMISSION_DENIED = 3;
 
@@ -189,13 +191,21 @@ public final class ComputerControlSession implements AutoCloseable {
      */
     public static final int BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH = 2;
 
+    /**
+     * Reason indicating that the session was blocked due to a {@link #notifyBlocked()} request from
+     * the caller.
+     */
+    public static final int BLOCK_REASON_CALLER_INITIATED = 3;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "BLOCK_REASON_", value = {
             // Keep in sync with computercontrol_extension_atoms.proto
             BLOCK_REASON_UNKNOWN,
             BLOCK_REASON_SECURE_CONTENT,
-            BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH})
+            BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH,
+            BLOCK_REASON_CALLER_INITIATED,
+    })
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
     public @interface SessionBlockReason {
     }
@@ -706,27 +716,10 @@ public final class ComputerControlSession implements AutoCloseable {
             if (mRegisteredLifecycleCallback != null) {
                 throw new IllegalStateException("Lifecycle callback was already registered!");
             }
-            mRegisteredLifecycleCallback = new LifecycleCallback() {
-                @Override
-                public void onActive() {
-                    Binder.withCleanCallingIdentity(() -> executor.execute(callback::onActive));
-                }
-
-                @Override
-                public void onBlocked(@SessionBlockReason int reason,
-                        @Nullable String blockingPackage) {
-                    Binder.withCleanCallingIdentity(
-                            () -> executor.execute(
-                                    () -> callback.onBlocked(reason, blockingPackage)));
-                }
-
-                @Override
-                public void onClosed(@SessionCloseReason int reason) {
-                    Binder.withCleanCallingIdentity(
-                            () -> executor.execute(() -> callback.onClosed(reason)));
-                }
-            };
-            mLifecycle.addCallback(mRegisteredLifecycleCallback);
+            mRegisteredLifecycleCallback = callback;
+            mLifecycle.addCallback(
+                    (cmd) -> Binder.withCleanCallingIdentity(() -> executor.execute(cmd)),
+                    mRegisteredLifecycleCallback);
         }
     }
 
@@ -797,6 +790,34 @@ public final class ComputerControlSession implements AutoCloseable {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * Notifies the system that the caller is blocked and unable to perform any further
+     * interactions in the session, and needs user intervention to unblock the session. If the
+     * request is successful, the session will enter the blocked lifecycle state
+     * ({@link LifecycleCallback#onBlocked(int, String)}), with
+     * {@link #BLOCK_REASON_CALLER_INITIATED}.
+     */
+    public void notifyBlocked() {
+        try {
+            mSession.notifyBlocked();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Attempts to exit the blocked state when the session is blocked for any reason. This should
+     * be called when the user explicitly chooses to end their control of the session.
+     */
+    public void requestUnblock() {
+        try {
+            mSession.requestUnblock();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
 
     @Override
     public void close() {

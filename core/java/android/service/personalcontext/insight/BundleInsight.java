@@ -23,18 +23,18 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.os.Bundle;
-import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.hint.PublishedContextHint;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
-import android.service.personalcontext.insight.interaction.FeedbackRequest;
 
 /**
  * An insight that stores arbitrary data in a {@link Bundle}. Should only be used if there is no
  * appropriate insight type already defined.
+ * @hide
  */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public final class BundleInsight extends ContextInsight {
     private static final String KEY_DATA = "data";
@@ -61,8 +61,8 @@ public final class BundleInsight extends ContextInsight {
             @NonNull Bundle data,
             @NonNull String insightTypeName) {
         super(baseParams);
-        mDataBundle = data;
-        mInsightTypeName = insightTypeName;
+        mDataBundle = requireNonNull(data);
+        mInsightTypeName = requireNonNull(insightTypeName);
     }
 
     /** @hide */
@@ -143,8 +143,8 @@ public final class BundleInsight extends ContextInsight {
          * @param hint the origin {@link ContextHint} to add
          */
         @NonNull
-        public Builder addOriginHint(@NonNull ContextHintWithSignature hint) {
-            mBaseBuilder.addOriginHint(hint);
+        public Builder addOriginHint(@NonNull PublishedContextHint hint) {
+            mBaseBuilder.addOriginHint(requireNonNull(hint));
             return this;
         }
 
@@ -155,7 +155,7 @@ public final class BundleInsight extends ContextInsight {
          */
         @NonNull
         public Builder addToken(@NonNull Token token) {
-            mBaseBuilder.addToken(token);
+            mBaseBuilder.addToken(requireNonNull(token));
             return this;
         }
 
@@ -172,36 +172,6 @@ public final class BundleInsight extends ContextInsight {
         }
 
         /**
-         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
-         * to be routed back to the understander that created this {@link ContextInsight}.
-         *
-         * @param originatingComponent the component that is creating this insight
-         *
-         * @hide
-         */
-        @SystemApi
-        @NonNull
-        public Builder setOriginatingComponentId(
-                @Nullable ComponentIdProvider originatingComponent) {
-            mBaseBuilder.setOriginatingComponentId(originatingComponent);
-            return this;
-        }
-
-        /**
-         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
-         * is requested, the originating component id must be set via
-         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
-         * {@link #build}.
-         *
-         * @param feedbackRequest the feedback that is being requested
-         */
-        @NonNull
-        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
-            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
-            return this;
-        }
-
-        /**
          * Sets the data in the given {@link Bundle} to the resulting {@link BundleInsight}'s data
          * bundle.
          *
@@ -209,6 +179,7 @@ public final class BundleInsight extends ContextInsight {
          */
         @NonNull
         public Builder setDataBundle(@NonNull Bundle dataBundle) {
+            requireNonNull(dataBundle);
             mDataBundle.clear();
             mDataBundle.putAll(dataBundle);
             return this;

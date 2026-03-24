@@ -23,7 +23,7 @@ import android.service.autofill.Dataset
 import android.service.personalcontext.RenderToken
 import android.service.personalcontext.hint.AutofillInlineRequestHint
 import android.service.personalcontext.hint.BundleHint
-import android.service.personalcontext.hint.ContextHintWithSignature
+import android.service.personalcontext.hint.PublishedContextHint
 import android.service.personalcontext.insight.DisplayInsight
 import android.service.personalcontext.insight.InsightDisplayDetails
 import android.testing.AndroidTestingRunner
@@ -78,24 +78,25 @@ class AutofillRendererServiceTest : SysuiTestCase() {
                     )
                     .build()
             val originHint =
-                AutofillInlineRequestHint.Builder()
-                    .setSessionId(sessionId)
-                    .setTaskId(0)
-                    .setRequestTimestamp(Instant.now())
-                    .setActivityComponent(ComponentName("test_package", "test_component"))
-                    .setFocusedId(AutofillId(0))
-                    .setAutofillValue(AutofillValue.forText("test"))
-                    .setInlineSuggestionsRequest(inlineSuggestionsRequest)
-                    .setAugmentedAutofillManagerClient(Binder())
+                AutofillInlineRequestHint.Builder(
+                        sessionId,
+                        0,
+                        Instant.now(),
+                        ComponentName("test_package", "test_component"),
+                        AutofillId(0),
+                        AutofillValue.forText("test"),
+                        inlineSuggestionsRequest,
+                        Binder(),
+                    )
                     .build()
             underTest.onRender(
                 DisplayInsight.Builder(InsightDisplayDetails.Builder("title").build())
                     .addOriginHint(
-                        ContextHintWithSignature.Builder(originHint, generateSignedHintKey())
-                            .build()
+                        PublishedContextHint.Builder(originHint, generateSignedHintKey()).build()
                     )
-                    .build(),
-                RenderToken(UUID.randomUUID()),
+                    .build()
+                    .fakePublish(),
+                RenderToken(UUID.randomUUID(), null),
             )
 
             val datasetCaptor = argumentCaptor<MutableList<Dataset>>()
@@ -114,15 +115,16 @@ class AutofillRendererServiceTest : SysuiTestCase() {
                     )
                     .build()
             val originHint =
-                AutofillInlineRequestHint.Builder()
-                    .setSessionId(sessionId)
-                    .setTaskId(0)
-                    .setRequestTimestamp(Instant.now())
-                    .setActivityComponent(ComponentName("test_package", "test_component"))
-                    .setFocusedId(AutofillId(0))
-                    .setAutofillValue(AutofillValue.forText("test"))
-                    .setInlineSuggestionsRequest(inlineSuggestionsRequest)
-                    .setAugmentedAutofillManagerClient(Binder())
+                AutofillInlineRequestHint.Builder(
+                        sessionId,
+                        0,
+                        Instant.now(),
+                        ComponentName("test_package", "test_component"),
+                        AutofillId(0),
+                        AutofillValue.forText("test"),
+                        inlineSuggestionsRequest,
+                        Binder(),
+                    )
                     .build()
             val inlineSuggestionHints = arrayOf("inline_hint1", "inline_hint2")
             val bundleHint =
@@ -139,15 +141,14 @@ class AutofillRendererServiceTest : SysuiTestCase() {
             underTest.onRender(
                 DisplayInsight.Builder(InsightDisplayDetails.Builder("title").build())
                     .addOriginHint(
-                        ContextHintWithSignature.Builder(originHint, generateSignedHintKey())
-                            .build()
+                        PublishedContextHint.Builder(originHint, generateSignedHintKey()).build()
                     )
                     .addOriginHint(
-                        ContextHintWithSignature.Builder(bundleHint, generateSignedHintKey())
-                            .build()
+                        PublishedContextHint.Builder(bundleHint, generateSignedHintKey()).build()
                     )
-                    .build(),
-                RenderToken(UUID.randomUUID()),
+                    .build()
+                    .fakePublish(),
+                RenderToken(UUID.randomUUID(), null),
             )
 
             val datasetCaptor = argumentCaptor<MutableList<Dataset>>()
@@ -163,7 +164,7 @@ class AutofillRendererServiceTest : SysuiTestCase() {
         fun generateSignedHintKey(): SecretKeySpec {
             val key = ByteArray(64)
             Random().nextBytes(key)
-            return SecretKeySpec(key, ContextHintWithSignature.HMAC_ALGORITHM)
+            return SecretKeySpec(key, PublishedContextHint.HMAC_ALGORITHM)
         }
 
         val AUTOFILL_INLINE_PRESENTATION_SPEC: InlinePresentationSpec =

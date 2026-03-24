@@ -391,17 +391,7 @@ public class AudioSystem
                 yield BluetoothCodecType.CODEC_ID_LDAC;
             }
             case AUDIO_FORMAT_OPUS -> BluetoothCodecType.CODEC_ID_OPUS;
-            case AUDIO_FORMAT_LHDC -> {
-                if (com.android.bluetooth.flags.Flags.a2dpLhdcApi()) {
-                    yield BluetoothCodecType.CODEC_ID_LHDCV5;
-                }
-                Log.e(
-                        TAG,
-                        "Unknown audio format 0x"
-                                + Integer.toHexString(audioFormat)
-                                + " for conversion to BT codec");
-                yield -1;
-            }
+            case AUDIO_FORMAT_LHDC -> BluetoothCodecType.CODEC_ID_LHDCV5;
             default -> {
                 Log.e(
                         TAG,
@@ -471,10 +461,8 @@ public class AudioSystem
         if (codecId == BluetoothCodecType.CODEC_ID_OPUS) {
             return AudioSystem.AUDIO_FORMAT_OPUS;
         }
-        if (com.android.bluetooth.flags.Flags.a2dpLhdcApi()) {
-            if (codecId == BluetoothCodecType.CODEC_ID_LHDCV5) {
-                return AudioSystem.AUDIO_FORMAT_LHDC;
-            }
+        if (codecId == BluetoothCodecType.CODEC_ID_LHDCV5) {
+            return AudioSystem.AUDIO_FORMAT_LHDC;
         }
         Log.e(TAG, "Unknown A2DP BT codec: " + codecId + " for conversion to audio format");
         return AudioSystem.AUDIO_FORMAT_DEFAULT;

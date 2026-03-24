@@ -63,4 +63,13 @@ public interface ServiceConfig {
      * function metadata changes.
      */
     int getAppFunctionMetadataChangeDebounceMilliseconds();
+
+    /** Returns the maximum number of agent packages whose allowlists can be cached. */
+    int getAppFunctionAllowlistCacheSize();
+
+    /** Returns the debounce time in milliseconds for app function enabled state changes. */
+    long getAppFunctionEnabledStateChangeDebounceMilliseconds();
+
+    /** Returns the maximum debounce time in milliseconds for app function enabled state changes. */
+    long getAppFunctionEnabledStateChangeMaxDebounceMilliseconds();
 }

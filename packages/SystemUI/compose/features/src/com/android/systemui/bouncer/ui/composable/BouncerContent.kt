@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -68,6 +69,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +79,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -92,6 +95,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -252,7 +256,10 @@ fun ContentScope.BouncerContent(
                         }
                     IntOffset(x = 0, y = yOffset.toInt())
                 }
-                .graphicsLayer { alpha = contentAlpha() },
+                .graphicsLayer { alpha = contentAlpha() }
+                .motionTestValues {
+                    contentAlpha() exportAs BouncerMotionTestKeys.bouncerContentAlpha
+                },
         alphaOnEntry = { contentAlpha() },
     )
 }
@@ -506,7 +513,7 @@ private fun ContentScope.BesideUserSwitcherLayout(
         LocalWindowSizeClass.current.isHeightAtLeastBreakpoint(
             WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
         )
-    val isContainerized = shouldBeContainerized()
+    val isContainerized = calculateContainerLayout() != null
     val padding =
         when {
             isContainerized -> PaddingValues(vertical = 96.dp)
@@ -553,12 +560,8 @@ private fun ContentScope.BesideUserSwitcherLayout(
                     }
                 }
                 .testTag("BesideUserSwitcherLayout")
-                .motionTestValues {
-                    swapAnimationEnd exportAs BouncerMotionTestKeys.swapAnimationEnd
-                }
                 .padding(padding)
     ) {
-        LaunchedEffect(isSwapped) { swapAnimationEnd = false }
         val animatedOffset by
             animateFloatAsState(
                 targetValue =
@@ -577,9 +580,7 @@ private fun ContentScope.BesideUserSwitcherLayout(
                         -1f
                     },
                 label = "offset",
-            ) {
-                swapAnimationEnd = true
-            }
+            )
 
         fun Modifier.swappable(inverted: Boolean = false): Modifier {
             return graphicsLayer {
@@ -820,7 +821,12 @@ private fun StatusMessage(viewModel: BouncerMessageViewModel, modifier: Modifier
                     maxLines = 2,
                     textAlign = TextAlign.Center,
                     modifier =
-                        Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+                        Modifier.fillMaxWidth().semantics {
+                            liveRegion = LiveRegionMode.Polite
+                            if (it.isNullOrEmpty()) {
+                                hideFromAccessibility()
+                            }
+                        },
                 )
             }
         }
@@ -890,6 +896,10 @@ private fun ActionArea(viewModel: BouncerOverlayContentViewModel, modifier: Modi
     val appearFadeInAnimatable = remember { Animatable(0f) }
     val appearMoveAnimatable = remember { Animatable(0f) }
     val appearAnimationInitialOffset = with(LocalDensity.current) { 80.dp.toPx() }
+    val actionAreaTranslationY by
+        remember(appearAnimationInitialOffset) {
+            derivedStateOf { (1 - appearMoveAnimatable.value) * appearAnimationInitialOffset }
+        }
 
     viewModel.actionButton?.let { actionButtonModel ->
         LaunchedEffect(Unit) {
@@ -920,12 +930,17 @@ private fun ActionArea(viewModel: BouncerOverlayContentViewModel, modifier: Modi
                 modifier
                     .graphicsLayer {
                         // Translate the button up from an initially pushed-down position:
-                        translationY =
-                            (1 - appearMoveAnimatable.value) * appearAnimationInitialOffset
+                        translationY = actionAreaTranslationY
                         // Fade the button in:
                         alpha = appearFadeInAnimatable.value
                     }
-                    .height(48.dp)
+                    .motionTestValues {
+                        appearFadeInAnimatable.value exportAs
+                            BouncerMotionTestKeys.bouncerActionButtonAlpha
+                        actionAreaTranslationY exportAs
+                            BouncerMotionTestKeys.bouncerActionButtonTranslationY
+                    }
+                    .heightIn(min = 48.dp)
                     .clip(ButtonDefaults.shape)
                     .background(color = MaterialTheme.colorScheme.secondaryContainer)
                     .semantics { role = Role.Button }
@@ -1108,43 +1123,35 @@ private fun UserSwitcherDropdownMenu(
 ) {
     val context = LocalContext.current
 
-    // TODO(b/303071855): once the FR is fixed, remove this composition local override.
-    MaterialTheme(
-        colorScheme =
-            MaterialTheme.colorScheme.copy(
-                surface = MaterialTheme.colorScheme.surfaceContainerHighest
-            ),
-        shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(28.dp)),
+    DropdownMenu(
+        expanded = isExpanded,
+        onDismissRequest = onDismissed,
+        offset = DpOffset(x = 0.dp, y = -UserSwitcherDropdownHeight),
+        modifier = Modifier.width(dropDownWidth).sysuiResTag("user_list_dropdown"),
+        shape = RoundedCornerShape(28.dp),
     ) {
-        DropdownMenu(
-            expanded = isExpanded,
-            onDismissRequest = onDismissed,
-            offset = DpOffset(x = 0.dp, y = -UserSwitcherDropdownHeight),
-            modifier = Modifier.width(dropDownWidth).sysuiResTag("user_list_dropdown"),
-        ) {
-            items.forEach { userSwitcherDropdownItem ->
-                DropdownMenuItem(
-                    modifier = Modifier.sysuiResTag("user_switcher_item"),
-                    leadingIcon = {
-                        Icon(
-                            icon = userSwitcherDropdownItem.icon,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = checkNotNull(userSwitcherDropdownItem.text.loadText(context)),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    },
-                    onClick = {
-                        onDismissed()
-                        userSwitcherDropdownItem.onClick()
-                    },
-                )
-            }
+        items.forEach { userSwitcherDropdownItem ->
+            DropdownMenuItem(
+                modifier = Modifier.sysuiResTag("user_switcher_item"),
+                leadingIcon = {
+                    Icon(
+                        icon = userSwitcherDropdownItem.icon,
+                        tint = Color.Unspecified, // Preserve the icon's original colors.
+                        modifier = Modifier.size(28.dp),
+                    )
+                },
+                text = {
+                    Text(
+                        text = checkNotNull(userSwitcherDropdownItem.text.loadText(context)),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                },
+                onClick = {
+                    onDismissed()
+                    userSwitcherDropdownItem.onClick()
+                },
+            )
         }
     }
 }
@@ -1284,7 +1291,10 @@ private val SceneTransitions = transitions {
 
 @VisibleForTesting
 object BouncerMotionTestKeys {
-    val swapAnimationEnd = MotionTestValueKey<Boolean>("swapAnimationEnd")
+    val bouncerActionButtonAlpha = MotionTestValueKey<Float>("bouncerContentActionBtnAlpha")
+    val bouncerActionButtonTranslationY =
+        MotionTestValueKey<Float>("bouncerContentActionBtnTranslationY")
+    val bouncerContentAlpha = MotionTestValueKey<Float>("bouncerContentAlpha")
 }
 
 private const val BOUNCER_CONTENTS_PASSIVE_AUTH_DELAY = 500

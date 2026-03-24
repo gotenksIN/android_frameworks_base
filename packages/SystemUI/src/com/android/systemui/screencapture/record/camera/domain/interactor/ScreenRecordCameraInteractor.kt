@@ -44,6 +44,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -86,26 +89,25 @@ constructor(
                 null,
             )
             .filterNotNull()
-    val isOnTapSupported: Flow<Boolean> =
+    val isOnTapSupported: StateFlow<Boolean> =
         isCameraSupported
             .map { it && repository.isOnTapSupported() }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isOnTapSupported",
                 coroutineScope,
                 SharingStarted.Eagerly,
-                null,
+                false,
             )
-            .filterNotNull()
-    val isBackgroundColorSupported: Flow<Boolean> =
+    val canChangeBackgroundColor: StateFlow<Boolean> =
         isCameraSupported
-            .map { it && repository.isBackgroundColorSupported() }
+            .flatMapLatest { if (it) repository.isBackgroundColorAvailable else flowOf(false) }
+            .map { isAvailable -> isAvailable && repository.isBackgroundColorSupported() }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isBackgroundColorSupported",
                 coroutineScope,
                 SharingStarted.Eagerly,
-                null,
+                false,
             )
-            .filterNotNull()
     val streamConfiguration: StateFlow<StreamConfiguration?> =
         combine(repository.isConnected.filter { it }, displayParameters.filterNotNull()) {
                 _,
@@ -134,8 +136,13 @@ constructor(
         // Keep the service connected throughout the recording for faster camera on/off
         coroutineScope.launch { connect() }
 
+        // Populate current background color when camera is connected
         cameraBackground
             .onEach { color -> repository.setBackgroundColor(color) }
+            .launchIn(coroutineScope)
+
+        repository.isConnected
+            .onEach { if (it) repository.setBackgroundColor(cameraBackground.value) }
             .launchIn(coroutineScope)
 
         combine(surfaceParameters.filterNotNull(), streamConfiguration.filterNotNull()) {
@@ -147,6 +154,9 @@ constructor(
                 ) {
                     Log.d(TAG, "Waiting for a properly sized surface")
                     return@combine
+                }
+                if (state.value == CameraState.Started || state.value == CameraState.Starting) {
+                    stopStream()
                 }
                 Log.d(TAG, "Starting the stream: ${params.size}")
                 repository.startStream(
@@ -173,7 +183,7 @@ constructor(
 
     suspend fun stopStream() {
         repository.stopStream()
-        Log.i(TAG, "Stopped the stream")
+        Log.d(TAG, "Stopped the stream")
     }
 
     fun setBackgroundColor(@ColorInt color: Int) {

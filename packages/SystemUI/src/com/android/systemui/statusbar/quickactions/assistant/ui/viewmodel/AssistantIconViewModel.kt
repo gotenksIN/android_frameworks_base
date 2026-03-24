@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.quickactions.assistant.ui.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -25,9 +26,9 @@ import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.assistant.domain.interactor.AssistantIconInteractor
 import com.android.systemui.statusbar.quickactions.assistant.shared.model.AssistantIconSharedModel
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipViewModel
-import com.android.systemui.statusbar.quickactions.ui.viewmodel.ChipIcon
-import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipId
-import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
+import com.android.systemui.statusbar.quickactions.shared.model.ChipContent
+import com.android.systemui.statusbar.quickactions.shared.model.QuickActionChipId
+import com.android.systemui.statusbar.quickactions.shared.model.QuickActionChipModel
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.map
@@ -38,13 +39,15 @@ constructor(assistantIconInteractor: AssistantIconInteractor) :
     StatusBarPopupChipViewModel, ExclusiveActivatable() {
     private val hydrator: Hydrator = Hydrator("AssistantIconViewModel.hydrator")
 
-    override val chip: QuickActionChipUiState by
+    override val chip: QuickActionChipModel by
         hydrator.hydratedStateOf(
             traceName = "AssistantIcon",
-            initialValue = QuickActionChipUiState.Hidden(QuickActionChipId.AssistantIcon),
+            initialValue = QuickActionChipModel.Hidden(QuickActionChipId.AssistantIcon),
             source =
                 assistantIconInteractor.assistantIconSharedModel.map {
-                    it.toPopupChipModel({ assistantIconInteractor.startAssistant() })
+                    it.toLaunchChipModel { context ->
+                        context?.let { assistantIconInteractor.startAssistant(context) }
+                    }
                 },
         )
 
@@ -58,22 +61,24 @@ constructor(assistantIconInteractor: AssistantIconInteractor) :
     }
 }
 
-fun AssistantIconSharedModel.toPopupChipModel(startAssistant: () -> Unit): QuickActionChipUiState {
+fun AssistantIconSharedModel.toLaunchChipModel(
+    startAssistant: (Context?) -> Unit
+): QuickActionChipModel {
     // Hide the icon if assistInfo is null or is not the configured package.
     return if (assistInfo == null || !isStatusBarAssistantPackage) {
-        QuickActionChipUiState.Hidden(QuickActionChipId.AssistantIcon)
+        QuickActionChipModel.Hidden(QuickActionChipId.AssistantIcon)
     } else {
         // TODO(b/440281094): update with a proper description.
-        val iconDrawable =
-            Icon.Resource(resId = R.drawable.ic_assistant_icon, contentDescription = null)
-        QuickActionChipUiState.PopupChip(
+
+        QuickActionChipModel.LaunchChip(
             chipId = QuickActionChipId.AssistantIcon,
-            icons = listOf(ChipIcon(icon = iconDrawable)),
-            chipContent = null,
-            showPopup = startAssistant,
+            chipContent =
+                ChipContent.IconOnly(
+                    Icon.Resource(resId = R.drawable.ic_assistant_icon, contentDescription = null)
+                ),
+            onClick = startAssistant,
             contentDescription =
                 ContentDescription.Resource(R.string.accessibility_status_bar_assistant_icon),
-            isPopupShown = isAssistShown,
         )
     }
 }

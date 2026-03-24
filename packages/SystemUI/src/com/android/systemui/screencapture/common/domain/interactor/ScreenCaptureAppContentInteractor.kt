@@ -27,6 +27,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 /** The app content available to be shared for a single package. */
 data class SingleAppContent(
@@ -67,12 +68,14 @@ constructor(
     /**
      * Fetch app content info for the given [packageName].
      *
-     * Thumbnails will be fetched at the given [thumbnailWidthPx] and [thumbnailHeightPx].
+     * Thumbnails will be fetched at the given [thumbnailWidthPx] and [thumbnailHeightPx]. Icons
+     * will be fetched at the given [iconSizePx].
      */
     fun appContentsFor(
         packageName: String,
         thumbnailWidthPx: Int,
         thumbnailHeightPx: Int,
+        iconSizePx: Int,
     ): Flow<Result<SingleAppContent>> =
         repository
             .appContentsFor(
@@ -80,6 +83,7 @@ constructor(
                 user = (parameters as ScreenCaptureUiParameters.ShareScreen).hostAppUserHandle,
                 thumbnailWidthPx = thumbnailWidthPx,
                 thumbnailHeightPx = thumbnailHeightPx,
+                iconSizePx = iconSizePx,
             )
             .map { result ->
                 result.map { appContentResult ->
@@ -96,22 +100,33 @@ constructor(
     /**
      * Fetch app content info for all the given [packageNames].
      *
-     * Thumbnails will be fetched at the given [thumbnailWidthPx] and [thumbnailHeightPx]. Only
-     * includes entries for packages that have app content that was successfully fetched.
+     * Thumbnails will be fetched at the given [thumbnailWidthPx] and [thumbnailHeightPx]. Icons
+     * will be fetched at the given [iconSizePx]. Only includes entries for packages that have app
+     * content that was successfully fetched.
      */
     fun appContentsFor(
         packageNames: List<String>,
         thumbnailWidthPx: Int,
         thumbnailHeightPx: Int,
-    ): Flow<MultiAppContent> =
-        combine(
+        iconSizePx: Int,
+    ): Flow<MultiAppContent> {
+        return combine(
             packageNames.distinct().map { packageName ->
                 appContentsFor(
                         packageName = packageName,
                         thumbnailWidthPx = thumbnailWidthPx,
                         thumbnailHeightPx = thumbnailHeightPx,
+                        iconSizePx = iconSizePx,
                     )
                     .map { result -> packageName to result }
+                    // Emit an initial empty result so combine triggers immediately for all
+                    // packages.
+                    .onStart {
+                        emit(
+                            packageName to
+                                Result.success(SingleAppContent(emptyList(), WeakReference(null)))
+                        )
+                    }
             }
         ) { results ->
             val contents = mutableListOf<ScreenCaptureAppContent>()
@@ -128,4 +143,5 @@ constructor(
             }
             MultiAppContent(contents = contents, projectionCallbacks = callbacks)
         }
+    }
 }

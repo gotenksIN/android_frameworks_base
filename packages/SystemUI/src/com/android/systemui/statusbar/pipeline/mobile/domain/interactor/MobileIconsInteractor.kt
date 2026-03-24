@@ -449,15 +449,17 @@ constructor(
         mobileConnectionsRepo.defaultDataSubRatConfig
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { defaultConfig ->
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 val enabled = (defaultConfig?.alwaysShowNetworkTypeIcon ?: false)
                     || (defaultConfig?.enableDdsRatIconEnhancement ?: false)
                     || (defaultConfig?.enableRatIconEnhancement ?: false)
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 val state = MobileIconCustomizationMode(
                     isRatCustomization = enabled,
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                     alwaysShowNetworkTypeIcon = defaultConfig?.alwaysShowNetworkTypeIcon ?: false,
                     ddsRatIconEnhancementEnabled = defaultConfig?.enableDdsRatIconEnhancement ?: false,
                     nonDdsRatIconEnhancementEnabled = defaultConfig?.enableRatIconEnhancement ?: false,
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 )
                 state
             }

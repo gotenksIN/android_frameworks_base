@@ -1545,11 +1545,11 @@ final class ActivityManagerConstants extends ContentObserver {
             CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawEmptyProcesses);
             CUR_TRIM_CACHED_PROCESSES = computeTrimCachedApps(rawEmptyProcesses, MAX_CACHED_PROCESSES);
 // QTI_END: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
-// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
             // Update the constants for process state controller
             mService.mProcessStateController.setCurMaxCachedProcesses(CUR_MAX_CACHED_PROCESSES);
             mService.mProcessStateController.setCurMaxEmptyProcesses(CUR_MAX_EMPTY_PROCESSES);
             mService.mProcessStateController.setCurTrimEmptyProcesses(CUR_TRIM_EMPTY_PROCESSES);
+// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
         }
 // QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
     }

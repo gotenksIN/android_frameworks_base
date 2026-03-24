@@ -11905,21 +11905,28 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
     public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
 
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * Specifies whether the "Radio Info" (and related) activities should be hidden on user builds.
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * <p>If {@code true}, the activities will be hidden on user builds.
      * If {@code false}, the activities will be visible (default behavior).
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * <p>Note: The hidden menu will always be displayed in non-user builds, regardless of this
      * configuration.
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
      * @hide
      */
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     public static final String KEY_HIDE_RADIO_INFO_ON_USER_BUILD_BOOL =
             "hide_radio_info_on_user_build_bool";
 
-// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
      * Controls whether the turbo DSDA icon is shown on the UI.
      *
@@ -11932,7 +11939,6 @@ public class CarrierConfigManager {
      */
     public static final String KEY_SHOW_TURBO_DSDA_ICON = "show_turbo_dsda_icon";
 
-// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
 
     /**
      * A list of network types that support a linger timer to delay the teardown of a data network.

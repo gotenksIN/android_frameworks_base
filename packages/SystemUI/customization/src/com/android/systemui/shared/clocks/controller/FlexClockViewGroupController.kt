@@ -44,13 +44,16 @@ import com.android.systemui.shared.clocks.view.BitmapClockViewGroup
 import com.android.systemui.shared.clocks.view.FlexClockViewGroup
 import java.util.Locale
 
-class FlexClockViewGroupController(private val clockCtx: FlexClockContext) :
-    FlexClockViewController {
+class FlexClockViewGroupController(
+    private val clockCtx: FlexClockContext,
+    private val layerCfg: LayerConfig,
+    private val isLargeClock: Boolean,
+) : FlexClockViewController {
     val layerControllers = mutableListOf<FlexClockViewController>()
     val dozeState = AnimationState(1F)
     override val view =
         if (enableAiClocks()) {
-            BitmapClockViewGroup(clockCtx)
+            BitmapClockViewGroup(clockCtx, isLargeClock)
         } else {
             FlexClockViewGroup(clockCtx)
         }
@@ -60,7 +63,7 @@ class FlexClockViewGroupController(private val clockCtx: FlexClockContext) :
     init {
         fun createController(cfg: LayerConfig) {
             if (enableAiClocks()) {
-                val controller = BitmapClockViewController(clockCtx, cfg, isLargeClock = true)
+                val controller = BitmapClockViewController(clockCtx, cfg, isLargeClock)
                 view.addView(controller.view)
                 layerControllers.add(controller)
             } else {

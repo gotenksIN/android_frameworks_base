@@ -27,7 +27,6 @@ import android.graphics.Outline
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
 import android.util.TypedValue
-import android.view.ViewOutlineProvider
 import android.view.MotionEvent.ACTION_OUTSIDE
 import android.view.View
 import android.view.View.ALPHA
@@ -35,6 +34,7 @@ import android.view.View.SCALE_X
 import android.view.View.SCALE_Y
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.ViewGroup.MarginLayoutParams
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -116,7 +116,9 @@ abstract class ManageWindowsViewContainer(
         private val iconViews = mutableListOf<ImageView>()
         val scrollableMenuView: ScrollView =
             ScrollView(context).apply { isVerticalScrollBarEnabled = false }
-        private val menuBaseView: LinearLayout = LinearLayout(context)
+        private val menuBaseView: LinearLayout =
+            LinearLayout(context).apply { id = R.id.manage_windows_menu_container }
+
         var scrollableMenuHeight = 0
         var menuWidth = 0
         var onIconClickListener: ((Int) -> Unit)? = null
@@ -135,11 +137,12 @@ abstract class ManageWindowsViewContainer(
             menuBackground.paint.color = menuBackgroundColor
             scrollableMenuView.alpha = 0f
             scrollableMenuView.background = menuBackground
-            scrollableMenuView.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, menuRadius)
+            scrollableMenuView.outlineProvider =
+                object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, menuRadius)
+                    }
                 }
-            }
             scrollableMenuView.clipToOutline = true
             scrollableMenuView.elevation = getDimensionPixelSize(MENU_ELEVATION_DP)
             scrollableMenuView.setOnTouchListener { _, event ->
@@ -194,11 +197,12 @@ abstract class ManageWindowsViewContainer(
                         )
                     }
                 val appSnapshotButton = ImageView(context)
-                appSnapshotButton.outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        outline.setRoundRect(0, 0, view.width, view.height, iconRadius)
+                appSnapshotButton.outlineProvider =
+                    object : ViewOutlineProvider() {
+                        override fun getOutline(view: View, outline: Outline) {
+                            outline.setRoundRect(0, 0, view.width, view.height, iconRadius)
+                        }
                     }
-                }
                 appSnapshotButton.clipToOutline = true
                 appSnapshotButton.scaleType = ImageView.ScaleType.FIT_CENTER
                 appSnapshotButton.contentDescription =
@@ -351,7 +355,9 @@ abstract class ManageWindowsViewContainer(
             private const val ICON_RADIUS_DP = 16f
             private const val ICON_MARGIN_DP = 16f
             private const val MENU_ELEVATION_DP = 1f
+            // LINT.IfChange(MENU_MAX_ICONS_PER_ROW)
             private const val MENU_MAX_ICONS_PER_ROW = 3
+            // LINT.ThenChange(../../../../../../../../tests/e2e/desktopmode/scenarios/src/com/android/wm/shell/scenarios/ManageOpenInstances.kt)
             private const val MENU_MAX_ROWS_BEFORE_SCROLL = 2
             private const val MENU_BOUNDS_ANIM_DURATION = 200L
             private const val MENU_BOUNDS_SHRUNK_SCALE = 0.8f

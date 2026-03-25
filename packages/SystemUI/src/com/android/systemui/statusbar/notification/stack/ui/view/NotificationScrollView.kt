@@ -125,9 +125,6 @@ interface NotificationScrollView {
     /** sets the current QS expand fraction */
     fun setQsExpandFraction(expandFraction: Float)
 
-    /** sets the current expand fraction when expanding from lockscreen */
-    fun setLStoShadeProgress(shadeProgress: Float)
-
     /**
      * Returns the number of max Notifications that can be fitted in the given space without
      * clipping their height.
@@ -185,9 +182,12 @@ interface NotificationScrollView {
     /** @return a callback to access the ExpandableNotificationRows to be manipulated. */
     fun getExpandHelperCallback(): SwipeToExpandCallback
 
+    /** Sets the base side paddings when not aligning to the QS tiles. */
+    fun setBaseSidePadding(basePadding: Int)
+
     /**
-     * Sets the side padding configuration, including the base padding and whether to align to the
-     * QQS tiles.
+     * Sets whether the notification panel should inset its left and right paddings to visually
+     * align with the second tile from each edge in the QQS above notifications.
      */
-    fun setSidePaddingConfig(basePadding: Int, alignToInnerQqsTiles: Boolean)
+    fun setAlignToInnerQqsTiles(alignToInnerQqsTiles: Boolean)
 }

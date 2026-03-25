@@ -39,6 +39,7 @@ import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.SystemProperties;
 import android.util.Size;
+import android.view.Display;
 import android.view.Gravity;
 
 import com.android.internal.policy.DesktopModeCompatUtils;
@@ -84,7 +85,8 @@ public final class DesktopModeBoundsCalculator {
         // during the size update.
         final boolean shouldRespectOptionPosition = updateOptionBoundsSize;
         // Calculate caption height for target display if needed.
-        final Context displayContext = displayContent.getDisplayPolicy().getContext();
+        final Display targetDisplay = displayContent.getDisplay();
+        final Context displayContext = task.mWmService.mContext.createDisplayContext(targetDisplay);
         final int captionHeight = activity != null && shouldExcludeCaptionFromAppBounds(
                 activity.info, task.isResizeable(), activity.mOptOutEdgeToEdge,
                 activity.mAppCompatController.getSandboxOverrides()

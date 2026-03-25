@@ -17,7 +17,7 @@
 package com.android.server.personalcontext;
 
 import android.service.personalcontext.hint.PublishedContextHint;
-import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.ContextInsight;
 
 import com.android.server.personalcontext.component.Component;
 import com.android.server.personalcontext.component.Refiner;
@@ -43,7 +43,6 @@ public class ContextLogger
     private final Map<Long, Timeline> mActiveRendererTimelines = new HashMap<>();
 
     /** Called when a workflow is started. */
-    @Override
     public void onRefinerWorkflowStarted(long flowId, Collection<PublishedContextHint> hints) {
         final Timeline flowTimeline = new Timeline();
 
@@ -56,7 +55,6 @@ public class ContextLogger
     }
 
     /** Called when a set of hints is sent to a refiner. */
-    @Override
     public void onHintsSentToRefiner(
             long flowId, Collection<PublishedContextHint> hints, Refiner refiner) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
@@ -70,7 +68,6 @@ public class ContextLogger
     }
 
     /** Called when a set of hints is received from a refiner. */
-    @Override
     public void onHintsReceivedFromRefiner(
             long flowId, Collection<PublishedContextHint> hints, Refiner refiner) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
@@ -86,7 +83,6 @@ public class ContextLogger
     }
 
     /** Called when a workflow stops. */
-    @Override
     public void onRefinerWorkflowFinished(long flowId) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -97,7 +93,6 @@ public class ContextLogger
     }
 
     /** Called when a workflow has an unexpected error. */
-    @Override
     public void onRefinerWorkflowError(long flowId, Throwable t) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -117,8 +112,7 @@ public class ContextLogger
     }
 
     /** Called when a workflow is started. */
-    @Override
-    public void onRendererWorkflowStarted(long flowId, PublishedContextInsight insight) {
+    public void onRendererWorkflowStarted(long flowId, ContextInsight insight) {
         final Timeline flowTimeline = new Timeline();
 
         flowTimeline.addStringDetail("Render workflow %s started", flowId);
@@ -129,9 +123,7 @@ public class ContextLogger
     }
 
     /** Called when an insight is sent to a renderer. */
-    @Override
-    public void onInsightSentToRenderer(
-            long flowId, PublishedContextInsight insight, Renderer renderer) {
+    public void onInsightSentToRenderer(long flowId, ContextInsight insight, Renderer renderer) {
         Timeline flowTimeline = mActiveRendererTimelines.get(flowId);
         if (flowTimeline == null) return;
 
@@ -140,7 +132,6 @@ public class ContextLogger
     }
 
     /** Called when a workflow stops. */
-    @Override
     public void onRendererWorkflowFinished(long flowId) {
         Timeline flowTimeline = mActiveRendererTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -151,7 +142,6 @@ public class ContextLogger
     }
 
     /** Called when a workflow has an unexpected error. */
-    @Override
     public void onRendererWorkflowError(long flowId, Throwable t) {
         Timeline flowTimeline = mActiveRendererTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -226,14 +216,14 @@ public class ContextLogger
             addStringDetail("  Exception: %s", t.getMessage());
         }
 
-        public void addInsightDetail(PublishedContextInsight insight) {
+        public void addInsightDetail(ContextInsight insight) {
             addStringDetail(
                     "  Insight: %s - %s (%s source hints)",
                     insight.getClass().getSimpleName(),
-                    insight.getInsight().getInsightId(),
-                    insight.getInsight().getOriginHints().size());
+                    insight.getInsightId(),
+                    insight.getOriginHints().size());
 
-            addHintListDetail(insight.getInsight().getOriginHints());
+            addHintListDetail(insight.getOriginHints());
         }
 
         public void dump(PrintWriter fout) {

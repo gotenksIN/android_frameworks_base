@@ -374,9 +374,9 @@ class EnumProcessor(processingEnv: ProcessingEnvironment) :
         fields.map { element ->
             // Our example has no javadoc, but this would get ENUM_ENTRY_1's documentation.
             val documentation =
-                processingEnv.elementUtils.getDocComment(element)?.trimIndent()?.trim() ?: ""
+                processingEnv.elementUtils.getDocComment(element)?.trimIndent() ?: ""
 
-            if (documentation.isEmpty()) {
+            if (documentation.trim().isEmpty()) {
                 printError(element, "Missing JavaDoc")
             }
 

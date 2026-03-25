@@ -61,12 +61,6 @@ public final class WindowRelayoutResult implements Parcelable {
     @Nullable
     public ActivityWindowInfo activityWindowInfo;
 
-    /**
-     * Whether the synchronized insets animation is allowed for this window.
-     * @see ViewRootImpl#isSyncedInsetsAnimationEnabledByDefault
-     */
-    public boolean usesSyncedInsetsAnimation;
-
     /** Only use this constructor from tests. */
     public WindowRelayoutResult() {
         this(new ClientWindowFrames(), new MergedConfiguration(),
@@ -84,7 +78,6 @@ public final class WindowRelayoutResult implements Parcelable {
         if (copyFrom.activityWindowInfo != null) {
             activityWindowInfo = new ActivityWindowInfo(copyFrom.activityWindowInfo);
         }
-        usesSyncedInsetsAnimation = copyFrom.usesSyncedInsetsAnimation;
     }
 
     /**
@@ -122,7 +115,6 @@ public final class WindowRelayoutResult implements Parcelable {
         activeControls = in.readTypedObject(InsetsSourceControl.Array.CREATOR);
         syncSeqId = in.readInt();
         activityWindowInfo = in.readTypedObject(ActivityWindowInfo.CREATOR);
-        usesSyncedInsetsAnimation = in.readBoolean();
     }
 
     @Override
@@ -133,7 +125,6 @@ public final class WindowRelayoutResult implements Parcelable {
         dest.writeTypedObject(activeControls, flags);
         dest.writeInt(syncSeqId);
         dest.writeTypedObject(activityWindowInfo, flags);
-        dest.writeBoolean(usesSyncedInsetsAnimation);
     }
 
     @NonNull

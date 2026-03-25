@@ -21,12 +21,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -67,7 +65,7 @@ fun PostRecordSnackbar(
                     color = MaterialTheme.colorScheme.inverseSurface,
                     shape = RoundedCornerShape(percent = 50),
                 )
-                .padding(start = 12.dp, end = 12.dp)
+                .padding(start = 12.dp, end = 20.dp)
                 .height(48.dp),
     ) {
         Box(
@@ -89,19 +87,14 @@ fun PostRecordSnackbar(
             text = visuals.message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.inverseOnSurface,
-            modifier = Modifier.padding(end = 6.dp).weight(weight = 1f, fill = false).basicMarquee(),
+            modifier = Modifier.weight(weight = 1f, fill = false).basicMarquee(),
         )
         if (visuals.actionLabel != null) {
-            TextButton(
-                onClick = data::performAction,
-                modifier = Modifier.width(58.dp),
-                contentPadding = PaddingValues(0.dp),
-            ) {
+            TextButton(onClick = data::performAction, modifier = Modifier) {
                 Text(
                     text = visuals.actionLabel,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.inverseOnSurface,
-                    modifier = Modifier.basicMarquee(),
                 )
             }
         }

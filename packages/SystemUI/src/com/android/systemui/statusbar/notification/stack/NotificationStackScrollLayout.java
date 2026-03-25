@@ -756,6 +756,7 @@ public class NotificationStackScrollLayout
         return 0f;
     }
 
+    @VisibleForTesting
     protected void setLogger(NotificationStackScrollLogger logger) {
         mLogger = logger;
     }
@@ -1466,11 +1467,6 @@ public class NotificationStackScrollLayout
         } else {
             startAnimationToState();
         }
-        if (SceneContainerFlag.isEnabled()) {
-            // Skip invalidate because we are already in the draw phase and do not need to schedule
-            // a new draw pass in another frame.
-            updateFirstAndLastBackgroundViews(/* shouldInvalidate= */ false);
-        }
         avoidNotificationOverlaps();
         Trace.endSection();
     }
@@ -1926,12 +1922,6 @@ public class NotificationStackScrollLayout
             setCheckForLeaveBehind(false);
             onExpansionStopped();
         }
-    }
-
-    @Override
-    public void setLStoShadeProgress(float shadeProgress) {
-        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        mAmbientState.setLStoShadeProgress(shadeProgress);
     }
 
     @VisibleForTesting
@@ -3461,16 +3451,11 @@ public class NotificationStackScrollLayout
     }
 
     private void updateFirstAndLastBackgroundViews() {
-        updateFirstAndLastBackgroundViews(/* shouldInvalidate= */ true);
-    }
-
-    private void updateFirstAndLastBackgroundViews(boolean shouldInvalidate) {
         ExpandableView lastChild = getLastChildWithBackground();
         mSectionsManager.updateFirstAndLastViewsForAllSections(getChildrenWithBackground());
+
         mAmbientState.setLastVisibleBackgroundChild(lastChild);
-        if (shouldInvalidate) {
-            invalidate();
-        }
+        invalidate();
     }
 
     private void onViewAddedInternal(ExpandableView child) {
@@ -3517,15 +3502,15 @@ public class NotificationStackScrollLayout
     }
 
     @Override
-    public void setSidePaddingConfig(int baseSidePadding, boolean alignToInnerQqsTiles) {
+    public void setAlignToInnerQqsTiles(boolean alignToInnerQqsTiles) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        if (mScrollViewFields.baseSidePadding == baseSidePadding
-                && mScrollViewFields.alignToInnerQqsTiles == alignToInnerQqsTiles) {
-            return;
-        }
-        mScrollViewFields.baseSidePadding = baseSidePadding;
         mScrollViewFields.alignToInnerQqsTiles = alignToInnerQqsTiles;
-        requestLayout();
+    }
+
+    @Override
+    public void setBaseSidePadding(int baseSidePadding) {
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        mScrollViewFields.baseSidePadding = baseSidePadding;
     }
 
     private void updateNotificationAnimationStates() {
@@ -3605,8 +3590,8 @@ public class NotificationStackScrollLayout
             boolean isTransient = child instanceof ExpandableNotificationRow
                     && child.getTransientContainer() != null;
             Log.e(TAG, "Attempting to re-position "
-                    + (isTransient ? "transient " : "")
-                    + "view {"
+                    + (isTransient ? "transient" : "")
+                    + " view {"
                     + child
                     + "}");
             return;
@@ -3922,18 +3907,40 @@ public class NotificationStackScrollLayout
      */
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
+        boolean shouldRefuse = false;
         if (SceneContainerFlag.isEnabled()) {
             // TODO(b/433984972): this is especially useful because there are scenarios that the
             //  NSSL children overlaps with other visible, interactive items.
-            if (shouldRefuseTouchEvent(ev)) {
+            shouldRefuse = shouldRefuseTouchEvent(ev);
+            if (shouldRefuse) {
+                if (ev.getActionMasked() != MotionEvent.ACTION_MOVE && mLogger != null) {
+                    mLogger.logNsslOnInterceptTouchEvent(
+                            ev.getActionMasked(),
+                            /* result= */ true,
+                            /* shouldRefuse= */ true,
+                            /* touchHandlerIntercepted= */ false
+                    );
+                }
                 return true;
             }
         }
 
-        if (mTouchHandler != null && mTouchHandler.onInterceptTouchEvent(ev)) {
-            return true;
+        boolean touchHandlerIntercepted = false;
+        if (mTouchHandler != null) {
+            touchHandlerIntercepted = mTouchHandler.onInterceptTouchEvent(ev);
         }
-        return super.onInterceptTouchEvent(ev);
+
+        boolean result = touchHandlerIntercepted || super.onInterceptTouchEvent(ev);
+
+        if (ev.getActionMasked() != MotionEvent.ACTION_MOVE && mLogger != null) {
+            mLogger.logNsslOnInterceptTouchEvent(
+                    ev.getActionMasked(),
+                    result,
+                    shouldRefuse,
+                    touchHandlerIntercepted
+            );
+        }
+        return result;
     }
 
     /**
@@ -3997,7 +4004,14 @@ public class NotificationStackScrollLayout
             debugShadeLog("NSSL's root view is not visible. Refusing touch event");
             return true;
         }
-        return !mScrollViewFields.interactive || isOutBoundsDownEvent(ev);
+        boolean interactive = mScrollViewFields.interactive;
+        boolean isOutBounds = isOutBoundsDownEvent(ev);
+        boolean result = !interactive || isOutBounds;
+        if (ev.getActionMasked() != MotionEvent.ACTION_MOVE && mLogger != null) {
+            mLogger.logNsslShouldRefuseTouchEvent(ev.getActionMasked(), result, interactive,
+                    isOutBounds);
+        }
+        return result;
     }
 
     private boolean isRootViewVisible() {
@@ -4023,7 +4037,7 @@ public class NotificationStackScrollLayout
             return false;
         }
         ShadeScrimBounds bounds = shape.getBounds();
-        Log.d("NSSL", "bounds=" + bounds + " x: " + x + " y: " + y);
+        Log.d("NSSL", "bounds=" + bounds.toString() + " x: " + x + " y: " + y);
         return x < bounds.getLeft()
                 || x > bounds.getRight()
                 || y < bounds.getTop()

@@ -177,7 +177,6 @@ constructor(
         }
 
     init {
-        if (DEBUG) Log.d(TAG, "Controller for $userHandle | $mPackageName | $mToken")
         mMediaSwitchingType =
             mediaSwitchingType
                 ?: if (enableInputRouting()) {

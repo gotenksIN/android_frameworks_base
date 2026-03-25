@@ -56,11 +56,6 @@ constructor(
         policy.setExpansionIntentForElement(notificationElement.get(), displayId)
     }
 
-    /** Updates the target display for the shade, if necessary. */
-    fun updateShadeDisplayIfNeeded(displayId: Int) {
-        policy.updateShadeDisplayIfNeeded(displayId)
-    }
-
     /** Called when notification panel keyboard shortcut is pressed. */
     fun onNotificationPanelKeyboardShortcut() {
         policy.setExpansionIntentForElement(

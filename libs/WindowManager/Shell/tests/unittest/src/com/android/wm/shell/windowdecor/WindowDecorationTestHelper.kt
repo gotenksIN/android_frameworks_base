@@ -212,6 +212,7 @@ object WindowDecorationTestHelper {
                 windowDecorationExclusionTracker,
                 inputPilferer,
                 inputManager,
+                mock<FocusTransitionObserver>(),
                 shellDesktopState,
                 mock<MultiDisplayDragMoveIndicatorController>(),
                 { StubTransaction() },

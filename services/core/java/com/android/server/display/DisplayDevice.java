@@ -46,7 +46,7 @@ import java.util.Arrays;
  * Display devices are guarded by the {@link DisplayManagerService.SyncRoot} lock.
  * </p>
  */
-public abstract class DisplayDevice {
+abstract class DisplayDevice {
     /**
      * Maximum acceptable anisotropy for the output image.
      *
@@ -82,7 +82,7 @@ public abstract class DisplayDevice {
     // DEBUG STATE: Last device info which was written to the log, or null if none.
     // Do not use for any other purpose.
     DisplayDeviceInfo mDebugLastLoggedDeviceInfo;
-    public DisplayDevice(DisplayAdapter displayAdapter, IBinder displayToken, String uniqueId,
+    DisplayDevice(DisplayAdapter displayAdapter, IBinder displayToken, String uniqueId,
             Context context) {
         mDisplayAdapter = displayAdapter;
         mDisplayToken = displayToken;

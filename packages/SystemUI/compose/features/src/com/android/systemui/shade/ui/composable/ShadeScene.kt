@@ -154,7 +154,7 @@ constructor(
         actionsViewModelFactory.create()
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         actionsViewModel.activate()
     }
 

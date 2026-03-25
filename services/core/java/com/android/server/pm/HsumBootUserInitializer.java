@@ -82,12 +82,12 @@ public final class HsumBootUserInitializer {
     /** Whether it should create an initial Admin user, but without setting it as the main user. */
     private final boolean mShouldCreateInitialAdminUser;
 
-    /** Whether the device requires an admin. */
-    private final boolean mRequiresAdmin;
+    /** Whether the device is managed (a managed device doesn't need an admin). */
+    private final boolean mIsManagedDevice;
 
     /** Static factory method for creating a {@link HsumBootUserInitializer} instance. */
     public static @Nullable HsumBootUserInitializer createInstance(UserManagerService ums,
-            ActivityManagerService ams, PackageManagerService pms, boolean requiresAdmin,
+            ActivityManagerService ams, PackageManagerService pms, boolean isManagedDevice,
             Context context) {
 
         if (!UserManager.isHeadlessSystemUserMode()) {
@@ -95,7 +95,7 @@ public final class HsumBootUserInitializer {
         }
         var instance = new HsumBootUserInitializer(ums, ams, pms,
                 designateMainUserOnBoot(context), createInitialAdminUserOnBoot(context),
-                requiresAdmin, context);
+                isManagedDevice, context);
         setDumpable(instance, context);
         return instance;
     }
@@ -103,14 +103,14 @@ public final class HsumBootUserInitializer {
     @VisibleForTesting
     HsumBootUserInitializer(UserManagerService ums, ActivityManagerService ams,
             PackageManagerService pms, boolean shouldDesignateMainUser,
-            boolean shouldCreateInitialAdminUser, boolean requiresAdmin, Context context) {
+            boolean shouldCreateInitialAdminUser, boolean isManagedDevice, Context context) {
         mUms = ums;
         mAms = ams;
         mPms = pms;
         mContentResolver = context.getContentResolver();
         mShouldDesignateMainUser = shouldDesignateMainUser;
         mShouldCreateInitialAdminUser = shouldCreateInitialAdminUser;
-        mRequiresAdmin = requiresAdmin;
+        mIsManagedDevice = isManagedDevice;
         mDeviceProvisionedObserver = (Flags.hsuDeviceProvisioner()
                     ? new HsuDeviceProvisioner(
                             context, new Handler(Looper.getMainLooper()), ums)
@@ -194,8 +194,8 @@ public final class HsumBootUserInitializer {
     public void init(TimingsTraceAndSlog t) {
         if (DEBUG) {
             Slogf.d(TAG, "init(): mShouldDesignateMainUser=%b, shouldCreateInitialAdminUser=%b, "
-                    + "requiresAdmin=%b, Flags.createInitialAdminUser=%b",
-                    mShouldDesignateMainUser, mShouldCreateInitialAdminUser, mRequiresAdmin,
+                    + "isManagedDevice=%b, Flags.createInitialAdminUser=%b",
+                    mShouldDesignateMainUser, mShouldCreateInitialAdminUser, mIsManagedDevice,
                     Flags.createInitialUser());
         } else {
             Slogf.i(TAG, "Initializing");
@@ -206,13 +206,11 @@ public final class HsumBootUserInitializer {
             return;
         }
 
-        if (!mRequiresAdmin) {
-            // There's no need to proceed: the device management is initiated and can result only in
-            // device being managed by a DPC running on HSU (in which case it doesn't need any extra
-            // user) or in factory resetting a device and re-creating an admin user on boot.
+        if (mIsManagedDevice) {
+            // There's no need to proceed: either the device is managed by the HSU (in which case it
+            // doesn't need any extra user) or by a full user (which cannot be removed).
             if (DEBUG) {
-                Slogf.d(TAG, "Initial user existence check is bypassed once the multiuser managed "
-                        + "device provisioning has started");
+                Slogf.d(TAG, "Not checking if initial user exists on managed device");
             }
             return;
         }
@@ -438,7 +436,7 @@ public final class HsumBootUserInitializer {
         pw.print("  mDeviceProvisionedObserver="); pw.println(mDeviceProvisionedObserver);
         pw.print("  mShouldDesignateMainUser="); pw.println(mShouldDesignateMainUser);
         pw.print("  mShouldCreateInitialAdminUser="); pw.println(mShouldCreateInitialAdminUser);
-        pw.print("  mRequiresAdmin="); pw.println(mRequiresAdmin);
+        pw.print("  mIsManagedDevice="); pw.println(mIsManagedDevice);
     }
 
     @VisibleForTesting

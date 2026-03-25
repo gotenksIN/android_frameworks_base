@@ -46,8 +46,7 @@ class FreeformRuleRepositoryTest : SysuiTestCase() {
                 )
 
             assertThat(result).isInstanceOf(ResponseModel.Success::class.java)
-            assertThat((result as ResponseModel.Success<DraftRuleModel>).draftRule)
-                .isInstanceOf(DraftRuleModel.New::class.java)
+            assertThat((result as ResponseModel.Success<DraftRuleModel>).draftRule.isNew).isTrue()
             assertThat((result as ResponseModel.Success<DraftRuleModel>).draftRule.action)
                 .isEqualTo(ActionModel.Block)
         }

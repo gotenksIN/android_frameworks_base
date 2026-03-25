@@ -178,7 +178,7 @@ public class AuthController implements
     @NonNull private Lazy<UdfpsLogger> mUdfpsLogger;
     @VisibleForTesting IBiometricSysuiReceiver mReceiver;
     @VisibleForTesting @NonNull final BiometricDisplayListener mOrientationListener;
-    @Nullable private List<FaceSensorPropertiesInternal> mFaceProps;
+    @Nullable private final List<FaceSensorPropertiesInternal> mFaceProps;
     @Nullable private List<FingerprintSensorPropertiesInternal> mFpProps;
     @Nullable private List<FingerprintSensorPropertiesInternal> mUdfpsProps;
     @Nullable private List<FingerprintSensorPropertiesInternal> mSidefpsProps;
@@ -345,7 +345,6 @@ public class AuthController implements
             Log.d(TAG, "handleAllFaceAuthenticatorsRegistered | sensors: " + Arrays.toString(
                     sensors.toArray()));
         }
-        mFaceProps = sensors;
 
         mFaceManager.registerBiometricStateListener(new BiometricStateListener() {
             @Override
@@ -794,6 +793,8 @@ public class AuthController implements
                 });
 
         mWakefulnessLifecycle = wakefulnessLifecycle;
+
+        mFaceProps = mFaceManager != null ? mFaceManager.getSensorPropertiesInternal() : null;
 
         mDisplay = mContext.getDisplay();
         updateSensorLocations();

@@ -101,11 +101,6 @@ constructor(
             if (Flags.notificationShadeBlur() || Flags.fixNsslBlockingQs()) {
                 launch { viewModel.interactive.collectTraced(view::setInteractive) }
             }
-            launch {
-                viewModel.lockScreenToShadeTransitionProgress.collectTraced {
-                    view.setLStoShadeProgress(it)
-                }
-            }
             launch { viewModel.isSplitShade.collectTraced { view.setSplitShade(it) } }
             launch {
                 viewModel
@@ -149,7 +144,8 @@ constructor(
             launch {
                 viewModel.sidePaddingConfig.collectLatestTraced {
                     (baseSidePadding, alignToInnerQqsTiles) ->
-                    view.setSidePaddingConfig(baseSidePadding, alignToInnerQqsTiles)
+                    view.setBaseSidePadding(baseSidePadding)
+                    view.setAlignToInnerQqsTiles(alignToInnerQqsTiles)
                 }
             }
 

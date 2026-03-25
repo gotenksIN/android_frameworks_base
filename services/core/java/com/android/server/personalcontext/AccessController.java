@@ -42,7 +42,6 @@ public class AccessController {
             ACCESS_RECEIVE_HINTS,
             ACCESS_PUBLISH_INSIGHTS,
             ACCESS_RECEIVE_INSIGHTS,
-            ACCESS_REGISTER_VISUALIZER,
     })
     public @interface Access {
     }
@@ -72,11 +71,6 @@ public class AccessController {
      */
     public static final int ACCESS_RECEIVE_INSIGHTS = 1 << 3;
 
-    /**
-     * Access to register a visualizer.
-     */
-    public static final int ACCESS_REGISTER_VISUALIZER = 1 << 4;
-
     private final PackageManager mPackageManager;
     private final Context mContext;
 
@@ -87,8 +81,6 @@ public class AccessController {
     private final Set<String> mInsightPublishers;
 
     private final Set<String> mInsightReceivers;
-
-    private final Set<String> mVisualizers;
 
 
     /**
@@ -111,9 +103,6 @@ public class AccessController {
 
         mInsightReceivers = Set.of(mContext.getResources().getStringArray(
                 R.array.config_allowlistPersonalContextInsightReceiving));
-
-        mVisualizers = Set.of(mContext.getResources().getStringArray(
-                R.array.config_allowlistPersonalContextVisualizers));
     }
 
     /**
@@ -173,11 +162,6 @@ public class AccessController {
 
         if ((accessFlags & ACCESS_RECEIVE_INSIGHTS) == ACCESS_RECEIVE_INSIGHTS
                 && !mInsightReceivers.contains(targetPackage)) {
-            return false;
-        }
-
-        if ((accessFlags & ACCESS_REGISTER_VISUALIZER) == ACCESS_REGISTER_VISUALIZER
-                && !mVisualizers.contains(targetPackage)) {
             return false;
         }
 

@@ -20,7 +20,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.domain.interactor.HotspotStatusInteractor
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
@@ -36,18 +37,28 @@ import dagger.assisted.AssistedInject
 class HotspotIconViewModel
 @AssistedInject
 constructor(@Assisted context: Context, interactor: HotspotStatusInteractor) :
-    SystemStatusIconViewModel.Default, HydratedActivatable() {
+    SystemStatusIconViewModel.Default, ExclusiveActivatable() {
     init {
         SystemStatusIconsInCompose.expectInNewMode()
     }
 
+    private val hydrator = Hydrator("HotspotIconViewModel.hydrator")
+
     override val slotName = context.getString(com.android.internal.R.string.status_bar_hotspot)
 
     override val visible: Boolean by
-        interactor.isEnabled.hydratedStateOf(traceName = null, initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = null,
+            initialValue = false,
+            source = interactor.isEnabled,
+        )
 
     override val icon: Icon?
         get() = visible.toUiState()
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     private fun Boolean.toUiState(): Icon? =
         if (this) {

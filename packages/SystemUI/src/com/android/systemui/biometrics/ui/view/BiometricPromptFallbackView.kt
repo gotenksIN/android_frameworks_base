@@ -132,12 +132,13 @@ fun BiometricPromptFallbackView(promptViewModel: PromptViewModel, callback: Spag
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleLargeEmphasized,
                     modifier =
-                        Modifier.padding(horizontal = 16.dp).weight(1f).semantics {
+                        Modifier.padding(start = 16.dp).semantics {
                             heading()
                             // TODO(391644182): Use paneTitle once prompt is moved to compose
                             liveRegion = LiveRegionMode.Polite
                         },
                 )
+                Spacer(modifier = Modifier.weight(1f))
 
                 FilledIconButton(
                     onClick = { callback.onUserCanceled() },

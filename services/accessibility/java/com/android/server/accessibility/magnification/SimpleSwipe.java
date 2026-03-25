@@ -84,6 +84,6 @@ class SimpleSwipe extends GestureMatcher {
 
     @Override
     protected String getGestureName() {
-        return SimpleSwipe.class.getSimpleName();
+        return this.getClass().getSimpleName();
     }
 }

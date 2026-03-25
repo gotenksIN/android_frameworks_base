@@ -23,7 +23,8 @@ import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.ui.transitions.BlurConfig
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.qs.FooterActionsController
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsViewModel
 import com.android.systemui.scene.domain.interactor.SceneInteractor
@@ -38,6 +39,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
@@ -60,21 +62,26 @@ constructor(
     @Main private val mainDispatcher: CoroutineDispatcher,
     windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     private val blurConfig: BlurConfig,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
     val qsContainerViewModel =
         qsContainerViewModelFactory.create(supportsBrightnessMirroring = true)
+
+    private val hydrator = Hydrator("QuickSettingsSceneContentViewModel.hydrator")
 
     /**
      * Whether the shade container transparency effect should be enabled (`true`), or whether to
      * render a fully-opaque shade container (`false`).
      */
     val isTransparencyEnabled: Boolean by
-        if (Flags.notificationShadeBlur()) {
-                windowRootViewBlurInteractor.isBlurCurrentlySupported
-            } else {
-                MutableStateFlow(false)
-            }
-            .hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "isTransparencyEnabled",
+            source =
+                if (Flags.notificationShadeBlur()) {
+                    windowRootViewBlurInteractor.isBlurCurrentlySupported
+                } else {
+                    MutableStateFlow(false)
+                },
+        )
 
     private val footerActionsControllerInitialized = AtomicBoolean(false)
 
@@ -100,8 +107,14 @@ constructor(
         return footerActionsViewModelFactory.create(lifecycleOwner)
     }
 
-    override suspend fun onActivated() {
-        coroutineScope { launch { qsContainerViewModel.activate() } }
+    override suspend fun onActivated(): Nothing {
+        coroutineScope {
+            launch { hydrator.activate() }
+
+            launch { qsContainerViewModel.activate() }
+
+            awaitCancellation()
+        }
     }
 
     /**

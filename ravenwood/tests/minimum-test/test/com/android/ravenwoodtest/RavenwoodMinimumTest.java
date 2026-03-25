@@ -15,10 +15,7 @@
  */
 package com.android.ravenwoodtest;
 
-import static org.junit.Assert.assertFalse;
-
 import android.platform.test.annotations.DisabledOnRavenwood;
-import android.platform.test.ravenwood.RavenwoodRule;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
@@ -42,6 +39,6 @@ public class RavenwoodMinimumTest {
     @Test
     @DisabledOnRavenwood
     public void testIgnored() {
-        assertFalse("Shouldn't be executed under ravenwood", RavenwoodRule.isOnRavenwood());
+        throw new RuntimeException("Shouldn't be executed under ravenwood");
     }
 }

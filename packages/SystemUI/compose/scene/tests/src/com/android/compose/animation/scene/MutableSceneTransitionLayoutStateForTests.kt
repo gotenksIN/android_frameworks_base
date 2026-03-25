@@ -20,7 +20,6 @@ import android.view.ViewRootImpl
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MotionScheme
 import com.android.compose.animation.scene.content.state.TransitionState
-import kotlinx.coroutines.CoroutineScope
 
 internal fun MutableSceneTransitionLayoutStateForTests(
     initialScene: SceneKey,
@@ -40,13 +39,6 @@ internal fun MutableSceneTransitionLayoutStateForTests(
             override var transitions = transitions
             override val motionScheme = MotionScheme.standard()
             override val viewRootImpl: ViewRootImpl? = null
-
-            // TODO(b/493511007): Remove this MutableSceneTransitionLayoutStateForTests entirely.
-            override val coroutineScope: CoroutineScope
-                get() =
-                    error(
-                        "animationScope must be provided when using MutableSceneTransitionLayoutStateForTests"
-                    )
         }
 
     return MutableSceneTransitionLayoutStateImpl(

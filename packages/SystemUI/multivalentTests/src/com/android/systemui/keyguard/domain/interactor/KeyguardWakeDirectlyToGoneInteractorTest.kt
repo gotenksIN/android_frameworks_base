@@ -36,10 +36,6 @@ import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepos
 import com.android.systemui.keyguard.shared.model.BiometricUnlockMode
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.LockAfterDelayTimerState
-import com.android.systemui.kosmos.collectLastValue
-import com.android.systemui.kosmos.collectValues
-import com.android.systemui.kosmos.runCurrent
-import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
@@ -48,12 +44,9 @@ import com.android.systemui.scene.data.repository.setSceneTransition
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.Scenes.Gone
-import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvisioningRepository
-import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
 import com.android.systemui.testKosmos
 import com.android.systemui.user.data.repository.FakeUserRepository
 import com.android.systemui.util.settings.fakeSettings
-import com.google.common.truth.Truth.assertThat
 import junit.framework.Assert.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
@@ -82,13 +75,15 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
             whenever(lockPatternUtils.isSecure(anyInt())).thenReturn(true)
         }
 
+    private val testScope = kosmos.testScope
     private val underTest by lazy { kosmos.keyguardWakeDirectlyToGoneInteractor }
+    private val lockPatternUtils = kosmos.lockPatternUtils
     private val repository = kosmos.fakeKeyguardRepository
     private val transitionRepository = kosmos.fakeKeyguardTransitionRepository
 
     @Test
-    fun canWakeDirectlyToGone_keyguardServiceEnabledThenDisabled() =
-        kosmos.runTest {
+    fun testCanWakeDirectlyToGone_keyguardServiceEnabledThenDisabled() =
+        testScope.runTest {
             val canWake by collectValues(underTest.canWakeDirectlyToGone)
 
             assertEquals(
@@ -116,8 +111,8 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun canWakeDirectlyToGone_lockscreenDisabledThenEnabled_lockNowEvent() =
-        kosmos.runTest {
+    fun testCanWakeDirectlyToGone_lockscreenDisabledThenEnabled_lockNowEvent() =
+        testScope.runTest {
             val canWake by collectValues(underTest.canWakeDirectlyToGone)
 
             assertEquals(
@@ -178,8 +173,8 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun canWakeDirectlyToGone_wakeAndUnlock() =
-        kosmos.runTest {
+    fun testCanWakeDirectlyToGone_wakeAndUnlock() =
+        testScope.runTest {
             val canWake by collectValues(underTest.canWakeDirectlyToGone)
 
             assertEquals(
@@ -201,8 +196,8 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun canWakeDirectlyToGone_andSetsAlarm_ifPowerButtonDoesNotLockImmediately() =
-        kosmos.runTest {
+    fun testCanWakeDirectlyToGone_andSetsAlarm_ifPowerButtonDoesNotLockImmediately() =
+        testScope.runTest {
             val canWake by collectValues(underTest.canWakeDirectlyToGone)
 
             assertEquals(
@@ -224,8 +219,8 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun setsCanIgnoreAuth_whenTimingOut() =
-        kosmos.runTest {
+    fun testSetsCanIgnoreAuth_whenTimingOut() =
+        testScope.runTest {
             val userSettingDelay = 12345
             val canWake by collectValues(underTest.canWakeDirectlyToGone)
             kosmos.setSceneTransition(ObservableTransitionState.Idle(Scenes.Lockscreen))
@@ -264,8 +259,8 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun lockAfterScreenTimeoutTimerElapses() =
-        kosmos.runTest {
+    fun testLockAfterScreenTimeoutTimerElapses() =
+        testScope.runTest {
             val canWake by collectValues(underTest.canWakeDirectlyToGone)
             kosmos.sceneInteractor.changeScene(
                 toScene = Scenes.Lockscreen,
@@ -360,23 +355,5 @@ class KeyguardWakeDirectlyToGoneInteractorTest : SysuiTestCase() {
 
             // Not possible to go directly back to Gone anymore
             assertEquals(listOf(false, true, false, true, false), canWake)
-        }
-
-    @Test
-    fun canWakeDirectlyToGone_deviceNotProvisioned() =
-        kosmos.runTest {
-            val isDeviceProvisioned by
-                collectLastValue(deviceProvisioningInteractor.isDeviceProvisioned)
-            val canWakeDirectlyToGone by collectLastValue(underTest.canWakeDirectlyToGone)
-            assertThat(isDeviceProvisioned).isTrue()
-            assertThat(canWakeDirectlyToGone).isFalse()
-
-            fakeDeviceProvisioningRepository.setDeviceProvisioned(false)
-            assertThat(isDeviceProvisioned).isFalse()
-            assertThat(canWakeDirectlyToGone).isTrue()
-
-            fakeDeviceProvisioningRepository.setDeviceProvisioned(true)
-            assertThat(isDeviceProvisioned).isTrue()
-            assertThat(canWakeDirectlyToGone).isFalse()
         }
 }

@@ -27,7 +27,6 @@ import android.util.Slog;
 import androidx.annotation.NonNull;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.server.personalcontext.AccessController;
 import com.android.server.personalcontext.component.Renderer;
 
 import java.io.PrintWriter;
@@ -47,12 +46,8 @@ public class EmbeddedInsightRenderer implements Renderer {
 
     public EmbeddedInsightRenderer(
             Context context,
-            AccessController accessController,
             Executor executor) {
-        this(
-                new ClientRegistry(),
-                new VisualizerRegistry(context, accessController, executor),
-                executor);
+        this(new ClientRegistry(), new VisualizerRegistry(context, executor), executor);
     }
 
     /** Construct an {@link EmbeddedInsightRenderer} for test purposes. */

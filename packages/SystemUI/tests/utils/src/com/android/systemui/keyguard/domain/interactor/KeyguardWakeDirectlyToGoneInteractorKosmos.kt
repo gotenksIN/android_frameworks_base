@@ -16,25 +16,32 @@
 
 package com.android.systemui.keyguard.domain.interactor
 
+import android.content.testableContext
+import com.android.internal.widget.lockPatternUtils
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
-import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
+import com.android.systemui.user.domain.interactor.selectedUserInteractor
+import com.android.systemui.util.settings.fakeSettings
 
 val Kosmos.keyguardWakeDirectlyToGoneInteractor: KeyguardWakeDirectlyToGoneInteractor by
     Kosmos.Fixture {
         KeyguardWakeDirectlyToGoneInteractor(
             applicationCoroutineScope,
+            testableContext,
             fakeKeyguardRepository,
             keyguardTransitionInteractor,
             powerInteractor,
+            fakeSettings,
+            lockPatternUtils,
+            fakeSettings,
+            selectedUserInteractor,
             keyguardEnabledInteractor,
             keyguardServiceShowLockscreenInteractor,
             { sceneInteractor },
             { deviceUnlockedInteractor },
-            deviceProvisioningInteractor,
         )
     }

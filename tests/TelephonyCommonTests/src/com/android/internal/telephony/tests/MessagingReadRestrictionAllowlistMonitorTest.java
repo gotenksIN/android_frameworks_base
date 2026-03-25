@@ -43,10 +43,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.content.pm.SigningInfo;
-import android.content.pm.UserInfo;
 import android.content.res.Resources;
-import android.os.UserHandle;
-import android.os.UserManager;
 import android.os.Process;
 import android.os.SystemClock;
 import android.platform.test.annotations.Presubmit;
@@ -93,10 +90,6 @@ import java.util.stream.Collectors;
 public class MessagingReadRestrictionAllowlistMonitorTest {
     @Rule public TemporaryFolder mTemporaryFolder = new TemporaryFolder();
 
-    private static final int DEFAULT_USER_ID = 0;
-    private static final int SECOND_USER_ID = 10;
-    private static final int HSUM_PRIMARY_UID = 10;
-    private static final int HSUM_SECONDARY_UID = 11;
     private static final Random RANDOM = new Random();
     private static final String TEST_PACKAGE_ONE = "com.example.app.one";
     private static final String TEST_PACKAGE_TWO = "com.example.app.two";
@@ -110,7 +103,6 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
 
     @Mock private PackageManager mPackageManager;
     @Mock private AppOpsManager mAppOpsManager;
-    @Mock private UserManager mUserManager;
     @Mock private Resources mResources;
 
     private File mReadRestrictionAllowlistFile;
@@ -125,13 +117,7 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
         when(mSpyContext.getResources()).thenReturn(mResources);
         when(mSpyContext.getSystemService(AppOpsManager.class)).thenReturn(mAppOpsManager);
         when(mSpyContext.getPackageManager()).thenReturn(mPackageManager);
-        when(mSpyContext.getSystemService(UserManager.class)).thenReturn(mUserManager);
         doNothing().when(mSpyContext).enforceCallingOrSelfPermission(anyString(), anyString());
-        UserInfo defaultUserInfo = new UserInfo();
-        defaultUserInfo.id = DEFAULT_USER_ID;
-        UserInfo secondUserInfo = new UserInfo();
-        secondUserInfo.id = SECOND_USER_ID;
-        when(mUserManager.getUsers()).thenReturn(Arrays.asList(defaultUserInfo, secondUserInfo));
         when(mResources.getStringArray(R.array.config_messaging_read_restriction_allowlist))
                 .thenReturn(mResourcePackageAllowlist);
         // Use a separate folder for each test case, for better isolation.
@@ -210,8 +196,8 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
                 eq(Process.myUid()), eq(TEST_PACKAGE_ONE), eq(AppOpsManager.MODE_ALLOWED));
         verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
                 eq(Process.myUid()), eq(TEST_PACKAGE_TWO), eq(AppOpsManager.MODE_ALLOWED));
-        assertFileContents(mReadRestrictionAllowlistFile, List.of(packageInfoOne.getConfigValue(),
-                packageInfoTwo.getConfigValue()));
+        assertFileContents(mReadRestrictionAllowlistFile, packageInfoOne.getConfigValue() + ","
+                + packageInfoTwo.getConfigValue());
     }
 
     @Test
@@ -352,43 +338,6 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
     }
 
     @Test
-    public void deviceConfig_HSUMDevice_forStaticAllowlist_updatesAppOpsForTargetUserIds()
-            throws Exception {
-        final List<InstalledPackageInfo> staticListPackages = Arrays.asList(
-            installAllowlistedPackageForUser("com.one", /* isSystem= */ true,
-                /* anyCertificate = */ true, HSUM_PRIMARY_UID),
-            installAllowlistedPackageForUser("com.two", /* isSystem= */ true,
-                /* anyCertificate = */ true, HSUM_PRIMARY_UID),
-            installAllowlistedPackageForUser("com.two", /* isSystem= */ true,
-                /* anyCertificate = */ true, HSUM_PRIMARY_UID),
-            installAllowlistedPackageForUser("com.three", /* isSystem= */ true,
-                /* anyCertificate = */ true, HSUM_SECONDARY_UID),
-            installAllowlistedPackageForUser("com.four", /* isSystem= */ true,
-                /* anyCertificate = */ true, HSUM_SECONDARY_UID)
-            );
-        updateStaticAllowlist(staticListPackages.stream().map(InstalledPackageInfo::packageName)
-                    .toArray(String[]::new));
-        mAllowlistMonitor.initialize();
-        awaitForUpdateInBackground();
-
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                eq(UserHandle.getUid(HSUM_PRIMARY_UID, Process.myUid())), eq("com.one"),
-                eq(AppOpsManager.MODE_ALLOWED));
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                eq(UserHandle.getUid(HSUM_PRIMARY_UID, Process.myUid())), eq("com.two"),
-                eq(AppOpsManager.MODE_ALLOWED));
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                eq(UserHandle.getUid(HSUM_SECONDARY_UID, Process.myUid())), eq("com.two"),
-                eq(AppOpsManager.MODE_ALLOWED));
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                eq(UserHandle.getUid(HSUM_SECONDARY_UID, Process.myUid())), eq("com.three"),
-                eq(AppOpsManager.MODE_ALLOWED));
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                eq(UserHandle.getUid(HSUM_SECONDARY_UID, Process.myUid())), eq("com.four"),
-                eq(AppOpsManager.MODE_ALLOWED));
-    }
-
-    @Test
     public void deviceConfigUpdated_multiplePackageUpdates_onlyAppOpsForChangedPackagesAreUpdated()
             throws Exception {
         final List<String> allInitialPackages = List.of("com.one", "com.two", "com.three",
@@ -450,79 +399,6 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
         assertFileContents(mReadRestrictionAllowlistFile, expectedFileContents);
     }
 
-  @Test
-    public void deviceConfigUpdatedAcrossUsers_onlyAppOpsForChangedPackagesAreUpdatedInTargetUser()
-            throws Exception {
-        final List<String> allInitialPackagesInDefaultUser = List.of("com.one", "com.two",
-            "com.three");
-        final List<String> allInitialPackagesInSecondUser = List.of("com.three", "com.four",
-            "com.five");
-        final List<InstalledPackageInfo> deviceConfigPackages = Arrays.asList(
-            installAllowlistedPackageForUser("com.one", /* isSystem= */ false,
-                /* anyCertificate = */ false, DEFAULT_USER_ID),
-            installAllowlistedPackageForUser("com.two", /* isSystem= */ false,
-                /* anyCertificate = */ false, DEFAULT_USER_ID),
-            installAllowlistedPackageForUser("com.three", /* isSystem= */ false,
-                /* anyCertificate = */ false, DEFAULT_USER_ID)
-            );
-
-        final List<InstalledPackageInfo> staticListPackages = Arrays.asList(
-            installAllowlistedPackageForUser("com.three", /* isSystem= */ true,
-                /* anyCertificate = */ true, SECOND_USER_ID),
-            installAllowlistedPackageForUser("com.four", /* isSystem= */ true,
-                /* anyCertificate = */ true, SECOND_USER_ID),
-            installAllowlistedPackageForUser("com.five", /* isSystem= */ true,
-                /* anyCertificate = */ true, SECOND_USER_ID)
-            );
-
-        writeDeviceConfigAllowlist(KEY_READ_RESTRICTION_ALLOWLIST,
-                deviceConfigPackages.stream().map(InstalledPackageInfo::getConfigValue)
-                    .collect(Collectors.joining(",")));
-        updateStaticAllowlist(staticListPackages.stream().map(InstalledPackageInfo::packageName)
-                    .toArray(String[]::new));
-        mAllowlistMonitor.initialize();
-        awaitForUpdateInBackground();
-
-        // Verify that AppOps are set correctly for all initial packages.
-        for (String pkg : allInitialPackagesInDefaultUser) {
-            verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                    eq(UserHandle.getUid(DEFAULT_USER_ID, Process.myUid())), eq(pkg),
-                    eq(AppOpsManager.MODE_ALLOWED));
-        }
-        for (String pkg : allInitialPackagesInSecondUser) {
-            verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-                    eq(UserHandle.getUid(SECOND_USER_ID, Process.myUid())), eq(pkg),
-                    eq(AppOpsManager.MODE_ALLOWED));
-        }
-
-        // DeviceConfig is updated.
-        InstalledPackageInfo updatedPackage = installAllowlistedPackageForUser("com.six",
-            /* isSystem= */ false, /* anyCertificate = */ false, SECOND_USER_ID);
-        writeDeviceConfigAllowlist(KEY_READ_RESTRICTION_ALLOWLIST, updatedPackage.getConfigValue());
-        mAllowlistMonitor.onPropertiesChanged(new DeviceConfig.Properties.Builder(
-                    DeviceConfig.NAMESPACE_TELEPHONY)
-                    .setString(KEY_READ_RESTRICTION_ALLOWLIST, updatedPackage.getConfigValue())
-                .build());
-
-        // Verify that AppOps are updated correctly.
-        awaitForUpdateInBackground();
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-        eq(UserHandle.getUid(DEFAULT_USER_ID, Process.myUid())), eq("com.one"),
-            eq(AppOpsManager.MODE_DEFAULT));
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-        eq(UserHandle.getUid(DEFAULT_USER_ID, Process.myUid())), eq("com.two"),
-            eq(AppOpsManager.MODE_DEFAULT));
-        verify(mAppOpsManager).setMode(eq(AppOpsManager.OP_READ_RESTRICTED_MESSAGES),
-        eq(UserHandle.getUid(SECOND_USER_ID, Process.myUid())), eq("com.six"),
-            eq(AppOpsManager.MODE_ALLOWED));
-        List<String> expectedFileContents = new ArrayList<>();
-        expectedFileContents.addAll(
-            staticListPackages.stream().map(InstalledPackageInfo::getConfigValue)
-                .collect(Collectors.toList()));
-        expectedFileContents.add(updatedPackage.getConfigValue());
-        assertFileContents(mReadRestrictionAllowlistFile, expectedFileContents);
-    }
-
     private void awaitForUpdateInBackground() throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         mBackgroundExecutor.execute(() -> {
@@ -553,10 +429,9 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
      * @param acceptedCertificate The certificate used for allowlisting.
      */
     record InstalledPackageInfo(String packageName,
-            String certificateDigest,
-            boolean preinstalled,
-            String acceptedCertificate,
-            int userId) {
+        String certificateDigest,
+        boolean preinstalled,
+        String acceptedCertificate) {
 
         String getConfigValue() {
             return packageName + ":" + acceptedCertificate;
@@ -565,42 +440,26 @@ public class MessagingReadRestrictionAllowlistMonitorTest {
 
     private InstalledPackageInfo installAllowlistedPackage(@NonNull String packageName,
         boolean isSystem, boolean anyCertificate) throws Exception {
-        return installAllowlistedPackageForUser(packageName, isSystem, anyCertificate,
-            DEFAULT_USER_ID);
-    }
-
-    private InstalledPackageInfo installAllowlistedPackageForUser(@NonNull String packageName,
-        boolean isSystem, boolean anyCertificate, int userId) throws Exception {
         final Signature signature = generateSignature((byte) (RANDOM.nextInt(127)));
         final String certificateDigest = installInPackageManager(packageName, signature, isSystem);
         final String acceptedCertificate = anyCertificate ? "*" : certificateDigest;
-        installInPackageManagerForUser(packageName, signature, isSystem, userId);
+        installInPackageManager(packageName, signature, isSystem);
         return new InstalledPackageInfo(packageName, certificateDigest, isSystem,
-            acceptedCertificate, userId);
+            acceptedCertificate);
     }
 
     private String installInPackageManager(@NonNull String packageName,
         @NonNull Signature signature, boolean preinstalled) throws Exception {
-        return installInPackageManagerForUser(packageName, signature, preinstalled,
-            DEFAULT_USER_ID);
-    }
-
-    private String installInPackageManagerForUser(@NonNull String packageName,
-        @NonNull Signature signature, boolean preinstalled, int userId) throws Exception {
         final String certificateDigest = PackageUtils.computeSha256Digest(signature.toByteArray());
         final PackageInfo packageInfo = generatePackageInfo(signature);
-        when(mPackageManager.getPackageInfoAsUser(packageName,
-            PackageManager.GET_SIGNING_CERTIFICATES, userId)).thenReturn(packageInfo);
-        // Test uid = userId * 100000 + Process.myUid()
-        int uid = UserHandle.getUid(userId, Process.myUid());
+        when(mPackageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES))
+                .thenReturn(packageInfo);
         final ApplicationInfo applicationInfo = new ApplicationInfo();
-        applicationInfo.uid = uid;
+        applicationInfo.uid = Process.myUid();
         if (preinstalled) {
             applicationInfo.flags |= ApplicationInfo.FLAG_SYSTEM;
         }
-        when(mPackageManager.getPackageUidAsUser(eq(packageName), eq(userId)))
-                .thenReturn(uid);
-        when(mPackageManager.getApplicationInfoAsUser(eq(packageName), any(), eq(userId)))
+        when(mPackageManager.getApplicationInfo(eq(packageName), any()))
                 .thenReturn(applicationInfo);
         return certificateDigest;
     }

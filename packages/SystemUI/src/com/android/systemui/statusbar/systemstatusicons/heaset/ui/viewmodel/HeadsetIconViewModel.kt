@@ -20,7 +20,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.pipeline.audio.domain.interactor.WiredAudioDeviceInteractor
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
@@ -40,14 +41,21 @@ import dagger.assisted.AssistedInject
 class HeadsetIconViewModel
 @AssistedInject
 constructor(@Assisted context: Context, interactor: WiredAudioDeviceInteractor) :
-    SystemStatusIconViewModel.Default, HydratedActivatable() {
+    SystemStatusIconViewModel.Default, ExclusiveActivatable() {
     init {
         SystemStatusIconsInCompose.expectInNewMode()
     }
 
+    private val hydrator = Hydrator("HeadsetIconViewModel.hydrator")
+
     override val slotName = context.getString(com.android.internal.R.string.status_bar_headset)
 
-    private val wiredAudioDevice by interactor.wiredAudioDevice.hydratedStateOf(initialValue = null)
+    private val wiredAudioDevice by
+        hydrator.hydratedStateOf(
+            traceName = "wiredAudioDevice",
+            initialValue = null,
+            source = interactor.wiredAudioDevice,
+        )
 
     override val visible: Boolean
         get() = wiredAudioDevice != null
@@ -71,6 +79,10 @@ constructor(@Assisted context: Context, interactor: WiredAudioDeviceInteractor) 
                     )
                 }
             }
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

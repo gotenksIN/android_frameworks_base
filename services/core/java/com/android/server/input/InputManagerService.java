@@ -3371,7 +3371,7 @@ public class InputManagerService extends IInputManager.Stub
             throw new IllegalArgumentException("fromAxis " + MotionEvent.axisToString(fromAxis)
                     + " is not a valid controller axis");
         }
-        if (!isControllerAxis(toAxis) && toAxis != MotionEvent.AXIS_DISABLED) {
+        if (!isControllerAxis(toAxis)) {
             throw new IllegalArgumentException("toAxis " + MotionEvent.axisToString(toAxis)
                     + " is not a valid controller axis");
         }

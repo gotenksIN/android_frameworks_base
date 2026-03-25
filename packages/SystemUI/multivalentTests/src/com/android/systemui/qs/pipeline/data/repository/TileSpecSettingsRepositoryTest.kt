@@ -24,8 +24,10 @@ import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
+import com.android.systemui.qs.panels.data.repository.qsPreferencesRepository
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.pipeline.shared.TilesUpgradePath
+import com.android.systemui.qs.pipeline.shared.internetTileMigration
 import com.android.systemui.qs.pipeline.shared.logging.QSPipelineLogger
 import com.android.systemui.res.R
 import com.android.systemui.retail.data.repository.FakeRetailModeRepository
@@ -65,6 +67,8 @@ class TileSpecSettingsRepositoryTest : SysuiTestCase() {
                     secureSettings,
                     hsum,
                     logger,
+                    kosmos.qsPreferencesRepository,
+                    kosmos.internetTileMigration,
                     kosmos.userRepository,
                     testScope.backgroundScope,
                     testDispatcher,

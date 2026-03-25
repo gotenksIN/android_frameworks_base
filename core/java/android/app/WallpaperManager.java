@@ -3403,18 +3403,7 @@ public class WallpaperManager {
     public static InputStream openDefaultWallpaper(Context context, @SetWallpaperFlags int which) {
         if (optimizeDefaultWallpaper() &&  context.getResources().getBoolean(
                 R.bool.config_optimizeDefaultWallpaper)) {
-            if (sGlobals.mService != null) {
-                try {
-                    int displayId = context.getDisplayId();
-                    ParcelFileDescriptor pfd = sGlobals.mService.getCroppedDefaultWallpaper(
-                            context.getOpPackageName(), which, displayId);
-                    if (pfd != null) {
-                        return new ParcelFileDescriptor.AutoCloseInputStream(pfd);
-                    }
-                } catch (RemoteException e) {
-                    throw e.rethrowFromSystemServer();
-                }
-            }
+            return openRawDefaultWallpaper(context, which);
         }
         return openRawDefaultWallpaper(context, which);
     }

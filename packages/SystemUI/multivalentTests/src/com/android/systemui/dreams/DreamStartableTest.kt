@@ -46,6 +46,7 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
+import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
@@ -190,7 +191,7 @@ class DreamStartableTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.Dream)
 
             // Occlude the device.
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
 
             // Verify that the dream scene is still showing.

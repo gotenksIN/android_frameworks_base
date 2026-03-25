@@ -20,7 +20,6 @@ import android.annotation.IntDef;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.graphics.Rect;
-import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.util.AttributeSet;
@@ -151,10 +150,10 @@ public class NotificationRowIconView extends CachingIconView {
         mAppIcon = loadAppIcon();
         if (mAppIcon != null) {
             setImageDrawable(mAppIcon);
-            adjustViewForIconStyle();
+            adjustViewForAppIcon();
         } else {
             super.setImageIcon(icon);
-            adjustViewForIconStyle();
+            restoreViewForSmallIcon();
         }
     }
 
@@ -172,30 +171,32 @@ public class NotificationRowIconView extends CachingIconView {
         if (mAppIcon != null) {
             return () -> {
                 setImageDrawable(mAppIcon);
-                adjustViewForIconStyle();
+                adjustViewForAppIcon();
             };
         } else {
             return () -> {
                 super.setImageIcon(icon);
-                adjustViewForIconStyle();
+                restoreViewForSmallIcon();
             };
         }
     }
 
     /**
-     * Determine whether the notification icon will be treated as a full-color icon (like an app
-     * icon) or a classic status bar icon, and adjust padding, background, and color overlay
-     * accordingly.
+     * Override padding and background from the view to display the app icon.
      */
-    private void adjustViewForIconStyle() {
-        if (mAppIcon != null || getDrawable() instanceof AdaptiveIconDrawable) {
-            removePadding();
-            removeBackground();
-        } else {
-            restorePadding();
-            restoreBackground();
-            restoreColors();
-        }
+    private void adjustViewForAppIcon() {
+        removePadding();
+        removeBackground();
+    }
+
+    /**
+     * Restore padding and background overridden by {@link this#adjustViewForAppIcon}.
+     * Does nothing if they were not overridden.
+     */
+    private void restoreViewForSmallIcon() {
+        restorePadding();
+        restoreBackground();
+        restoreColors();
     }
 
     private void removePadding() {
@@ -278,7 +279,7 @@ public class NotificationRowIconView extends CachingIconView {
         mAppIcon = loadAppIcon();
         if (mAppIcon != null) {
             setImageDrawable(mAppIcon);
-            adjustViewForIconStyle();
+            adjustViewForAppIcon();
         }
     }
 

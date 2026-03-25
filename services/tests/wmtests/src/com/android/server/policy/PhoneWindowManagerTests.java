@@ -295,10 +295,7 @@ public class PhoneWindowManagerTests {
 
         // Apply sleep-token for sleep-screen-off.
         isScreenTurnedOff[0] = false;
-        mPhoneWindowManager.startedGoingToSleep(
-                DEFAULT_DISPLAY_GROUP,
-                0 /* reason */,
-                /* anyDefaultOrAdjacentGroupInteractive= */ false);
+        mPhoneWindowManager.startedGoingToSleep(DEFAULT_DISPLAY_GROUP, 0 /* reason */);
         assertThat(mPhoneWindowManager.mIsGoingToSleep).isTrue();
         mPhoneWindowManager.screenTurnedOff(DEFAULT_DISPLAY, true /* isSwappingDisplay */);
         verify(mDisplayPolicy).screenTurnedOff(true /* acquireSleepToken */);
@@ -317,10 +314,7 @@ public class PhoneWindowManagerTests {
 
         int nonDefaultDisplay = DEFAULT_DISPLAY + 1;
         when(mPowerManagerInternal.isDefaultGroupAdjacent(nonDefaultDisplay)).thenReturn(false);
-        mPhoneWindowManager.startedGoingToSleep(
-                nonDefaultDisplay,
-                0 /* reason */,
-                /* anyDefaultOrAdjacentGroupInteractive= */ false);
+        mPhoneWindowManager.startedGoingToSleep(nonDefaultDisplay, 0 /* reason */);
         assertThat(mPhoneWindowManager.mIsGoingToSleep).isFalse();
 
         mPhoneWindowManager.finishedGoingToSleep(nonDefaultDisplay, 0 /* reason */);
@@ -337,10 +331,10 @@ public class PhoneWindowManagerTests {
 
         int nonDefaultDisplay = DEFAULT_DISPLAY + 1;
         when(mPowerManagerInternal.isDefaultGroupAdjacent(nonDefaultDisplay)).thenReturn(true);
-        mPhoneWindowManager.startedGoingToSleep(
-                nonDefaultDisplay,
-                0 /* reason */,
-                /* anyDefaultOrAdjacentGroupInteractive= */ false);
+        when(mPowerManagerInternal.isAnyDefaultAdjacentGroupInteractive())
+                .thenReturn(false);
+        when(mPowerManagerInternal.isGroupInteractive(DEFAULT_DISPLAY)).thenReturn(false);
+        mPhoneWindowManager.startedGoingToSleep(nonDefaultDisplay, 0 /* reason */);
         assertThat(mPhoneWindowManager.mIsGoingToSleep).isTrue();
 
         mPhoneWindowManager.finishedGoingToSleep(nonDefaultDisplay, 0 /* reason */);
@@ -357,10 +351,7 @@ public class PhoneWindowManagerTests {
 
         int nonDefaultDisplay = DEFAULT_DISPLAY + 1;
         when(mPowerManagerInternal.isDefaultGroupAdjacent(nonDefaultDisplay)).thenReturn(false);
-        mPhoneWindowManager.startedWakingUp(
-                nonDefaultDisplay,
-                0 /* reason */,
-                /* anyDefaultOrAdjacentGroupInteractive= */ true);
+        mPhoneWindowManager.startedWakingUp(nonDefaultDisplay, 0 /* reason */);
         verify(mPhoneWindowManager.mDefaultDisplayPolicy, times(0)).setAwake(true);
 
         mPhoneWindowManager.finishedWakingUp(nonDefaultDisplay, 0 /* reason */);
@@ -377,18 +368,16 @@ public class PhoneWindowManagerTests {
 
         int nonDefaultDisplay = DEFAULT_DISPLAY + 1;
         when(mPowerManagerInternal.isDefaultGroupAdjacent(nonDefaultDisplay)).thenReturn(true);
+        when(mPowerManagerInternal.isAnyDefaultAdjacentGroupInteractive())
+                .thenReturn(true);
+        when(mPowerManagerInternal.isGroupInteractive(DEFAULT_DISPLAY_GROUP)).thenReturn(false);
 
-        mPhoneWindowManager.startedWakingUp(
-                nonDefaultDisplay,
-                0 /* reason */,
-                /* anyDefaultOrAdjacentGroupInteractive= */ true);
+        mPhoneWindowManager.startedWakingUp(nonDefaultDisplay, 0 /* reason */);
         verify(mPhoneWindowManager.mDefaultDisplayPolicy).setAwake(true);
 
         mPhoneWindowManager.finishedWakingUp(nonDefaultDisplay, 0 /* reason */);
         verify(mKeyguardServiceDelegate).onFinishedWakingUp();
     }
-
-    // TODO: Add test that actually relies on a test of that flag
 
     @Test
     public void testCheckAddPermission_withoutAccessibilityOverlay_noAccessibilityAppOpLogged() {

@@ -47,7 +47,7 @@ import java.io.IOException;
 import java.util.List;
 
 public class UnprocessedPerfettoProtoLogImplTest {
-    private static final String TEST_PROTOLOG_DATASOURCE_NAME = getTestDsName();
+    private static final String TEST_PROTOLOG_DATASOURCE_NAME = "test.android.protolog.unprocessed";
 
     private final File mTracingDirectory = InstrumentationRegistry.getInstrumentation()
             .getTargetContext().getFilesDir();
@@ -56,14 +56,6 @@ public class UnprocessedPerfettoProtoLogImplTest {
     private static UnprocessedPerfettoProtoLogImpl sProtoLog;
 
     public UnprocessedPerfettoProtoLogImplTest() throws IOException { }
-
-    private static String getTestDsName() {
-        if (android.tracing.Flags.javaNativeProtolog()) {
-            return "android.protolog";
-        } else {
-            return "test.android.protolog.unprocessed";
-        }
-    }
 
     @BeforeClass
     public static void setUp() throws Exception {
@@ -121,8 +113,8 @@ public class UnprocessedPerfettoProtoLogImplTest {
                 .filter(config ->
                         config.getMessagesList().stream()
                                 .anyMatch(messageConfig ->
-                                        messageConfig.getMessage()
-                                                .equals("My Unprocessed Message")
+                                        messageConfig.getGroupId()
+                                                == TestProtoLogGroup.TEST_GROUP.getId()
                                 ) && config.getMessagesCount() == 1
                 )
                 .toList();

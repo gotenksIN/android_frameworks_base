@@ -16,6 +16,8 @@
 
 package com.android.wm.shell.dagger;
 
+import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
@@ -153,14 +155,12 @@ import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeControlle
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopFirstListenerManager;
 import com.android.wm.shell.desktopmode.desktoptaskshandlers.DesktopTasksTransitionHandler;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
-import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityUtils;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationFilter;
 import com.android.wm.shell.desktopmode.education.AppToWebEducationController;
 import com.android.wm.shell.desktopmode.education.AppToWebEducationFilter;
 import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.education.data.AppToWebEducationDatastoreRepository;
-import com.android.wm.shell.desktopmode.homescreenpeeking.DesktopHomeScreenPeekController;
 import com.android.wm.shell.desktopmode.multidesks.DeskSwitchTransitionHandler;
 import com.android.wm.shell.desktopmode.multidesks.DesksController;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
@@ -889,8 +889,7 @@ public abstract class WMShellModule {
             DesksController desksController,
             Optional<DesktopTasksTransitionObserver> desktopTasksTransitionObserver,
             SnapController snapController,
-            DesktopRemoteListener desktopRemoteListener,
-            DesktopWallpaperActivityUtils desktopWallpaperActivityUtils) {
+            DesktopRemoteListener desktopRemoteListener) {
         return new DesktopTasksController(
                 context,
                 desktopAnimationConfiguration,
@@ -952,8 +951,7 @@ public abstract class WMShellModule {
                 desksController,
                 desktopTasksTransitionObserver.get(),
                 snapController,
-                desktopRemoteListener,
-                desktopWallpaperActivityUtils);
+                desktopRemoteListener);
     }
 
     @WMSingleton
@@ -1011,7 +1009,8 @@ public abstract class WMShellModule {
             ShellController shellController,
             Optional<PinnedLayerController> pinnedLayerController,
             @DynamicOverride DesksOrganizer desksOrganizer) {
-        if (desktopState.canEnterDesktopMode()) {
+        if (ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
+                && desktopState.canEnterDesktopMode()) {
             return Optional.of(
                     new DesktopTaskChangeListener(
                             desktopUserRepositories,
@@ -1034,7 +1033,8 @@ public abstract class WMShellModule {
             Optional<DesktopImeHandler> desktopImeHandler,
             Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
             DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
-        if (desktopState.canEnterDesktopMode()) {
+        if (ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
+                && desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopInOrderTransitionObserver(
                     desktopImmersiveController,
                     focusTransitionObserver,
@@ -1292,14 +1292,13 @@ public abstract class WMShellModule {
             DisplayController displayController,
             DesktopState desktopState,
             AccessibilityManager accessibilityManager,
-            ShellController shellController,
-            KeyguardManager keyguardManager) {
+            ShellController shellController) {
         if (desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopModeKeyGestureHandler(context,
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories, inputManager, shellTaskOrganizer,
                     focusTransitionObserver, mainExecutor, displayController, desktopState,
-                    accessibilityManager, shellController, keyguardManager));
+                    accessibilityManager, shellController));
         }
         return Optional.empty();
     }
@@ -1700,15 +1699,13 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             @NonNull DesktopModeEventLogger desktopModeEventLogger,
             @NonNull ShellController shellController,
-            @NonNull DisplayController displayController,
-            DesktopHomeScreenPeekController desktopHomeScreenPeekController
+            @NonNull DisplayController displayController
     ) {
         if (desktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.of(
                     new DesksTransitionObserver(desktopUserRepositories, desksOrganizer,
                             transitions, desktopWallpaperActivityTokenProvider, mainScope,
-                            desktopModeEventLogger, shellController, displayController,
-                            desktopHomeScreenPeekController));
+                            desktopModeEventLogger, shellController, displayController));
         }
         return Optional.empty();
     }

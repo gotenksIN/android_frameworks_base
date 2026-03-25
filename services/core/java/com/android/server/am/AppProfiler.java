@@ -64,7 +64,6 @@ import android.annotation.BroadcastBehavior;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
-import android.app.ActivityManager.ProcessState;
 import android.app.ActivityThread;
 import android.app.IApplicationThread;
 import android.app.ProfilerInfo;
@@ -668,7 +667,7 @@ public class AppProfiler {
         long[] tmp = new long[3];
         do {
             ProcessProfileRecord profile;
-            @ProcessState int procState;
+            int procState;
             int statType;
             int pid = -1;
             long lastPssTime;
@@ -806,7 +805,7 @@ public class AppProfiler {
         int num = 0;
         do {
             ProcessProfileRecord profile;
-            @ProcessState int procState;
+            int procState;
             int statType;
             int pid = -1;
             long lastRssTime;
@@ -879,7 +878,7 @@ public class AppProfiler {
     }
 
     @GuardedBy("mProfilerLock")
-    void updateNextPssTimeLPf(@ProcessState int procState, ProcessProfileRecord profile, long now,
+    void updateNextPssTimeLPf(int procState, ProcessProfileRecord profile, long now,
             boolean forceUpdate) {
         if (!forceUpdate) {
             if (now <= profile.getNextPssTime() && now <= Math.max(profile.getLastPssTime()
@@ -900,8 +899,8 @@ public class AppProfiler {
      * Record new PSS sample for a process.
      */
     @GuardedBy("mProfilerLock")
-    private void recordPssSampleLPf(ProcessProfileRecord profile, @ProcessState int procState,
-            long pss, long uss, long swapPss, long rss, int statType, long pssDuration, long now) {
+    private void recordPssSampleLPf(ProcessProfileRecord profile, int procState, long pss, long uss,
+            long swapPss, long rss, int statType, long pssDuration, long now) {
         final ProcessRecord proc = profile.mApp;
         EventLogTags.writeAmPss(
                 profile.getPid(), proc.uid, proc.processName, pss * 1024, uss * 1024,
@@ -959,8 +958,8 @@ public class AppProfiler {
      * reaches some threshold set with ActivityManager.setWatchHeapLimit().
      */
     @GuardedBy("mProfilerLock")
-    private void recordRssSampleLPf(ProcessProfileRecord profile, @ProcessState int procState,
-            long rss, int statType, long rssDuration, long now) {
+    private void recordRssSampleLPf(ProcessProfileRecord profile, int procState, long rss,
+            int statType, long rssDuration, long now) {
         final ProcessRecord proc = profile.mApp;
         // TODO(b/296454553): writeAmPss needs to be renamed to writeAmRss, and the zeroed out
         // fields need to be removed. This will be updated once the flag is fully rolled out to
@@ -1183,7 +1182,7 @@ public class AppProfiler {
      * Schedule PSS collection of a process.
      */
     @GuardedBy("mProfilerLock")
-    private boolean requestPssLPf(ProcessProfileRecord profile, @ProcessState int procState) {
+    private boolean requestPssLPf(ProcessProfileRecord profile, int procState) {
         if (mPendingPssOrRssProfiles.contains(profile)) {
             return false;
         }

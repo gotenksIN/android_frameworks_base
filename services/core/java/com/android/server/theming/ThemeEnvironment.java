@@ -43,7 +43,7 @@ import com.android.server.pm.UserManagerInternal;
  * @hide
  */
 @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-public class ThemeEnvironment {
+public final class ThemeEnvironment {
     private static final String TAG = "ThemeEnvironment";
 
     private ThemeUserLifecycle mThemeUserLifecycle;
@@ -130,11 +130,11 @@ public class ThemeEnvironment {
      * or their state could not be loaded; {@code false} otherwise.
      */
     boolean shouldIgnoreEventForUser(int userId, String methodName) {
-        return shouldIgnoreEventForUser(userId, methodName, false);
+        return shouldIgnoreEventForUser(userId, methodName, false /* skipLazyLoad */);
     }
 
     boolean shouldIgnoreEventForUser(int userId, String methodName, boolean skipLazyLoad) {
-        if (isBooting() && !skipLazyLoad) {
+        if (isBooting()) {
             return true;
         }
 

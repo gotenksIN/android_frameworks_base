@@ -662,16 +662,6 @@ public final class TransitionInfo implements Parcelable {
         return out;
     }
 
-    /**
-     * Returns {@code true} if the startDisplayId and endDisplayId are different and if no apps
-     * are starting causing the startDisplayId to be invalid.
-     */
-    public static boolean isCrossDisplay(int startDisplayId, int endDisplayId) {
-        return startDisplayId != INVALID_DISPLAY && endDisplayId != INVALID_DISPLAY
-                && startDisplayId != endDisplayId;
-    }
-
-
     /** Represents the change a WindowContainer undergoes during a transition */
     public static final class Change implements Parcelable {
         private final WindowContainerToken mContainer;
@@ -1070,14 +1060,6 @@ public final class TransitionInfo implements Parcelable {
         @Nullable
         public AnimationOptions getAnimationOptions() {
             return mAnimationOptions;
-        }
-
-        /**
-         * Returns {@code true} if the start and end display ids are different and if no apps
-         * are starting causing the startDisplayId to be invalid.
-         */
-        public boolean isCrossDisplay() {
-            return TransitionInfo.isCrossDisplay(mStartDisplayId, mEndDisplayId);
         }
 
         /**

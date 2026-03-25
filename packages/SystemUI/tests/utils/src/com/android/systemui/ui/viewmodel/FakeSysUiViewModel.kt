@@ -17,7 +17,8 @@
 package com.android.systemui.ui.viewmodel
 
 import androidx.compose.runtime.getValue
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,22 +30,32 @@ class FakeSysUiViewModel(
     private val onDeactivation: () -> Unit = {},
     upstreamFlow: Flow<Boolean> = flowOf(true),
     upstreamStateFlow: StateFlow<Boolean> = MutableStateFlow(true).asStateFlow(),
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
 
     var activationCount = 0
     var cancellationCount = 0
 
+    private val hydrator = Hydrator("test")
     val stateBackedByFlow: Boolean by
-        upstreamFlow.hydratedStateOf(traceName = "test", initialValue = true)
-    val stateBackedByStateFlow: Boolean by upstreamStateFlow.hydratedStateOf(traceName = "test")
+        hydrator.hydratedStateOf(
+            traceName = "test",
+            initialValue = true,
+            source = upstreamFlow,
+        )
+    val stateBackedByStateFlow: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "test",
+            source = upstreamStateFlow,
+        )
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         activationCount++
         onActivation()
-    }
-
-    override suspend fun onDeactivated() {
-        cancellationCount++
-        onDeactivation()
+        try {
+            hydrator.activate()
+        } finally {
+            cancellationCount++
+            onDeactivation()
+        }
     }
 }

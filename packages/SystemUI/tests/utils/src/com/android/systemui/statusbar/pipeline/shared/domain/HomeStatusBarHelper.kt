@@ -39,10 +39,7 @@ object HomeStatusBarHelper {
         if (SceneContainerFlag.isEnabled) {
             sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
             // Secure camera is an occluding activity
-            keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
-                onTop = true,
-                taskInfo = null,
-            )
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(onTop = true, taskInfo = null)
             keyguardInteractor.onCameraLaunchDetected(
                 CAMERA_LAUNCH_SOURCE_POWER_DOUBLE_TAP,
                 isSecureCamera = true,
@@ -54,10 +51,7 @@ object HomeStatusBarHelper {
                 to = KeyguardState.OCCLUDED,
                 testScope = testScope,
             )
-            keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
-                onTop = true,
-                taskInfo = null,
-            )
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(onTop = true, taskInfo = null)
             keyguardInteractor.onCameraLaunchDetected(
                 CAMERA_LAUNCH_SOURCE_POWER_DOUBLE_TAP,
                 isSecureCamera = true,

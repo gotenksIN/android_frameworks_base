@@ -60,7 +60,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
@@ -2052,6 +2052,7 @@ public class ViewRootImplTest {
     }
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_PREDICTIVE_BACK_FIX_IME_EVENTS_SKIP_BACK_DISPATCHER)
     public void imeDispatchesBack_eventGoesToTopBackCallback() throws Exception {
         mView = new View(sContext);
         attachViewToWindow(mView);
@@ -2073,8 +2074,8 @@ public class ViewRootImplTest {
     @EnableCompatChanges({ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION})
     @EnableFlags(Flags.FLAG_SYNCED_INSETS_ANIMATION)
     public void testDispatchesApplyInsetsDuringAnimationProgress_conditions() {
-        assumeTrue("Synced Insets Animation is not supported on this device",
-                ActivityManager.isHighEndGfx());
+        assumeFalse("Synced Insets Animation is not supported on this device",
+                ActivityManager.isLowRamDeviceStatic());
 
         // 1. Setup ViewRootImpl and InsetsController
         mView = new View(sContext);
@@ -2121,8 +2122,8 @@ public class ViewRootImplTest {
     @EnableCompatChanges({ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION})
     @DisableFlags(Flags.FLAG_SYNCED_INSETS_ANIMATION)
     public void testDispatchesApplyInsetsDuringAnimationProgress_flagDisabled() {
-        assumeTrue("Synced Insets Animation is not supported on this device",
-                ActivityManager.isHighEndGfx());
+        assumeFalse("Synced Insets Animation is not supported on this device",
+                ActivityManager.isLowRamDeviceStatic());
         assertFalse(mViewRootImpl.dispatchesApplyInsetsDuringAnimationProgress());
     }
 
@@ -2130,8 +2131,8 @@ public class ViewRootImplTest {
     @DisableCompatChanges({ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION})
     @EnableFlags(Flags.FLAG_SYNCED_INSETS_ANIMATION)
     public void testDispatchesApplyInsetsDuringAnimationProgress_compatChangeRuleDisabled() {
-        assumeTrue("Synced Insets Animation is not supported on this device",
-                ActivityManager.isHighEndGfx());
+        assumeFalse("Synced Insets Animation is not supported on this device",
+                ActivityManager.isLowRamDeviceStatic());
         assertFalse(mViewRootImpl.dispatchesApplyInsetsDuringAnimationProgress());
     }
 
@@ -2139,8 +2140,8 @@ public class ViewRootImplTest {
     @EnableFlags(Flags.FLAG_SYNCED_INSETS_ANIMATION)
     @EnableCompatChanges({ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION})
     public void testWindowInsetsDispatch_duringAnimation() {
-        assumeTrue("Synced Insets Animation is not supported on this device",
-                ActivityManager.isHighEndGfx());
+        assumeFalse("Synced Insets Animation is not supported on this device",
+                ActivityManager.isLowRamDeviceStatic());
         mView = new View(sContext);
         attachViewToWindow(mView);
         mViewRootImpl = mView.getViewRootImpl();
@@ -2175,8 +2176,8 @@ public class ViewRootImplTest {
     @EnableFlags(Flags.FLAG_SYNCED_INSETS_ANIMATION)
     @EnableCompatChanges({ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION})
     public void testVisibleInsets_duringAnimation() {
-        assumeTrue("Synced Insets Animation is not supported on this device",
-                ActivityManager.isHighEndGfx());
+        assumeFalse("Synced Insets Animation is not supported on this device",
+                ActivityManager.isLowRamDeviceStatic());
 
         final Insets expectedVisibleInsets = Insets.of(10, 20, 30, 40);
 

@@ -18,6 +18,7 @@ package com.android.systemui.shared.clocks.view
 
 import android.annotation.SuppressLint
 import android.graphics.Canvas
+import android.graphics.Color
 import android.icu.text.NumberFormat
 import android.util.MathUtils.constrainedMap
 import android.view.View
@@ -115,26 +116,26 @@ class FlexClockViewGroup(clockCtx: FlexClockContext) :
         children.forEach { textView -> textView.refreshText() }
     }
 
-    override fun onLocaleChanged(locale: Locale) {
+    fun onLocaleChanged(locale: Locale) {
         updateLocale(locale)
         requestLayout()
     }
 
-    override fun updateColor(lockscreenColor: Int, aodColor: Int) {
+    fun updateColor(lockscreenColor: Int, aodColor: Int = Color.WHITE) {
         children.forEach { view -> view.updateColor(lockscreenColor, aodColor) }
         invalidate()
     }
 
-    override fun updateAxes(axes: ClockAxisStyle, isAnimated: Boolean) {
+    fun updateAxes(axes: ClockAxisStyle, isAnimated: Boolean) {
         children.forEach { view -> view.updateAxes(axes, isAnimated) }
         requestLayout()
     }
 
-    override fun onFontSettingChanged(fontSizePx: Float) {
+    fun onFontSettingChanged(fontSizePx: Float) {
         children.forEach { view -> view.applyTextSize(fontSizePx, constrainedByHeight = false) }
     }
 
-    override fun animateDoze(isDozing: Boolean, isAnimated: Boolean) {
+    fun animateDoze(isDozing: Boolean, isAnimated: Boolean) {
         fun executeDozeAnimation() {
             children.forEach { view -> view.animateDoze(isDozing, isAnimated) }
         }
@@ -143,7 +144,7 @@ class FlexClockViewGroup(clockCtx: FlexClockContext) :
         else onAnimateDoze = { executeDozeAnimation() }
     }
 
-    override fun animateCharge() {
+    fun animateCharge() {
         children.forEach { view -> view.animateCharge() }
     }
 

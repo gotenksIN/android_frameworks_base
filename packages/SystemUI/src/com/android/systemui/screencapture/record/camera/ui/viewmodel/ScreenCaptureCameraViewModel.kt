@@ -66,7 +66,7 @@ constructor(
         }
 
     val areTapsSupported: Boolean by
-        screenRecordCameraInteractor.canTap.hydratedStateOf(
+        screenRecordCameraInteractor.isOnTapSupported.hydratedStateOf(
             "ScreenCaptureCameraViewModel#areTapsSupported"
         )
 

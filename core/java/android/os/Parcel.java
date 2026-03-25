@@ -16,7 +16,6 @@
 
 package android.os;
 
-import static android.os.Build.VERSION_CODES.CINNAMON_BUN;
 import static android.security.Flags.failOnParcelSizeMismatch;
 
 import static com.android.internal.util.Preconditions.checkArgument;
@@ -30,9 +29,6 @@ import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.TestApi;
 import android.app.AppOpsManager;
-import android.app.compat.CompatChanges;
-import android.compat.annotation.ChangeId;
-import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodReplace;
@@ -248,11 +244,6 @@ public final class Parcel {
     private static final boolean DEBUG_RECYCLE = false;
     private static final boolean DEBUG_ARRAY_MAP = false;
     private static final String TAG = "Parcel";
-
-    /**  Feature flag for parcel hardening */
-    @ChangeId
-    @EnabledSince(targetSdkVersion = CINNAMON_BUN)
-    private static final long PARCEL_HARDENING = 416031865L;
 
     @UnsupportedAppUsage
     @SuppressWarnings({"UnusedDeclaration"})
@@ -4761,8 +4752,7 @@ public final class Parcel {
             object = readValue(type, loader, clazz, itemTypes);
             int actual = dataPosition() - start;
             if (actual != length) {
-                boolean failOnMismatch = failOnParcelSizeMismatch()
-                        && CompatChanges.isChangeEnabled(PARCEL_HARDENING);
+                boolean failOnMismatch = failOnParcelSizeMismatch();
                 String msg = "Unparcelling of " + object + " of type " + Parcel.valueTypeToString(
                         type) + "  consumed " + actual + " bytes, but " + length + " expected."
                         + (failOnMismatch ? " [throwing]" : " [ignored]");

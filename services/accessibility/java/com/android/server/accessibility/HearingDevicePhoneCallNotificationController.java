@@ -103,7 +103,7 @@ public class HearingDevicePhoneCallNotificationController {
             TelephonyCallback.CallStateListener {
 
         private static final String TAG =
-                CallStateListener.class.getSimpleName();
+                "HearingDevice_CallStateListener";
         private static final String ACTION_SWITCH_TO_BUILTIN_MIC =
                 "com.android.server.accessibility.hearingdevice.action.SWITCH_TO_BUILTIN_MIC";
         private static final String ACTION_SWITCH_TO_HEARING_MIC =

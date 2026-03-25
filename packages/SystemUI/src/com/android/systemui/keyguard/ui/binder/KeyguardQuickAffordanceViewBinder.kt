@@ -20,7 +20,6 @@ package com.android.systemui.keyguard.ui.binder
 import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.graphics.drawable.Animatable2
-import android.graphics.drawable.LayerDrawable
 import android.util.Size
 import android.view.View
 import android.view.ViewGroup
@@ -38,6 +37,7 @@ import com.android.keyguard.logging.KeyguardQuickAffordancesLogger
 import com.android.systemui.Flags.enableLockscreenBlur
 import com.android.systemui.animation.Expandable
 import com.android.systemui.animation.view.LaunchableImageView
+import com.android.systemui.common.shared.colors.SurfaceEffectColors
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.ui.binder.IconViewBinder
 import com.android.systemui.common.ui.view.updateLongClickListener
@@ -49,7 +49,6 @@ import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.VibratorHelper
 import com.android.systemui.util.doOnEnd
-import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import com.google.android.msdl.domain.MSDLPlayer
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -67,7 +66,6 @@ constructor(
     private val msdlPlayer: MSDLPlayer,
     private val logger: KeyguardQuickAffordancesLogger,
     private val hapticsViewModelFactory: KeyguardQuickAffordanceHapticViewModel.Factory,
-    private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
 ) {
 
     private val EXIT_DOZE_BUTTON_REVEAL_ANIMATION_DURATION_MS = 250L
@@ -95,21 +93,22 @@ constructor(
         val button = view as ImageView
         val configurationBasedDimensions = MutableStateFlow(loadFromResources(view))
         val hapticsViewModel = hapticsViewModelFactory.create()
-        val cornerRadius = view.resources.getDimension(R.dimen.keyguard_affordance_fixed_radius)
-        val blurRadius =
-            view.resources.getDimensionPixelSize(R.dimen.keyguard_shortcuts_blur_radius)
 
         val disposableHandle =
             view.repeatWhenAttached {
-                if (enableLockscreenBlur() && view.background !is LayerDrawable) {
-                    val blurDrawable =
+                if (enableLockscreenBlur()) {
+                    val cornerRadius =
+                        view.resources
+                            .getDimensionPixelSize(R.dimen.keyguard_affordance_fixed_radius)
+                            .toFloat()
+                    val blurRadius =
+                        view.resources.getDimensionPixelSize(R.dimen.keyguard_shortcuts_blur_radius)
+                    view.background =
                         view.viewRootImpl.createBackgroundBlurDrawable().apply {
                             setCornerRadius(cornerRadius)
                             setBlurRadius(blurRadius)
-                            setVisible(false, false)
+                            setColor(SurfaceEffectColors.surfaceEffect1(view.context))
                         }
-                    val surfaceDrawable = view.background
-                    view.background = LayerDrawable(arrayOf(blurDrawable, surfaceDrawable))
                 }
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     launch {
@@ -135,18 +134,6 @@ constructor(
                             }
                         }
                     }
-
-                    if (enableLockscreenBlur()) {
-                        launch {
-                            combine(
-                                windowRootViewBlurInteractor.isBlurCurrentlySupported,
-                                viewModel,
-                                { isSupported, viewModel ->
-                                    updateBackground(viewModel, view, isSupported)
-                                },
-                            )
-                        }
-                    }
                 }
             }
 
@@ -159,26 +146,6 @@ constructor(
                 view.setOnApplyWindowInsetsListener(null)
                 disposableHandle.dispose()
             }
-        }
-    }
-
-    private fun updateBackground(
-        viewModel: KeyguardQuickAffordanceViewModel,
-        view: View,
-        isBlurSupported: Boolean,
-    ) {
-        if (enableLockscreenBlur() && view.background is LayerDrawable) {
-            val blurDrawable =
-                (view.background as LayerDrawable).getDrawable(0) as BackgroundBlurDrawable
-            blurDrawable.setVisible(
-                isBlurSupported && viewModel.isSelected && !viewModel.isActivated,
-                false,
-            )
-            (view.background as LayerDrawable)
-                .getDrawable(1)
-                .setTintList(getBackgroundTintList(viewModel, view, isBlurSupported))
-        } else {
-            view.backgroundTintList = getBackgroundTintList(viewModel, view, isBlurSupported)
         }
     }
 
@@ -233,12 +200,23 @@ constructor(
                 }
             )
         )
-        updateBackground(
-            viewModel,
-            view,
-            windowRootViewBlurInteractor.isBlurCurrentlySupported.value,
-        )
 
+        if (!usingBlurredBackground(view)) {
+            view.backgroundTintList =
+                if (!viewModel.isSelected) {
+                    ColorStateList.valueOf(
+                        view.context.getColor(
+                            if (viewModel.isActivated) {
+                                com.android.internal.R.color.materialColorPrimaryFixed
+                            } else {
+                                com.android.internal.R.color.materialColorSurfaceContainerHigh
+                            }
+                        )
+                    )
+                } else {
+                    null
+                }
+        }
         view
             .animate()
             .scaleX(if (viewModel.isSelected) SCALE_SELECTED_BUTTON else 1f)
@@ -304,33 +282,11 @@ constructor(
                 if (isDimmed) DIM_ALPHA else alpha
             }
             .collect {
-                if (enableLockscreenBlur() && view.background is LayerDrawable) {
-                    (view.background as LayerDrawable).getDrawable(0).alpha = (it * 255).toInt()
+                if (usingBlurredBackground(view)) {
+                    view.background?.alpha = (it * 255).toInt()
                 }
                 view.alpha = it
             }
-    }
-
-    private fun getBackgroundTintList(
-        viewModel: KeyguardQuickAffordanceViewModel,
-        view: View,
-        isBlurSupported: Boolean,
-    ): ColorStateList? {
-        return if (!viewModel.isSelected) {
-            ColorStateList.valueOf(
-                view.context.getColor(
-                    if (viewModel.isActivated) {
-                        com.android.internal.R.color.materialColorPrimaryFixed
-                    } else if (enableLockscreenBlur() && isBlurSupported) {
-                        com.android.internal.R.color.customColorSurfaceEffect1
-                    } else {
-                        com.android.internal.R.color.materialColorSurfaceContainerHigh
-                    }
-                )
-            )
-        } else {
-            null
-        }
     }
 
     private fun loadFromResources(view: View): ConfigurationBasedDimensions {
@@ -342,6 +298,9 @@ constructor(
                 )
         )
     }
+
+    private fun usingBlurredBackground(view: View): Boolean =
+        view.background?.let { enableLockscreenBlur() && it is BackgroundBlurDrawable } ?: false
 
     private class OnClickListener(
         private val viewModel: KeyguardQuickAffordanceViewModel,

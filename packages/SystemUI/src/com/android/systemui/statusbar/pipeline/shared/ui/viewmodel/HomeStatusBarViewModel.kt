@@ -170,7 +170,7 @@ interface HomeStatusBarViewModel : Activatable {
     fun onNotificationIconChipClicked()
 
     /** Notifies that there is an intent to start expansion of a shade */
-    fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int, isConsumed: Boolean)
+    fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int)
 
     /** Whether the QS Chip should be highlighted. */
     val isQuickSettingsChipHighlighted: Boolean
@@ -367,39 +367,49 @@ constructor(
     override val areaDark: IsAreaDark by
         darkIconInteractor
             .isAreaDark(thisDisplayId)
-            .hydratedStateOf(initialValue = IsAreaDark { true })
+            .hydratedStateOf(traceName = "areaDark", initialValue = IsAreaDark { true })
 
     override val useDesktopStatusBar: Boolean by
-        desktopInteractor.useDesktopStatusBar.hydratedStateOf(initialValue = false)
+        desktopInteractor.useDesktopStatusBar.hydratedStateOf(
+            traceName = "useDesktopStatusBar",
+            initialValue = false,
+        )
 
     override val isQuickSettingsChipHighlighted: Boolean by
         combine(
                 shadeInteractor.isQsExpanded,
-                statusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
+                statusBarVisibilityInteractor.isShadeVisibleOnThisDisplay,
             ) { isQsExpanded, isShadeOnThisDisplay ->
                 isQsExpanded && isShadeOnThisDisplay
             }
-            .hydratedStateOf(initialValue = false)
+            .hydratedStateOf(traceName = "isQsChipHighlighted", initialValue = false)
 
     override val isNotificationsChipHighlighted: Boolean by
         combine(
                 shadeInteractor.isNotificationsExpanded,
-                statusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
+                statusBarVisibilityInteractor.isShadeVisibleOnThisDisplay,
             ) { isNotificationsExpanded, isShadeOnThisDisplay ->
                 isNotificationsExpanded && isShadeOnThisDisplay
             }
-            .hydratedStateOf(initialValue = false)
+            .hydratedStateOf(traceName = "isNotificationsChipHighlighted", initialValue = false)
 
     override val hasStatusBarNotifications: Boolean by
         statusBarNotificationIconsInteractor.hasStatusBarNotifications.hydratedStateOf(
-            initialValue = false
+            traceName = "hasStatusBarNotifications",
+            initialValue = false,
         )
 
     override val isNotificationsChipClickable: Boolean by
-        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(initialValue = false)
+        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(
+            traceName = "isNotificationsChipClickable",
+            initialValue = false,
+        )
 
     override val isQuickSettingsChipClickable: Boolean by
-        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(initialValue = false)
+        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(
+            traceName = "isQuickSettingsChipClickable",
+            initialValue = false,
+        )
 
     override val isHomeStatusBarAllowed = statusBarVisibilityInteractor.isHomeStatusBarAllowed
 
@@ -454,11 +464,12 @@ constructor(
 
     override val ongoingActivityChips: ChipsVisibilityModel by
         chipsVisibilityModel.hydratedStateOf(
+            traceName = "ongoingActivityChips",
             initialValue =
                 ChipsVisibilityModel(
                     chips = MultipleOngoingActivityChipsModel(),
                     areChipsAllowed = false,
-                )
+                ),
         )
 
     override fun onChipBoundsChanged(key: String, bounds: RectF) {
@@ -494,15 +505,7 @@ constructor(
         )
     }
 
-    override fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int, isConsumed: Boolean) {
-        // The event was already consumed by a child (like a chip). So we don't want to expand the
-        // shade, but we still update the target display to ensure the shade window becomes
-        // available on the active display.
-        if (isConsumed) {
-            shadeExpansionTargetDisplayInteractor.updateShadeDisplayIfNeeded(thisDisplayId)
-            return
-        }
-
+    override fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int) {
         val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
         shadeExpansionTargetDisplayInteractor.setExpansionIntentFromStatusBarEvent(
             eventX = eventX,
@@ -618,7 +621,7 @@ constructor(
             } else {
                 flowOf(false)
             }
-            .hydratedStateOf(initialValue = false)
+            .hydratedStateOf(traceName = "isSignOutButtonVisible", initialValue = false)
 
     override fun onSignOut() {
         logger.d { "onSignOut" }

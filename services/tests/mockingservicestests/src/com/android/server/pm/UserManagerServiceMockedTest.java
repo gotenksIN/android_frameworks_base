@@ -15,9 +15,6 @@
  */
 package com.android.server.pm;
 
-import static android.app.admin.DevicePolicyManager.MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_COMPLETED;
-import static android.app.admin.DevicePolicyManager.MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED;
-import static android.app.admin.DevicePolicyManager.MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_STARTED;
 import static android.app.admin.flags.Flags.FLAG_APP_RESTRICTIONS_COEXISTENCE;
 import static android.content.pm.PackageManager.FEATURE_AUTOMOTIVE;
 import static android.content.pm.PackageManager.FEATURE_EMBEDDED;
@@ -81,8 +78,6 @@ import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
 import android.app.KeyguardManager;
 import android.app.PropertyInvalidatedCache;
-import android.app.admin.DevicePolicyManager;
-import android.app.admin.DevicePolicyManager.MultiuserManagedDeviceProvisioningState;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.content.Context;
 import android.content.pm.PackageManagerInternal;
@@ -229,7 +224,6 @@ public final class UserManagerServiceMockedTest {
     // NOTE: do not call mockGetLocalService() to set DevicePolicyManagerInternal on
     // setFixtures() as some tests exercise the scenario where it's null
     private @Mock DevicePolicyManagerInternal mDevicePolicyManagerInternal;
-    private @Mock DevicePolicyManager mDevicePolicyManager;
     private @Mock KeyguardManager mKeyguardManager;
     private @Mock PowerManager mPowerManager;
     private @Mock TelecomManager mTelecomManager;
@@ -263,7 +257,6 @@ public final class UserManagerServiceMockedTest {
                 anyInt())).thenReturn(true);
         mockGetLocalService(LockSettingsInternal.class, mLockSettingsInternal);
         mockGetLocalService(PackageManagerInternal.class, mPackageManagerInternal);
-        mockGetSystemService(DevicePolicyManager.class, mDevicePolicyManager);
         doNothing().when(mSpiedContext).sendBroadcastAsUser(any(), any(), any());
         mockIsLowRamDevice(false);
 
@@ -1829,33 +1822,32 @@ public final class UserManagerServiceMockedTest {
     public void testIsLastFullAdminNonRemovable_deviceUnmanaged_returnsTrue() {
         setSystemUserHeadless(true);
         mockDisallowRemovingLastAdminUser(true);
+        mockGetLocalService(DevicePolicyManagerInternal.class, mDevicePolicyManagerInternal);
         addAdminUser(USER_ID); // USER_ID is full, admin (target)
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
+        mockIsDeviceOrganizationManaged(false);
 
         assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isTrue();
-    }
-
-    @Test
-    public void testIsLastFullAdminNonRemovable_deviceManagedInitiated_returnsFalse() {
-        setSystemUserHeadless(true);
-        mockDisallowRemovingLastAdminUser(true);
-        addAdminUser(USER_ID); // USER_ID is full, admin (target)
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_STARTED);
-
-        assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isFalse();
     }
 
     @Test
     public void testIsLastFullAdminNonRemovable_deviceManaged_returnsFalse() {
         setSystemUserHeadless(true);
         mockDisallowRemovingLastAdminUser(true);
+        mockGetLocalService(DevicePolicyManagerInternal.class, mDevicePolicyManagerInternal);
         addAdminUser(USER_ID); // USER_ID is full, admin (target)
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_COMPLETED);
+        mockIsDeviceOrganizationManaged(true);
 
         assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isFalse();
+    }
+
+    @Test
+    public void testIsLastFullAdminNonRemovable_dpmiNull_returnsTrue() {
+        setSystemUserHeadless(true);
+        mockDisallowRemovingLastAdminUser(true);
+        mockGetLocalService(DevicePolicyManagerInternal.class, null);
+        addAdminUser(USER_ID); // USER_ID is full, admin (target)
+
+        assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isTrue();
     }
 
     @Test
@@ -1914,8 +1906,6 @@ public final class UserManagerServiceMockedTest {
 
     @Test
     public void testRevokeUserAdmin() {
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
         addAdminUser(USER_ID);
 
         expect.that(mUms.revokeUserAdminInternal(USER_ID)).isTrue();
@@ -1992,8 +1982,6 @@ public final class UserManagerServiceMockedTest {
     @Test
     public void testRevokeUserAdminFailsForLastFullAdmin() {
         mockDisallowRemovingLastAdminUser(true);
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
         // Mark system user as headless so that it is not a full admin user.
         setSystemUserHeadless(true);
         addAdminUser(USER_ID);
@@ -2088,8 +2076,6 @@ public final class UserManagerServiceMockedTest {
                 mainUserId, REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN);
 
         mockIsMainUserPermanentAdmin(false);
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
         expectGetUserRemovability("main user that is not permanent admin",
                 mainUserId, REMOVE_RESULT_USER_IS_REMOVABLE);
     }
@@ -2097,8 +2083,6 @@ public final class UserManagerServiceMockedTest {
     @Test
     public void testGetUserRemovabilityLocked_lastAdmin_flagEnabled() {
         assumeDoesntHaveMainUser();
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
 
         var adminUser = addUser(
                 new UserInfo(USER_ID, A_USER_HAS_NO_NAME, FLAG_FULL | FLAG_ADMIN));
@@ -2114,8 +2098,6 @@ public final class UserManagerServiceMockedTest {
 
     @Test
     public void testGetUserRemovabilityLocked_otherUsers() {
-        mockMultiuserManagedDeviceProvisioningState(
-                MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
         var nonAdminUser = addUser(new UserInfo(USER_ID, A_USER_HAS_NO_NAME, FLAG_FULL));
         var adminUser1 = addUser(
                 new UserInfo(USER_ID2, A_USER_HAS_NO_NAME, FLAG_FULL | FLAG_ADMIN));
@@ -2367,13 +2349,8 @@ public final class UserManagerServiceMockedTest {
                 .thenReturn(new Pair<>(currentUserId, targetUserId));
     }
 
-    private void mockMultiuserManagedDeviceProvisioningState(
-            @MultiuserManagedDeviceProvisioningState int value) {
-        when(mDevicePolicyManager.getMultiuserManagedDeviceProvisioningState()).thenReturn(value);
-    }
-
-    private <T> void mockGetSystemService(Class<T> serviceClass, T service) {
-        doReturn(service).when(mSpiedContext).getSystemService(serviceClass);
+    private void mockIsDeviceOrganizationManaged(boolean value) {
+        when(mDevicePolicyManagerInternal.isDeviceOrganizationManaged()).thenReturn(value);
     }
 
     private <T> void mockGetLocalService(Class<T> serviceClass, T service) {

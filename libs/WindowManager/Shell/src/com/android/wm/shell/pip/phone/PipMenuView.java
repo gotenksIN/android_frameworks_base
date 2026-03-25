@@ -148,6 +148,7 @@ public class PipMenuView extends FrameLayout {
     protected View mSettingsButton;
     protected View mDismissButton;
     protected View mTopEndContainer;
+    protected PipMenuIconsAlgorithm mPipMenuIconsAlgorithm;
 
     // How long the shell will wait for the app to close the PiP if a custom action is set.
     private final int mPipForceCloseDelay;
@@ -195,9 +196,14 @@ public class PipMenuView extends FrameLayout {
             }
         });
 
+        findViewById(R.id.resize_handle).setAlpha(0);
+
         mActionsGroup = findViewById(R.id.actions_group);
         mBetweenActionPaddingLand = getResources().getDimensionPixelSize(
                 R.dimen.pip_between_action_padding_land);
+        mPipMenuIconsAlgorithm = new PipMenuIconsAlgorithm(mContext);
+        mPipMenuIconsAlgorithm.bindViews((ViewGroup) mViewRoot, (ViewGroup) mTopEndContainer,
+                findViewById(R.id.resize_handle), mSettingsButton, mDismissButton);
         mDismissFadeOutDurationMs = context.getResources()
                 .getInteger(R.integer.config_pipExitAnimationDuration);
 
@@ -261,7 +267,7 @@ public class PipMenuView extends FrameLayout {
     }
 
     void showMenu(int menuState, Rect stackBounds, boolean allowMenuTimeout,
-            boolean resizeMenuOnShow, boolean withDelay) {
+            boolean resizeMenuOnShow, boolean withDelay, boolean showResizeHandle) {
         mAllowMenuTimeout = allowMenuTimeout;
         mDidLastShowMenuResize = resizeMenuOnShow;
         if (mMenuState != menuState) {
@@ -340,6 +346,10 @@ public class PipMenuView extends FrameLayout {
 
     void pokeMenu() {
         cancelDelayedHide();
+    }
+
+    void updateMenuLayout(Rect bounds) {
+        mPipMenuIconsAlgorithm.onBoundsChanged(bounds);
     }
 
     void hideMenu() {

@@ -27,6 +27,7 @@ import com.android.systemui.plugins.qs.TileDetailsViewModel
 import com.android.systemui.qs.tiles.base.domain.actions.QSTileIntentUserInputHandler
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -56,8 +57,9 @@ constructor(
         )
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope { launch { (contentViewModel as Activatable).activate() } }
+        awaitCancellation()
     }
 
     @AssistedFactory

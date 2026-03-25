@@ -82,7 +82,8 @@ public class ProcessedPerfettoProtoLogImpl extends PerfettoProtoLogImpl {
             @NonNull ViewerConfigInputStreamProvider viewerConfigInputStreamProvider,
             @NonNull ProtoLogViewerConfigReader viewerConfigReader,
             @NonNull ProtoLogCacheUpdater cacheUpdater,
-            @NonNull IProtoLogGroup[] groups) {
+            @NonNull IProtoLogGroup[] groups)
+            throws ServiceManager.ServiceNotFoundException {
         super(datasource, cacheUpdater, groups);
 
         this.mViewerConfigFilePath = viewerConfigFilePath;

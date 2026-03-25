@@ -132,7 +132,7 @@ constructor(
                                         .get()
                                         .isFingerprintAuthCurrentlyAllowed,
                                     keyguardInteractor.get().isKeyguardDismissible,
-                                    keyguardInteractor.get().primaryBouncerShowing,
+                                    bouncerRepository.primaryBouncerShow,
                                     isDozingOrAod,
                                     currentDisplayModeSupported,
                                 ) {

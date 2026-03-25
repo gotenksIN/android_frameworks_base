@@ -94,7 +94,6 @@ import static com.android.hardware.input.Flags.useEventDisplayIdForKeyWakeup;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
 import static com.android.server.policy.Flags.wearKeyguardDrawnTimeoutOnBootConfig;
-import static com.android.server.policy.Flags.brightnessOverrideToast;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_CANCEL;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_COMPLETE;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_START;
@@ -149,7 +148,6 @@ import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Rect;
 import android.hardware.SensorPrivacyManager;
-import android.hardware.display.BrightnessInfo;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.hdmi.HdmiAudioSystemClient;
@@ -2492,10 +2490,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Match current screen state.
         if (!mPowerManager.isInteractive()) {
-            startedGoingToSleep(
-                    Display.DEFAULT_DISPLAY_GROUP,
-                    PowerManager.GO_TO_SLEEP_REASON_TIMEOUT,
-                    /* anyDefaultOrAdjacentGroupInteractive= */ false);
+            startedGoingToSleep(Display.DEFAULT_DISPLAY_GROUP,
+                    PowerManager.GO_TO_SLEEP_REASON_TIMEOUT);
             finishedGoingToSleep(Display.DEFAULT_DISPLAY_GROUP,
                     PowerManager.GO_TO_SLEEP_REASON_TIMEOUT);
         }
@@ -3627,18 +3623,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP:
             case KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_DOWN:
                 if (complete) {
-                    if (brightnessOverrideToast()) {
-                        BrightnessInfo info =
-                                mDisplayManager.getDisplay(displayId).getBrightnessInfo();
-                        if (info != null && info.isBrightnessOverrideByWindow) {
-                            showBrightnessOverrideToast();
-                            break;
-                        }
-                    }
-
                     int direction =
-                            gestureType == KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP ? 1
-                                    : -1;
+                            gestureType == KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP ? 1 : -1;
                     changeDisplayBrightnessValue(displayId, direction);
                 }
                 break;
@@ -3716,15 +3702,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         + " that was not registered by this handler");
                 break;
         }
-    }
-
-    private void showBrightnessOverrideToast() {
-        Toast.makeText(
-                mContext,
-                UiThread.get().getLooper(),
-                mContext.getString(R.string.brightness_unable_adjust_msg),
-                Toast.LENGTH_SHORT)
-                .show();
     }
 
     private void changeDisplayBrightnessValue(int displayId, int direction) {
@@ -5320,8 +5297,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     // Both the default and default adjacent groups should be non interactive
-    private boolean isReadyToSignalSleep(
-            int displayGroupId, boolean anyDefaultOrAdjacentGroupInteractive) {
+    private boolean isReadyToSignalSleep(int displayGroupId) {
         if (!com.android.server.display.feature.flags.Flags.separateTimeouts()) {
             return displayGroupId == Display.DEFAULT_DISPLAY_GROUP;
         }
@@ -5332,7 +5308,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return false;
         }
 
-        return !anyDefaultOrAdjacentGroupInteractive;
+        boolean areAllDefaultAdjacentGroupsNonInteractive =
+                !mPowerManagerInternal.isAnyDefaultAdjacentGroupInteractive();
+        boolean isDefaultGroupNonInteractive =
+                !mPowerManagerInternal.isGroupInteractive(Display.DEFAULT_DISPLAY_GROUP);
+        return areAllDefaultAdjacentGroupsNonInteractive && isDefaultGroupNonInteractive;
     }
 
     private boolean shouldFinishSleeping(int displayGroupId) {
@@ -5370,8 +5350,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     // Either of the default or default adjacent groups should be interactive
-    private boolean isReadyToSignalWakeup(
-            int displayGroupId, boolean anyDefaultOrAdjacentGroupInteractive) {
+    private boolean isReadyToSignalWakeup(int displayGroupId) {
         if (!com.android.server.display.feature.flags.Flags.separateTimeouts()) {
             return displayGroupId == Display.DEFAULT_DISPLAY_GROUP;
         }
@@ -5382,16 +5361,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return false;
         }
 
-        return anyDefaultOrAdjacentGroupInteractive;
+        boolean isAnyDefaultAdjacentGroupInteractive =
+                mPowerManagerInternal.isAnyDefaultAdjacentGroupInteractive();
+        boolean isDefaultGroupInteractive = mPowerManagerInternal
+                .isGroupInteractive(DEFAULT_DISPLAY);
+        return isAnyDefaultAdjacentGroupInteractive || isDefaultGroupInteractive;
     }
 
     // Called on the PowerManager's Notifier thread.
     @Override
-    public void startedGoingToSleep(
-            int displayGroupId,
-            @PowerManager.GoToSleepReason int pmSleepReason,
-            boolean anyDefaultOrAdjacentGroupInteractive) {
-        if (!isReadyToSignalSleep(displayGroupId, anyDefaultOrAdjacentGroupInteractive)) {
+    public void startedGoingToSleep(int displayGroupId,
+            @PowerManager.GoToSleepReason int pmSleepReason) {
+        if (!isReadyToSignalSleep(displayGroupId)) {
             return;
         }
 
@@ -5451,10 +5432,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     // Called on the PowerManager's Notifier thread.
     @Override
-    public void startedWakingUp(
-            int displayGroupId,
-            @WakeReason int pmWakeReason,
-            boolean anyDefaultOrAdjacentGroupInteractive) {
+    public void startedWakingUp(int displayGroupId, @WakeReason int pmWakeReason) {
         if (DEBUG_WAKEUP) {
             Slog.i(TAG, "Started waking up... (groupId=" + displayGroupId + " why="
                     + WindowManagerPolicyConstants.onReasonToString(
@@ -5462,7 +5440,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             pmWakeReason)) + ")");
         }
 
-        if (!isReadyToSignalWakeup(displayGroupId, anyDefaultOrAdjacentGroupInteractive)) {
+        if (!isReadyToSignalWakeup(displayGroupId)) {
             return;
         }
 
@@ -5956,10 +5934,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
         }
         mSideFpsEventHandler.onFingerprintSensorReady();
-        startedWakingUp(
-                Display.DEFAULT_DISPLAY_GROUP,
-                PowerManager.WAKE_REASON_UNKNOWN,
-                /* anyDefaultOrAdjacentGroupInteractive= */ true);
+        startedWakingUp(Display.DEFAULT_DISPLAY_GROUP, PowerManager.WAKE_REASON_UNKNOWN);
         finishedWakingUp(Display.DEFAULT_DISPLAY_GROUP, PowerManager.WAKE_REASON_UNKNOWN);
 
         int defaultDisplayState = mDisplayManager.getDisplay(DEFAULT_DISPLAY).getState();

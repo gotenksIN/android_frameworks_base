@@ -58,6 +58,7 @@ import com.android.systemui.classifier.falsingManager
 import com.android.systemui.concurrency.fakeExecutor
 import com.android.systemui.deviceentry.data.repository.deviceEntryRepository
 import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryBypassRepository
+import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryHapticsInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
@@ -836,7 +837,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             runCurrent()
             assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             powerInteractor.setAwakeForTest()
             runCurrent()
 
@@ -1290,31 +1291,6 @@ class SceneContainerStartableTest : SysuiTestCase() {
             deviceEntryRepository.deviceUnlockStatus.value =
                 DeviceUnlockStatus(true, deviceUnlockSource = null)
             runCurrent()
-            assertThat(canWakeDirectlyToGone).isTrue()
-
-            powerInteractor.setAwakeForTest()
-            runCurrent()
-
-            assertThat(currentSceneKey).isEqualTo(Scenes.Gone)
-        }
-
-    @Test
-    fun switchToGoneWhenDeviceStartsToWakeUp_whenDeviceNotProvisioned() =
-        kosmos.runTest {
-            val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
-            val canWakeDirectlyToGone by
-                collectLastValue(keyguardWakeDirectlyToGoneInteractor.canWakeDirectlyToGone)
-            prepareState(
-                initialSceneKey = Scenes.Lockscreen,
-                authenticationMethod = AuthenticationMethodModel.None,
-                isKeyguardEnabled = true,
-                isDeviceProvisioned = false,
-            )
-            powerInteractor.setAsleepForTest()
-            underTest.start()
-            runCurrent()
-
-            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
             assertThat(canWakeDirectlyToGone).isTrue()
 
             powerInteractor.setAwakeForTest()
@@ -1882,12 +1858,12 @@ class SceneContainerStartableTest : SysuiTestCase() {
             verify(notificationShadeWindowController, never()).setKeyguardOccluded(true)
             verify(notificationShadeWindowController, times(1)).setKeyguardOccluded(false)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
             verify(notificationShadeWindowController, times(1)).setKeyguardOccluded(true)
             verify(notificationShadeWindowController, times(1)).setKeyguardOccluded(false)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false)
             runCurrent()
             verify(notificationShadeWindowController, times(1)).setKeyguardOccluded(true)
             verify(notificationShadeWindowController, times(2)).setKeyguardOccluded(false)
@@ -2308,13 +2284,13 @@ class SceneContainerStartableTest : SysuiTestCase() {
             underTest.start()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Occluded)
 
             prepareState(isDeviceUnlocked = true)
-            keyguardOcclusionInteractor.setOccludedFromWm(false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Gone)
@@ -2328,13 +2304,13 @@ class SceneContainerStartableTest : SysuiTestCase() {
             underTest.start()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Occluded)
 
             prepareState(isDeviceUnlocked = false)
-            keyguardOcclusionInteractor.setOccludedFromWm(false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
@@ -2351,12 +2327,12 @@ class SceneContainerStartableTest : SysuiTestCase() {
 
             assertThat(currentScene).isEqualTo(Scenes.Communal)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Occluded)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Communal)
@@ -2371,7 +2347,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             underTest.start()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Occluded)
@@ -2381,7 +2357,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.Occluded)
             assertThat(currentOverlays).contains(Overlays.Bouncer)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
             runCurrent()
 
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
@@ -2401,7 +2377,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             underTest.start()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
-            keyguardOcclusionInteractor.setOccludedFromWm(true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
             runCurrent()
 
             assertThat(backStack?.asIterable()?.toList()).isEqualTo(listOf(Scenes.Lockscreen))
@@ -2413,7 +2389,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
                 .isEqualTo(listOf(Scenes.Occluded, Scenes.Lockscreen))
 
             // Changing occlusion state underneath the shade should remove it from the backstack
-            keyguardOcclusionInteractor.setOccludedFromWm(false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
             runCurrent()
 
             assertThat(backStack?.asIterable()?.toList()).isEqualTo(listOf(Scenes.Lockscreen))
@@ -2876,7 +2852,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
 
             kosmos.powerInteractor.setAwakeForTest()
-            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(true, null)
+            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true, null)
             kosmos.keyguardServiceShowLockscreenInteractor.showNowEvents.tryEmit(
                 ShowWhileAwakeReason.FOLDED_WITH_SWIPE_UP_TO_CONTINUE
             )

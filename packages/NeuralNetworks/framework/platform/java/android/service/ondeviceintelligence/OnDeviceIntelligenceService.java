@@ -659,9 +659,6 @@ public abstract class OnDeviceIntelligenceService extends Service {
     /**
      * Invoked when the caller requests to list available embedding models.
      *
-     * <p> The implementation should ensure the results are in order of preference
-     * (most strongly recommended to least strongly recommended).
-     *
      * @param callerUid UID of the caller that initiated this call chain.
      * @param callback Callback to populate with the list of {@link EmbeddingModel}.
      */
@@ -697,9 +694,6 @@ public abstract class OnDeviceIntelligenceService extends Service {
 
     /**
      * Get the list of available image description models.
-     *
-     * <p> The implementation should ensure the results are in order of preference
-     * (most strongly recommended to least strongly recommended).
      *
      * @param callerUid UID of the caller that initiated this call chain.
      * @param callback Callback to populate with the list of {@link ImageDescriptionModelInfo}.

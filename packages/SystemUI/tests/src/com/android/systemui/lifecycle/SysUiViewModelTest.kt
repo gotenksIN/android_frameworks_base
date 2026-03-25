@@ -233,13 +233,14 @@ private class FakeViewModel : ExclusiveActivatable() {
     var lastActivationCoroutineContext: CoroutineContext? = null
         private set
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         isActivated = true
         lastActivationCoroutineContext = coroutineContext
-    }
-
-    override suspend fun onDeactivated() {
-        isActivated = false
+        try {
+            awaitCancellation()
+        } finally {
+            isActivated = false
+        }
     }
 }
 

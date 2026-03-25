@@ -4,13 +4,6 @@ container: "system"
 # Important: Flags must be accessed through DisplayManagerFlags.
 
 flag {
-    name: "refactor_persistent_data_store"
-    namespace: "display_manager"
-    description: "Refactor the persistent data store to make it more usable and scalable."
-    bug: "425590769"
-}
-
-flag {
     name: "is_always_on_available_api"
     namespace: "display_manager"
     description: "Allows querying of AOD availability"
@@ -309,6 +302,16 @@ flag {
     namespace: "display_manager"
     description: "Enable the propagating of work durations from config to surface flinger"
     bug: "399396620"
+}
+
+flag {
+    name: "display_info_copy_on_write_cache_enabled"
+    namespace: "display_manager"
+    description: "Enable copy on write cache for display info"
+    bug: "430010606"
+    metadata {
+          purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

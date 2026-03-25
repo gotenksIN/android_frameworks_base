@@ -23,11 +23,13 @@ import android.view.ViewGroup
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.IntRect
+import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.battery.BatteryMeterViewController
 import com.android.systemui.clock.domain.interactor.ClockInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.kairos.KairosNetwork
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.privacy.AbstractOngoingPrivacyChip
 import com.android.systemui.privacy.PrivacyItem
@@ -42,6 +44,7 @@ import com.android.systemui.shade.domain.interactor.PrivacyChipInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.ui.composable.ChipHighlightModel
+import com.android.systemui.statusbar.systemstatusicons.domain.interactor.EmptySystemStatusIconBlockListInteractor
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.phone.domain.interactor.ShadeDarkIconInteractor
@@ -51,12 +54,13 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.CarrierT
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModelKairos
-import com.android.systemui.statusbar.systemstatusicons.domain.interactor.EmptySystemStatusIconBlockListInteractor
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
 import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
@@ -85,10 +89,16 @@ constructor(
     desktopInteractor: DesktopInteractor,
     @ShadeDisplayAware systemBarUtilsState: SystemBarUtilsState,
     @Assisted private val ignoreTestHarness: Boolean,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("ShadeHeaderViewModel.hydrator")
 
     val isShadeAreaDark: IsAreaDark by
-        shadeDarkIconInteractor.isShadeAreaDark.hydratedStateOf(initialValue = IsAreaDark { true })
+        hydrator.hydratedStateOf(
+            traceName = "isShadeAreaDark",
+            initialValue = IsAreaDark { true },
+            source = shadeDarkIconInteractor.isShadeAreaDark,
+        )
 
     val createBatteryMeterViewController:
         (ViewGroup, StatusBarLocation) -> BatteryMeterViewController =
@@ -96,28 +106,49 @@ constructor(
 
     /** True if there is exactly one mobile connection. */
     val isSingleCarrier: Boolean by
-        mobileIconsInteractor.isSingleCarrier.hydratedStateOf(
-            initialValue = mobileIconsInteractor.isSingleCarrier.value
+        hydrator.hydratedStateOf(
+            traceName = "isSingleCarrier",
+            initialValue = mobileIconsInteractor.isSingleCarrier.value,
+            source = mobileIconsInteractor.isSingleCarrier,
         )
 
     /** The list of subscription Ids for current mobile connections. */
     val mobileSubIds: List<Int> by
-        mobileIconsInteractor.filteredSubscriptions
-            .map { list -> list.map { it.subscriptionId } }
-            .hydratedStateOf(initialValue = emptyList())
+        hydrator.hydratedStateOf(
+            traceName = "mobileSubIds",
+            initialValue = emptyList(),
+            source =
+                mobileIconsInteractor.filteredSubscriptions.map { list ->
+                    list.map { it.subscriptionId }
+                },
+        )
 
-    val carrierText: CharSequence? by carrierTextInteractor.carrierText.hydratedStateOf()
+    val carrierText: CharSequence? by
+        hydrator.hydratedStateOf(
+            traceName = "carrierText",
+            source = carrierTextInteractor.carrierText,
+        )
 
     /** The list of PrivacyItems to be displayed by the privacy chip. */
-    val privacyItems: List<PrivacyItem> by privacyChipInteractor.privacyItems.hydratedStateOf()
+    val privacyItems: List<PrivacyItem> by
+        hydrator.hydratedStateOf(
+            traceName = "privacyItems",
+            source = privacyChipInteractor.privacyItems,
+        )
 
     /** Whether or not mic & camera indicators are enabled in the device privacy config. */
     val isMicCameraIndicationEnabled: Boolean by
-        privacyChipInteractor.isMicCameraIndicationEnabled.hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "isMicCameraIndicationEnabled",
+            source = privacyChipInteractor.isMicCameraIndicationEnabled,
+        )
 
     /** Whether or not location indicators are enabled in the device privacy config. */
     val isLocationIndicationEnabled: Boolean by
-        privacyChipInteractor.isLocationIndicationEnabled.hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "isLocationIndicationEnabled",
+            source = privacyChipInteractor.isLocationIndicationEnabled,
+        )
 
     /** Whether or not the privacy chip should be visible. */
     val isPrivacyChipVisible: Boolean by derivedStateOf { privacyItems.isNotEmpty() }
@@ -147,16 +178,28 @@ constructor(
                     DualShadeEducationModel.ForQuickSettingsShade
 
     val longerDateText: String by
-        combine(clockInteractor.longerDateFormat, clockInteractor.currentTime) { format, time ->
-                format.format(time)
-            }
-            .hydratedStateOf(initialValue = "")
+        hydrator.hydratedStateOf(
+            traceName = "longerDateText",
+            initialValue = "",
+            source =
+                combine(clockInteractor.longerDateFormat, clockInteractor.currentTime) {
+                    format,
+                    time ->
+                    format.format(time)
+                },
+        )
 
     val shorterDateText: String by
-        combine(clockInteractor.shorterDateFormat, clockInteractor.currentTime) { format, time ->
-                format.format(time)
-            }
-            .hydratedStateOf(initialValue = "")
+        hydrator.hydratedStateOf(
+            traceName = "shorterDateText",
+            initialValue = "",
+            source =
+                combine(clockInteractor.shorterDateFormat, clockInteractor.currentTime) {
+                    format,
+                    time ->
+                    format.format(time)
+                },
+        )
 
     val inactiveChipHighlight: ChipHighlightModel
         get() =
@@ -167,15 +210,26 @@ constructor(
             }
 
     val statusBarHeightPx: Int by
-        systemBarUtilsState.statusBarHeight.hydratedStateOf(
+        hydrator.hydratedStateOf(
             traceName = "ShadeHeader#statusBarHeight",
             initialValue = 0,
+            source = systemBarUtilsState.statusBarHeight,
         )
 
     private val useDesktopStatusBar: Boolean by
-        desktopInteractor.useDesktopStatusBar.hydratedStateOf(
-            initialValue = desktopInteractor.useDesktopStatusBar.value
+        hydrator.hydratedStateOf(
+            traceName = "useDesktopStatusBar",
+            initialValue = desktopInteractor.useDesktopStatusBar.value,
+            source = desktopInteractor.useDesktopStatusBar,
         )
+
+    override suspend fun onActivated(): Nothing {
+        coroutineScope {
+            launch { hydrator.activate() }
+
+            awaitCancellation()
+        }
+    }
 
     /** Notifies that the privacy chip was clicked. */
     fun onPrivacyChipClicked(privacyChip: AbstractOngoingPrivacyChip) {

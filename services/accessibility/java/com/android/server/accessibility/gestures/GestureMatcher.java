@@ -312,7 +312,7 @@ public abstract class GestureMatcher {
     /** This class allows matchers to transition between states on a delay. */
     protected final class DelayedTransition implements Runnable {
 
-        private static final String LOG_TAG = DelayedTransition.class.getSimpleName();
+        private static final String LOG_TAG = "GestureMatcher.DelayedTransition";
         int mTargetState;
         MotionEvent mEvent;
         MotionEvent mRawEvent;

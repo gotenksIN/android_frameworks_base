@@ -56,8 +56,8 @@ class ActivityStarterImplTest : SysuiTestCase() {
             ActivityStarterImpl(
                 statusBarStateController = statusBarStateController,
                 mainExecutor = mainExecutor,
-                legacyActivityStarterLazy = { legacyActivityStarterInternal },
-                activityStarterInternalLazy = { activityStarterInternal },
+                legacyActivityStarter = { legacyActivityStarterInternal },
+                activityStarterInternal = { activityStarterInternal },
             )
     }
 

@@ -33,7 +33,7 @@
     <string name="profile_name_glasses" msgid="3506504967216601277">"enhet"</string>
     <string name="summary_glasses" msgid="5469208629679579157">"Appen får åtkomst till dessa behörigheter på din <xliff:g id="DEVICE_TYPE">%1$s</xliff:g>"</string>
     <string name="profile_name_medical" msgid="5617160509499466400">"medicinteknisk produkt"</string>
-    <string name="title_app_streaming" msgid="237666000400427614">"Vill du tillåta att &lt;strong&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/strong&gt; streamar appar och systemfunktioner mellan din <xliff:g id="DEVICE_TYPE">%2$s</xliff:g> och &lt;strong&gt;<xliff:g id="DEVICE_NAME">%3$s</xliff:g>&lt;/strong&gt;?"</string>
+    <string name="title_app_streaming" msgid="237666000400427614">"Vill du tillåta att &lt;strong&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/strong&gt; streamar appar och systemfunktioner mellan <xliff:g id="DEVICE_TYPE">%2$s</xliff:g> och &lt;strong&gt;<xliff:g id="DEVICE_NAME">%3$s</xliff:g>&lt;/strong&gt;?"</string>
     <string name="summary_app_streaming" msgid="8346968726357732862">"<xliff:g id="APP_NAME">%1$s</xliff:g> får följande behörigheter:"</string>
     <string name="helper_summary_app_streaming" msgid="160149899100957545">"<xliff:g id="APP_NAME">%1$s</xliff:g> begär behörighet för <xliff:g id="DEVICE_NAME">%2$s</xliff:g> att streama appar och systemfunktioner mellan dina enheter."</string>
     <string name="title_automotive_projection" msgid="3296005598978412847"></string>
@@ -47,7 +47,8 @@
     <string name="summary_virtual_device" msgid="1062189396947962635">"<xliff:g id="APP_NAME">%2$s</xliff:g> får följande behörigheter:"</string>
     <string name="profile_name_generic" msgid="6851028682723034988">"enhet"</string>
     <string name="summary_generic" msgid="1761976003668044801">"Den här appen kommer att kunna synkronisera information mellan telefonen och den valda enheten, till exempel namnet på någon som ringer"</string>
-    <string name="summary_generic_with_remote_ai_capability" msgid="5053633566439056634">"Tillåt att &lt;strong&gt;<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>&lt;/strong&gt; synkroniserar information som uppgifter om uppringaren och kör smarta åtgärder från din <xliff:g id="DEVICE_TYPE">%2$s</xliff:g>"</string>
+    <!-- no translation found for summary_generic_with_remote_ai_capability (5053633566439056634) -->
+    <skip />
     <string name="consent_yes" msgid="8344487259618762872">"Tillåt"</string>
     <string name="consent_no" msgid="2640796915611404382">"Tillåt inte"</string>
     <string name="consent_cancel" msgid="5655005528379285841">"Avbryt"</string>

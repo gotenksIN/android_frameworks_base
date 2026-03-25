@@ -2607,7 +2607,7 @@
     <string name="keyboard_layout_notification_more_than_three_selected_message" msgid="1581834181578206937">"ಕೀಬೋರ್ಡ್ ಲೇಔಟ್ ಅನ್ನು <xliff:g id="LAYOUT_1">%1$s</xliff:g>, <xliff:g id="LAYOUT_2">%2$s</xliff:g>, <xliff:g id="LAYOUT_3">%3$s</xliff:g> ಗೆ ಸೆಟ್ ಮಾಡಲಾಗಿದೆ… ಬದಲಾಯಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ."</string>
     <string name="keyboard_layout_notification_multiple_selected_title" msgid="5242444914367024499">"ಭೌತಿಕ ಕೀಬೋರ್ಡ್‌ಗಳನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಲಾಗಿದೆ"</string>
     <string name="keyboard_layout_notification_multiple_selected_message" msgid="6576533454124419202">"ಕೀಬೋರ್ಡ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ"</string>
-    <string name="profile_label_private" msgid="6463418670715290696">"ಖಾಸಗಿ"</string>
+    <string name="profile_label_private" msgid="6463418670715290696">"ಪ್ರೈವೆಟ್"</string>
     <string name="profile_label_clone" msgid="769106052210954285">"ಕ್ಲೋನ್"</string>
     <string name="profile_label_work" msgid="3495359133038584618">"ಕೆಲಸ"</string>
     <string name="profile_label_work_2" msgid="4691533661598632135">"ಕೆಲಸ 2"</string>
@@ -2706,7 +2706,7 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"ಟಿವಿ ಆಫ್ ಮಾಡಲು ಪವರ್ ಬಟನ್ ಅನ್ನು ಲಾಂಗ್ ಪ್ರೆಸ್ ಮಾಡಿ"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ಸಿಸ್ಟಮ್ ಸಂಪನ್ಮೂಲಕ್ಕೆ ಸಂಬಂಧಿಸಿದ ಎಚ್ಚರಿಕೆಗಳು"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ಸಂಪನ್ಮೂಲಗಳನ್ನು ಮಿತಿಮೀರಿ ಬಳಸಲಾಗುತ್ತಿದೆ"</string>
-    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"ಅತಿಯಾದ ಸಂಪನ್ಮೂಲ ಬಳಕೆಯಿಂದಾಗಿ ಆ್ಯಪ್‌ \'<xliff:g id="APP_NAME">%1$s</xliff:g> ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ನೀವು ಅದನ್ನು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿನ ಆ್ಯಪ್‌ಗಳ ಮೆನುವಿನಿಂದ ಮರು-ಸಕ್ರಿಯಗೊಳಿಸಬಹುದು.\""</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"ಆ್ಯಪ್ \'<xliff:g id="APP_NAME">%1$s</xliff:g> ತೀರಾ ಹೆಚ್ಚಿನ ಸಂಪನ್ಮೂಲಗಳನ್ನು ಬಳಸುತ್ತಿದೆ.\""</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"ನಿಮ್ಮ ಪೋಷಕರಿಂದ ಬಂದ ಅಪ್‌ಡೇಟ್"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ಅನ್ನು ಸದ್ಯಕ್ಕೆ ತೆಗೆದುಹಾಕಲಾಗಿದೆ"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> ಈಗ ಲಭ್ಯವಿದೆ"</string>

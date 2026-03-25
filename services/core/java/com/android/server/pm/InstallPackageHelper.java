@@ -184,7 +184,6 @@ import com.android.internal.pm.pkg.parsing.ParsingPackageUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.server.EventLogTags;
-import com.android.server.IoThread;
 import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.pm.parsing.PackageCacher;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
@@ -482,15 +481,9 @@ final class InstallPackageHelper {
                             + " is no longer a PCC package. Cleaning up.");
             mPm.mSettings.removePccIdLPw(oldPkgSetting.getPccId());
             pkgSetting.setPccId(Process.INVALID_UID);
-            final int[] safeAllUsers = (allUsers != null) ? allUsers.clone() : new int[0];
-            final PackageSetting safeOldPkgSetting = new PackageSetting(oldPkgSetting);
-            IoThread.getHandler().post(() -> {
-                try (PackageManagerTracedLock installLock = mPm.mInstallLock.acquireLock()) {
-                    mAppDataHelper.destroyPccData(
-                            safeOldPkgSetting,
-                            FLAG_STORAGE_CE | FLAG_STORAGE_DE, safeAllUsers);
-                }
-            });
+
+            mAppDataHelper.destroyPccData(
+                    oldPkgSetting, FLAG_STORAGE_CE | FLAG_STORAGE_DE, allUsers);
         }
 
       if(android.content.pm.Flags.verifiedDexopt()){

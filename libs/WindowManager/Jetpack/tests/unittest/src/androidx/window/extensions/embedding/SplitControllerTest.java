@@ -63,7 +63,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.clearInvocations;
@@ -112,7 +111,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
@@ -137,12 +135,8 @@ import java.util.function.Consumer;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class SplitControllerTest {
-    private static final Intent PLACEHOLDER_INTENT = new Intent()
-            .setComponent(new ComponentName("test", "placeholder"))
-            .setAction(Intent.ACTION_MAIN);
-    private static final ArgumentMatcher<Intent> PLACEHOLDER_MATCHER =
-            i -> PLACEHOLDER_INTENT.getComponent() == i.getComponent()
-            && PLACEHOLDER_INTENT.getAction() == i.getAction();
+    private static final Intent PLACEHOLDER_INTENT = new Intent().setComponent(
+            new ComponentName("test", "placeholder"));
 
     @Rule
     public MockitoRule rule = MockitoJUnit.rule();
@@ -765,7 +759,7 @@ public class SplitControllerTest {
 
         assertTrue(result);
         verify(mSplitPresenter).startActivityToSide(eq(mTransaction), eq(mActivity),
-                argThat(PLACEHOLDER_MATCHER), mBundleArgumentCaptor.capture(),
+                eq(PLACEHOLDER_INTENT), mBundleArgumentCaptor.capture(),
                 eq(placeholderRule), eq(SPLIT_ATTRIBUTES), eq(true) /* isPlaceholder */);
 
         final ActivityOptions activityOptions =
@@ -804,7 +798,7 @@ public class SplitControllerTest {
 
         assertTrue(result);
         verify(mSplitPresenter).startActivityToSide(eq(mTransaction), eq(mActivity),
-                argThat(PLACEHOLDER_MATCHER), mBundleArgumentCaptor.capture(),
+                eq(PLACEHOLDER_INTENT), mBundleArgumentCaptor.capture(),
                 eq(placeholderRule), eq(SPLIT_ATTRIBUTES), eq(true) /* isPlaceholder */);
 
         final ActivityOptions activityOptions =
@@ -843,7 +837,7 @@ public class SplitControllerTest {
 
         assertTrue(result);
         verify(mSplitPresenter).startActivityToSide(eq(mTransaction), eq(mActivity),
-                argThat(PLACEHOLDER_MATCHER), mBundleArgumentCaptor.capture(),
+                eq(PLACEHOLDER_INTENT), mBundleArgumentCaptor.capture(),
                 eq(placeholderRule), eq(SPLIT_ATTRIBUTES), eq(true) /* isPlaceholder */);
 
         final ActivityOptions activityOptions =
@@ -1423,7 +1417,7 @@ public class SplitControllerTest {
         mSplitController.launchPlaceholderIfNecessary(mTransaction, mActivity,
                 true /* isOnCreated */);
 
-        verify(mTransaction).startActivityInTaskFragment(any(), any(), argThat(PLACEHOLDER_MATCHER),
+        verify(mTransaction).startActivityInTaskFragment(any(), any(), eq(PLACEHOLDER_INTENT),
                 any());
     }
 
@@ -1437,7 +1431,7 @@ public class SplitControllerTest {
                 true /* isOnCreated */);
 
         assertTrue(container.hasActivity(mActivity.getActivityToken()));
-        verify(mTransaction).startActivityInTaskFragment(any(), any(), argThat(PLACEHOLDER_MATCHER),
+        verify(mTransaction).startActivityInTaskFragment(any(), any(), eq(PLACEHOLDER_INTENT),
                 any());
     }
 

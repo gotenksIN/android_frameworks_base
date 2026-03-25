@@ -28,7 +28,6 @@ import android.content.Context
 import android.graphics.drawable.Icon
 import android.service.notification.StatusBarNotification
 import android.util.ArrayMap
-import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.traceSection
 import com.android.internal.logging.InstanceId
 import com.android.systemui.dagger.qualifiers.Main
@@ -41,7 +40,7 @@ import com.android.systemui.statusbar.notification.collection.PipelineEntry
 import com.android.systemui.statusbar.notification.collection.provider.SectionStyleProvider
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationListRepository
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
-import com.android.systemui.statusbar.notification.domain.interactor.RenderNotificationListInteractor.Companion.IS_SCREEN_SHARE_NOTIFICATION
+import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModels
 import com.android.systemui.statusbar.notification.shared.ActiveBundleModel
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationEntryModel
@@ -76,11 +75,6 @@ constructor(
                 }
             }
         }
-    }
-
-    companion object {
-        @VisibleForTesting
-        const val IS_SCREEN_SHARE_NOTIFICATION = "android.isScreenShareLiveUpdate"
     }
 }
 
@@ -222,14 +216,9 @@ private class ActiveNotificationsStoreBuilder(
             callType = sbn.toCallType(),
             promotedContent = promotedNotificationContentModels,
             requestedPromotion = sbn.notification.isRequestPromotedOngoing,
-            isScreenShareNotification = sbn.notification.isScreenShareNotification(),
             notifStyle = notifStyle(sbn.notification),
         )
     }
-}
-
-private fun Notification.isScreenShareNotification(): Boolean {
-    return extras.getBoolean(IS_SCREEN_SHARE_NOTIFICATION, false)
 }
 
 private fun ActiveNotificationsStore.createOrReuseNotif(
@@ -258,7 +247,6 @@ private fun ActiveNotificationsStore.createOrReuseNotif(
     callType: CallType,
     promotedContent: PromotedNotificationContentModels?,
     requestedPromotion: Boolean,
-    isScreenShareNotification: Boolean,
     notifStyle: NotifStyle?,
 ): ActiveNotificationModel {
     return individuals[key]?.takeIf {
@@ -288,7 +276,6 @@ private fun ActiveNotificationsStore.createOrReuseNotif(
             callType = callType,
             promotedContent = promotedContent,
             requestedPromotion = requestedPromotion,
-            isScreenShareNotification = isScreenShareNotification,
             style = notifStyle,
         )
     }
@@ -318,7 +305,6 @@ private fun ActiveNotificationsStore.createOrReuseNotif(
             callType = callType,
             promotedContent = promotedContent,
             requestedPromotion = requestedPromotion,
-            isScreenShareNotification = isScreenShareNotification,
             style = notifStyle,
         )
 }
@@ -349,7 +335,6 @@ private fun ActiveNotificationModel.isCurrent(
     callType: CallType,
     promotedContent: PromotedNotificationContentModels?,
     requestedPromotion: Boolean,
-    isScreenShareNotification: Boolean,
     style: NotifStyle?,
 ): Boolean {
     return when {
@@ -380,7 +365,6 @@ private fun ActiveNotificationModel.isCurrent(
         // recreating the active notification model constantly?
         promotedContent != this.promotedContent -> false
         requestedPromotion != this.requestedPromotion -> false
-        isScreenShareNotification != this.isScreenShareNotification -> false
         style != this.style -> false
         else -> true
     }

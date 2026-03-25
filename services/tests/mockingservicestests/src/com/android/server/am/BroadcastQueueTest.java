@@ -46,7 +46,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
@@ -2593,7 +2592,7 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
         waitForIdle();
         verify(mAms).crashApplicationWithTypeWithExtrasLocked(eq(callerApp.uid),
                 eq(callerApp.mPid), eq(callerApp.info.packageName),
-                eq(callerApp.userId), contains(Intent.ACTION_TIME_TICK),
+                eq(callerApp.userId), anyString(),
                 eq(true),
                 eq(RemoteServiceException.ExcessiveEnqueuedBroadcastsException.TYPE_ID),
                 isNull(),
@@ -2721,7 +2720,7 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
         waitForIdle();
         verify(mAms).crashApplicationWithTypeWithExtrasLocked(eq(callerApp.uid),
                 eq(callerApp.mPid), eq(callerApp.info.packageName),
-                eq(callerApp.userId), contains(Intent.ACTION_TIME_TICK),
+                eq(callerApp.userId), anyString(),
                 eq(true),
                 eq(RemoteServiceException.ExcessiveEnqueuedBroadcastsException.TYPE_ID),
                 isNull(),

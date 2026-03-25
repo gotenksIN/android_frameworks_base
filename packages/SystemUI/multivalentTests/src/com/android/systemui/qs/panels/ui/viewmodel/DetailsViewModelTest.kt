@@ -22,7 +22,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.uiEventLoggerFake
 import com.android.systemui.Flags.FLAG_DUAL_SHADE
-import com.android.systemui.Flags.FLAG_QS_NEW_TILES
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.kosmos.Kosmos
@@ -31,7 +30,6 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.qs.FakeQSTile
 import com.android.systemui.qs.QSEvent
-import com.android.systemui.qs.flags.QsSplitInternetTile
 import com.android.systemui.qs.pipeline.data.repository.tileSpecRepository
 import com.android.systemui.qs.pipeline.domain.interactor.currentTilesInteractor
 import com.android.systemui.qs.pipeline.shared.TileSpec
@@ -46,12 +44,10 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @SmallTest
 @EnableSceneContainer
-@DisableFlags(FLAG_QS_NEW_TILES) // Wifi tile does not have
 class DetailsViewModelTest : SysuiTestCase() {
 
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
-    private val internetTileName = if (QsSplitInternetTile.isEnabled) "wifi" else "internet"
-    private val spec = TileSpec.create(internetTileName)
+    private val spec = TileSpec.create("internet")
     private val specNoDetails = TileSpec.create("NoDetailsTile")
 
     private val Kosmos.underTest: DetailsViewModel by Kosmos.Fixture { detailsViewModel }
@@ -77,7 +73,7 @@ class DetailsViewModelTest : SysuiTestCase() {
             // Click on the tile that has the `spec`.
             assertThat(underTest.onTileClicked(spec)).isTrue()
             assertThat(underTest.activeTileDetails).isNotNull()
-            assertThat(underTest.activeTileDetails?.title).isEqualTo(internetTileName)
+            assertThat(underTest.activeTileDetails?.title).isEqualTo("internet")
 
             // Click on a tile that doesn't have a valid spec.
             assertThat(underTest.onTileClicked(null)).isFalse()
@@ -86,7 +82,7 @@ class DetailsViewModelTest : SysuiTestCase() {
             // Click again on the tile that has the `spec`.
             assertThat(underTest.onTileClicked(spec)).isTrue()
             assertThat(underTest.activeTileDetails).isNotNull()
-            assertThat(underTest.activeTileDetails?.title).isEqualTo(internetTileName)
+            assertThat(underTest.activeTileDetails?.title).isEqualTo("internet")
 
             // Click on a tile that doesn't have a detailed view.
             assertThat(underTest.onTileClicked(specNoDetails)).isFalse()

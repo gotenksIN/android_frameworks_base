@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -182,9 +183,29 @@ constructor(
                         with(lockscreenElements) {
                             LockscreenElement(
                                 LockscreenElementKeys.Clock.Small,
-                                Modifier.height(88.dp),
+                                Modifier.wrapContentWidth().height(88.dp),
                             )
                         }
+                    }
+                }
+
+                if (viewModel.showMedia) {
+                    Element(
+                        key = Media.Elements.MediaCarousel,
+                        modifier =
+                            Modifier.padding(
+                                top = notificationStackPadding,
+                                start = notificationStackPadding,
+                                end = notificationStackPadding,
+                            ),
+                    ) {
+                        Media(
+                            viewModelFactory = viewModel.mediaViewModelFactory,
+                            presentationStyle = MediaPresentationStyle.Default,
+                            behavior = viewModel.mediaUiBehavior,
+                            onDismissed = viewModel::onMediaSwipeToDismiss,
+                            location = Media.Location.SHADE,
+                        )
                     }
                 }
 
@@ -200,22 +221,6 @@ constructor(
                     isTransparencyEnabled = viewModel.isTransparencyEnabled,
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = { notificationStackPadding },
-                    aboveNotifications = { modifier ->
-                        if (viewModel.showMedia) {
-                            Element(
-                                key = Media.Elements.MediaCarousel,
-                                modifier = modifier.padding(horizontal = notificationStackPadding),
-                            ) {
-                                Media(
-                                    viewModelFactory = viewModel.mediaViewModelFactory,
-                                    presentationStyle = MediaPresentationStyle.Default,
-                                    behavior = viewModel.mediaUiBehavior,
-                                    onDismissed = viewModel::onMediaSwipeToDismiss,
-                                    location = Media.Location.SHADE,
-                                )
-                            }
-                        }
-                    },
                     shouldDrawScrimBackground = false,
                     modifier =
                         Modifier.fillMaxWidth().focusProperties {

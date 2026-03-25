@@ -129,7 +129,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
      * Currently requesting pss for.
      */
     @GuardedBy("mProfilerLock")
-    private @ActivityManager.ProcessState int mPssProcState = PROCESS_STATE_NONEXISTENT;
+    private int mPssProcState = PROCESS_STATE_NONEXISTENT;
 
     /**
      * The type of stat collection that we are currently requesting.
@@ -196,13 +196,13 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     private IApplicationThread mThread;
 
     @GuardedBy("mProfilerLock")
-    private @ActivityManager.ProcessState  int mSetProcState;
+    private int mSetProcState;
 
     @GuardedBy("mProfilerLock")
     private @OomAdjust int mSetAdj;
 
     @GuardedBy("mProfilerLock")
-    private @OomAdjust int mCurRawAdj;
+    private int mCurRawAdj;
 
     @GuardedBy("mProfilerLock")
     private long mLastStateTime;
@@ -432,13 +432,12 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
-    @ActivityManager.ProcessState
     int getPssProcState() {
         return mPssProcState;
     }
 
     @GuardedBy("mProfilerLock")
-    void setPssProcState(@ActivityManager.ProcessState int pssProcState) {
+    void setPssProcState(int pssProcState) {
         mPssProcState = pssProcState;
     }
 
@@ -536,7 +535,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
         }
     }
 
-    void setProcessTrackerState(@ActivityManager.ProcessState int procState, int memFactor) {
+    void setProcessTrackerState(int procState, int memFactor) {
         synchronized (mService.mProcessStats.mLock) {
             final ProcessState tracker = mBaseProcessTracker;
             if (tracker != null) {
@@ -563,13 +562,12 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
-    long computeNextPssTime(@ActivityManager.ProcessState int procState, boolean test,
-            boolean sleeping, long now) {
+    long computeNextPssTime(int procState, boolean test, boolean sleeping, long now) {
         return ProcessList.computeNextPssTime(procState, mProcStateMemTracker, test, sleeping, now,
                 // Cap the Pss time to make sure no Pss is collected during the very few
                 // minutes after the system is boot, given the system is already busy.
                 Math.max(mService.mBootCompletedTimestamp, mService.mLastIdleTime)
-                        + mService.mConstants.FULL_PSS_MIN_INTERVAL);
+                + mService.mConstants.FULL_PSS_MIN_INTERVAL);
     }
 
     private static void commitNextPssTime(ProcStateMemTracker tracker) {
@@ -616,7 +614,6 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
-    @ActivityManager.ProcessState
     int getSetProcState() {
         return mSetProcState;
     }
@@ -627,7 +624,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
-    @OomAdjust int getCurRawAdj() {
+    int getCurRawAdj() {
         return mCurRawAdj;
     }
 

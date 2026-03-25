@@ -63,7 +63,7 @@ public class NamedVariable extends Operation implements Serializable {
         return "VariableName["
                 + mVarId
                 + "] = \""
-                + Utils.trimString(mVarName, 30)
+                + Utils.trimString(mVarName, 10)
                 + "\" type="
                 + mVarType;
     }

@@ -32,7 +32,6 @@ import com.android.app.tracing.coroutines.flow.stateInTraced
 import com.android.app.tracing.coroutines.launchInTraced
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.screencapture.record.shared.ScreenRecordingLogger
 import com.android.systemui.screenrecord.ScreenRecordUxController
 import com.android.systemui.screenrecord.data.model.ScreenRecordModel
 import com.android.systemui.screenrecord.service.IScreenRecordingService
@@ -83,7 +82,6 @@ constructor(
     coroutineScope: CoroutineScope,
     private val screenRecordUxController: ScreenRecordUxController,
     private val serviceFlow: Flow<IScreenRecordingService?>,
-    private val logger: ScreenRecordingLogger,
 ) : ScreenRecordingStartStopRepository, ScreenRecordRepository {
 
     @Inject
@@ -92,12 +90,10 @@ constructor(
         @Background coroutineScope: CoroutineScope,
         userRepository: UserRepository,
         screenRecordUxController: ScreenRecordUxController,
-        logger: ScreenRecordingLogger,
     ) : this(
         coroutineScope = coroutineScope,
         screenRecordUxController = screenRecordUxController,
         serviceFlow = bindServiceAsAFlow(context, userRepository),
-        logger = logger,
     )
 
     private val serviceCallback = ServiceCallback()
@@ -147,7 +143,6 @@ constructor(
         statusUpdates
             .flatMapLatest { status ->
                 if (status is Starting) {
-                    logger.startingScreenRecording(status.parameters, status.untilStarted)
                     countDownFlow(
                         duration = status.untilStarted,
                         onTick = { status.copy(untilStarted = it) },
@@ -199,13 +194,11 @@ constructor(
                                 } else {
                                     service.startRecording(parameters)
                                     screenRecordUxController.updateState(true)
-                                    logger.startScreenRecording(parameters)
                                 }
                             }
                             is Stopped -> {
                                 service.stopRecording(status.reason)
                                 screenRecordUxController.updateState(false)
-                                logger.stopScreenRecording(status.reason)
                             }
                             is Starting -> {
                                 /* do nothing */

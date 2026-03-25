@@ -16,8 +16,6 @@
 
 package com.android.server.appfunctions.dynamic;
 
-import static com.android.server.appfunctions.AppFunctionExecutors.SHARED_BACKGROUND_EXECUTOR;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.appfunctions.AppFunctionActivityId;
@@ -33,6 +31,7 @@ import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 
+import com.android.internal.os.BackgroundThread;
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.SystemService;
 
@@ -80,7 +79,8 @@ public final class MultiUserDynamicAppFunctionRegistry {
                 mPerUserRegistrations.put(
                         user.getUserIdentifier(),
                         new DynamicAppFunctionRegistry(
-                                SHARED_BACKGROUND_EXECUTOR, registrationListener));
+                                BackgroundThread.getExecutor(),
+                                registrationListener));
             }
         }
     }

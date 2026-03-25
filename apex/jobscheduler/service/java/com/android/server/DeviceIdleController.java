@@ -350,7 +350,6 @@ public class DeviceIdleController extends SystemService
     private Bundle mPowerSaveTempWhilelistChangedOptions;
     private AnyMotionDetector mAnyMotionDetector;
     private final AppStateTrackerImpl mAppStateTracker;
-    private PackageManager mPackageManager;
     @GuardedBy("this")
     private boolean mLightEnabled;
     @GuardedBy("this")
@@ -2654,7 +2653,7 @@ public class DeviceIdleController extends SystemService
 
     @Override
     public void onStart() {
-        mPackageManager = getContext().getPackageManager();
+        final PackageManager pm = getContext().getPackageManager();
 
         synchronized (this) {
             mLightEnabled = mDeepEnabled = getContext().getResources().getBoolean(
@@ -2669,7 +2668,7 @@ public class DeviceIdleController extends SystemService
                     // pre-installed on FULL users. Look for pre-installed system
                     // apps across all users to make sure they're properly
                     // allowlisted.
-                    ApplicationInfo ai = mPackageManager.getApplicationInfo(pkg,
+                    ApplicationInfo ai = pm.getApplicationInfo(pkg,
                             PackageManager.MATCH_ANY_USER | PackageManager.MATCH_SYSTEM_ONLY);
                     int appid = UserHandle.getAppId(ai.uid);
                     mPowerSaveWhitelistAppsExceptIdle.put(ai.packageName, appid);
@@ -2686,7 +2685,7 @@ public class DeviceIdleController extends SystemService
                     // pre-installed on FULL users. Look for pre-installed system
                     // apps across all users to make sure they're properly
                     // allowlisted.
-                    ApplicationInfo ai = mPackageManager.getApplicationInfo(pkg,
+                    ApplicationInfo ai = pm.getApplicationInfo(pkg,
                             PackageManager.MATCH_ANY_USER | PackageManager.MATCH_SYSTEM_ONLY);
                     int appid = UserHandle.getAppId(ai.uid);
                     // These apps are on both the whitelist-except-idle as well
@@ -3037,7 +3036,7 @@ public class DeviceIdleController extends SystemService
     public boolean addPowerSaveWhitelistExceptIdleInternal(String name) {
         synchronized (this) {
             try {
-                final ApplicationInfo ai = mPackageManager.getApplicationInfo(name,
+                final ApplicationInfo ai = getContext().getPackageManager().getApplicationInfo(name,
                         PackageManager.MATCH_ANY_USER);
                 if (mPowerSaveWhitelistAppsExceptIdle.put(name, UserHandle.getAppId(ai.uid))
                         == null) {
@@ -3281,15 +3280,9 @@ public class DeviceIdleController extends SystemService
             long durationMs, @TempAllowListType int tempAllowListType, int userId, boolean sync,
             @ReasonCode int reasonCode, @Nullable String reason) {
         try {
-            ApplicationInfo ai = mPackageManager.getApplicationInfoAsUser(packageName, 0, userId);
-            addPowerSaveTempWhitelistAppDirectInternal(
-                    callingUid, ai.uid, durationMs, tempAllowListType, sync, reasonCode, reason);
-            if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()
-                    && ai.pccUid != Process.INVALID_UID) {
-                addPowerSaveTempWhitelistAppDirectInternal(
-                        callingUid, ai.pccUid, durationMs, tempAllowListType,
-                        sync, reasonCode, reason);
-            }
+            int uid = getContext().getPackageManager().getPackageUidAsUser(packageName, userId);
+            addPowerSaveTempWhitelistAppDirectInternal(callingUid, uid, durationMs,
+                    tempAllowListType, sync, reasonCode, reason);
         } catch (NameNotFoundException e) {
         }
     }
@@ -3357,13 +3350,9 @@ public class DeviceIdleController extends SystemService
      */
     private void removePowerSaveTempAllowlistAppInternal(String packageName, int userId) {
         try {
-            final ApplicationInfo ai = mPackageManager
-                    .getApplicationInfoAsUser(packageName, 0, userId);
-            removePowerSaveTempWhitelistAppDirectInternal(ai.uid);
-            if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()
-                    && ai.pccUid != Process.INVALID_UID) {
-                removePowerSaveTempWhitelistAppDirectInternal(ai.pccUid);
-            }
+            final int uid = getContext().getPackageManager().getPackageUidAsUser(
+                    packageName, userId);
+            removePowerSaveTempWhitelistAppDirectInternal(uid);
         } catch (NameNotFoundException e) {
         }
     }
@@ -4436,17 +4425,17 @@ public class DeviceIdleController extends SystemService
         }
     }
 
-    private int[] buildAppIdArray(ArrayMap<String, Integer> systemApps,
+    private static int[] buildAppIdArray(ArrayMap<String, Integer> systemApps,
             ArrayMap<String, Integer> userApps, SparseBooleanArray outAppIds) {
         outAppIds.clear();
         if (systemApps != null) {
             for (int i = 0; i < systemApps.size(); i++) {
-                addAppAndPccIdLocked(systemApps.keyAt(i), systemApps.valueAt(i), outAppIds);
+                outAppIds.put(systemApps.valueAt(i), true);
             }
         }
         if (userApps != null) {
             for (int i = 0; i < userApps.size(); i++) {
-                addAppAndPccIdLocked(userApps.keyAt(i), userApps.valueAt(i), outAppIds);
+                outAppIds.put(userApps.valueAt(i), true);
             }
         }
         int size = outAppIds.size();
@@ -4455,22 +4444,6 @@ public class DeviceIdleController extends SystemService
             appids[i] = outAppIds.keyAt(i);
         }
         return appids;
-    }
-
-    private void addAppAndPccIdLocked(
-            String pkg, int appId, SparseBooleanArray outAppIds) {
-        outAppIds.put(appId, true);
-        if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()) {
-            try {
-                ApplicationInfo ai =
-                        mPackageManager.getApplicationInfo(pkg, PackageManager.MATCH_ANY_USER);
-                if (ai.pccUid != Process.INVALID_UID) {
-                    outAppIds.put(ai.pccUid, true);
-                }
-            } catch (NameNotFoundException e) {
-                // Package not found or not initialized; ignore discovery for this build cycle.
-            }
-        }
     }
 
     private void updateWhitelistAppIdsLocked() {

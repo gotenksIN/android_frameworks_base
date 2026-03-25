@@ -42,12 +42,9 @@ import java.util.function.Consumer;
  * bindings, to determine the importance of the edges' target processes during graph traversal.
  */
 @RavenwoodKeepWholeClass
-class ProcessNode extends GraphNode {
+class ProcessNode implements GraphNode {
     /** A reference to the underlying ProcessRecordInternal. */
     private final @NonNull ProcessRecordInternal mProc;
-
-    /** Capabilities granted to this process. */
-    private @ProcessCapability int mCapability = PROCESS_CAPABILITY_NONE;
 
     /**
      * Whether this process node has {@link ActivityManager#PROCESS_CAPABILITY_IMPLICIT_CPU_TIME}
@@ -144,15 +141,8 @@ class ProcessNode extends GraphNode {
 
     @Override
     public final @ProcessCapability int getCapability() {
-        return mCapability;
-    }
-
-    final void clearCapability() {
-        mCapability = PROCESS_CAPABILITY_NONE;
-    }
-
-    final void setCapability(@ProcessCapability int capability) {
-        mCapability = capability;
+        // TODO: b/477161434 - Implement the method.
+        return PROCESS_CAPABILITY_NONE;
     }
 
     // TODO: b/483182189 - Move state getters below to ProcessEdge.
@@ -179,10 +169,6 @@ class ProcessNode extends GraphNode {
 
     boolean isReceivingBroadcast() {
         return mProc.getReceivers().isReceivingBroadcast();
-    }
-
-    boolean isPendingFinishAttach() {
-        return mProc.isPendingFinishAttach();
     }
 
     boolean hasActiveInstrumentation() {
@@ -247,7 +233,7 @@ class ProcessNode extends GraphNode {
     }
 
     @ProcessState
-    int getCurProcState() {
+    int getProcState() {
         return mProc.getCurProcState();
     }
 

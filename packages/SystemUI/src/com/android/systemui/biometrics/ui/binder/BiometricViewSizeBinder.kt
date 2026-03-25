@@ -23,6 +23,7 @@ import android.content.pm.PackageManager
 import android.graphics.Outline
 import android.transition.AutoTransition
 import android.transition.TransitionManager
+import android.util.Log
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
@@ -72,12 +73,10 @@ object BiometricViewSizeBinder {
         if (!Flags.largeScreenBp()) {
             return false
         }
-        val isWatch =
-            isWatchGlobal
-                ?: context.packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH).also {
-                    watch ->
-                    isWatchGlobal = watch
-                }
+        val isWatch = isWatchGlobal
+            ?: context.packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH).also { watch ->
+                isWatchGlobal = watch
+            }
         return !isWatch
     }
 
@@ -121,9 +120,8 @@ object BiometricViewSizeBinder {
         panelView.outlineProvider =
             object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
-                    if (
-                        !useLargeScreen(view.context) &&
-                            currentView == BiometricPromptView.CREDENTIAL
+                    if (!useLargeScreen(view.context) &&
+                        currentView == BiometricPromptView.CREDENTIAL
                     ) {
                         outline.setRect(0, 0, view.width, view.height)
                         return
@@ -204,10 +202,6 @@ object BiometricViewSizeBinder {
                         windowManager.maximumWindowMetrics.windowInsets
                             .getInsets(WindowInsets.Type.navigationBars())
                             .bottom
-                    val topInset =
-                        windowManager.maximumWindowMetrics.windowInsets
-                            .getInsets(WindowInsets.Type.statusBars())
-                            .top
                     currentState.guidelineBounds.let { bounds ->
                         nextConstraintSet.setGuidelineEnd(R.id.bottomGuideline, bottomInset)
 
@@ -224,10 +218,7 @@ object BiometricViewSizeBinder {
                                 abs(bounds.right),
                             )
                         }
-
-                        if (currentState.position == PromptPosition.Bottom) {
-                            nextConstraintSet.setGuidelineBegin(R.id.topGuideline, topInset)
-                        } else if (bounds.top >= 0) {
+                        if (bounds.top >= 0) {
                             nextConstraintSet.setGuidelineBegin(R.id.topGuideline, bounds.top)
                         } else if (bounds.top < 0) {
                             nextConstraintSet.setGuidelineEnd(R.id.topGuideline, abs(bounds.top))

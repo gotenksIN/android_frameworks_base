@@ -2012,18 +2012,17 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         @Override
         public void positionChanged(long frameNumber, int left, int top, int right, int bottom,
                 int clipLeft, int clipTop, int clipRight, int clipBottom,
-                int nodeWidth, int nodeHeight, boolean shouldDisableClip) {
+                int nodeWidth, int nodeHeight) {
             try {
                 if (DEBUG_POSITION) {
                     Log.d(TAG, String.format(
                             "%d updateSurfacePosition RenderWorker, frameNr = %d, "
                                     + "position = [%d, %d, %d, %d] clip = [%d, %d, %d, %d] "
-                                    + "surfaceSize = %dx%d renderNodeSize = %d%d"
-                                    + "shouldDisableClip = %b",
+                                    + "surfaceSize = %dx%d renderNodeSize = %d%d",
                             System.identityHashCode(SurfaceView.this), frameNumber,
                             left, top, right, bottom, clipLeft, clipTop, clipRight, clipBottom,
                             mRtSurfaceWidth, mRtSurfaceHeight,
-                            nodeWidth, nodeHeight, shouldDisableClip));
+                            nodeWidth, nodeHeight));
                 }
                 synchronized (mSurfaceControlLock) {
                     if (mSurfaceControl == null) return;
@@ -2066,14 +2065,14 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                                 mRTLastSetCrop.top, mRTLastSetCrop.right, mRTLastSetCrop.bottom,
                                 surfaceToNodeScaleX, surfaceToNodeScaleY));
                     }
-                    if (!mDisableAutoClip && !shouldDisableClip) {
+                    if (!mDisableAutoClip) {
                         mPositionChangedTransaction.setCrop(mSurfaceControl, mRTLastSetCrop.left,
                                 mRTLastSetCrop.top, mRTLastSetCrop.right, mRTLastSetCrop.bottom);
                     } else {
                         mPositionChangedTransaction.setCrop(mSurfaceControl, mViewClipBounds.left,
                                 mViewClipBounds.top, mViewClipBounds.right, mViewClipBounds.bottom);
                     }
-                    if (mRTLastSetCrop.isEmpty() && !mDisableAutoClip && !shouldDisableClip) {
+                    if (mRTLastSetCrop.isEmpty()) {
                         mPositionChangedTransaction.hide(mSurfaceControl);
                     } else {
                         mPositionChangedTransaction.show(mSurfaceControl);

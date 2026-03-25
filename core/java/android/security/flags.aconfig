@@ -156,7 +156,7 @@ flag {
     name: "enable_talisman_service"
     namespace: "cross_device_authentication"
     description: "Enable the Talisman service."
-    bug: "477486847"
+    bug: "433283951"
 }
 
 flag {
@@ -200,13 +200,6 @@ flag {
     namespace: "security"
     description: "Do not clamp lockout durations to Integer.MAX_VALUE milliseconds"
     bug: "444472965"
-}
-
-flag {
-    name: "enable_service_side_credential_type_cache"
-    namespace: "security"
-    description: "Enable credential type cache in LockSettingsService"
-    bug: "492567083"
 }
 
 flag {

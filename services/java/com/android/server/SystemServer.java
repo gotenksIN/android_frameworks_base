@@ -16,7 +16,6 @@
 
 package com.android.server;
 
-import static android.app.admin.DevicePolicyManager.MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED;
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.media.tv.flags.Flags.mediaQualityFw;
@@ -160,6 +159,7 @@ import com.android.server.camera.CameraServiceProxy;
 import com.android.server.clipboard.ClipboardService;
 import com.android.server.companion.CompanionDeviceManagerService;
 import com.android.server.companion.datatransfer.continuity.TaskContinuityManagerService;
+import com.android.server.companion.datatransfer.continuity.UniversalClipboardService;
 import com.android.server.companion.virtual.VirtualDeviceManagerService;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.compat.PlatformCompatNative;
@@ -277,7 +277,6 @@ import com.android.server.security.authenticationpolicy.WatchRangingService;
 import com.android.server.security.authenticationpolicy.agent.AgentAuthService;
 import com.android.server.security.intrusiondetection.IntrusionDetectionService;
 import com.android.server.security.rkp.RemoteProvisioningService;
-import com.android.server.security.trusttoken.TrustTokenManagerService;
 import com.android.server.selectiontoolbar.SelectionToolbarManagerService;
 import com.android.server.selinux.SelinuxAuditLogsService;
 import com.android.server.sensorprivacy.SensorPrivacyService;
@@ -2754,8 +2753,7 @@ public final class SystemServer implements Dumpable {
                     new GraphicsStatsService(context));
             t.traceEnd();
 
-            if (context.getResources().getBoolean(
-                    R.bool.config_enablePersonalContextManagerService)) {
+            if (android.service.personalcontext.Flags.enablePersonalContextService()) {
                 t.traceBegin("StartPersonalContextService");
                 mSystemServiceManager.startService(PersonalContextManagerService.class);
                 t.traceEnd();
@@ -2777,12 +2775,6 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(AttestationVerificationManagerService.class);
             t.traceEnd();
 
-            if (android.security.Flags.enableTalismanService()) {
-                t.traceBegin("StartTrustTokenManagerService");
-                mSystemServiceManager.startService(TrustTokenManagerService.class);
-                t.traceEnd();
-            }
-
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_COMPANION_DEVICE_SETUP)) {
                 t.traceBegin("StartCompanionDeviceManager");
                 mSystemServiceManager.startService(CompanionDeviceManagerService.class);
@@ -2792,6 +2784,12 @@ public final class SystemServer implements Dumpable {
             if (android.companion.Flags.taskContinuity()) {
                 t.traceBegin("StartTaskContinuityService");
                 mSystemServiceManager.startService(TaskContinuityManagerService.class);
+                t.traceEnd();
+            }
+
+            if (android.companion.Flags.universalClipboard()) {
+                t.traceBegin("StartUniversalClipboardService");
+                mSystemServiceManager.startService(UniversalClipboardService.class);
                 t.traceEnd();
             }
 
@@ -3305,19 +3303,13 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startBootPhase(t, SystemService.PHASE_LOCK_SETTINGS_READY);
         t.traceEnd();
 
-        boolean requiresAdmin =
-                dpms.getMultiuserManagedDeviceProvisioningState()
-                    == MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED;
-
         // Create initial user if needed, which should be done early since some system services rely
         // on it in their setup, but likely needs to be done after LockSettingsService is ready.
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(mUserManagerService, mActivityManagerService,
                         // NOTE: there is no need to pass the whole dpms because it just need to
-                        // to check if the device is unmanaged (at boot time).
-                        mPackageManagerService,
-                        requiresAdmin,
-                        mSystemContext);
+                        // to check if the device is managed (at boot time).
+                        mPackageManagerService, dpms.isDeviceManaged(), mSystemContext);
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);

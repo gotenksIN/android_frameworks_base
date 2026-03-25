@@ -18,26 +18,21 @@ package com.android.internal.vibrator.persistence;
 
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_AMPLITUDE;
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_DURATION_MS;
-import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_START_TIME_MS;
 import static com.android.internal.vibrator.persistence.XmlConstants.NAMESPACE;
 import static com.android.internal.vibrator.persistence.XmlConstants.TAG_WAVEFORM_ENTRY;
 import static com.android.internal.vibrator.persistence.XmlConstants.VALUE_AMPLITUDE_DEFAULT;
 
 import android.annotation.NonNull;
 import android.os.VibrationEffect;
-import android.os.vibrator.StepSegment;
 import android.util.IntArray;
 import android.util.LongArray;
 
 import com.android.internal.vibrator.persistence.SerializedComposedEffect.SerializedSegment;
-import com.android.internal.vibrator.persistence.SerializedAmplitudeStepWaveform.StepSegmentBuilder;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Serialized representation of a list of waveform entries created via
@@ -52,26 +47,16 @@ final class SerializedWaveformEffectEntries implements SerializedSegment {
     private final long[] mTimings;
     @NonNull
     private final int[] mAmplitudes;
-    @NonNull
-    private final long[] mStartTimesMillis;
 
     private SerializedWaveformEffectEntries(@NonNull long[] timings,
-            @NonNull int[] amplitudes, @NonNull long[] startTimesMillis) {
+            @NonNull int[] amplitudes) {
         mTimings = timings;
         mAmplitudes = amplitudes;
-        mStartTimesMillis = startTimesMillis;
     }
 
     @Override
     public void deserializeIntoComposition(@NonNull VibrationEffect.Composition composition) {
-        List<StepSegment> segments = new ArrayList<>();
-        for (int i = 0; i < mTimings.length; i++) {
-            float parsedAmplitude = mAmplitudes[i] == VibrationEffect.DEFAULT_AMPLITUDE
-                    ? VibrationEffect.DEFAULT_AMPLITUDE
-                    : (float) mAmplitudes[i] / VibrationEffect.MAX_AMPLITUDE;
-            segments.add(new StepSegment(parsedAmplitude, (int) mTimings[i], mStartTimesMillis[i]));
-        }
-        composition.addEffect(new VibrationEffect.Composed(segments, -1));
+        composition.addEffect(VibrationEffect.createWaveform(mTimings, mAmplitudes, -1));
     }
 
     @Override
@@ -86,9 +71,6 @@ final class SerializedWaveformEffectEntries implements SerializedSegment {
             }
 
             serializer.attributeLong(NAMESPACE, ATTRIBUTE_DURATION_MS, mTimings[i]);
-            if (mStartTimesMillis[i] >= 0) {
-                serializer.attributeLong(NAMESPACE, ATTRIBUTE_START_TIME_MS, mStartTimesMillis[i]);
-            }
             serializer.endTag(NAMESPACE, TAG_WAVEFORM_ENTRY);
         }
 
@@ -99,22 +81,17 @@ final class SerializedWaveformEffectEntries implements SerializedSegment {
         return "SerializedWaveformEffectEntries{"
                 + "timings=" + Arrays.toString(mTimings)
                 + ", amplitudes=" + Arrays.toString(mAmplitudes)
-                + ", startTimesMillis=" + Arrays.toString(mStartTimesMillis)
                 + '}';
     }
 
     /** Builder for {@link SerializedWaveformEffectEntries}. */
-    static final class Builder implements StepSegmentBuilder {
+    static final class Builder {
         private final LongArray mTimings = new LongArray();
         private final IntArray mAmplitudes = new IntArray();
-        private final LongArray mStartTimesMillis = new LongArray();
 
-        @Override
-        public void addDurationAmplitudeAndStartTime(long durationMs, int amplitude,
-                long startTimeMillis) {
+        void addDurationAndAmplitude(long durationMs, int amplitude) {
             mTimings.add(durationMs);
             mAmplitudes.add(amplitude);
-            mStartTimesMillis.add(startTimeMillis);
         }
 
         boolean hasNonZeroDuration() {
@@ -128,7 +105,7 @@ final class SerializedWaveformEffectEntries implements SerializedSegment {
 
         SerializedWaveformEffectEntries build() {
             return new SerializedWaveformEffectEntries(
-                    mTimings.toArray(), mAmplitudes.toArray(), mStartTimesMillis.toArray());
+                    mTimings.toArray(), mAmplitudes.toArray());
         }
     }
 
@@ -138,7 +115,8 @@ final class SerializedWaveformEffectEntries implements SerializedSegment {
         /** Parses a single {@link XmlConstants#TAG_WAVEFORM_ENTRY} into the builder. */
         public static void parseWaveformEntry(TypedXmlPullParser parser, Builder waveformBuilder)
                 throws XmlParserException, IOException {
-            SerializedAmplitudeStepWaveform.Parser.parseWaveformEntry(parser, waveformBuilder);
+            SerializedAmplitudeStepWaveform.Parser.parseWaveformEntry(parser,
+                    waveformBuilder::addDurationAndAmplitude);
         }
     }
 }

@@ -20,7 +20,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.bluetooth.domain.interactor.BluetoothConnectionStatusInteractor
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
@@ -36,18 +37,28 @@ import dagger.assisted.AssistedInject
 class BluetoothIconViewModel
 @AssistedInject
 constructor(@Assisted context: Context, interactor: BluetoothConnectionStatusInteractor) :
-    SystemStatusIconViewModel.Default, HydratedActivatable() {
+    SystemStatusIconViewModel.Default, ExclusiveActivatable() {
     init {
         SystemStatusIconsInCompose.expectInNewMode()
     }
 
+    private val hydrator = Hydrator("BluetoothIconViewModel.hydrator")
+
     override val slotName = context.getString(com.android.internal.R.string.status_bar_bluetooth)
 
     override val visible: Boolean by
-        interactor.isBluetoothConnected.hydratedStateOf(traceName = null, initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = null,
+            initialValue = false,
+            source = interactor.isBluetoothConnected,
+        )
 
     override val icon: Icon?
         get() = visible.toUiState()
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     private fun Boolean.toUiState(): Icon? =
         if (this) {

@@ -36,6 +36,9 @@ import android.os.Parcelable;
 import android.os.Process;
 import android.os.StatFs;
 import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -43,6 +46,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.server.DropBoxManagerInternal.EntrySource;
 import com.android.server.DropBoxManagerService.EntryFile;
+import com.android.server.feature.flags.Flags;
 
 import libcore.io.Streams;
 
@@ -72,6 +76,8 @@ import java.util.zip.GZIPOutputStream;
  */
 @RunWith(AndroidJUnit4.class)
 public class DropBoxTest {
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
     private Context mContext;
 
     @Before
@@ -411,7 +417,14 @@ public class DropBoxTest {
     }
 
     @Test
-    public void testIsTagEnabledWithException() throws Exception {
+    @EnableFlags(Flags.FLAG_ENABLE_WTF_EXCEPTION_DROPBOX_CARVEOUT)
+    public void testIsTagEnabledWithException_CarveoutEnabled() throws Exception {
+        testIsTagEnabledWithExceptionImpl();
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_WTF_EXCEPTION_DROPBOX_CARVEOUT)
+    public void testIsTagEnabledWithException_CarveoutDisabled() throws Exception {
         testIsTagEnabledWithExceptionImpl();
     }
 
@@ -433,8 +446,10 @@ public class DropBoxTest {
         assertFalse(dropbox.isTagEnabled(wtfTag));
         assertFalse(dropbox.isTagEnabled(wtfTag, null));
 
-        // With exception: should be enabled
-        assertTrue(dropbox.isTagEnabled(wtfTag, exceptionClassName));
+        // With exception: should be enabled iff flag is on
+        assertEquals(
+                dropbox.isTagEnabled(wtfTag, exceptionClassName),
+                Flags.enableWtfExceptionDropboxCarveout());
 
         // Other exception: should still be disabled
         assertFalse(dropbox.isTagEnabled(wtfTag, "java.lang.RuntimeException"));

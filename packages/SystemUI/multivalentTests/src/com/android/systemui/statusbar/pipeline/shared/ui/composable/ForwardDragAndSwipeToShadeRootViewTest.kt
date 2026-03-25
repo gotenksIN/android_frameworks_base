@@ -18,7 +18,6 @@ package com.android.systemui.statusbar.pipeline.shared.ui.composable
 
 import android.view.MotionEvent
 import android.view.View
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
@@ -40,7 +39,6 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.spy
@@ -48,7 +46,6 @@ import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 
 private const val TEST_TAG = "testBox"
-private const val CHILD_TAG = "childBox"
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -57,7 +54,7 @@ class ForwardDragAndSwipeToShadeRootViewTest : SysuiTestCase() {
     @get:Rule val composeTestRule = createComposeRule()
 
     private lateinit var legacyView: View
-    private lateinit var onDownCallback: (Offset, IntSize, Boolean) -> Unit
+    private lateinit var onDownCallback: (Offset, IntSize) -> Unit
     private lateinit var motionEventCaptor: ArgumentCaptor<MotionEvent>
 
     private var touchSlop: Float = 5f
@@ -67,64 +64,6 @@ class ForwardDragAndSwipeToShadeRootViewTest : SysuiTestCase() {
         legacyView = spy(View(context))
         onDownCallback = mock()
         motionEventCaptor = ArgumentCaptor.forClass(MotionEvent::class.java)
-    }
-
-    @Test
-    fun swipeDown_eventNotConsumed_passesFalseToCallback() {
-        composeTestRule.setContent {
-            Box(
-                modifier =
-                    Modifier.testTag(TEST_TAG)
-                        .size(100.dp)
-                        .forwardDragAndSwipeToShadeRootView(
-                            view = legacyView,
-                            touchSlop = touchSlop,
-                            onDown = onDownCallback,
-                        )
-            )
-        }
-
-        composeTestRule.onNodeWithTag(TEST_TAG).performTouchInput {
-            down(center)
-            up()
-        }
-        composeTestRule.waitForIdle()
-
-        // Verify that isConsumed is accurately reported as false
-        verify(onDownCallback).invoke(any(), any(), eq(false))
-    }
-
-    @Test
-    fun swipeDown_eventConsumedByChild_passesTrueToCallback() {
-        composeTestRule.setContent {
-            Box(
-                modifier =
-                    Modifier.testTag(TEST_TAG)
-                        .size(100.dp)
-                        .forwardDragAndSwipeToShadeRootView(
-                            view = legacyView,
-                            touchSlop = touchSlop,
-                            onDown = onDownCallback,
-                        )
-            ) {
-                // A child that consumes the click event
-                Box(
-                    modifier =
-                        Modifier.testTag(CHILD_TAG).size(50.dp).clickable { /* Consumes the event */
-                        }
-                )
-            }
-        }
-
-        // Perform the touch on the child box
-        composeTestRule.onNodeWithTag(CHILD_TAG).performTouchInput {
-            down(center)
-            up()
-        }
-        composeTestRule.waitForIdle()
-
-        // Verify that isConsumed is accurately reported as true
-        verify(onDownCallback).invoke(any(), any(), eq(true))
     }
 
     @Test
@@ -148,7 +87,7 @@ class ForwardDragAndSwipeToShadeRootViewTest : SysuiTestCase() {
         }
         composeTestRule.waitForIdle()
 
-        verify(onDownCallback).invoke(any(), any(), eq(false))
+        verify(onDownCallback).invoke(any(), any())
         verify(legacyView, never()).dispatchTouchEvent(any())
     }
 
@@ -175,7 +114,7 @@ class ForwardDragAndSwipeToShadeRootViewTest : SysuiTestCase() {
         }
         composeTestRule.waitForIdle()
 
-        verify(onDownCallback).invoke(any(), any(), eq(false))
+        verify(onDownCallback).invoke(any(), any())
         verify(legacyView, never()).dispatchTouchEvent(any())
     }
 
@@ -197,7 +136,7 @@ class ForwardDragAndSwipeToShadeRootViewTest : SysuiTestCase() {
             up()
         }
 
-        verify(onDownCallback).invoke(any(), any(), eq(false))
+        verify(onDownCallback).invoke(any(), any())
         verify(legacyView, atLeastOnce()).dispatchTouchEvent(motionEventCaptor.capture())
 
         val capturedEvents = motionEventCaptor.allValues
@@ -237,7 +176,7 @@ class ForwardDragAndSwipeToShadeRootViewTest : SysuiTestCase() {
             up()
         }
 
-        verify(onDownCallback).invoke(any(), any(), eq(false))
+        verify(onDownCallback).invoke(any(), any())
         // VERIFY that the exact number of events was dispatched. No more, no less.
         verify(legacyView, times(expectedEventCount))
             .dispatchTouchEvent(motionEventCaptor.capture())

@@ -61,7 +61,7 @@ constructor(
                     it.toUiState { icon -> icon.loadDrawableAsUser(context, userTracker.userId) }
                 }
             }
-            .hydratedStateOf(initialValue = emptyList())
+            .hydratedStateOf(traceName = "dreamItems", initialValue = emptyList())
 
     /**
      * Called when a dream is selected by the user.

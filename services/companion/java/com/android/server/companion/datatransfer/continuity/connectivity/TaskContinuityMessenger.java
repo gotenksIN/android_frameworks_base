@@ -51,10 +51,10 @@ public class TaskContinuityMessenger {
     private final int mUserId;
     private final Context mContext;
 
-    @GuardedBy("this")
+    @GuardedBy("mListeners")
     private final ArraySet<Listener> mListeners = new ArraySet<>(0);
 
-    @GuardedBy("this")
+    @GuardedBy("mConnectedAssociations")
     private final ArrayMap<Integer, AssociationInfo> mConnectedAssociations = new ArrayMap<>(0);
 
     @GuardedBy("this")
@@ -124,16 +124,12 @@ public class TaskContinuityMessenger {
 
     @NonNull
     public Collection<AssociationInfo> getConnectedAssociations() {
-        synchronized (this) {
-            return List.copyOf(mConnectedAssociations.values());
-        }
+        return mConnectedAssociations.values();
     }
 
     @Nullable
     public AssociationInfo getAssociationInfo(int associationId) {
-        synchronized (this) {
-            return mConnectedAssociations.get(associationId);
-        }
+        return mConnectedAssociations.get(associationId);
     }
 
     public enum SendMessageResult {
@@ -207,12 +203,9 @@ public class TaskContinuityMessenger {
     }
 
     public SendMessageResult sendMessage(@NonNull TaskContinuityMessage message) {
-        int[] connectedAssociations;
-        synchronized (this) {
-            connectedAssociations = new int[mConnectedAssociations.size()];
-            for (int i = 0; i < mConnectedAssociations.size(); i++) {
-                connectedAssociations[i] = mConnectedAssociations.keyAt(i);
-            }
+        int[] connectedAssociations = new int[mConnectedAssociations.size()];
+        for (int i = 0; i < mConnectedAssociations.size(); i++) {
+            connectedAssociations[i] = mConnectedAssociations.keyAt(i);
         }
 
         return sendMessage(connectedAssociations, Objects.requireNonNull(message));
@@ -267,7 +260,7 @@ public class TaskContinuityMessenger {
             FrameworkStatsLog.write(
                     FrameworkStatsLog.TASK_CONTINUITY_MESSAGE_RECEIVED,
                     taskContinuityMessage.getTypeForMetrics());
-            synchronized (this) {
+            synchronized (mListeners) {
                 for (Listener listener : mListeners) {
                     listener.onMessageReceived(associationId, taskContinuityMessage);
                 }

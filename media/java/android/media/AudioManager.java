@@ -11183,7 +11183,7 @@ public class AudioManager {
     public void permissionUpdateBarrier() {
         final IAudioService service = getService();
         try {
-            service.permissionUpdateBarrier(/* forRecord= */ true);
+            service.permissionUpdateBarrier();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

@@ -18,7 +18,8 @@ package com.android.systemui.qs.panels.ui.viewmodel
 
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.ui.controller.MediaLocation
 import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
 import com.android.systemui.qs.panels.domain.interactor.LargeTileSpanInteractor
@@ -26,6 +27,7 @@ import com.android.systemui.qs.panels.domain.interactor.QSColumnsInteractor
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -43,7 +45,9 @@ constructor(
     private val largeTileSpanInteractor: LargeTileSpanInteractor,
     @Assisted @MediaLocation mediaLocation: Int?,
     @Assisted mediaUiBehavior: MediaUiBehavior?,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("QSColumnsViewModelWithMedia")
 
     val columns by derivedStateOf {
         if (mediaInRowInLandscapeViewModel?.shouldMediaShowInRow == true) {
@@ -54,12 +58,18 @@ constructor(
     }
 
     private val maxSpan by
-        largeTileSpanInteractor.tileMaxWidth.hydratedStateOf(
-            initialValue = largeTileSpanInteractor.defaultTileMaxWidth
+        hydrator.hydratedStateOf(
+            traceName = "maxSpan",
+            source = largeTileSpanInteractor.tileMaxWidth,
+            initialValue = largeTileSpanInteractor.defaultTileMaxWidth,
         )
 
     private val useExtraLargeTiles by
-        largeTileSpanInteractor.useExtraLargeTiles.hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "useExtraLargeTiles",
+            source = largeTileSpanInteractor.useExtraLargeTiles,
+            initialValue = false,
+        )
 
     val largeSpan: Int
         get() =
@@ -76,10 +86,15 @@ constructor(
             null
         }
 
-    private val columnsWithoutMedia by interactor.columns.hydratedStateOf()
+    private val columnsWithoutMedia by
+        hydrator.hydratedStateOf(traceName = "columnsWithoutMedia", source = interactor.columns)
 
-    override suspend fun onActivated() {
-        coroutineScope { launch { mediaInRowInLandscapeViewModel?.activate() } }
+    override suspend fun onActivated(): Nothing {
+        coroutineScope {
+            launch { hydrator.activate() }
+            launch { mediaInRowInLandscapeViewModel?.activate() }
+            awaitCancellation()
+        }
     }
 
     @AssistedFactory

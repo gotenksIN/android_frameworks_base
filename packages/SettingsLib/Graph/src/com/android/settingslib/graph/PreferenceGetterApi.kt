@@ -18,7 +18,6 @@ package com.android.settingslib.graph
 
 import android.app.Application
 import android.os.SystemClock
-import android.preference.PreferenceScreen
 import androidx.annotation.IntDef
 import com.android.settingslib.graph.proto.PreferenceProto
 import com.android.settingslib.ipc.ApiDescriptor
@@ -29,9 +28,7 @@ import com.android.settingslib.metadata.PreferenceCoordinate
 import com.android.settingslib.metadata.PreferenceHierarchyNode
 import com.android.settingslib.metadata.PreferenceRemoteOpMetricsLogger
 import com.android.settingslib.metadata.PreferenceScreenCoordinate
-import com.android.settingslib.metadata.PreferenceScreenMetadata
 import com.android.settingslib.metadata.PreferenceScreenRegistry
-import com.android.settingslib.metadata.isExposable
 import com.android.settingslib.metadata.usePreferenceHierarchyScope
 
 /**
@@ -121,8 +118,7 @@ class PreferenceGetterApiHandler(
             }
         for ((screen, coordinates) in groups) {
             val screenMetadata = PreferenceScreenRegistry.create(application, screen)
-            // If screen is not exposable, act as if it does not exist
-            if (screenMetadata == null || !screenMetadata.isExposable(application)) {
+            if (screenMetadata == null) {
                 val latencyMs = SystemClock.elapsedRealtime() - elapsedRealtime
                 for (coordinate in coordinates) {
                     errors[coordinate] = PreferenceGetterErrorCode.NOT_FOUND
@@ -143,8 +139,7 @@ class PreferenceGetterApiHandler(
             screenMetadata.getPreferenceHierarchy(application, this).forEachRecursivelyAsync {
                 val metadata = it.metadata
                 val key = metadata.bindingKey
-                // Only map existing nodes if preference is exposable and it is not a screen
-                if (metadata.isExposable(application) && nodes.containsKey(key) && (metadata !is PreferenceScreenMetadata)) nodes[key] = it
+                if (nodes.containsKey(key)) nodes[key] = it
             }
             for (coordinate in coordinates) {
                 val node = nodes[coordinate.key]

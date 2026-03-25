@@ -29,6 +29,7 @@ import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.map
 
 /** View model for the [com.android.systemui.dreams.DreamOverlayContainerView] */
 class DreamOverlayContainerViewModel
@@ -53,14 +54,25 @@ constructor(
         private set
 
     /**
-     * An [AccessibilityActionModel] that provides an accessibility action for opening the dream
-     * switcher.
+     * An optional [AccessibilityActionModel] that provides an accessibility action for opening the
+     * dream switcher.
+     *
+     * This will be `null` if the ability to switch dreams is currently disabled.
      */
-    val dreamSwitcherAction: AccessibilityActionModel =
-        AccessibilityActionModel(
-            labelResId = R.string.dreams_switcher_accessibility_action,
-            action = { showDialog() },
-        )
+    val dreamSwitcherAction: AccessibilityActionModel? by
+        dreamInteractor.canSwitchDreams
+            .map { canSwitch ->
+                AccessibilityActionModel(
+                        labelResId = R.string.dreams_switcher_accessibility_action,
+                        action = { showDialog() },
+                    )
+                    .takeIf { canSwitch }
+            }
+            .hydratedStateOf(initialValue = null)
+
+    /** Whether the user is currently allowed to switch between different dream types. */
+    val canSwitchDreams: Boolean by
+        dreamInteractor.canSwitchDreams.hydratedStateOf(initialValue = false)
 
     /** Child ViewModel which handles edge swipe gestures to switch dreams */
     val edgeSwipeViewModel by lazy { edgeSwipeViewModelFactory.create() }
@@ -70,7 +82,7 @@ constructor(
         get() = edgeSwipeViewModel
 
     override fun showDialog(): Boolean {
-        if (currentDialog == null) {
+        if (canSwitchDreams && currentDialog == null) {
             currentDialog =
                 dialogDelegate.createDialog().apply {
                     setOnShowListener { dialogShowing = true }

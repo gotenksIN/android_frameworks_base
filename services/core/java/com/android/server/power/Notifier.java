@@ -744,8 +744,7 @@ public class Notifier {
         }
     }
 
-    private void handleEarlyInteractiveChange(
-            int groupId, boolean anyDefaultOrAdjacentGroupInteractive) {
+    private void handleEarlyInteractiveChange(int groupId) {
         synchronized (mLock) {
             Interactivity interactivity = mInteractivityByGroupId.get(groupId);
             if (interactivity == null) {
@@ -754,19 +753,9 @@ public class Notifier {
             }
             final int changeReason = interactivity.changeReason;
             if (interactivity.isInteractive) {
-                mHandler.post(
-                        () ->
-                                mPolicy.startedWakingUp(
-                                        groupId,
-                                        changeReason,
-                                        anyDefaultOrAdjacentGroupInteractive));
+                mHandler.post(() -> mPolicy.startedWakingUp(groupId, changeReason));
             } else {
-                mHandler.post(
-                        () ->
-                                mPolicy.startedGoingToSleep(
-                                        groupId,
-                                        changeReason,
-                                        anyDefaultOrAdjacentGroupInteractive));
+                mHandler.post(() -> mPolicy.startedGoingToSleep(groupId, changeReason));
             }
         }
     }
@@ -918,13 +907,11 @@ public class Notifier {
         mDisplayInteractivities = newDisplayInteractivities;
     }
 
-    /** Called when an individual PowerGroup changes wakefulness. */
+    /**
+     * Called when an individual PowerGroup changes wakefulness.
+     */
     @SuppressWarnings("AndroidFrameworkSystemServerLock")
-    public void onGroupWakefulnessChangeStarted(
-            int groupId,
-            int wakefulness,
-            int changeReason,
-            boolean anyDefaultOrAdjacentGroupInteractive,
+    public void onGroupWakefulnessChangeStarted(int groupId, int wakefulness, int changeReason,
             long eventTime) {
         final boolean isInteractive = PowerManagerInternal.isInteractive(wakefulness);
 
@@ -946,7 +933,7 @@ public class Notifier {
             interactivity.changeReason = changeReason;
             interactivity.changeStartTime = eventTime;
             interactivity.isChanging = true;
-            handleEarlyInteractiveChange(groupId, anyDefaultOrAdjacentGroupInteractive);
+            handleEarlyInteractiveChange(groupId);
             mWakefulnessSessionObserver.onWakefulnessChangeStarted(groupId, wakefulness,
                     changeReason, eventTime);
 

@@ -34,7 +34,6 @@ import static android.security.Flags.secureLockdown;
 import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_NONE;
 import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_PASSWORD_OR_PIN;
 import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_PIN;
-import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_UNKNOWN;
 import static com.android.internal.widget.LockPatternUtils.CURRENT_LSKF_BASED_PROTECTOR_ID_KEY;
 import static com.android.internal.widget.LockPatternUtils.PIN_LENGTH_UNAVAILABLE;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.PRIMARY_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE;
@@ -321,15 +320,6 @@ public class LockSettingsService extends ILockSettings.Stub {
     // This list contains the (protectorId, userId) of any protectors that were by replaced by a
     // migration and should be destroyed once rollback to the old build is no longer possible.
     private ArrayList<Pair<Long, Integer>> mProtectorsToDestroyOnBootCompleted = new ArrayList<>();
-
-    // Current credential type for each user. The entry for a particular user is updated on the
-    // first query for that user's credential type or when their credential changes. Does not
-    // contain entries for special user IDs such as USER_FRP.
-    //
-    // Locking: guarded by "itself". Additionally, adding an entry is done with mSpManager held
-    // (ordered above "itself") to synchronize with credential changes.
-    @GuardedBy("itself")
-    private final SparseIntArray mUserCredentialTypes = new SparseIntArray();
 
     // Current password metrics for all secured users on the device. Updated when user unlocks the
     // device or changes password. Removed when user is locked.
@@ -1554,8 +1544,9 @@ public class LockSettingsService extends ILockSettings.Stub {
     }
 
     /**
-     * This API is cached; whenever the result would change, {@link
-     * #invalidateCredentialTypeCaches(int)} must be called.
+     * This API is cached; whenever the result would change,
+     * {@link com.android.internal.widget.LockPatternUtils#invalidateCredentialTypeCache}
+     * must be called.
      */
     @Override
     public int getCredentialType(int userId) {
@@ -1572,69 +1563,17 @@ public class LockSettingsService extends ILockSettings.Stub {
         if (isSpecialUserId(userId)) {
             return mSpManager.getSpecialUserCredentialType(userId);
         }
-        // Fast path: query the cache.
-        int credentialType = queryServiceSideCredentialTypeCache(userId);
-        if (credentialType == CREDENTIAL_TYPE_UNKNOWN) {
-            // "Slow" path: get the credential type via the protector and populate the cache.
-            // This generally should still be fast, as the protector information is cached as well.
-            // However, we do need to take the mSpManager lock to synchronize with credential
-            // changes, and there's a chance of having to wait on that.
-            synchronized (mSpManager) {
-                credentialType = getCredentialTypeInternalLockedUncached(userId);
-                updateServiceSideCredentialTypeCache(userId, credentialType);
+        synchronized (mSpManager) {
+            final long protectorId = getCurrentLskfBasedProtectorId(userId);
+            if (protectorId == SyntheticPasswordManager.NULL_PROTECTOR_ID) {
+                // Only possible for new users during early boot (before onThirdPartyAppsStarted())
+                return CREDENTIAL_TYPE_NONE;
             }
-        }
-        return credentialType;
-    }
-
-    @GuardedBy("mSpManager")
-    private int getCredentialTypeInternalLockedUncached(int userId) {
-        final long protectorId = getCurrentLskfBasedProtectorId(userId);
-        if (protectorId == SyntheticPasswordManager.NULL_PROTECTOR_ID) {
-            // Only possible for new users during early boot (before onThirdPartyAppsStarted())
-            return CREDENTIAL_TYPE_NONE;
-        }
-        int rawType = mSpManager.getCredentialType(protectorId, userId);
-        if (rawType != CREDENTIAL_TYPE_PASSWORD_OR_PIN) {
-            return rawType;
-        }
-        return pinOrPasswordQualityToCredentialType(getKeyguardStoredQuality(userId));
-    }
-
-    @VisibleForTesting
-    int queryServiceSideCredentialTypeCache(int userId) {
-        if (!android.security.Flags.enableServiceSideCredentialTypeCache()) {
-            return CREDENTIAL_TYPE_UNKNOWN;
-        }
-        synchronized (mUserCredentialTypes) {
-            return mUserCredentialTypes.get(userId, CREDENTIAL_TYPE_UNKNOWN);
-        }
-    }
-
-    @GuardedBy("mSpManager")
-    private void updateServiceSideCredentialTypeCache(int userId, int credentialType) {
-        if (!android.security.Flags.enableServiceSideCredentialTypeCache()) {
-            return;
-        }
-        synchronized (mUserCredentialTypes) {
-            mUserCredentialTypes.put(userId, credentialType);
-        }
-    }
-
-    private void invalidateCredentialTypeCaches(int userId) {
-        invalidateServiceSideCredentialTypeCache(userId);
-        LockPatternUtils.invalidateCredentialTypeCache();
-    }
-
-    private void invalidateServiceSideCredentialTypeCache(int userId) {
-        if (!android.security.Flags.enableServiceSideCredentialTypeCache()) {
-            return;
-        }
-        synchronized (mUserCredentialTypes) {
-            int index = mUserCredentialTypes.indexOfKey(userId);
-            if (index >= 0) {
-                mUserCredentialTypes.removeAt(index);
+            int rawType = mSpManager.getCredentialType(protectorId, userId);
+            if (rawType != CREDENTIAL_TYPE_PASSWORD_OR_PIN) {
+                return rawType;
             }
+            return pinOrPasswordQualityToCredentialType(getKeyguardStoredQuality(userId));
         }
     }
 
@@ -2983,9 +2922,6 @@ public class LockSettingsService extends ILockSettings.Stub {
         mSpManager.removeUser(getGateKeeperService(), userId);
         mStrongAuth.removeUser(userId);
         mSoftwareRateLimiter.clearUserState(userId);
-        if (android.security.Flags.enableServiceSideCredentialTypeCache()) {
-            invalidateCredentialTypeCaches(userId);
-        }
 
         AndroidKeyStoreMaintenance.onUserRemoved(userId);
         mUnifiedProfilePasswordCache.removePassword(userId);
@@ -3516,7 +3452,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             removeBiometricsForUser(userId);
         }
         setCurrentLskfBasedProtectorId(newProtectorId, userId);
-        invalidateCredentialTypeCaches(userId);
+        LockPatternUtils.invalidateCredentialTypeCache();
         synchronizeTiedChallengeForProfiles(userId, profilePasswords);
 
         setUserPasswordMetrics(credential, userId);

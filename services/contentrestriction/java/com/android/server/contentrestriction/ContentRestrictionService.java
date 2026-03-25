@@ -76,7 +76,7 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
     private final RoleObserver mRoleObserver;
     private final ContentRestrictionSettings mContentRestrictionSettings;
 
-    private boolean mAllowBypassingContentRestrictionSandboxing;
+    private boolean mAllowContentRestrictionDevicePolicyBypassing;
 
     final ContentRestrictionManagerInternal mInternal = new ContentRestrictionManagerInternalImpl();
 
@@ -103,8 +103,8 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
         mRoleObserver = new RoleObserver();
         mRoleObserver.register();
         mContentRestrictionSettings = new ContentRestrictionSettings();
-        mAllowBypassingContentRestrictionSandboxing = mContext.getResources().getBoolean(
-                com.android.internal.R.bool.config_allowBypassingContentRestrictionSandboxing);
+        mAllowContentRestrictionDevicePolicyBypassing = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_allowContentRestrictionDevicePolicyBypassing);
     }
 
     @Override
@@ -130,7 +130,7 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
             return;
         }
         if (!isContentRestrictionEnabledForUser(userId)) {
-            dispatchIsContentAllowedCallback(callback, true);
+            dispatchIsContentAllowedCallback(callback, false);
             return;
         }
 
@@ -163,24 +163,23 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
 
     @Override
     @PermissionManuallyEnforced
-    public boolean shouldAllowBypassingContentRestrictionSandboxingForUser(@UserIdInt int userId) {
+    public boolean isDevicePolicyBypassingEnabledForUser(@UserIdInt int userId) {
         if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
             enforcePermission(INTERACT_ACROSS_USERS);
         }
 
-        return mAllowBypassingContentRestrictionSandboxing;
+        return mAllowContentRestrictionDevicePolicyBypassing;
     }
 
     @Override
     @PermissionManuallyEnforced
-    public void setShouldAllowBypassingContentRestrictionSandboxingForUser(
-            @UserIdInt int userId, boolean enabled) {
+    public void setDevicePolicyBypassingEnabledForUser(@UserIdInt int userId, boolean enabled) {
         if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
             enforcePermission(INTERACT_ACROSS_USERS);
         }
 
         enforcePermission(BYPASS_ROLE_QUALIFICATION);
-        mAllowBypassingContentRestrictionSandboxing = enabled;
+        mAllowContentRestrictionDevicePolicyBypassing = enabled;
     }
 
     @Override
@@ -383,8 +382,8 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
             pw.println("ContentRestrictionService state:");
             pw.increaseIndent();
 
-            pw.println("allowBypassingContentRestrictionSandboxing: "
-                    + mAllowBypassingContentRestrictionSandboxing);
+            pw.println("allowContentRestrictionDevicePolicyBypassing: "
+                    + mAllowContentRestrictionDevicePolicyBypassing);
             pw.println();
 
             synchronized (mLock) {

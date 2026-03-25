@@ -422,9 +422,6 @@
     <!-- To be able to execute AppFunction for Android Context Engine use cases -->
     <uses-permission android:name="android.permission.EXECUTE_APP_FUNCTIONS_SYSTEM"/>
 
-    <!-- To be able to render personal context autofill insights and host a visualizer. -->
-    <uses-permission android:name="android.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS"/>
-
     <!-- To be able to report UI latency stats to UILatencyStatsService. -->
     <uses-permission android:name="android.permission.REPORT_UI_LATENCY_STATS"
         android:featureFlag="com.android.server.ui_latency_stats.ui_latency_stats_service" />
@@ -592,9 +589,6 @@
 
         <service android:name=".recordissue.IssueRecordingService"
                  android:foregroundServiceType="systemExempted"/>
-
-        <service android:name=".recordissue.IssueRecordingServiceLegacy"
-                android:foregroundServiceType="systemExempted"/>
 
         <receiver android:name=".SysuiRestartReceiver"
             android:exported="false">
@@ -780,7 +774,6 @@
             android:theme="@style/Theme.SystemUI.MediaProjectionAlertDialog"
             android:finishOnCloseSystemDialogs="true"
             android:launchMode="singleTop"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:excludeFromRecents="true"
             android:visibleToInstantApps="true"/>
 

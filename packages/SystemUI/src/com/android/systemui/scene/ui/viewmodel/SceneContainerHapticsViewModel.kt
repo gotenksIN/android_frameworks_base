@@ -30,6 +30,7 @@ import com.google.android.msdl.data.model.MSDLToken
 import com.google.android.msdl.domain.MSDLPlayer
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -53,8 +54,9 @@ constructor(
             }
             .distinctUntilChanged()
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         playShadePullHaptics()
+        awaitCancellation()
     }
 
     /**

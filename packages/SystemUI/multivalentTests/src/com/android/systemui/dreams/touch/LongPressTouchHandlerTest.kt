@@ -61,8 +61,10 @@ class LongPressTouchHandlerTest : SysuiTestCase() {
         }
 
     @Test
-    fun onSessionStart_registersListener() =
+    fun onSessionStart_whenSwitchingEnabled_registersListener() =
         kosmos.runTest {
+            // GIVEN switching is enabled
+            setCanSwitchDreams(true)
 
             // WHEN a new session starts
             underTest.onSessionStart(session)
@@ -73,8 +75,10 @@ class LongPressTouchHandlerTest : SysuiTestCase() {
         }
 
     @Test
-    fun onLongPress_showsSwitcher() =
+    fun onLongPress_whenSwitchingEnabled_showsSwitcher() =
         kosmos.runTest {
+            // GIVEN switching is enabled
+            setCanSwitchDreams(true)
             underTest.onSessionStart(session)
             verify(session).registerGestureListener(gestureListenerCaptor.capture())
             val listener = gestureListenerCaptor.firstValue
@@ -87,8 +91,10 @@ class LongPressTouchHandlerTest : SysuiTestCase() {
         }
 
     @Test
-    fun onLongPress_vibrates() =
+    fun onLongPress_whenSwitchingEnabled_vibrates() =
         kosmos.runTest {
+            // GIVEN switching is enabled
+            setCanSwitchDreams(true)
             underTest.onSessionStart(session)
             verify(session).registerGestureListener(gestureListenerCaptor.capture())
             val listener = gestureListenerCaptor.firstValue
@@ -104,4 +110,27 @@ class LongPressTouchHandlerTest : SysuiTestCase() {
                 )
                 .isEqualTo(1)
         }
+
+    @Test
+    fun onLongPress_whenSwitchingDisabled_doesNothing() =
+        kosmos.runTest {
+            // GIVEN switching is enabled, and a listener is registered
+            setCanSwitchDreams(true)
+            underTest.onSessionStart(session)
+            verify(session).registerGestureListener(gestureListenerCaptor.capture())
+            val listener = gestureListenerCaptor.firstValue
+
+            // WHEN switching is disabled
+            setCanSwitchDreams(false)
+
+            // and a long press occurs
+            listener.onLongPress(mock())
+
+            // THEN nothing happens
+            assertThat(vibratorHelper.fake.totalVibrations).isEqualTo(0)
+        }
+
+    private fun Kosmos.setCanSwitchDreams(canSwitch: Boolean) {
+        dreamDialogController.fake.setDialogAllowed(canSwitch)
+    }
 }

@@ -647,8 +647,7 @@ public class ProcessStateController {
      */
     @VisibleForTesting
     @GuardedBy({"mLock", "mProcLock"})
-    public void setUidCurProcState(@NonNull UidRecordInternal uidRec,
-            @ActivityManager.ProcessState int curProcState) {
+    public void setUidCurProcState(@NonNull UidRecordInternal uidRec, int curProcState) {
         uidRec.setCurProcState(curProcState);
     }
 
@@ -657,8 +656,7 @@ public class ProcessStateController {
      */
     @VisibleForTesting
     @GuardedBy({"mLock", "mProcLock"})
-    public void setUidSetProcState(@NonNull UidRecordInternal uidRec,
-            @ActivityManager.ProcessState int setProcState) {
+    public void setUidSetProcState(@NonNull UidRecordInternal uidRec, int setProcState) {
         uidRec.setSetProcState(setProcState);
     }
 
@@ -811,9 +809,8 @@ public class ProcessStateController {
      * less important state.
      */
     @GuardedBy("mLock")
-    public void forceProcessStateUpTo(@NonNull ProcessRecordInternal proc,
-            @ActivityManager.ProcessState int newState) {
-        final @ActivityManager.ProcessState int prevProcState = proc.getReportedProcState();
+    public void forceProcessStateUpTo(@NonNull ProcessRecordInternal proc, int newState) {
+        final int prevProcState = proc.getReportedProcState();
         if (prevProcState > newState) {
             synchronized (mProcLock) {
                 proc.setReportedProcState(newState);

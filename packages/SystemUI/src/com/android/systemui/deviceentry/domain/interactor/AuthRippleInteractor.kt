@@ -18,7 +18,6 @@ package com.android.systemui.deviceentry.domain.interactor
 import android.graphics.PointF
 import android.hardware.biometrics.BiometricSourceType
 import com.android.systemui.biometrics.data.repository.FacePropertyRepository
-import com.android.systemui.biometrics.domain.interactor.PeripheralFpsInteractor
 import com.android.systemui.biometrics.domain.interactor.SideFpsSensorInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
@@ -54,7 +53,6 @@ constructor(
     keyguardInteractor: KeyguardInteractor,
     sideFpsSensorInteractor: SideFpsSensorInteractor,
     facePropertyRepository: FacePropertyRepository,
-    peripheralFpsInteractor: PeripheralFpsInteractor,
     @Background private val backgroundScope: CoroutineScope,
 ) {
     private val successfulEntryFromDeviceEntryIcon: Flow<Unit> =
@@ -137,20 +135,14 @@ constructor(
             .flatMapLatest { source ->
                 when (source) {
                     BiometricUnlockSource.FINGERPRINT_SENSOR ->
-                        combine(
-                                deviceEntryUdfpsInteractor.isUdfpsSupported,
-                                peripheralFpsInteractor.isSupported,
-                                ::Pair,
-                            )
-                            .flatMapLatest { (isUdfpsSupported, isPeripheralLocationSupported) ->
-                                if (isUdfpsSupported) {
-                                    udfpsLocation
-                                } else if (isPeripheralLocationSupported) {
-                                    peripheralFpsInteractor.locationForRippleEffect
-                                } else {
-                                    sfpsSensorLocation
-                                }
+                        deviceEntryUdfpsInteractor.isUdfpsSupported.flatMapLatest { isUdfpsSupported
+                            ->
+                            if (isUdfpsSupported) {
+                                udfpsLocation
+                            } else {
+                                sfpsSensorLocation
                             }
+                        }
                     BiometricUnlockSource.FACE_SENSOR -> faceSensorOrigin
                     // For ADB debugging only: custom sensor location.
                     null -> _adbCommandCustomSensorLocation

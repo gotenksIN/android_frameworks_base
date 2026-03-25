@@ -155,30 +155,28 @@ public class ScreenCapture {
          *
          * @hide
          */
-        public static final int FLAG_MOUSE_CURSOR =
-                android.gui.CompositionFilterFlag.FLAG_MOUSE_CURSOR;
+        public static final int FLAG_MOUSE_CURSOR = 1;
 
         /**
          * Indicates a window should be treated as screenshot UI elements in screen capturing.
          *
          * @hide
          */
-        public static final int FLAG_SCREENSHOT_UI =
-                android.gui.CompositionFilterFlag.FLAG_SCREENSHOT_UI;
+        public static final int FLAG_SCREENSHOT_UI = 1 << 1;
 
         /**
          * Indicates the window should be treated as a status bar in screen capturing.
          *
          * @hide
          */
-        public static final int FLAG_STATUS_BAR = android.gui.CompositionFilterFlag.FLAG_STATUS_BAR;
+        public static final int FLAG_STATUS_BAR = 1 << 2;
 
         /**
          * Indicates the window should be treated as a IME window in screen capturing.
          *
          * @hide
          */
-        public static final int FLAG_IME = android.gui.CompositionFilterFlag.FLAG_IME;
+        public static final int FLAG_IME = 1 << 4;
 
         /**
          * A {@link CompositionFilterFlag} is a property of a window. It's used to denote windows

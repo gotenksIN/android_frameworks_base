@@ -78,8 +78,6 @@ interface IDigitalClockTextView : IDigitalClockView {
     var text: String
 
     fun refreshText()
-
-    fun animateCharge()
 }
 
 abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
@@ -422,7 +420,7 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
         textAnimator.setTransientTextStyle(targetStyle, returnStyle, animation)
     }
 
-    override fun animateCharge() {
+    fun animateCharge() {
         if (!this::textAnimator.isInitialized || textAnimator.isRunning) {
             // Skip charge animation if dozing animation is already playing.
             return

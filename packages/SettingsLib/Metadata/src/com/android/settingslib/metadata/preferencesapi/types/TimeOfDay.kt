@@ -18,13 +18,12 @@ package com.android.settingslib.metadata.preferencesapi.types
 
 import android.content.Context
 import com.android.settingslib.metadata.R
-import com.android.settingslib.metadata.preferencesapi.types.EType
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 /** A time of day defined by the 24-hour format HH:mm. */
 object TimeOfDay : ApiType<LocalTime, String> {
-    override val externalType: EType<String> = EType.String
+    override fun getType(): Class<String> = String::class.java
 
     override fun getDescription(context: Context): String =
         context.getString(R.string.time_of_day_type_description)

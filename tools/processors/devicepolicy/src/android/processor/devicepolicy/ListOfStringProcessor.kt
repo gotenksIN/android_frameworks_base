@@ -77,20 +77,16 @@ class ListOfStringProcessor(processingEnv: ProcessingEnvironment) :
             TypeSpecificPolicyMetadata.newBuilder()
                 .setListMetadata(
                     TypeSpecificPolicyMetadata.ListPolicyMetadata.newBuilder()
-                        .setStringMetadata(getStringMetadata(listOfStringDefinition))
+                        .setStringMetadata(
+                            stringProcessor.extractTypeSpecificMetadata(listOfStringDefinition.base)
+                        )
                         .setEmptyListAllowed(listOfStringDefinition.emptyListAllowed)
                         .setResolutionMechanism(resolutionMechanism)
                 )
                 .build()
 
-        return Pair(typeSpecificMetadata, listOfStringDefinition.base)
+        return Pair(typeSpecificMetadata, listOfStringDefinition.base.base)
     }
-
-    private fun getStringMetadata(annotation: ListOfStringPolicyDefinition) =
-        TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder()
-            .setEmptyStringAllowed(annotation.emptyStringAllowed)
-            .setUnprintableCharactersAllowed(annotation.unprintableCharactersAllowed)
-            .build()
 
     private fun getResolutionMechanism(annotation: ListOfStringPolicyDefinition, element: Element) =
         ListResolutionMechanismProcessor(errorPrinter = { message -> printError(element, message) })
@@ -127,7 +123,7 @@ class ListResolutionMechanismProcessor(val errorPrinter: (message: String) -> Un
         val isUnion = annotationValue.union
 
         if (isCustom && isUnion) {
-            printError("Only one resolution mechanism can be selected")
+            printError( "Only one resolution mechanism can be selected")
             return false
         }
 

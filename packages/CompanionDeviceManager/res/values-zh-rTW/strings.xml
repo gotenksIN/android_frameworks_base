@@ -33,9 +33,9 @@
     <string name="profile_name_glasses" msgid="3506504967216601277">"裝置"</string>
     <string name="summary_glasses" msgid="5469208629679579157">"這個應用程式將可取得<xliff:g id="DEVICE_TYPE">%1$s</xliff:g>上的這些權限"</string>
     <string name="profile_name_medical" msgid="5617160509499466400">"醫療器材"</string>
-    <string name="title_app_streaming" msgid="237666000400427614">"要允許「<xliff:g id="APP_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;在<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>和 &lt;strong&gt;<xliff:g id="DEVICE_NAME">%3$s</xliff:g>&lt;/strong&gt;間串流傳輸應用程式和系統功能嗎？"</string>
+    <string name="title_app_streaming" msgid="237666000400427614">"要允許「<xliff:g id="APP_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;在<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>和 &lt;strong&gt;<xliff:g id="DEVICE_NAME">%3$s</xliff:g>&lt;/strong&gt; 間串流傳輸應用程式和系統功能嗎？"</string>
     <string name="summary_app_streaming" msgid="8346968726357732862">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」將獲得下列權限："</string>
-    <string name="helper_summary_app_streaming" msgid="160149899100957545">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」正在代表<xliff:g id="DEVICE_NAME">%2$s</xliff:g>要求必要權限，以便在裝置間串流傳輸應用程式和系統功能。"</string>
+    <string name="helper_summary_app_streaming" msgid="160149899100957545">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」正在代表 <xliff:g id="DEVICE_NAME">%2$s</xliff:g> 要求必要權限，以便在裝置間串流傳輸應用程式和系統功能。"</string>
     <string name="title_automotive_projection" msgid="3296005598978412847"></string>
     <string name="summary_automotive_projection" msgid="8683801274662496164"></string>
     <string name="title_computer" msgid="5040395223341777259">"允許「<xliff:g id="DISPLAY_NAME">%3$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;從<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>存取這項資訊"</string>
@@ -47,7 +47,8 @@
     <string name="summary_virtual_device" msgid="1062189396947962635">"「<xliff:g id="APP_NAME">%2$s</xliff:g>」將獲得下列權限："</string>
     <string name="profile_name_generic" msgid="6851028682723034988">"裝置"</string>
     <string name="summary_generic" msgid="1761976003668044801">"這個應用程式可在手機和指定裝置間同步資訊，例如來電者名稱"</string>
-    <string name="summary_generic_with_remote_ai_capability" msgid="5053633566439056634">"允許「<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;同步處理來電者資訊等資料，並可在「<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>」上執行智慧操作"</string>
+    <!-- no translation found for summary_generic_with_remote_ai_capability (5053633566439056634) -->
+    <skip />
     <string name="consent_yes" msgid="8344487259618762872">"允許"</string>
     <string name="consent_no" msgid="2640796915611404382">"不允許"</string>
     <string name="consent_cancel" msgid="5655005528379285841">"取消"</string>

@@ -238,8 +238,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     DisplayManagerInternal mDisplayManagerInternal;
     @Nullable
     DisplayUpdater mDisplayUpdater;
-    @Nullable
-    DisplayUnblocker mDisplayUnblocker;
     @NonNull
     private final DeviceStateController mDeviceStateController;
     @NonNull
@@ -1174,8 +1172,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         mDisplayManagerInternal = LocalServices.getService(DisplayManagerInternal.class);
 
         if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
-            mDisplayUnblocker = new DisplayUnblocker(this);
-            mDisplayUpdater = new DisplayUpdater(this, mDisplayUnblocker);
+            mDisplayUpdater = new DisplayUpdater(this);
         } else {
             mDisplayManager.registerDisplayListener(this, mService.mUiHandler);
         }
@@ -2742,24 +2739,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
             final DisplayContent display = getChildAt(displayNdx);
-
-            // Don't resume the activities on the display:
-            // 1. The system is removing the display
-            // 2. The display is removed or invalid
-            if (display.isRemoving() || display.isRemovedOrInvalid()) {
-                Slog.i(TAG, " Skipping resume: display id=" + display.mDisplayId
-                        + " is removing, removed or invalid");
-                continue;
-            }
-
-            if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                if (!display.mDisplay.canHostTasks()) {
-                    Slog.w(TAG, "Activity launch is not allowed on a display id="
-                            + display.mDisplayId + " that cannot host tasks");
-                    continue;
-                }
-            }
-
             final boolean curResult = result;
             boolean[] resumedOnDisplay = new boolean[1];
             final ActivityRecord topOfDisplay = display.topRunningActivity();

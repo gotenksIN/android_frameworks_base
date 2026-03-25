@@ -17,8 +17,8 @@
 package com.android.server.supervision
 
 import android.Manifest.permission.BYPASS_ROLE_QUALIFICATION
-import android.Manifest.permission.MANAGE_ROLE_HOLDERS
 import android.Manifest.permission.MANAGE_SUPERVISION
+import android.Manifest.permission.MANAGE_ROLE_HOLDERS
 import android.app.Activity
 import android.app.KeyguardManager
 import android.app.Notification
@@ -66,6 +66,7 @@ import android.os.UserHandle
 import android.os.UserHandle.MIN_SECONDARY_USER_ID
 import android.os.UserHandle.USER_SYSTEM
 import android.os.UserManager
+import android.platform.test.annotations.EnableFlags
 import android.platform.test.annotations.RequiresFlagsDisabled
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
@@ -102,7 +103,6 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.time.Duration
 import java.util.concurrent.Executor
 import java.util.function.Consumer
 import kotlin.test.assertFailsWith
@@ -1057,46 +1057,15 @@ class SupervisionServiceTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(
-        Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS,
-        Flags.FLAG_ENABLE_SUPERVISION_PACKAGE_USAGE_APIS,
-    )
-    fun setPolicy_packagePolicyTypeBlocked_unsuspendsAndHidesPackage() {
-        setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
-    }
-
-    @Test
-    @RequiresFlagsEnabled(
-        Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS,
-        Flags.FLAG_ENABLE_SUPERVISION_PACKAGE_USAGE_APIS,
-    )
-    fun setPolicy_packagePolicyTypeAllowed_unsuspendsAndUnhidesPackage() {
-        setAndVerifyPackagePolicy(PACKAGE_POLICY_ALLOWED)
-    }
-
-    @Test
-    @RequiresFlagsEnabled(
-        Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS,
-        Flags.FLAG_ENABLE_SUPERVISION_PACKAGE_USAGE_APIS,
-    )
-    fun setPolicy_packagePolicyTypeTimeLimit_suspendsAndUnhidesPackage() {
-        setAndVerifyPackagePolicy(
-            PACKAGE_POLICY_TIME_LIMIT_BUILDER.setTimeLimit(Duration.ofHours(1)).build()
-        )
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
+    fun setPolicy_packagePolicyTypeBlockedEnabled_callsSetApplicationHiddenForUserTrue() {
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_BLOCKED)
     }
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_SUPERVISION_PACKAGE_USAGE_APIS)
-    fun setPolicy_packagePolicyTypeBlocked_withoutPackageUsageApis_doesNotUnsuspendPackage() {
-        setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_SUPERVISION_PACKAGE_USAGE_APIS)
-    fun setPolicy_packagePolicyTypeAllowed_withoutPackageUsageApis_doesNotUnsuspendPackage() {
-        setAndVerifyPackagePolicy(PACKAGE_POLICY_ALLOWED)
+    fun setPolicy_packagePolicyTypeBlockedDisabled_callsSetApplicationHiddenForUserFalse() {
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_ALLOWED)
     }
 
     @Test
@@ -1108,8 +1077,7 @@ class SupervisionServiceTest {
         setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
 
         // The policy is set to blocked.
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
-
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_BLOCKED)
         // After the policy is set, the app is hidden.
         simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
 
@@ -1130,8 +1098,7 @@ class SupervisionServiceTest {
         setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
 
         // The policy is set to blocked.
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
-
+        val policy = setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_BLOCKED)
         // Verify that hasPendingNotification is true, then manually set it to false.
         val policyData = getPolicyData(policy)
         assertThat(policyData?.hasPendingNotification).isTrue()
@@ -1154,8 +1121,7 @@ class SupervisionServiceTest {
         val launchIntent = mockPackageLaunchIntent(PACKAGE_NAME)
 
         // The policy is set to unblocked.
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_ALLOWED)
-
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_ALLOWED)
         // After the policy is set, the app is unhidden.
         simulatePackageAppeared(PACKAGE_NAME, USER_ID)
 
@@ -1177,8 +1143,7 @@ class SupervisionServiceTest {
         mockPackageLaunchIntent(PACKAGE_NAME, launchIntent = null)
 
         // The policy is set to unblocked.
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_ALLOWED)
-
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_ALLOWED)
         // After the policy is set, the app is unhidden.
         simulatePackageAppeared(PACKAGE_NAME, USER_ID)
 
@@ -1204,8 +1169,7 @@ class SupervisionServiceTest {
             .thenThrow(PackageManager.NameNotFoundException())
 
         // The policy is set to blocked.
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
-
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_BLOCKED)
         // The package disappeared callback is received for some reason.
         simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
 
@@ -1223,8 +1187,7 @@ class SupervisionServiceTest {
         setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
 
         // The policy is set to unblocked.
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_ALLOWED)
-
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_ALLOWED)
         // The package disappeared callback is received for some reason.
         simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
 
@@ -1241,7 +1204,7 @@ class SupervisionServiceTest {
         val policies = service.getPolicies(USER_ID)
         assertThat(policies).isEmpty()
 
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
+        val policy = setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_BLOCKED)
 
         val policiesAfterInsertion = service.getPolicies(USER_ID)
         assertThat(policiesAfterInsertion).containsExactly(policy)
@@ -1253,7 +1216,10 @@ class SupervisionServiceTest {
         injector.setCallingUid(1234) // Non-system uid.
         context.permissions[MANAGE_SUPERVISION] = PERMISSION_DENIED
 
-        assertFailsWith<SecurityException> { service.setPolicy(USER_ID, PACKAGE_POLICY_BLOCKED) }
+        val policy =
+            PackageUsagePolicy.Builder(PACKAGE_NAME, PackageUsagePolicy.TYPE_BLOCKED).build()
+
+        assertFailsWith<SecurityException> { service.setPolicy(USER_ID, policy) }
     }
 
     @Test
@@ -1303,40 +1269,26 @@ class SupervisionServiceTest {
         assertThat(service.hasValidRecoveryMethod(USER_ID)).isTrue()
     }
 
-    private fun setAndVerifyPackagePolicy(policy: PackageUsagePolicy): PackageUsagePolicy {
+    private fun setAndVerifyPackageBlockedPolicy(packageUsageType: Int): PackageUsagePolicy {
+        val policy = PackageUsagePolicy.Builder(PACKAGE_NAME, packageUsageType).build()
+
         service.setPolicy(USER_ID, policy)
         injector.awaitServiceThreadIdle()
 
-        val expectedSuspended = policy.type == PackageUsagePolicy.TYPE_TIME_LIMIT
-        if (Flags.enableSupervisionPackageUsageApis()) {
-            verifyPackageSuspendedByAdmin(expectedSuspended)
-        } else {
-            verifyPackageSuspendedByAdminNotCalled()
-        }
+        val expectedEnabled = packageUsageType == PackageUsagePolicy.TYPE_BLOCKED
 
-        val expectedHidden = policy.type == PackageUsagePolicy.TYPE_BLOCKED
         verify(mockDpmInternal)
             .setApplicationHiddenBySystem(
                 eq(SupervisionManager.SUPERVISION_SYSTEM_ENTITY),
-                eq(policy.packageName),
+                eq(PACKAGE_NAME),
                 eq(USER_ID),
-                eq(expectedHidden),
+                eq(expectedEnabled),
             )
-
         verifySupervisionAppServiceEvent(USER_ID) {
             // Supervision apps are notified of the policy change.
             verify(it).onPolicyChanged(eq(policy))
         }
         return policy
-    }
-
-    private fun verifyPackageSuspendedByAdmin(suspended: Boolean) {
-        verify(mockPackageManagerInternal)
-            .setPackagesSuspendedByAdmin(eq(USER_ID), eq(arrayOf(PACKAGE_NAME)), eq(suspended))
-    }
-
-    private fun verifyPackageSuspendedByAdminNotCalled() {
-        verify(mockPackageManagerInternal, never()).setPackagesSuspendedByAdmin(any(), any(), any())
     }
 
     private fun verifyApplicationHiddenNotification(
@@ -1484,7 +1436,7 @@ class SupervisionServiceTest {
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
     fun onDisableSupervision_clearsPolicies() {
-        val policy = setAndVerifyPackagePolicy(PACKAGE_POLICY_BLOCKED)
+        setAndVerifyPackageBlockedPolicy(PackageUsagePolicy.TYPE_BLOCKED)
 
         assertThat(service.getUserDataLocked(USER_ID).policies).isNotEmpty()
 
@@ -1883,17 +1835,6 @@ class SupervisionServiceTest {
         const val PACKAGE_NAME = "com.example.supervisionapp"
         const val ROLE_HOLDER_PACKAGE = "com.some.role.holder"
         const val HIDDEN_PACKAGE = "com.some.hidden.app"
-        val PACKAGE_POLICY_BLOCKED
-            get() =
-                PackageUsagePolicy.Builder(PACKAGE_NAME, PackageUsagePolicy.TYPE_BLOCKED).build()
-
-        val PACKAGE_POLICY_ALLOWED
-            get() =
-                PackageUsagePolicy.Builder(PACKAGE_NAME, PackageUsagePolicy.TYPE_ALLOWED).build()
-
-        val PACKAGE_POLICY_TIME_LIMIT_BUILDER
-            get() = PackageUsagePolicy.Builder(PACKAGE_NAME, PackageUsagePolicy.TYPE_TIME_LIMIT)
-
         val supervisionRoleHolders =
             mapOf(
                 RoleManager.ROLE_SYSTEM_SUPERVISION to "com.example.supervisionapp1",

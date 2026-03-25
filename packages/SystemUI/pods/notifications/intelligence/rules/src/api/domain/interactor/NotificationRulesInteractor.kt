@@ -32,9 +32,6 @@ public interface NotificationRulesInteractor {
         text: String,
     ): ResponseModel<DraftRuleModel>
 
-    /**
-     * Saves the given [rule]. Returns true if the rule was saved successfully and false if there
-     * was an error when saving.
-     */
-    suspend fun saveRule(rule: DraftRuleModel): Boolean
+    /** Creates a new rule and adds it to the list of saved rules. */
+    public fun createRule(newRule: RuleModel)
 }

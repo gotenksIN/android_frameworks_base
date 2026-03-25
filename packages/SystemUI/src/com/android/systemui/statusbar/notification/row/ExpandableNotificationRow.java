@@ -20,7 +20,6 @@ import static android.app.Notification.Action.SEMANTIC_ACTION_MARK_CONVERSATION_
 import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_EXPANDED;
 import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
 
-import static android.app.Flags.enableAutomationNotificationUi;
 import static com.android.systemui.Flags.notificationRowTransparency;
 import static com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_NONE;
 import static com.android.systemui.statusbar.notification.NotificationUtils.logKey;
@@ -353,11 +352,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     // this value will reset when the view is completely removed from the shade (ie: filtered out)
     private long initializationTime = -1;
 
-    private NotificationUiEligibilityChecker mNotificationUiEligibilityChecker;
-
-    /** Automation-specific background for the notification. */
-    @Nullable private AutomationNotificationBackground mAutomationNotificationBackground = null;
-
     /**
      * It is added for unit testing purpose.
      * Please do not use it for other purposes.
@@ -526,13 +520,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
-    private void setAutomationBackgroundEnabled(boolean enabled) {
-        if (!enableAutomationNotificationUi()) {
-            return;
-        }
-        // TODO(b/484385191) - Set/re-set/clear automation background based on whether enabled.
-    }
-
     public NotificationContentView getPrivateLayout() {
         return mPrivateLayout;
     }
@@ -680,8 +667,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mUpdateSelfBackgroundOnUpdate = false;
             updateBackgroundColorsOfSelf();
         }
-        setAutomationBackgroundEnabled(
-                mNotificationUiEligibilityChecker.eligibleForAutomationUi(mEntryAdapter.getSbn()));
         Trace.endSection();
     }
 
@@ -2124,7 +2109,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         initDimens();
     }
 
-    /** Initialize row. */
+    /**
+     * Initialize row.
+     */
     public void initialize(
             EntryAdapter entryAdapter,
             RemoteInputViewSubcomponent.Factory rivSubcomponentFactory,
@@ -2152,8 +2139,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             UiEventLogger uiEventLogger,
             NotificationRebindingTracker notificationRebindingTracker,
             BundleInteractionLogger bundleInteractionLogger,
-            NotificationActivityStarter notificationActivityStarter,
-            NotificationUiEligibilityChecker notificationUiEligibilityChecker) {
+            NotificationActivityStarter notificationActivityStarter) {
+
         mEntryAdapter = entryAdapter;
         mIsBundle = entryAdapter instanceof BundleEntryAdapter;
         if (isBundle()) {
@@ -2205,7 +2192,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mColorUpdateLogger = colorUpdateLogger;
         mDismissibilityProvider = dismissibilityProvider;
         mBundleInteractionLogger = bundleInteractionLogger;
-        mNotificationUiEligibilityChecker = notificationUiEligibilityChecker;
         // Haptics are handled in the ExpandableNotificationRowController
         setHapticFeedbackEnabled(false);
     }
@@ -4013,9 +3999,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     protected boolean hideBackground() {
-        return mShowNoBackground
-                || (enableAutomationNotificationUi() && mAutomationNotificationBackground != null)
-                || super.hideBackground();
+        return mShowNoBackground || super.hideBackground();
     }
 
     public int getPositionOfChild(ExpandableNotificationRow childRow) {

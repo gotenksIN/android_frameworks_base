@@ -84,7 +84,8 @@ constructor(
     /** @see SecureLockDeviceInteractor.shouldListenForBiometricAuth */
     val shouldListenForBiometricAuth: Boolean by
         secureLockDeviceInteractor.shouldListenForBiometricAuth.hydratedStateOf(
-            initialValue = false
+            traceName = "shouldListenForBiometricAuth",
+            initialValue = false,
         )
 
     /** @see SecureLockDeviceInteractor.enrolledStrongBiometricModalities */

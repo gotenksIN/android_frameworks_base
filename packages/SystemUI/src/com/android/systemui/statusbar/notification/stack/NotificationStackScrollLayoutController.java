@@ -2207,17 +2207,35 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                     && ev.getActionMasked() != MotionEvent.ACTION_DOWN) {
                 mJankMonitor.begin(mView, CUJ_NOTIFICATION_SHADE_SCROLL_FLING);
             }
-            debugLog(()->
-                    "onInterceptTouchEvent: " + motionEventToDebugString(ev)
-                            + ", swipeWantsIt: " + swipeWantsIt
-                            + ", scrollWantsIt: " + scrollWantsIt
-                            + ", expandWantsIt: " + expandWantsIt
-                            + ", longPressWantsIt: " + longPressWantsIt
-                            + ", hunWantsIt: " + hunWantsIt
-                            + ", lockscreenExpandWantsIt: " + lockscreenExpandWantsIt
-            );
-            return swipeWantsIt || scrollWantsIt || expandWantsIt || longPressWantsIt || hunWantsIt
-                    || lockscreenExpandWantsIt;
+            boolean result = swipeWantsIt || scrollWantsIt || expandWantsIt || longPressWantsIt
+                    || hunWantsIt || lockscreenExpandWantsIt;
+
+            if (ev.getActionMasked() != MotionEvent.ACTION_MOVE) {
+                mLogger.logNsslcInterceptTouchEvent(
+                        ev.getActionMasked(),
+                        result,
+                        skipForDragging,
+                        isTouchInGutsView(ev),
+                        longPressWantsIt,
+                        expandWantsIt,
+                        lockscreenExpandWantsIt,
+                        scrollWantsIt,
+                        hunWantsIt,
+                        swipeWantsIt,
+                        isUp,
+                        shouldLockscreenExpandHandleTouch(),
+                        shouldHeadsUpHandleTouch(),
+                        mView.getOnlyScrollingInThisMotion(),
+                        mView.isExpandingNotification(),
+                        mView.getExpandedInThisMotion(),
+                        mView.getDisallowDismissInThisMotion(),
+                        mView.isBeingDragged(),
+                        mView.getIsExpanded(),
+                        SceneContainerFlag.isEnabled()
+                );
+            }
+
+            return result;
         }
 
         @Override
@@ -2364,6 +2382,24 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                             + ", hunWantsIt: " + hunWantsIt
                             + ", lockscreenExpandWantsIt: " + lockscreenExpandWantsIt
             );
+
+            if (ev.getActionMasked() != MotionEvent.ACTION_MOVE) {
+                mLogger.logNsslcTouchEvent(
+                        ev.getActionMasked(),
+                        result,
+                        SceneContainerFlag.isEnabled(),
+                        longPressWantsIt,
+                        expandWantsIt,
+                        lockscreenExpandWantsIt,
+                        horizontalSwipeWantsIt,
+                        scrollerWantsIt,
+                        hunWantsIt,
+                        mView.getOnlyScrollingInThisMotion(),
+                        mView.isExpandingNotification(),
+                        lockscreenExpandWantsIt,
+                        isCancelOrUp
+                );
+            }
             return result;
         }
 

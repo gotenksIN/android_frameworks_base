@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
  */
 public class AccessibilityCheckerUtils {
 
-    private static final String LOG_TAG = AccessibilityCheckerUtils.class.getSimpleName();
+    private static final String LOG_TAG = "AccessibilityCheckerUtils";
 
     @VisibleForTesting
     // LINT.IfChange

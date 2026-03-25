@@ -91,7 +91,8 @@ constructor(
         )
 
     /** Alpha value applied to all LockscreenElements. */
-    val alpha: Float by alpha(viewState = viewStateAccessor).hydratedStateOf(initialValue = 0f)
+    val alpha: Float by
+        alpha(viewState = viewStateAccessor).hydratedStateOf(traceName = "alpha", initialValue = 0f)
 
     /** An observable for the alpha level for the entire keyguard root view. */
     private fun alpha(viewState: ViewStateAccessor): Flow<Float> {

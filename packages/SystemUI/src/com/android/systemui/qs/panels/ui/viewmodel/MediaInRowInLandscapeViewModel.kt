@@ -18,8 +18,10 @@ package com.android.systemui.qs.panels.ui.viewmodel
 
 import android.content.res.Configuration
 import android.content.res.Resources
+import androidx.compose.runtime.getValue
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
 import com.android.systemui.media.controls.ui.controller.MediaHostStatesManager
 import com.android.systemui.media.controls.ui.controller.MediaLocation
@@ -56,55 +58,70 @@ constructor(
     mediaCarouselInteractor: MediaCarouselInteractor,
     @Assisted @MediaLocation private val inLocation: Int,
     @Assisted private val mediaUiBehavior: MediaUiBehavior,
-) : HydratedActivatable(traceName = "MediaInRowInLandscapeViewModel - $inLocation") {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("MediaInRowInLanscapeViewModel - $inLocation")
 
     val shouldMediaShowInRow: Boolean
         get() = usingMedia && inSingleShade && isLandscapeAndLong && isMediaVisible
 
     private val inSingleShade: Boolean by
-        shadeModeInteractor.shadeMode
-            .map { it == ShadeMode.Single }
-            .hydratedStateOf(initialValue = shadeModeInteractor.shadeMode.value == ShadeMode.Single)
+        hydrator.hydratedStateOf(
+            traceName = "inSingleShade",
+            initialValue = shadeModeInteractor.shadeMode.value == ShadeMode.Single,
+            source = shadeModeInteractor.shadeMode.map { it == ShadeMode.Single },
+        )
 
     private val isLandscapeAndLong: Boolean by
-        configurationInteractor.configurationValues
-            .map { it.isLandscapeAndLong }
-            .hydratedStateOf(initialValue = resources.configuration.isLandscapeAndLong)
+        hydrator.hydratedStateOf(
+            traceName = "isLandscapeAndLong",
+            initialValue = resources.configuration.isLandscapeAndLong,
+            source = configurationInteractor.configurationValues.map { it.isLandscapeAndLong },
+        )
 
     private val isMediaVisible by
-        if (MediaControlsInComposeFlag.isEnabled) {
-                if (
-                    mediaUiBehavior.carouselVisibility ==
-                        MediaCarouselVisibility.WhenAnyCardIsActive
-                ) {
-                    mediaCarouselInteractor.hasActiveMedia
+        hydrator.hydratedStateOf(
+            traceName = "isMediaVisible",
+            initialValue = false,
+            source =
+                if (MediaControlsInComposeFlag.isEnabled) {
+                    if (
+                        mediaUiBehavior.carouselVisibility ==
+                            MediaCarouselVisibility.WhenAnyCardIsActive
+                    ) {
+                        mediaCarouselInteractor.hasActiveMedia
+                    } else {
+                        mediaCarouselInteractor.hasAnyMedia
+                    }
                 } else {
-                    mediaCarouselInteractor.hasAnyMedia
-                }
-            } else {
-                conflatedCallbackFlow {
-                        val callback =
-                            object : MediaHostStatesManager.Callback {
-                                override fun onHostStateChanged(
-                                    location: Int,
-                                    mediaHostState: MediaHostState,
-                                ) {
-                                    if (location == inLocation) {
-                                        trySend(mediaHostState.visible)
+                    conflatedCallbackFlow {
+                            val callback =
+                                object : MediaHostStatesManager.Callback {
+                                    override fun onHostStateChanged(
+                                        location: Int,
+                                        mediaHostState: MediaHostState,
+                                    ) {
+                                        if (location == inLocation) {
+                                            trySend(mediaHostState.visible)
+                                        }
                                     }
                                 }
-                            }
-                        mediaHostStatesManager.addCallback(callback)
+                            mediaHostStatesManager.addCallback(callback)
 
-                        awaitClose { mediaHostStatesManager.removeCallback(callback) }
-                    }
-                    .onStart {
-                        emit(
-                            mediaHostStatesManager.mediaHostStates.get(inLocation)?.visible ?: false
-                        )
-                    }
-            }
-            .hydratedStateOf(initialValue = false)
+                            awaitClose { mediaHostStatesManager.removeCallback(callback) }
+                        }
+                        .onStart {
+                            emit(
+                                mediaHostStatesManager.mediaHostStates.get(inLocation)?.visible
+                                    ?: false
+                            )
+                        }
+                },
+        )
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

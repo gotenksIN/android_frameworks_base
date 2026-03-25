@@ -26,11 +26,9 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.qs.QSTile
 import com.android.systemui.qs.FakeQSFactory
 import com.android.systemui.qs.FakeQSTile
-import com.android.systemui.qs.panels.domain.interactor.iconTilesInteractor
 import com.android.systemui.qs.pipeline.data.model.RestoreData
 import com.android.systemui.qs.pipeline.data.repository.fakeRestoreRepository
 import com.android.systemui.qs.pipeline.data.repository.fakeTileSpecRepository
-import com.android.systemui.qs.pipeline.domain.autoaddable.withWorkTileAutoAddable
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.qsTileFactory
 import com.android.systemui.settings.fakeUserTracker
@@ -55,10 +53,7 @@ import org.junit.runner.RunWith
 class WorkProfileAutoAddedAfterRestoreTest : SysuiTestCase() {
 
     private val kosmos by lazy {
-        testKosmos().apply {
-            fakeUserTracker.set(listOf(USER_0_INFO), 0)
-            withWorkTileAutoAddable()
-        }
+        testKosmos().apply { fakeUserTracker.set(listOf(USER_0_INFO), 0) }
     }
     // Getter here so it can change when there is a managed profile.
     private val workTileAvailable: Boolean
@@ -74,7 +69,7 @@ class WorkProfileAutoAddedAfterRestoreTest : SysuiTestCase() {
     fun setUp() {
         kosmos.qsTileFactory = FakeQSFactory(::tileCreator)
         kosmos.restoreReconciliationInteractor.start()
-        kosmos.autoAddInteractor.init(kosmos.currentTilesInteractor, kosmos.iconTilesInteractor)
+        kosmos.autoAddInteractor.init(kosmos.currentTilesInteractor)
     }
 
     @Test

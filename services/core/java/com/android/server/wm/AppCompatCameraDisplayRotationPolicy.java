@@ -465,8 +465,12 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
 
     @Nullable
     private ActivityRecord getTopActivity(@Nullable Task cameraTask) {
-        return cameraTask != null ? cameraTask.getTopActivity(
-                /* includeFinishing= */ true, /* includeOverlays= */ false) : null;
+        if (Flags.cameraCompatFullscreenPickSameTaskActivity()) {
+            return cameraTask != null ? cameraTask.getTopActivity(
+                    /* includeFinishing= */ true, /* includeOverlays= */ false) : null;
+        } else {
+            return mDisplayContent.topRunningActivity(/* considerKeyguardState= */ true);
+        }
     }
 
     /**

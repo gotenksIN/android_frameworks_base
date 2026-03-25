@@ -39,7 +39,6 @@ import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME_Z
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_DISALLOW_FACTORY_RESET;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_EASTER_EGGS;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_LOCKSCREEN_MESSAGE;
-import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API;
 import static android.processor.devicepolicy.AllowedDpcTypes.ALLOWED;
 import static android.processor.devicepolicy.AllowedDpcTypes.DISALLOWED;
 
@@ -47,6 +46,7 @@ import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.app.admin.flags.Flags;
+import android.app.admin.DevicePolicyManager;
 import android.processor.devicepolicy.AllowedDpcTypes;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.EnumResolutionMechanism;
@@ -54,6 +54,7 @@ import android.processor.devicepolicy.ListOfStringPolicyDefinition;
 import android.processor.devicepolicy.ListResolutionMechanism;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
@@ -126,11 +127,11 @@ public final class PolicyIdentifier<T> {
      * Screen capture is disallowed. See {@link android.view.Display#FLAG_SECURE} for more details
      * on how blocking works.
      */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
     public static final int SCREEN_CAPTURE_DISALLOWED = 1;
 
     /** Screen capture is allowed. */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
     public static final int SCREEN_CAPTURE_ALLOWED = 2;
 
     /**
@@ -156,7 +157,7 @@ public final class PolicyIdentifier<T> {
      * DevicePolicyManager#POLICY_SCOPE_DEVICE} and the caller is not a profile owner of an
      * organization-owned managed profile or a device owner, a security exception will be thrown.
      */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
     @NonNull
     @EnumPolicyDefinition(
             base =
@@ -345,17 +346,24 @@ public final class PolicyIdentifier<T> {
     @NonNull
     @ListOfStringPolicyDefinition(
             base =
-                    @PolicyDefinition(
-                            allowedScopes = {POLICY_SCOPE_USER},
-                            affectedResource = RESOURCE_PER_USER,
-                            requiredPermission = MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS,
-                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL,
-                            allowedDpcTypes =
-                                    @AllowedDpcTypes(
-                                            deviceOwner = ALLOWED,
-                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
-                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+                    @StringPolicyDefinition(
+                            base =
+                                    @PolicyDefinition(
+                                            allowedScopes = {POLICY_SCOPE_USER},
+                                            affectedResource = RESOURCE_PER_USER,
+                                            requiredPermission =
+                                                    MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS,
+                                            requiredCrossUserPermission =
+                                                    MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL,
+                                            allowedDpcTypes =
+                                            @AllowedDpcTypes(
+                                                    deviceOwner = ALLOWED,
+                                                    managedProfileOwnerOfOrganizationOwnedDevice =
+                                                            ALLOWED,
+                                                    managedProfileOwnerOfPersonalOwnedDevice =
+                                                            DISALLOWED,
+                                                    unaffiliatedFullUserProfileOwner =
+                                                            DISALLOWED))),
             resolutionMechanism = @ListResolutionMechanism(custom = true))
     public static final PolicyIdentifier<List<String>> CONTENT_RESTRICTION_APPS =
             new PolicyIdentifier<>("CONTENT_RESTRICTION_APPS");
@@ -620,9 +628,8 @@ public final class PolicyIdentifier<T> {
                                             deviceOwner = ALLOWED,
                                             profileOwnerOnUser0 = ALLOWED,
                                             managedProfileOwnerOfOrganizationOwnedDevice =
-                                                    ALLOWED,
-                                            financedDeviceOwner = ALLOWED,
-                                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
             intDef = FactoryResetValue.class,
             defaultValue = FACTORY_RESET_ALLOWED,

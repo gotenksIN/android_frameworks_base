@@ -177,7 +177,7 @@ constructor(
             transformationViewModel.fillTouchableRegionInto(outTouchableRegion)
 
             Box(
-                contentAlignment = Alignment.BottomEnd,
+                contentAlignment = Alignment.BottomCenter,
                 modifier =
                     modifier
                         .fillMaxSize()

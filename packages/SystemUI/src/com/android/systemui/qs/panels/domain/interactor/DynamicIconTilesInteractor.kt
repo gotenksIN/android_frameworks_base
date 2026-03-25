@@ -25,6 +25,7 @@ import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.util.kotlin.pairwise
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -38,7 +39,7 @@ constructor(
     @PanelsLog private val logBuffer: LogBuffer,
 ) : ExclusiveActivatable() {
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         currentTilesInteractor.userAndTiles
             .pairwise()
             .filter { !it.newValue.userChange } // Only compare tile changes for the same user
@@ -51,6 +52,7 @@ constructor(
             .filter { it.isNotEmpty() }
             .onEach { logChange(it) }
             .collect { removedTiles -> iconTilesInteractor.removeLargeTiles(removedTiles) }
+        awaitCancellation()
     }
 
     @AssistedFactory

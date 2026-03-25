@@ -179,7 +179,7 @@ constructor(
         fun create(): ShortcutCustomizationViewModel
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         shortcutCustomizationInteractor.pressedKeys.collect {
             val keys = filterDefaultCustomShortcutModifierKey(it)
             val errorMessage = getErrorMessageForPressedKeys(keys)

@@ -133,7 +133,6 @@ constructor(
             appName = appName,
             packageName = packageName,
             componentName = contentIntent?.intent?.component,
-            isScreenShareNotification = this.isScreenShareNotification,
             statusBarChipIconView = statusBarChipIconView,
             promotedContent = promotedContent,
             creationTime = creationTime,

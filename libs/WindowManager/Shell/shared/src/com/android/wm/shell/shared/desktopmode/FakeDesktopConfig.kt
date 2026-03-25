@@ -21,6 +21,7 @@ import java.io.PrintWriter
 
 class FakeDesktopConfig : DesktopConfig {
 
+    override var shouldMaximizeWhenDragToTopEdge: Boolean = false
     override var useDesktopOverrideDensity: Boolean = false
 
     override var windowDecorPreWarmSize: Int = 0

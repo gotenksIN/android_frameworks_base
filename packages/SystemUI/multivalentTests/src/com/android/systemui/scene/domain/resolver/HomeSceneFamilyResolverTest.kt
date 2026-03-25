@@ -43,6 +43,7 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
+import kotlin.OptIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceTimeBy
@@ -74,7 +75,7 @@ class HomeSceneFamilyResolverTest : SysuiTestCase() {
     fun resolvesToOccluded() =
         kosmos.runTest {
             val resolvedScene by collectLastValue(homeSceneFamilyResolver.resolvedScene)
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(onTop = true)
 
             assertThat(resolvedScene).isEqualTo(Scenes.Occluded)
         }

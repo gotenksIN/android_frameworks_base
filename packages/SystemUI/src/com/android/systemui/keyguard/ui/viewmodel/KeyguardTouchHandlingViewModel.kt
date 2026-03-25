@@ -22,7 +22,8 @@ import androidx.compose.runtime.getValue
 import com.android.systemui.Flags
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTouchHandlingInteractor
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.google.android.msdl.data.model.MSDLToken
@@ -42,7 +43,8 @@ constructor(
     private val msdlPlayer: MSDLPlayer,
     private val falsingManager: FalsingManager,
     deviceEntryUdfpsInteractor: DeviceEntryUdfpsInteractor,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+    private val hydrator = Hydrator("KeyguardTouchHandlingViewModel.hydrator")
 
     /**
      * Bounds of the UDFPS accessibility overlay. This is needed in order to prevent interrupted
@@ -63,18 +65,33 @@ constructor(
 
     /** Whether the long-press handling feature should be enabled. */
     val isLongPressHandlingEnabled: Boolean by
-        interactor.isLongPressHandlingEnabled.hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "longPressHandlingEnabled",
+            initialValue = false,
+            source = interactor.isLongPressHandlingEnabled,
+        )
 
     /** Whether the double tap handling feature should be enabled. */
     val isDoubleTapHandlingEnabled: Boolean by
-        interactor.isDoubleTapHandlingEnabled.hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "doubleTapHandlingEnabled",
+            initialValue = false,
+            source = interactor.isDoubleTapHandlingEnabled,
+        )
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     /**
      * Notifies that the user has long-pressed on the lock screen.
+     *
+     * @param isA11yAction: Whether the action was performed as an a11y action
      */
-    fun onLongPress() {
+    fun onLongPress(isA11yAction: Boolean) {
         if (
             SceneContainerFlag.isEnabled &&
+                !isA11yAction &&
                 falsingManager.isFalseLongTap(FalsingManager.LOW_PENALTY)
         ) {
             return
@@ -83,7 +100,7 @@ constructor(
         if (Flags.msdlFeedback()) {
             msdlPlayer.playToken(MSDLToken.LONG_PRESS)
         }
-        interactor.onLongPress()
+        interactor.onLongPress(isA11yAction)
     }
 
     /**

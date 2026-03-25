@@ -484,24 +484,20 @@ public class SupervisionService extends ISupervisionManager.Stub {
         int type = policy.getType();
         switch (type) {
             case PackageUsagePolicy.TYPE_BLOCKED -> {
-                if (Flags.enableSupervisionPackageUsageApis()) {
-                    setPackageSuspendedForUser(userId, packageName, false);
-                }
                 setApplicationHiddenForUser(userId, packageName, true);
                 enablePendingNotificationStateLocked(userId, policy);
             }
             case PackageUsagePolicy.TYPE_ALLOWED -> {
-                if (Flags.enableSupervisionPackageUsageApis()) {
-                    setPackageSuspendedForUser(userId, packageName, false);
-                }
                 setApplicationHiddenForUser(userId, packageName, false);
                 enablePendingNotificationStateLocked(userId, policy);
             }
             case PackageUsagePolicy.TYPE_TIME_LIMIT -> {
                 if (Flags.enableSupervisionPackageUsageApis()) {
                     setApplicationHiddenForUser(userId, packageName, false);
-                    // TODO(b/482425646): Only suspend the package when limit is reached.
-                    setPackageSuspendedForUser(userId, packageName, true);
+                    Slogf.w(
+                            SupervisionLog.TAG,
+                            "Time usage limit policy not implemented yet for package: %s",
+                            packageName);
                 }
             }
             default ->
@@ -564,14 +560,6 @@ public class SupervisionService extends ISupervisionManager.Stub {
         if (dpmi != null) {
             dpmi.setApplicationHiddenBySystem(
                     SupervisionManager.SUPERVISION_SYSTEM_ENTITY, packageName, userId, hidden);
-        }
-    }
-
-    private void setPackageSuspendedForUser(
-            @UserIdInt int userId, String packageName, boolean suspended) {
-        PackageManagerInternal pmi = mInjector.getPackageManagerInternal();
-        if (pmi != null) {
-            pmi.setPackagesSuspendedByAdmin(userId, new String[] {packageName}, suspended);
         }
     }
 
@@ -1254,7 +1242,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
             mRoleManager.removeRoleHolderAsUser(
                     roleName,
                     packageName,
-                    RoleManager.MANAGE_HOLDERS_FLAG_DONT_KILL_APP,
+                    0,
                     user,
                     context.getMainExecutor(),
                     success -> {

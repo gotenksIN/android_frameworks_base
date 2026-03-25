@@ -27,11 +27,6 @@ import dagger.Module
 
 @Module
 interface KeyguardRepositoryModule {
-    @Binds
-    fun keyguardOcclusionRepository(
-        impl: KeyguardOcclusionRepositoryImpl
-    ): KeyguardOcclusionRepository
-
     @Binds fun keyguardRepository(impl: KeyguardRepositoryImpl): KeyguardRepository
 
     @Binds

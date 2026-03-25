@@ -675,13 +675,5 @@ abstract class LogModule {
         fun providesCameraLog(factory: LogBufferFactory): LogBuffer {
             return factory.create(name = "CameraLog", maxSize = 50)
         }
-
-        /** Provides a [LogBuffer] for Camera related events. */
-        @Provides
-        @SysUISingleton
-        @ScreenRecordingLog
-        fun providesScreenRecordingLog(factory: LogBufferFactory): LogBuffer {
-            return factory.create(name = "ScreenRecordingLog", maxSize = 100)
-        }
     }
 }

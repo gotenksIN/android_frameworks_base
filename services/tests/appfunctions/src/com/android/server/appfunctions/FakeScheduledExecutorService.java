@@ -27,10 +27,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -39,7 +39,7 @@ import java.util.concurrent.TimeoutException;
  * Commands scheduled via {@link #schedule(Runnable, long, TimeUnit)} will run after calling {@link
  * #fastForwardTime(long)}.
  */
-public class FakeScheduledExecutorService implements ScheduledExecutorService {
+class FakeScheduledExecutorService implements ScheduledExecutorService {
 
     private final List<Runnable> mExecutes = new ArrayList<>();
     private final List<MockScheduledFuture<?>> mFutures = new ArrayList<>();
@@ -47,7 +47,7 @@ public class FakeScheduledExecutorService implements ScheduledExecutorService {
     private boolean mIsShutdown = false;
 
     /** Advances fake time, runs all the commands for which the delay has expired. */
-    public long fastForwardTime(long millis) {
+    long fastForwardTime(long millis) {
         mTimeElapsedMillis += millis;
         ImmutableList<MockScheduledFuture<?>> futuresCopy = ImmutableList.copyOf(mFutures);
         mFutures.clear();
@@ -80,8 +80,7 @@ public class FakeScheduledExecutorService implements ScheduledExecutorService {
         mTimeElapsedMillis = 0;
     }
 
-    /** Returns the elapsed time in nanoseconds. */
-    public long getClockTimeNanos() {
+    long getClockTimeNanos() {
         return TimeUnit.MILLISECONDS.toNanos(mTimeElapsedMillis);
     }
 

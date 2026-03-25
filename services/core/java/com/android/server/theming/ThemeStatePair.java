@@ -310,11 +310,7 @@ public class ThemeStatePair {
     OverlaySnapshot commitAndGetOverlayData() {
         ThemeState stateToCommit;
         synchronized (mLock) {
-            // If the timestamps are different, this was a forced update.
-            // We should treat it as a content change to ensure re-registration.
-            final boolean forceContentChange = mCurrent.timeStamp() != mPending.timeStamp();
-
-            if (!shouldUpdateOverlaysLocked() && !forceContentChange) {
+            if (!shouldUpdateOverlaysLocked()) {
                 mCurrent = mPending;
                 return new OverlaySnapshot(userId, mPending.childProfiles(), mLightScheme,
                         mDarkScheme, /*contentChanged*/ false);

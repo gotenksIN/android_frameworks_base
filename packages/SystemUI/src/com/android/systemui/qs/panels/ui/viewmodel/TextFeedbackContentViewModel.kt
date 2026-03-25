@@ -18,9 +18,11 @@ package com.android.systemui.qs.panels.ui.viewmodel
 
 import android.content.Context
 import android.graphics.drawable.Animatable
+import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.dagger.qualifiers.UiBackground
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.qs.panels.domain.interactor.TextFeedbackInteractor
 import com.android.systemui.qs.panels.domain.model.TextFeedbackModel
 import com.android.systemui.qs.pipeline.shared.TileSpec
@@ -37,16 +39,22 @@ constructor(
     private val interactor: TextFeedbackInteractor,
     @UiBackground private val loadingDispatcher: CoroutineDispatcher,
     @Assisted private val context: Context,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+    private val hydrator = Hydrator("TextFeedbackViewModel.hydrator")
 
     val textFeedback: TextFeedbackViewModel by
-        interactor.textFeedback
-            .map { it.load(context) }
-            .flowOn(loadingDispatcher)
-            .hydratedStateOf(initialValue = TextFeedbackViewModel.NoFeedback)
+        hydrator.hydratedStateOf(
+            traceName = "textFeedback",
+            initialValue = TextFeedbackViewModel.NoFeedback,
+            source = interactor.textFeedback.map { it.load(context) }.flowOn(loadingDispatcher),
+        )
 
     fun requestShowFeedback(tile: TileSpec) {
         interactor.requestShowFeedback(tile)
+    }
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
     }
 
     @AssistedFactory

@@ -216,7 +216,6 @@ constructor(
             semanticStyle = chipSemanticStyle,
             isAppVisible = isAppVisible,
             instanceId = instanceId,
-            isScreenShareNotification = isScreenShareNotification,
         )
     }
 
@@ -462,7 +461,6 @@ constructor(
             isHidden = isHidden,
             transitionManager = transitionManager,
             instanceId = instanceId,
-            isScreenShareNotification = isScreenShareNotification,
         )
     }
 
@@ -511,7 +509,6 @@ constructor(
         val time: PromotedNotificationContentModel.When?,
         val isAppVisible: Boolean,
         val instanceId: InstanceId?,
-        val isScreenShareNotification: Boolean,
     )
 
     companion object {

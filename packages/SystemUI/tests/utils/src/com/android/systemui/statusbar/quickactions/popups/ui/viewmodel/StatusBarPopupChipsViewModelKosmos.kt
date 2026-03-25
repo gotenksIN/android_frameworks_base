@@ -20,23 +20,19 @@ import android.view.Display
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.statusbar.quickactions.assistant.ui.viewmodel.assistantIconViewModelFactory
 import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.avControlsChipViewModelFactory
-import com.android.systemui.statusbar.quickactions.domain.interactor.quickActionsInteractor
 import com.android.systemui.statusbar.quickactions.ime.ui.viewmodel.imeIndicatorChipViewModelFactory
 import com.android.systemui.statusbar.quickactions.media.ui.viewmodel.mediaControlChipViewModelFactory
-import com.android.systemui.statusbar.quickactions.screenrecord.ui.viewmodel.largeScreenRecordingChipViewModelFactory
 import com.android.systemui.statusbar.quickactions.sharescreen.ui.viewmodel.shareScreenPrivacyIndicatorViewModelFactory
 
 private val Kosmos.statusBarPopupChipsViewModel: StatusBarPopupChipsViewModel by
     Kosmos.Fixture {
         StatusBarPopupChipsViewModel(
             displayId = Display.DEFAULT_DISPLAY,
-            quickActionsInteractor = quickActionsInteractor,
             mediaControlChipFactory = mediaControlChipViewModelFactory,
             avControlsChipFactory = avControlsChipViewModelFactory,
             shareScreenPrivacyIndicatorFactory = shareScreenPrivacyIndicatorViewModelFactory,
             assistantIconFactory = assistantIconViewModelFactory,
             imeIndicatorChipFactory = imeIndicatorChipViewModelFactory,
-            largeScreenRecordingChipViewModelFactory = largeScreenRecordingChipViewModelFactory,
         )
     }
 

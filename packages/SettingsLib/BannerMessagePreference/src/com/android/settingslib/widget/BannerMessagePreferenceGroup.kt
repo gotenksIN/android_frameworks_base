@@ -23,7 +23,6 @@ import android.os.Looper
 import android.os.Parcel
 import android.os.Parcelable
 import android.util.AttributeSet
-import android.view.AbsSavedState
 import android.view.View
 import android.view.animation.PathInterpolator
 import androidx.preference.Preference
@@ -371,9 +370,7 @@ class BannerMessagePreferenceGroup @JvmOverloads constructor(
     override fun onSaveInstanceState(): Parcelable {
         val superState = super.onSaveInstanceState()
 
-        val myState = SavedState(AbsSavedState.EMPTY_STATE)
-
-        myState.realSuperState = superState
+        val myState = SavedState(superState)
         myState.isActiveExpanded = activeSection.isExpanded
         myState.isDismissedExpanded = dismissedSection.isExpanded
         return myState
@@ -385,7 +382,7 @@ class BannerMessagePreferenceGroup @JvmOverloads constructor(
             return
         }
 
-        super.onRestoreInstanceState(state.realSuperState)
+        super.onRestoreInstanceState(state.superState)
         activeSection.isExpanded = state.isActiveExpanded
         dismissedSection.isExpanded = state.isDismissedExpanded
 
@@ -647,12 +644,10 @@ class BannerMessagePreferenceGroup @JvmOverloads constructor(
     private class SavedState : Preference.BaseSavedState {
         var isActiveExpanded: Boolean = false
         var isDismissedExpanded: Boolean = false
-        var realSuperState: Parcelable? = null
 
         constructor(source: Parcel) : super(source) {
             isActiveExpanded = source.readInt() == 1
             isDismissedExpanded = source.readInt() == 1
-            realSuperState = source.readParcelable(javaClass.classLoader)
         }
 
         constructor(superState: Parcelable?) : super(superState)
@@ -661,7 +656,6 @@ class BannerMessagePreferenceGroup @JvmOverloads constructor(
             super.writeToParcel(dest, flags)
             dest.writeInt(if (isActiveExpanded) 1 else 0)
             dest.writeInt(if (isDismissedExpanded) 1 else 0)
-            dest.writeParcelable(realSuperState, flags)
         }
 
         companion object {

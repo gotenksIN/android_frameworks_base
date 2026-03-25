@@ -65,7 +65,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 private const val TAG = "AppList"
 private const val CONTENT_TYPE_HEADER = "header"
-private const val CONTENT_TYPE_FOOTER = "footer"
 
 /** The config used to load the App List. */
 data class AppListConfig(
@@ -81,7 +80,6 @@ data class AppListInput<T : AppRecord>(
     val listModel: AppListModel<T>,
     val state: AppListState,
     val header: @Composable () -> Unit,
-    val footer: @Composable () -> Unit = {},
     val noItemMessage: String? = null,
     val bottomPadding: Dp,
     val noAppInfo: NoAppInfo = NoAppInfo(),
@@ -114,7 +112,7 @@ internal fun <T : AppRecord> AppListInput<T>.AppListImpl(
         val optionsState = viewModel.spinnerOptionsFlow.collectAsStateWithLifecycle(null)
         SpinnerOptions(optionsState, viewModel.optionFlow)
         val appListData = viewModel.appListDataFlow.collectAsStateWithLifecycle(null)
-        listModel.AppListWidget(appListData, header, footer, bottomPadding, noItemMessage, noAppInfo)
+        listModel.AppListWidget(appListData, header, bottomPadding, noItemMessage, noAppInfo)
     }
 }
 
@@ -140,7 +138,6 @@ private fun SpinnerOptions(
 private fun <T : AppRecord> AppListModel<T>.AppListWidget(
     appListData: State<AppListData<T>?>,
     header: @Composable () -> Unit,
-    footer: @Composable () -> Unit,
     bottomPadding: Dp,
     noItemMessage: String?,
     noAppInfo: NoAppInfo = NoAppInfo(),
@@ -168,8 +165,6 @@ private fun <T : AppRecord> AppListModel<T>.AppListWidget(
                         PlaceholderTitle(noItemMessage ?: stringResource(R.string.no_applications))
                     }
                 }
-
-                footer()
             }
             return
         }
@@ -180,7 +175,6 @@ private fun <T : AppRecord> AppListModel<T>.AppListWidget(
                 bottomPadding = bottomPadding,
                 state = rememberLazyListStateAndHideKeyboardWhenStartScroll(),
                 header = header,
-                footer = footer,
                 groupTitle = { index -> getGroupTitle(option, list[index].record) },
             ) { index: Int ->
                 val appEntry = list[index]
@@ -207,8 +201,6 @@ private fun <T : AppRecord> AppListModel<T>.AppListWidget(
                         }
                         .AppItem()
                 }
-
-                item(contentType = CONTENT_TYPE_FOOTER) { footer() }
             }
         }
     }

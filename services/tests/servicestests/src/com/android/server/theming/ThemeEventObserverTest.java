@@ -114,8 +114,7 @@ public class ThemeEventObserverTest {
         mEnvironment = new ThemeEnvironment(mContext, (key, def) -> def);
         mEnvironment.setBootingComplete(mThemeUserLifecycle);
 
-        mThemeEventObserver = new ThemeEventObserver(mContext, mEnvironment);
-        mThemeEventObserver.setDispatcher(mThemeManagerImpl);
+        mThemeEventObserver = new ThemeEventObserver(mContext, mThemeManagerImpl, mEnvironment);
         mThemeEventObserver.onServicesReady(mThemeWallpaperManager);
         mThemeEventObserver.registerListeners();
 

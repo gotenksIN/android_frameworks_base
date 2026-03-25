@@ -35,7 +35,7 @@
     <string name="profile_name_medical" msgid="5617160509499466400">"চিকিৎসা সম্পৰ্কীয় ডিভাইচ"</string>
     <string name="title_app_streaming" msgid="237666000400427614">"&lt;strong&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/strong&gt;ক আপোনাৰ <xliff:g id="DEVICE_TYPE">%2$s</xliff:g> আৰু &lt;strong&gt;<xliff:g id="DEVICE_NAME">%3$s</xliff:g>&lt;/strong&gt;ৰ মাজত এপ্ আৰু ছিষ্টেমৰ সুবিধাসমূহ ষ্ট্ৰীম কৰিবলৈ দিবনে?"</string>
     <string name="summary_app_streaming" msgid="8346968726357732862">"<xliff:g id="APP_NAME">%1$s</xliff:g>ক তলত দিয়া অনুমতিসমূহ দিয়া হ’ব:"</string>
-    <string name="helper_summary_app_streaming" msgid="160149899100957545">"<xliff:g id="APP_NAME">%1$s</xliff:g>ই আপোনাৰ ডিভাইচসমূহৰ মাজত এপ্ আৰু ছিষ্টেমৰ সুবিধাসমূহ ষ্ট্ৰীম কৰিবলৈ <xliff:g id="DEVICE_NAME">%2$s</xliff:g>ৰ হৈ অনুমতি বিচাৰি অনুৰোধ জনাইছে"</string>
+    <string name="helper_summary_app_streaming" msgid="160149899100957545">"<xliff:g id="APP_NAME">%1$s</xliff:g>এ আপোনাৰ ডিভাইচসমূহৰ মাজত এপ্ আৰু ছিষ্টেমৰ সুবিধাসমূহ ষ্ট্ৰীম কৰিবলৈ <xliff:g id="DEVICE_NAME">%2$s</xliff:g>ৰ হৈ অনুমতি বিচাৰি অনুৰোধ জনাইছে"</string>
     <string name="title_automotive_projection" msgid="3296005598978412847"></string>
     <string name="summary_automotive_projection" msgid="8683801274662496164"></string>
     <string name="title_computer" msgid="5040395223341777259">"&lt;strong&gt;<xliff:g id="DISPLAY_NAME">%3$s</xliff:g>&lt;/strong&gt;ক আপোনাৰ <xliff:g id="DEVICE_TYPE">%2$s</xliff:g>ৰ পৰা এই তথ্যখিনি এক্সেছ কৰিবলৈ দিয়ক"</string>
@@ -47,7 +47,8 @@
     <string name="summary_virtual_device" msgid="1062189396947962635">"<xliff:g id="APP_NAME">%2$s</xliff:g>ক তলত দিয়া অনুমতিসমূহ দিয়া হ’ব:"</string>
     <string name="profile_name_generic" msgid="6851028682723034988">"ডিভাইচ"</string>
     <string name="summary_generic" msgid="1761976003668044801">"এই এপ্‌টোৱে আপোনাৰ ফ’ন আৰু বাছনি কৰা ডিভাইচটোৰ মাজত কল কৰোঁতাৰ নামৰ দৰে তথ্য ছিংক কৰিব পাৰিব"</string>
-    <string name="summary_generic_with_remote_ai_capability" msgid="5053633566439056634">"&lt;strong&gt;<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>&lt;/strong&gt;ক আপোনাৰ <xliff:g id="DEVICE_TYPE">%2$s</xliff:g>ৰ পৰা কল কৰোঁতাৰ তথ্যৰ দৰে তথ্য ছিংক কৰিবলৈ আৰু স্মাৰ্ট কাৰ্যসমূহ চলাবলৈ অনুমতি দিয়ক"</string>
+    <!-- no translation found for summary_generic_with_remote_ai_capability (5053633566439056634) -->
+    <skip />
     <string name="consent_yes" msgid="8344487259618762872">"অনুমতি দিয়ক"</string>
     <string name="consent_no" msgid="2640796915611404382">"অনুমতি নিদিব"</string>
     <string name="consent_cancel" msgid="5655005528379285841">"বাতিল কৰক"</string>

@@ -19,11 +19,10 @@ package com.android.settingslib.metadata.preferencesapi.types
 import android.content.Context
 import androidx.annotation.StringRes
 import com.android.settingslib.metadata.R
-import com.android.settingslib.metadata.preferencesapi.types.EType
 
 /** A year of the form YYYY. */
 object Year: DirectApiType<String> {
-  override val externalType: EType<String> = EType.String
+  override fun getType(): Class<String> = String::class.java
   override fun getDescription(context: Context): String = "A year in the form YYYY"
   override fun getKey(): String = "Year"
 

@@ -101,7 +101,6 @@ import com.android.wm.shell.shared.IOverviewOverlayLeashInvalidationCallback;
 import com.android.wm.shell.shared.IShellTransitions;
 import com.android.wm.shell.shared.ShellTransitions;
 import com.android.wm.shell.shared.TransactionPool;
-import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.shared.annotations.ExternalThread;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
@@ -242,7 +241,6 @@ public class Transitions implements RemoteCallable<Transitions>,
 
     private final TransactionPool mTransactionPool;
     private final TransitionMixpatcher mMixpatcher;
-    private final ActivityPlanner mActivityPlanner;
 
     /** List of possible handlers. Ordered by specificity (eg. tapped back to front). */
     private final ArrayList<TransitionHandler> mHandlers = new ArrayList<>();
@@ -254,9 +252,6 @@ public class Transitions implements RemoteCallable<Transitions>,
 
     /** List of {@link Runnable} instances to run when the last active transition has finished.  */
     private final ArrayList<Runnable> mRunWhenIdleQueue = new ArrayList<>();
-
-    /** Surfaces to be released after all transitions have completed. */
-    private final ArrayList<SurfaceControl> mCleanupSurfaces = new ArrayList<>();
 
     private float mTransitionAnimationScaleSetting = 1.0f;
 
@@ -404,14 +399,9 @@ public class Transitions implements RemoteCallable<Transitions>,
         if (com.android.window.flags.Flags.transitMixpatcherBase()) {
             mMixpatcher = new TransitionMixpatcher(mOrganizer, mMainExecutor);
             mMixpatcher.overridePrePlanner(mMixpatchLegacyPrePlanner);
-            mActivityPlanner = new ActivityPlanner(context, pool,
-                    displayController, displayInsetsController, mainExecutor, animExecutor);
-
             addPlanner(mMixpatchLegacyPlanner);
-            addPlanner(mActivityPlanner);
         } else {
             mMixpatcher = null;
-            mActivityPlanner = null;
         }
     }
 
@@ -472,9 +462,6 @@ public class Transitions implements RemoteCallable<Transitions>,
     private void dispatchAnimScaleSetting(float scale) {
         for (int i = mHandlers.size() - 1; i >= 0; --i) {
             mHandlers.get(i).setAnimScaleSetting(scale);
-        }
-        if (mMixpatcher != null) {
-            mMixpatcher.setAnimScaleSetting(scale);
         }
     }
 
@@ -619,6 +606,7 @@ public class Transitions implements RemoteCallable<Transitions>,
     @VisibleForTesting
     static void setupStartState(@NonNull TransitionInfo info,
             @NonNull SurfaceControl.Transaction t, @NonNull SurfaceControl.Transaction finishT) {
+        final boolean crossDisplay = com.android.window.flags.Flags.crossDisplayTransition();
         final SparseBooleanArray isRevealingOnDisplay = new SparseBooleanArray();
         for (int i = 0; i < info.getChanges().size(); ++i) {
             final TransitionInfo.Change change = info.getChanges().get(i);
@@ -664,7 +652,7 @@ public class Transitions implements RemoteCallable<Transitions>,
                 continue;
             }
             boolean isOpening;
-            if (com.android.window.flags.Flags.crossDisplayTransitionV2()) {
+            if (crossDisplay) {
                 // If a window is closing or moving to another display, it reveals the content
                 // behind it.
                 if (isClosingType(mode) || change.getStartDisplayId() != change.getEndDisplayId()) {
@@ -675,7 +663,7 @@ public class Transitions implements RemoteCallable<Transitions>,
                 // being incorrectly hidden at the start of the transition.
                 final boolean isExcluded =
                         change.hasFlags(FLAG_MOVED_TO_TOP | FLAG_BACK_GESTURE_ANIMATED);
-                isOpening = !isRevealingOnDisplay.get(change.getEndDisplayId()) && isExcluded;
+                isOpening = !isRevealingOnDisplay.get(change.getEndDisplayId()) && !isExcluded;
             } else {
                 isOpening = isOpeningType(info.getType());
             }
@@ -948,7 +936,6 @@ public class Transitions implements RemoteCallable<Transitions>,
                             mRunWhenIdleQueue.get(i).run();
                         }
                         mRunWhenIdleQueue.clear();
-                        releaseCleanupSurfaces();
                     }
                 }
             }
@@ -1186,40 +1173,11 @@ public class Transitions implements RemoteCallable<Transitions>,
      */
     private void releaseSurfaces(@Nullable TransitionInfo info) {
         if (info == null) return;
+        if (com.android.window.flags.Flags.releaseAllTransitionSurfaces()) {
+            info.releaseAllSurfaces();
+            return;
+        }
         info.releaseAnimSurfaces();
-        if (com.android.window.flags.Flags.releaseAllTransitionSurfacesOnIdle()) {
-            recordReleaseSurfaces(mCleanupSurfaces, info.getChanges());
-        }
-    }
-
-    /** Called when all transitions are finished. */
-    private void releaseCleanupSurfaces() {
-        final int size = mCleanupSurfaces.size();
-        if (size == 0) return;
-        for (int i = size - 1; i >= 0; --i) {
-            mCleanupSurfaces.get(i).release();
-        }
-        mCleanupSurfaces.clear();
-    }
-
-    /** Populates the surfaces from changes that should be released later. */
-    static void recordReleaseSurfaces(@NonNull ArrayList<SurfaceControl> outCleanupSurfaces,
-            @NonNull List<TransitionInfo.Change> changes) {
-        for (int i = changes.size() - 1; i >= 0; --i) {
-            final TransitionInfo.Change change = changes.get(i);
-            SurfaceControl sc = change.getLeash();
-            if (sc.isValid()) {
-                outCleanupSurfaces.add(sc);
-            }
-            sc = change.getSnapshot();
-            if (sc != null && sc.isValid()) {
-                outCleanupSurfaces.add(sc);
-            }
-            sc = change.getTopCompatActivityLeash();
-            if (sc != null && sc.isValid()) {
-                outCleanupSurfaces.add(sc);
-            }
-        }
     }
 
     /**
@@ -1667,7 +1625,7 @@ public class Transitions implements RemoteCallable<Transitions>,
                     (info.getType() == TRANSIT_SLEEP
                             || (info.getFlags() & TransitionInfo.FLAG_SYNC) != 0)
                             || KeyguardTransitionHandler.handles(info);
-            if (!isSleepOrKeyguard && !TransitionUtil.isDreamTransition(info)) {
+            if (!isSleepOrKeyguard) {
                 return;
             }
             // Synthesize a change for sleep/keyguard (in order to ensure at-least one

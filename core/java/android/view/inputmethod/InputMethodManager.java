@@ -1498,7 +1498,6 @@ public final class InputMethodManager {
                                     ImeTracker.PHASE_CLIENT_HANDLE_SET_IME_VISIBILITY);
                         }
                     }
-                    args.recycle();
                     break;
                 case MSG_SEND_INPUT_EVENT: {
                     sendInputEventAndReportResultOnMainLooper((PendingEvent)msg.obj);

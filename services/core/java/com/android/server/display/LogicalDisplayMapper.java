@@ -946,7 +946,8 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
                 } else {
                     // This display never left this class, safe to remove without notification
                     mLogicalDisplays.removeAt(i);
-                    if (displayId != Display.DEFAULT_DISPLAY) {
+                    if (Flags.displayInfoCopyOnWriteCacheEnabled()
+                            && displayId != Display.DEFAULT_DISPLAY) {
                         mDisplayInfoCache.remove(displayId);
                     }
                 }
@@ -1138,7 +1139,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
 
             if ((eventsToDispatch & LOGICAL_DISPLAY_EVENT_DISCONNECTED) != 0) {
                 mLogicalDisplays.delete(id);
-                if (id != Display.DEFAULT_DISPLAY) {
+                if (Flags.displayInfoCopyOnWriteCacheEnabled() && id != Display.DEFAULT_DISPLAY) {
                     mDisplayInfoCache.remove(id);
                 }
             }

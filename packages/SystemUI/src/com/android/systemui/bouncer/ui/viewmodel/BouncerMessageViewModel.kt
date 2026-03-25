@@ -58,6 +58,7 @@ import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -108,9 +109,9 @@ constructor(
         a11yInteractor.getRecommendedTimeout(DEFAULT_MESSAGE_DURATION, FLAG_CONTENT_TEXT)
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         if (!SceneContainerFlag.isEnabled) {
-            return
+            return awaitCancellation()
         }
 
         coroutineScope {
@@ -124,6 +125,7 @@ constructor(
             launch { listenForBouncerEvents() }
             launch { listenForFaceMessages() }
             launch { listenForFingerprintMessages() }
+            awaitCancellation()
         }
     }
 
@@ -434,8 +436,6 @@ constructor(
                 )
             DeviceEntryRestrictionReason.UserLockdown ->
                 BouncerMessageStrings.authRequiredAfterUserLockdown(authMethod)
-            DeviceEntryRestrictionReason.UserNotUnlockedSinceSignOut ->
-                BouncerMessageStrings.authRequiredToSignIn(authMethod)
             DeviceEntryRestrictionReason.DeviceNotUnlockedSinceReboot ->
                 BouncerMessageStrings.authRequiredAfterReboot(authMethod)
             DeviceEntryRestrictionReason.PolicyLockdown ->

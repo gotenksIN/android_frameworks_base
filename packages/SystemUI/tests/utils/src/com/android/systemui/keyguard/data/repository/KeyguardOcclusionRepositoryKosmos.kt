@@ -18,5 +18,4 @@ package com.android.systemui.keyguard.data.repository
 
 import com.android.systemui.kosmos.Kosmos
 
-val Kosmos.keyguardOcclusionRepository: KeyguardOcclusionRepository by
-    Kosmos.Fixture { FakeKeyguardOcclusionRepository() }
+val Kosmos.keyguardOcclusionRepository by Kosmos.Fixture { KeyguardOcclusionRepository() }

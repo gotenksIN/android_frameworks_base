@@ -55,7 +55,7 @@ constructor(
     ) {
         remoteListener = remoteDesktopTaskListener
         if (!::deskChangeListener.isInitialized) deskChangeListener = createDeskChangeListener()
-        with(userRepositories.current) {
+        with (userRepositories.current) {
             addDeskChangeListener(deskChangeListener, mainExecutor)
             addVisibleTasksListener(visibleTasksListener, mainExecutor)
         }
@@ -63,14 +63,7 @@ constructor(
 
     /** Unregisters the current remote listener and stops further callbacks. */
     fun unregister() {
-        if (::deskChangeListener.isInitialized) {
-            userRepositories.current.removeDeskChangeListener(deskChangeListener)
-        } else {
-            ProtoLog.v(
-                WM_SHELL_DESKTOP_MODE,
-                "$TAG: unregister() invoked with uninitialized deskChangeListener",
-            )
-        }
+        userRepositories.current.removeDeskChangeListener(deskChangeListener)
         userRepositories.current.removeVisibleTasksListener(visibleTasksListener)
         remoteListener = null
     }

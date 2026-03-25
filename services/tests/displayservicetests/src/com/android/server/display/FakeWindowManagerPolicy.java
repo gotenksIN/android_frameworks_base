@@ -146,8 +146,9 @@ class FakeWindowManagerPolicy implements WindowManagerPolicy {
     }
 
     @Override
-    public void startedWakingUp(
-            int displayGroupId, int pmWakeReason, boolean anyDefaultOrAdjacentGroupInteractive) {}
+    public void startedWakingUp(int displayGroupId, int pmWakeReason) {
+
+    }
 
     @Override
     public void finishedWakingUp(int displayGroupId, int pmWakeReason) {
@@ -155,8 +156,9 @@ class FakeWindowManagerPolicy implements WindowManagerPolicy {
     }
 
     @Override
-    public void startedGoingToSleep(
-            int displayGroupId, int pmSleepReason, boolean anyDefaultOrAdjacentGroupInteractive) {}
+    public void startedGoingToSleep(int displayGroupId, int pmSleepReason) {
+
+    }
 
     @Override
     public void finishedGoingToSleep(int displayGroupId, int pmSleepReason) {

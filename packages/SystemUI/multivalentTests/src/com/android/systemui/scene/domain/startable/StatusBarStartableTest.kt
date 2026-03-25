@@ -265,8 +265,8 @@ class StatusBarStartableTest : SysuiTestCase() {
         }
         runCurrent()
 
-        kosmos.keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
-            onTop = preconditions.isOccluded,
+        kosmos.keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
+            showWhenLockedActivityOnTop = preconditions.isOccluded,
             taskInfo = if (preconditions.isOccluded) mock() else null,
         )
 

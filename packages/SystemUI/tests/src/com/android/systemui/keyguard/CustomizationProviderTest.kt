@@ -180,8 +180,7 @@ class CustomizationProviderTest : SysuiTestCase() {
             )
         val featureFlags =
             FakeFeatureFlags().apply { set(Flags.WALLPAPER_FULLSCREEN_PREVIEW, true) }
-
-        val interactor =
+        underTest.interactor =
             KeyguardQuickAffordanceInteractor(
                 keyguardInteractor =
                     KeyguardInteractorFactory.create(
@@ -214,18 +213,13 @@ class CustomizationProviderTest : SysuiTestCase() {
                 sceneInteractor = { kosmos.sceneInteractor },
                 msdlPlayer = { kosmos.msdlPlayer },
             )
-        val previewManager =
+        underTest.previewManager =
             KeyguardRemotePreviewManager(
                 mainImmediateScope = testScope.backgroundScope,
                 previewFactory = previewFactory,
                 mainDispatcher = testDispatcher,
                 backgroundHandler = backgroundHandler,
             )
-
-        underTest.interactor = dagger.Lazy { interactor }
-        underTest.shadeModeInteractor = dagger.Lazy { mock() }
-        underTest.fingerprintPropertyInteractor = dagger.Lazy { mock() }
-        underTest.previewManager = dagger.Lazy { previewManager }
         underTest.mainDispatcher = testDispatcher
 
         underTest.attachInfoForTesting(

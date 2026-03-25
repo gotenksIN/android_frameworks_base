@@ -199,13 +199,6 @@ public class BitmapOffloadService extends SystemService {
         }
 
         @Override
-        public void removeBitmap(Uri uri) {
-            mOffloadThread.getThreadHandler().post(() -> {
-                mResolver.delete(uri, null, null);
-            });
-        }
-
-        @Override
         public void registerPermissionHandler(@BitmapOffload.BitmapSource int source,
                 PermissionHandler handler) {
             synchronized (mLock) {

@@ -107,7 +107,7 @@ interface IAudioService {
 
     oneway void portEvent(in int portId, in int event, in @nullable PersistableBundle extras);
 
-    void permissionUpdateBarrier(in boolean forRecord);
+    void permissionUpdateBarrier();
 
     void waitForAudioHandlerBarrier();
 

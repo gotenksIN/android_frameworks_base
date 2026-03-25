@@ -18,7 +18,6 @@ package com.android.systemui.display.dagger
 
 import com.android.systemui.SysUICutoutProvider
 import com.android.systemui.common.ui.ConfigurationState
-import com.android.systemui.decor.dagger.PerDisplaySystemDecorationsModule
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.PerDisplaySingleton
 import com.android.systemui.display.data.repository.DisplayStateRepository
 import com.android.systemui.display.domain.interactor.DisplayStateInteractor
@@ -53,7 +52,7 @@ import kotlinx.coroutines.CoroutineScope
  * thread is not feasible as it would cause jank.
  */
 @PerDisplaySingleton
-@Subcomponent(modules = [PerDisplaySystemUIModule::class, PerDisplaySystemDecorationsModule::class])
+@Subcomponent(modules = [PerDisplaySystemUIModule::class])
 interface SystemUIDisplaySubcomponent {
 
     @get:DisplayAware val avControlsChipInteractor: AvControlsChipInteractor

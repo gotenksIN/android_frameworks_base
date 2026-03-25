@@ -25,7 +25,6 @@ import android.view.Surface;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.display.DisplayManagerService.SyncRoot;
-import com.android.server.display.persistence.PersistentDataStoreDelegate;
 import com.android.server.display.utils.DebugUtils;
 
 import java.util.ArrayList;
@@ -65,7 +64,7 @@ class DisplayDeviceRepository implements DisplayAdapter.Listener {
     /** Global lock object from {@link DisplayManagerService}. */
     private final SyncRoot mSyncRoot;
 
-    private final PersistentDataStoreDelegate mPersistentDataStore;
+    private final PersistentDataStore mPersistentDataStore;
     private final boolean mStableEdidsFlag;
 
     /**
@@ -75,7 +74,7 @@ class DisplayDeviceRepository implements DisplayAdapter.Listener {
      *
      */
     DisplayDeviceRepository(@NonNull SyncRoot syncRoot,
-            @NonNull PersistentDataStoreDelegate persistentDataStore, boolean stableEdidsFlag) {
+            @NonNull PersistentDataStore persistentDataStore, boolean stableEdidsFlag) {
         mSyncRoot = syncRoot;
         mPersistentDataStore = persistentDataStore;
         mStableEdidsFlag = stableEdidsFlag;

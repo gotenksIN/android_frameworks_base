@@ -34,7 +34,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Log;
 import android.widget.Toast;
-import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.Nullable;
 
@@ -65,12 +64,6 @@ public class UninstallUninstalling extends Activity implements
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-                () -> {
-                    // do nothing
-                });
 
         setFinishOnTouchOutside(false);
 
@@ -148,6 +141,11 @@ public class UninstallUninstalling extends Activity implements
         super.onSaveInstanceState(outState);
 
         outState.putInt(UNINSTALL_ID, mUninstallId);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // do nothing
     }
 
     @Override

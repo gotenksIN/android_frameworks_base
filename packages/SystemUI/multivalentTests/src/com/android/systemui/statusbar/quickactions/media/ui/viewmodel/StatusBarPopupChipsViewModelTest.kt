@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.quickactions.media.ui.viewmodel
 
-import android.graphics.RectF
 import android.platform.test.annotations.EnableFlags
 import android.view.Display
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -87,7 +86,7 @@ class StatusBarPopupChipsViewModelTest : SysuiTestCase() {
                 assertIs<QuickActionChipModel.PopupChip>(underTest.shownQuickActionChips.first())
             assertThat(mediaChip.isPopupShown).isFalse()
 
-            mediaChip.showPopup.invoke(context, RectF())
+            mediaChip.showPopup.invoke(context)
             val updatedChip =
                 assertIs<QuickActionChipModel.PopupChip>(underTest.shownQuickActionChips.first())
             assertThat(updatedChip.isPopupShown).isTrue()
@@ -104,7 +103,7 @@ class StatusBarPopupChipsViewModelTest : SysuiTestCase() {
                 assertIs<QuickActionChipModel.PopupChip>(underTest.shownQuickActionChips.first())
             assertThat(mediaChip.isPopupShown).isFalse()
 
-            mediaChip.showPopup.invoke(context, RectF())
+            mediaChip.showPopup.invoke(context)
 
             val shownChip =
                 assertIs<QuickActionChipModel.PopupChip>(underTest.shownQuickActionChips.first())

@@ -27,9 +27,7 @@ import android.hardware.fingerprint.FingerprintSensorPropertiesInternal
 import android.hardware.fingerprint.IFingerprintAuthenticatorsRegisteredCallback
 import android.util.Log
 import com.android.systemui.biometrics.shared.model.FingerprintSensorType
-import com.android.systemui.biometrics.shared.model.PeripheralFingerprintSensorLocation
 import com.android.systemui.biometrics.shared.model.SensorStrength
-import com.android.systemui.biometrics.shared.model.toPeripheralFingerprintSensorLocation
 import com.android.systemui.biometrics.shared.model.toSensorStrength
 import com.android.systemui.biometrics.shared.model.toSensorType
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
@@ -71,9 +69,6 @@ interface FingerprintPropertyRepository {
 
     /** The sensor location relative to each physical display. */
     val sensorLocations: StateFlow<Map<String, SensorLocationInternal>>
-
-    /** The sensor peripheral location. */
-    val peripheralSensorLocation: StateFlow<PeripheralFingerprintSensorLocation>
 }
 
 @SysUISingleton
@@ -138,17 +133,6 @@ constructor(
                 scope = applicationScope,
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = props.value.sensorType.toSensorType(),
-            )
-
-    override val peripheralSensorLocation: StateFlow<PeripheralFingerprintSensorLocation> =
-        props
-            .map { it.location.physicalSensorLocation.toPeripheralFingerprintSensorLocation() }
-            .stateIn(
-                scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
-                initialValue =
-                    props.value.location.physicalSensorLocation
-                        .toPeripheralFingerprintSensorLocation(),
             )
 
     override val sensorLocations: StateFlow<Map<String, SensorLocationInternal>> =

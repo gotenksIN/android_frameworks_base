@@ -1,5 +1,4 @@
-// Signature format: 6.0
-// - style=java
+// Signature format: 2.0
 package com.android.future.usb {
 
   public class UsbAccessory {

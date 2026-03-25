@@ -104,7 +104,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
             int displayId) {
         super(displayId, detectSingleFingerTripleTap, detectShortcutTrigger, trace, callback);
         if (DEBUG_ALL) {
-            Slog.i(mTag,
+            Slog.i(mLogTag,
                     "WindowMagnificationGestureHandler() , displayId = " + displayId + ")");
         }
         mContext = context;
@@ -160,7 +160,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
     @Override
     public void onDestroy(boolean resetMagnification) {
         if (DEBUG_ALL) {
-            Slog.i(mTag, "onDestroy(); delayed = "
+            Slog.i(mLogTag, "onDestroy(); delayed = "
                     + mDetectingState.toString());
         }
         if (resetMagnification) {
@@ -190,7 +190,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
     private void enableWindowMagnifier(float centerX, float centerY,
             @MagnificationConnectionManager.WindowPosition int windowPosition) {
         if (DEBUG_ALL) {
-            Slog.i(mTag, "enableWindowMagnifier :"
+            Slog.i(mLogTag, "enableWindowMagnifier :"
                     + centerX + ", " + centerY + ", " + windowPosition);
         }
 
@@ -203,7 +203,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
 
     private void disableWindowMagnifier() {
         if (DEBUG_ALL) {
-            Slog.i(mTag, "disableWindowMagnifier()");
+            Slog.i(mLogTag, "disableWindowMagnifier()");
         }
         mMagnificationConnectionManager.disableWindowMagnification(mDisplayId, false);
     }
@@ -219,7 +219,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
 
     private void onTripleTap(MotionEvent up) {
         if (DEBUG_DETECTING) {
-            Slog.i(mTag, "onTripleTap()");
+            Slog.i(mLogTag, "onTripleTap()");
         }
         toggleMagnification(up.getX(), up.getY(),
                 MagnificationConnectionManager.WINDOW_POSITION_AT_CENTER);
@@ -228,7 +228,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
     @VisibleForTesting
     void onTripleTapAndHold(MotionEvent up) {
         if (DEBUG_DETECTING) {
-            Slog.i(mTag, "onTripleTapAndHold()");
+            Slog.i(mLogTag, "onTripleTapAndHold()");
         }
         mViewportDraggingState.mEnabledBeforeDrag =
                 mMagnificationConnectionManager.isWindowMagnifierEnabled(mDisplayId);
@@ -295,7 +295,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
 
     private void transitionTo(State state) {
         if (DEBUG_STATE_TRANSITIONS) {
-            Slog.i(mTag, "state transition: " + (State.nameOf(mCurrentState) + " -> "
+            Slog.i(mLogTag, "state transition: " + (State.nameOf(mCurrentState) + " -> "
                     + State.nameOf(state) + " at "
                     + asList(copyOfRange(new RuntimeException().getStackTrace(), 1, 5)))
                     .replace(getClass().getName(), ""));
@@ -501,10 +501,10 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
                 List<MotionEventInfo> delayedEventQueue,
                 MotionEvent motionEvent) {
             if (DEBUG_DETECTING) {
-                Slog.d(mTag, "onGestureDetected : gesture = "
+                Slog.d(mLogTag, "onGestureDetected : gesture = "
                         + MagnificationGestureMatcher.gestureIdToString(
                         gestureId));
-                Slog.d(mTag,
+                Slog.d(mLogTag,
                         "onGestureDetected : delayedEventQueue = " + delayedEventQueue);
             }
             if (gestureId == MagnificationGestureMatcher.GESTURE_TWO_FINGERS_DOWN_OR_SWIPE
@@ -527,7 +527,7 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
                 List<MotionEventInfo> delayedEventQueue,
                 MotionEvent motionEvent) {
             if (DEBUG_DETECTING) {
-                Slog.d(mTag,
+                Slog.d(mLogTag,
                         "onGestureCancelled : delayedEventQueue = " + delayedEventQueue);
             }
             mMotionEventDispatcherDelegate.sendDelayedMotionEvents(delayedEventQueue,

@@ -1,2 +1,1 @@
-// Signature format: 6.0
-// - style=java
+// Signature format: 2.0

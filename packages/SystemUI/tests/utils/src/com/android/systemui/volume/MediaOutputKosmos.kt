@@ -24,7 +24,6 @@ import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.media.mediaOutputDialogManager
 import com.android.systemui.qs.panels.data.repository.qsPanelAppearanceRepository
-import com.android.systemui.settings.userTracker
 import com.android.systemui.util.concurrency.execution
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
@@ -47,7 +46,6 @@ val Kosmos.mediaOutputActionsInteractor by
         MediaOutputActionsInteractor(
             applicationCoroutineScope,
             testDispatcher,
-            userTracker,
             mediaOutputDialogManager,
             qsPanelAppearanceRepository,
             expandedAudioTileDetailsFeatureInteractor,

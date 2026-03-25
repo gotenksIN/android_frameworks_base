@@ -163,17 +163,10 @@ class DumpHandlerTest : SysuiTestCase() {
         dumpHandler.dump(fd, pw, args)
 
         // THEN the normal module and all buffers are dumped
-        if (DumpHandler.DUMP_ALL_WHEN_NORMAL) {
-            // Critical modules are dumped when DUMP_ALL_WHEN_NORMAL is true
-            verify(dumpable1).dump(pw, args)
-            verify(dumpable2).dump(pw, args)
-        } else {
-            // Critical modules are not dumped when DUMP_ALL_WHEN_NORMAL is false
-            verify(dumpable1, never())
-                .dump(any(PrintWriter::class.java), any(Array<String>::class.java))
-            verify(dumpable2, never())
-                .dump(any(PrintWriter::class.java), any(Array<String>::class.java))
-        }
+        verify(dumpable1, never())
+            .dump(any(PrintWriter::class.java), any(Array<String>::class.java))
+        verify(dumpable2, never())
+            .dump(any(PrintWriter::class.java), any(Array<String>::class.java))
         verify(dumpable3).dump(pw, args)
         verify(buffer1).dump(pw, 0)
         verify(buffer2).dump(pw, 0)

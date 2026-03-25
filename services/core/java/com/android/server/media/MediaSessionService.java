@@ -184,7 +184,6 @@ public class MediaSessionService extends SystemService implements Monitor {
     private AudioManager mAudioManager;
     private NotificationListener mNotificationListener;
     private boolean mHasFeatureLeanback;
-    private boolean mHasFeatureDesktop;
     private ActivityManagerInternal mActivityManagerInternal;
     private UsageStatsManagerInternal mUsageStatsManagerInternal;
 
@@ -302,8 +301,6 @@ public class MediaSessionService extends SystemService implements Monitor {
                 }, null /* handler */);
         mHasFeatureLeanback = mContext.getPackageManager().hasSystemFeature(
                 PackageManager.FEATURE_LEANBACK);
-        mHasFeatureDesktop = mContext.getPackageManager().hasSystemFeature(
-                PackageManager.FEATURE_PC);
 
         updateUser();
 
@@ -2422,10 +2419,9 @@ public class MediaSessionService extends SystemService implements Monitor {
                             asSystemService, stream, direction, flags, musicOnly);
                 } else if (isMute) {
                     if (down && keyEvent.getRepeatCount() == 0) {
-                        int muteDirection = mHasFeatureDesktop
-                                ? AudioManager.ADJUST_MUTE : AudioManager.ADJUST_TOGGLE_MUTE;
                         dispatchAdjustVolumeLocked(packageName, opPackageName, pid, uid,
-                                asSystemService, stream, muteDirection, flags, musicOnly);
+                                asSystemService, stream, AudioManager.ADJUST_TOGGLE_MUTE, flags,
+                                musicOnly);
                     }
                 }
             }

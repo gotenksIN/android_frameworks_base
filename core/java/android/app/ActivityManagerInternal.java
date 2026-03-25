@@ -28,7 +28,6 @@ import android.annotation.SpecialUsers.CanBeCURRENT;
 import android.annotation.SpecialUsers.CanBeCURRENT_OR_SELF;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager.ProcessCapability;
-import android.app.ActivityManager.ProcessState;
 import android.app.ActivityManager.RestrictionLevel;
 import android.app.AnrTypes.AnrType;
 import android.app.assist.ActivityId;
@@ -257,7 +256,7 @@ public abstract class ActivityManagerInternal {
      * Note if the UID doesn't exist, it'll return {@link ActivityManager#PROCESS_STATE_NONEXISTENT}
      * (-1).
      */
-    public abstract @ProcessState int getUidProcessState(int uid);
+    public abstract int getUidProcessState(int uid);
 
     /**
      * Get a map of pid and package name that process of that pid Android/data and Android/obb
@@ -795,8 +794,7 @@ public abstract class ActivityManagerInternal {
      * @param maxProcState the process state at or below which to preserve processes,
      *                     or {@code -1} to ignore the process state
      */
-    public abstract void killAllBackgroundProcessesExcept(int minTargetSdk,
-            @ProcessState int maxProcState);
+    public abstract void killAllBackgroundProcessesExcept(int minTargetSdk, int maxProcState);
 
     /** Starts a given process. */
     public abstract void startProcess(String processName, ApplicationInfo info,

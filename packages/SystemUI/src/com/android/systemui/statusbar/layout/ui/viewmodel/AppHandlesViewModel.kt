@@ -21,7 +21,8 @@ import android.graphics.Region
 import androidx.compose.runtime.getValue
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import com.android.wm.shell.windowdecor.viewholder.AppHandlePositionCallback
 import com.android.wm.shell.windowdecor.viewholder.AppHandles
@@ -46,7 +47,8 @@ constructor(
     appHandles: Optional<AppHandles>,
     @Background backgroundScope: CoroutineScope,
     @Main sysuiMainExecutor: Executor,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+    private val hydrator = Hydrator(traceName = "AppHandlesViewModel.hydrator")
 
     private val _appHandleBounds: Flow<List<Rect>> =
         if (appHandles.isPresent) {
@@ -69,9 +71,10 @@ constructor(
      * status bar content doesn't overlap with them. This is a hydrated value.
      */
     val appHandleBounds: List<Rect> by
-        _appHandleBounds.hydratedStateOf(
+        hydrator.hydratedStateOf(
             traceName = "StatusBar.appHandleBounds",
             initialValue = emptyList(),
+            source = _appHandleBounds,
         )
 
     private val _touchableExclusionRegion: Flow<Region> =
@@ -86,10 +89,15 @@ constructor(
      * its overlap with app handles.
      */
     val touchableExclusionRegion: Region by
-        _touchableExclusionRegion.hydratedStateOf(
+        hydrator.hydratedStateOf(
             traceName = "StatusBar.touchableExclusionRegion",
             initialValue = Region.obtain(),
+            source = _touchableExclusionRegion,
         )
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

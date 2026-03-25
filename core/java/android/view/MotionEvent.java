@@ -679,14 +679,6 @@ public final class MotionEvent extends InputEvent implements Parcelable {
     public static final int EDGE_RIGHT = 0x00000008;
 
     /**
-     * Used by {@link InputManager#remapControllerAxis} to indicate that the axis should be
-     * disabled.
-     *
-     * @hide
-     */
-    public static final int AXIS_DISABLED = -1;
-
-    /**
      * Axis constant: X axis of a motion event.
      * <p>
      * <ul>

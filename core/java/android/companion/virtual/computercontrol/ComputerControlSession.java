@@ -63,7 +63,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -558,7 +557,6 @@ public final class ComputerControlSession implements AutoCloseable {
                     e.rethrowFromSystemServer();
                 }
             }
-            fireScreenshotCallbackIfReady(callback);
         }
     }
 
@@ -866,16 +864,14 @@ public final class ComputerControlSession implements AutoCloseable {
             @CallbackExecutor Executor executor,
             OutcomeReceiver<Image, ScreenshotException> receiver,
             @Nullable CancellationSignal cancellationSignal,
-            AtomicBoolean isRequestSuccess,
-            AtomicReference<Image> pendingImage) {
+            AtomicBoolean isRequestSuccess) {
 
         ScreenshotCallbackRecord(
                 String traceTrack,
                 @CallbackExecutor Executor executor,
                 OutcomeReceiver<Image, ScreenshotException> receiver,
                 @Nullable CancellationSignal cancellationSignal) {
-            this(traceTrack, executor, receiver, cancellationSignal, new AtomicBoolean(),
-                    new AtomicReference<>());
+            this(traceTrack, executor, receiver, cancellationSignal, new AtomicBoolean());
         }
 
         ScreenshotCallbackRecord {
@@ -905,12 +901,7 @@ public final class ComputerControlSession implements AutoCloseable {
                 // The image was already consumed by an earlier callback.
                 return;
             }
-            final var oldImage = mOneShotPendingScreenshotCallback.pendingImage.getAndSet(image);
-            if (oldImage != null) {
-                Log.d(TAG, "Replacing old image with new one for screenshot callback");
-                oldImage.close();
-            }
-            fireScreenshotCallbackIfReady(mOneShotPendingScreenshotCallback);
+            fireScreenshotCallback(it -> it.onResult(image));
         }
     }
 
@@ -918,13 +909,6 @@ public final class ComputerControlSession implements AutoCloseable {
             @ScreenshotException.ErrorCode int error, String message) {
         synchronized (mImageReaderLock) {
             if (mOneShotPendingScreenshotCallback != callback) {
-                return;
-            }
-            final var pendingImage = callback.pendingImage.getAndSet(null);
-            if (pendingImage != null) {
-                // There is a pending image that is waiting for the request success result.
-                // Use that image and ignore the error.
-                fireScreenshotCallback(it -> it.onResult(pendingImage));
                 return;
             }
             Log.d(TAG, "onScreenshotError: code=" + error + ": " + message);
@@ -940,20 +924,6 @@ public final class ComputerControlSession implements AutoCloseable {
             throw new IllegalArgumentException(
                     "Touch coordinates must be within the display bounds");
         }
-    }
-
-    @GuardedBy("mImageReaderLock")
-    private void fireScreenshotCallbackIfReady(ScreenshotCallbackRecord callback) {
-        if (mOneShotPendingScreenshotCallback != callback) {
-            return;
-        }
-        if (!callback.isRequestSuccess.get()) {
-            return;
-        }
-        if (callback.pendingImage.get() == null) {
-            return;
-        }
-        fireScreenshotCallback(it -> it.onResult(callback.pendingImage.get()));
     }
 
     @GuardedBy("mImageReaderLock")

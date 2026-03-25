@@ -72,7 +72,7 @@ fun LargeScreenImeSwitcherMenuContent(
     Column(
         modifier =
             Modifier.fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(MenuDimensions.InternalPadding)
                 .semantics {
                     paneTitle = paneTitleDescription

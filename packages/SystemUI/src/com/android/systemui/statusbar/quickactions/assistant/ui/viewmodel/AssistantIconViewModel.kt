@@ -20,7 +20,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.assistant.domain.interactor.AssistantIconInteractor
 import com.android.systemui.statusbar.quickactions.assistant.shared.model.AssistantIconSharedModel
@@ -35,19 +36,24 @@ import kotlinx.coroutines.flow.map
 class AssistantIconViewModel
 @AssistedInject
 constructor(assistantIconInteractor: AssistantIconInteractor) :
-    StatusBarPopupChipViewModel, HydratedActivatable() {
+    StatusBarPopupChipViewModel, ExclusiveActivatable() {
+    private val hydrator: Hydrator = Hydrator("AssistantIconViewModel.hydrator")
 
     override val chip: QuickActionChipModel by
-        assistantIconInteractor.assistantIconSharedModel
-            .map {
-                it.toLaunchChipModel { context ->
-                    context?.let { assistantIconInteractor.startAssistant(context) }
-                }
-            }
-            .hydratedStateOf(
-                traceName = "AssistantIcon",
-                initialValue = QuickActionChipModel.Hidden(QuickActionChipId.AssistantIcon),
-            )
+        hydrator.hydratedStateOf(
+            traceName = "AssistantIcon",
+            initialValue = QuickActionChipModel.Hidden(QuickActionChipId.AssistantIcon),
+            source =
+                assistantIconInteractor.assistantIconSharedModel.map {
+                    it.toLaunchChipModel { context ->
+                        context?.let { assistantIconInteractor.startAssistant(context) }
+                    }
+                },
+        )
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

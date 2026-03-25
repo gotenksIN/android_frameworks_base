@@ -70,6 +70,6 @@ constructor(
         )
 
     fun openCustomizeLockScreen() {
-        keyguardTouchHandlingViewModel.onLongPress()
+        keyguardTouchHandlingViewModel.onLongPress(true)
     }
 }

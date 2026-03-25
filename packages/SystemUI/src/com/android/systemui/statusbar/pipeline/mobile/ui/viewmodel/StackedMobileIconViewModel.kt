@@ -20,7 +20,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.lifecycle.Activatable
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.shade.ShadeDisplayAware
@@ -68,11 +69,13 @@ constructor(
     @StackedMobileIconTableLog private val tableLogger: TableLogBuffer,
     @ShadeDisplayAware private val context: Context,
     private val mobileContextProvider: MobileContextProvider,
-) : HydratedActivatable(), StackedMobileIconViewModel {
+) : ExclusiveActivatable(), StackedMobileIconViewModel {
 
     init {
         StatusBarMobileIconKairos.assertInLegacyMode()
     }
+
+    private val hydrator = Hydrator("StackedMobileIconViewModel")
 
     private val iconViewModelFlow: Flow<List<MobileIconViewModelCommon>> =
         combine(
@@ -97,115 +100,162 @@ constructor(
         }
 
     override val dualSim: DualSim? by
-        _dualSim
-            .pairwiseBy(initialValue = null) { old: DualSim?, new: DualSim? ->
-                // _dualSim is nullable, meaning logDiffsForTable can't be used here. Instead,
-                // we do the comparison manually and return the new value
-                logDualSimDiff(old, new, tableLogger)
-                new
-            }
-            .hydratedStateOf(initialValue = null)
+        hydrator.hydratedStateOf(
+            traceName = "dualSim",
+            source =
+                _dualSim.pairwiseBy(initialValue = null) { old: DualSim?, new: DualSim? ->
+                    // _dualSim is nullable, meaning logDiffsForTable can't be used here. Instead,
+                    // we do the comparison manually and return the new value
+                    logDualSimDiff(old, new, tableLogger)
+                    new
+                },
+            initialValue = null,
+        )
 
     /** Content description of both icons, starting with the active connection. */
     override val contentDescription: String? by
-        flowIfIconIsVisible(
-                iconViewModelFlow.flatMapLatest { viewModels ->
-                    combine(viewModels.map { it.contentDescription }) { contentDescriptions ->
-                            contentDescriptions.map { it?.loadContentDescription(context) }
-                        }
-                        .map { loadedStrings ->
-                            // Only provide the content description if both icons have one
-                            if (loadedStrings.any { it == null }) {
-                                null
-                            } else {
-                                // The content description of each icon has the format:
-                                // "[Carrier name], N bars."
-                                // To combine, we simply join them with a space
-                                loadedStrings.joinToString(" ")
+        hydrator.hydratedStateOf(
+            traceName = "contentDescription",
+            source =
+                flowIfIconIsVisible(
+                    iconViewModelFlow.flatMapLatest { viewModels ->
+                        combine(viewModels.map { it.contentDescription }) { contentDescriptions ->
+                                contentDescriptions.map { it?.loadContentDescription(context) }
                             }
-                        }
-                }
-            )
-            .hydratedStateOf(initialValue = null)
+                            .map { loadedStrings ->
+                                // Only provide the content description if both icons have one
+                                if (loadedStrings.any { it == null }) {
+                                    null
+                                } else {
+                                    // The content description of each icon has the format:
+                                    // "[Carrier name], N bars."
+                                    // To combine, we simply join them with a space
+                                    loadedStrings.joinToString(" ")
+                                }
+                            }
+                    }
+                ),
+            initialValue = null,
+        )
 
     override val primaryViewModel: MobileIconViewModelCommon? by
-    iconViewModelFlow
-        .mapLatest { viewModels -> viewModels.firstOrNull() }
-        .hydratedStateOf(initialValue = null)
+    hydrator.hydratedStateOf(
+        traceName = "primaryViewModel",
+        source =
+        iconViewModelFlow.mapLatest { viewModels ->
+            viewModels.firstOrNull()
+        },
+        initialValue = null,
+    )
 
     override val secondaryViewModel: MobileIconViewModelCommon? by
-    iconViewModelFlow
-        .mapLatest { viewModels -> viewModels.lastOrNull() }
-        .hydratedStateOf(initialValue = null)
+    hydrator.hydratedStateOf(
+        traceName = "secondaryViewModel",
+        source =
+        iconViewModelFlow.mapLatest { viewModels ->
+            viewModels.lastOrNull()
+        },
+        initialValue = null,
+    )
 
     override val networkTypeIcon: Icon.Resource? by
-        flowIfIconIsVisible(
-                iconViewModelFlow.flatMapLatest { viewModels ->
-                    viewModels.firstOrNull()?.networkTypeIcon ?: flowOf(null)
-                }
-            )
-            .hydratedStateOf(initialValue = null)
+        hydrator.hydratedStateOf(
+            traceName = "networkTypeIcon",
+            source =
+                flowIfIconIsVisible(
+                    iconViewModelFlow.flatMapLatest { viewModels ->
+                        viewModels.firstOrNull()?.networkTypeIcon ?: flowOf(null)
+                    }
+                ),
+            initialValue = null,
+        )
 
     override val activityInVisible: Boolean by
-        flowIfIconIsVisible(
-                iconViewModelFlow.flatMapLatest { viewModels ->
-                    viewModels.firstOrNull()?.activityInVisible ?: flowOf(false)
-                }
-            )
-            .map { it == true }
-            .hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "activityInVisible",
+            source =
+                flowIfIconIsVisible(
+                        iconViewModelFlow.flatMapLatest { viewModels ->
+                            viewModels.firstOrNull()?.activityInVisible ?: flowOf(false)
+                        }
+                    )
+                    .map { it == true },
+            initialValue = false,
+        )
 
     override val activityOutVisible: Boolean by
-        flowIfIconIsVisible(
-                iconViewModelFlow.flatMapLatest { viewModels ->
-                    viewModels.firstOrNull()?.activityOutVisible ?: flowOf(false)
-                }
-            )
-            .map { it == true }
-            .hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "activityOutVisible",
+            source =
+                flowIfIconIsVisible(
+                        iconViewModelFlow.flatMapLatest { viewModels ->
+                            viewModels.firstOrNull()?.activityOutVisible ?: flowOf(false)
+                        }
+                    )
+                    .map { it == true },
+            initialValue = false,
+        )
 
     override val activityContainerVisible: Boolean by
-        flowIfIconIsVisible(
-                iconViewModelFlow.flatMapLatest { viewModels ->
-                    viewModels.firstOrNull()?.activityContainerVisible ?: flowOf(false)
-                }
-            )
-            .map { it == true }
-            .hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "activityContainerVisible",
+            source =
+                flowIfIconIsVisible(
+                        iconViewModelFlow.flatMapLatest { viewModels ->
+                            viewModels.firstOrNull()?.activityContainerVisible ?: flowOf(false)
+                        }
+                    )
+                    .map { it == true },
+            initialValue = false,
+        )
 
     override val mobileContext: Context? by
-        flowIfIconIsVisible(
-                iconViewModelFlow.map { viewModels ->
-                    // Get mobile context of primary connection
-                    viewModels.firstOrNull()?.let {
-                        mobileContextProvider.getMobileContextForSub(it.subscriptionId, context)
+        hydrator.hydratedStateOf(
+            traceName = "mobileContext",
+            source =
+                flowIfIconIsVisible(
+                    iconViewModelFlow.map { viewModels ->
+                        // Get mobile context of primary connection
+                        viewModels.firstOrNull()?.let {
+                            mobileContextProvider.getMobileContextForSub(it.subscriptionId, context)
+                        }
                     }
-                }
-            )
-            .hydratedStateOf(initialValue = null)
+                ),
+            initialValue = null,
+        )
 
     override val roaming: Boolean by
-        _isIconVisible
-            .flatMapLatest { isVisible ->
-                if (isVisible) {
-                        iconViewModelFlow.flatMapLatest { viewModels ->
-                            viewModels.firstOrNull()?.roaming ?: flowOf(false)
+        hydrator.hydratedStateOf(
+            traceName = "isRoaming",
+            source =
+                _isIconVisible.flatMapLatest { isVisible ->
+                    if (isVisible) {
+                            iconViewModelFlow.flatMapLatest { viewModels ->
+                                viewModels.firstOrNull()?.roaming ?: flowOf(false)
+                            }
+                        } else {
+                            flowOf(false)
                         }
-                    } else {
-                        flowOf(false)
-                    }
-                    .logDiffsForTable(
-                        tableLogBuffer = tableLogger,
-                        columnName = COL_ROAMING,
-                        initialValue = false,
-                    )
-            }
-            .hydratedStateOf(initialValue = false)
+                        .logDiffsForTable(
+                            tableLogBuffer = tableLogger,
+                            columnName = COL_ROAMING,
+                            initialValue = false,
+                        )
+                },
+            initialValue = false,
+        )
 
     override val isIconVisible: Boolean by
-        _isIconVisible
-            .logDiffsForTable(tableLogger, columnName = COL_IS_ICON_VISIBLE, initialValue = false)
-            .hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "isIconVisible",
+            source =
+                _isIconVisible.logDiffsForTable(
+                    tableLogger,
+                    columnName = COL_IS_ICON_VISIBLE,
+                    initialValue = false,
+                ),
+            initialValue = false,
+        )
 
     private fun <T> flowIfIconIsVisible(flow: Flow<T>): Flow<T?> {
         return _isIconVisible.flatMapLatest { isVisible ->
@@ -215,6 +265,10 @@ constructor(
                 flowOf(null)
             }
         }
+    }
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
     }
 
     @AssistedFactory

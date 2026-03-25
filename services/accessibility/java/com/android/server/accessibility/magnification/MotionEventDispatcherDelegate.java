@@ -25,7 +25,6 @@ import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 
 import com.android.internal.R;
-import com.android.server.accessibility.AccessibilityLogUtil;
 import com.android.server.accessibility.AccessibilityMotionEventBuilder;
 
 import java.util.List;
@@ -36,7 +35,7 @@ import java.util.List;
 class MotionEventDispatcherDelegate {
 
     private static final String TAG = MotionEventDispatcherDelegate.class.getSimpleName();
-    private static final boolean DEBUG = AccessibilityLogUtil.isDebugEnabled(TAG);
+    private static final boolean DBG = Log.isLoggable(TAG, Log.DEBUG);
 
     private final EventDispatcher mEventDispatcher;
     private final int mMultiTapMaxDelay;
@@ -79,7 +78,7 @@ class MotionEventDispatcherDelegate {
         // UP/DOWN event in queue: still delegating if pointer is down, detecting otherwise
         if (event.getActionMasked() == ACTION_DOWN) {
             mLastDelegatedDownEventTime = event.getDownTime();
-            if (DEBUG) {
+            if (DBG) {
                 Log.d(TAG, "dispatchMotionEvent mLastDelegatedDownEventTime time = "
                         + mLastDelegatedDownEventTime);
             }
@@ -91,7 +90,7 @@ class MotionEventDispatcherDelegate {
         // by stale events. After the cached events, which always have a down, are
         // injected we need to also update the down time of all subsequent non cached
         // events. All delegated events cached and non-cached are delivered here.
-        if (DEBUG) {
+        if (DBG) {
             Log.d(TAG, "dispatchMotionEvent original down time = " + event.getDownTime());
         }
         event.setDownTime(mLastDelegatedDownEventTime);

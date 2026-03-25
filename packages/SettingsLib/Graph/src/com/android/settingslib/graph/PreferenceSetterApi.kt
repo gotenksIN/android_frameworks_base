@@ -38,8 +38,6 @@ import com.android.settingslib.metadata.PreferenceRestrictionProvider
 import com.android.settingslib.metadata.PreferenceScreenRegistry
 import com.android.settingslib.metadata.ReadWritePermit
 import com.android.settingslib.metadata.KeyParameters
-import com.android.settingslib.metadata.PreferenceScreenMetadata
-import com.android.settingslib.metadata.isExposable
 import com.android.settingslib.metadata.toMap
 import com.android.settingslib.metadata.usePreferenceHierarchyScope
 
@@ -150,7 +148,6 @@ class PreferenceSetterApiHandler(
         }
         val screenMetadata =
             PreferenceScreenRegistry.create(application, request) ?: return notFound()
-        if(!screenMetadata.isExposable(application)) return notFound()
         val key = request.key
         val metadata =
             usePreferenceHierarchyScope {
@@ -171,8 +168,6 @@ class PreferenceSetterApiHandler(
         }
 
         fun invoke(): Int {
-            if (!metadata.isExposable(application) || metadata is PreferenceScreenMetadata)
-                return notFound()
             if (metadata !is PersistentPreference<*>) return PreferenceSetterResult.UNSUPPORTED
             if (!metadata.isEnabled(application)) return PreferenceSetterResult.DISABLED
             if (metadata is PreferenceRestrictionProvider && metadata.isRestricted(application)) {

@@ -194,7 +194,6 @@ public class AuthControllerTest extends SysuiTestCase {
     private Handler mHandler;
     private DelayableExecutor mBackgroundExecutor;
     private TestableAuthController mAuthController;
-    private List<FaceSensorPropertiesInternal> mFaceProps;
 
     @Before
     public void setup() throws RemoteException {
@@ -251,7 +250,7 @@ public class AuthControllerTest extends SysuiTestCase {
                                 true /* resetLockoutRequireHardwareAuthToken */));
         when(mFingerprintManager.getSensorPropertiesInternal()).thenReturn(fpProps);
 
-        mFaceProps =
+        final List<FaceSensorPropertiesInternal> faceProps =
                 List.of(
                         new FaceSensorPropertiesInternal(
                                 2 /* sensorId */,
@@ -262,7 +261,7 @@ public class AuthControllerTest extends SysuiTestCase {
                                 true /* supportsFaceDetection */,
                                 true /* supportsSelfIllumination */,
                                 true /* resetLockoutRequireHardwareAuthToken */));
-        when(mFaceManager.getSensorPropertiesInternal()).thenReturn(mFaceProps);
+        when(mFaceManager.getSensorPropertiesInternal()).thenReturn(faceProps);
 
         mAuthController = new TestableAuthController(mContextSpy);
 
@@ -273,7 +272,7 @@ public class AuthControllerTest extends SysuiTestCase {
                 .addAuthenticatorsRegisteredCallback(mFaceAuthenticatorsRegisteredCaptor.capture());
 
         mFpAuthenticatorsRegisteredCaptor.getValue().onAllAuthenticatorsRegistered(fpProps);
-        mFaceAuthenticatorsRegisteredCaptor.getValue().onAllAuthenticatorsRegistered(mFaceProps);
+        mFaceAuthenticatorsRegisteredCaptor.getValue().onAllAuthenticatorsRegistered(faceProps);
 
         verify(mKeyguardManager)
                 .addKeyguardLockedStateListener(any(), mKeyguardLockedStateCaptor.capture());
@@ -352,7 +351,6 @@ public class AuthControllerTest extends SysuiTestCase {
         reset(mFaceManager);
         mAuthController.start();
 
-        when(mFaceManager.getSensorPropertiesInternal()).thenReturn(mFaceProps);
         verify(mFaceManager)
                 .addAuthenticatorsRegisteredCallback(mFaceAuthenticatorsRegisteredCaptor.capture());
 

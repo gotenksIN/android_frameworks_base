@@ -330,31 +330,31 @@ public class PhonePipMenuController implements PipMenuController,
     }
 
     /**
-     * Similar to {@link #showMenu(int, Rect, boolean, boolean)} but only show the menu
+     * Similar to {@link #showMenu(int, Rect, boolean, boolean, boolean)} but only show the menu
      * upon PiP window transition is finished.
      */
     public void showMenuWithPossibleDelay(int menuState, Rect stackBounds, boolean allowMenuTimeout,
-            boolean willResizeMenu) {
+            boolean willResizeMenu, boolean showResizeHandle) {
         if (willResizeMenu) {
             // hide all visible controls including close button and etc. first, this is to ensure
             // menu is totally invisible during the transition to eliminate unpleasant artifacts
             fadeOutMenu();
         }
         showMenuInternal(menuState, stackBounds, allowMenuTimeout, willResizeMenu,
-                willResizeMenu /* withDelay=willResizeMenu here */);
+                willResizeMenu /* withDelay=willResizeMenu here */, showResizeHandle);
     }
 
     /**
      * Shows the menu activity immediately.
      */
     public void showMenu(int menuState, Rect stackBounds, boolean allowMenuTimeout,
-            boolean willResizeMenu) {
+            boolean willResizeMenu, boolean showResizeHandle) {
         showMenuInternal(menuState, stackBounds, allowMenuTimeout, willResizeMenu,
-                false /* withDelay */);
+                false /* withDelay */, showResizeHandle);
     }
 
     private void showMenuInternal(int menuState, Rect stackBounds, boolean allowMenuTimeout,
-            boolean willResizeMenu, boolean withDelay) {
+            boolean willResizeMenu, boolean withDelay, boolean showResizeHandle) {
         if (DEBUG) {
             ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
                     "%s: showMenu() state=%s"
@@ -362,8 +362,9 @@ public class PhonePipMenuController implements PipMenuController,
                             + " allowMenuTimeout=%s"
                             + " willResizeMenu=%s"
                             + " withDelay=%s"
+                            + " showResizeHandle=%s"
                             + " callers=\n%s", TAG, menuState, isMenuVisible(), allowMenuTimeout,
-                    willResizeMenu, withDelay, Debug.getCallers(5, "    "));
+                    willResizeMenu, withDelay, showResizeHandle, Debug.getCallers(5, "    "));
         }
 
         if (!checkPipMenuState()) {
@@ -375,7 +376,8 @@ public class PhonePipMenuController implements PipMenuController,
                 PipMenuController.ALPHA_NO_CHANGE);
         updateMenuBounds(stackBounds);
 
-        mPipMenuView.showMenu(menuState, stackBounds, allowMenuTimeout, willResizeMenu, withDelay);
+        mPipMenuView.showMenu(menuState, stackBounds, allowMenuTimeout, willResizeMenu, withDelay,
+                showResizeHandle);
     }
 
     /**

@@ -17,22 +17,16 @@
 package com.android.systemui.notifications.intelligence.rules.data.repository
 
 import android.content.ContentResolver
-import android.net.Uri
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
 
 /** A repository to fetch contact-related information for notification rules. */
-interface ContactsRepository {
-    /**
-     * Returns the contact associated with the given [lookupUri], or null if it couldn't be found.
-     */
-    suspend fun lookupContact(lookupUri: Uri, contentResolver: ContentResolver): ContactModel?
-
+public interface ContactsRepository {
     /**
      * Fetches all contacts whose name matches [searchQuery].
      *
      * @param contentResolver the content resolver for the current user.
      */
-    suspend fun fetchContacts(
+    public suspend fun fetchContacts(
         searchQuery: String,
         contentResolver: ContentResolver,
     ): List<ContactModel>

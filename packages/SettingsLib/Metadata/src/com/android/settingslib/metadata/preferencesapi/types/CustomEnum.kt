@@ -21,45 +21,29 @@ import androidx.annotation.StringRes
 import com.android.settingslib.metadata.preferencesapi.resolveString
 import kotlin.reflect.KClass
 import com.android.settingslib.metadata.preferencesapi.safe
-import com.android.settingslib.metadata.preferencesapi.types.EType
 
-inline fun <reified T : Any, E> CustomEnum(
+inline fun <reified T, E> CustomEnum(
     enumClass: KClass<E>,
     @StringRes description: Int
-): CustomEnum<E, T> where E : Enum<E>, E : EnumApi<T> {
-    val externalType = when (T::class) {
-        Int::class -> EType.Int
-        String::class -> EType.String
-        Boolean::class -> EType.Boolean
-        else -> error("Unsupported external type.")
-    } as EType<T>
-    return CustomEnum(enumClass, externalType, descriptionRes = description, description = null)
-}
+) where E : Enum<E>, E : EnumApi<T> = CustomEnum(enumClass, T::class.java, descriptionRes = description, description = null)
 
-inline fun <reified T : Any, E> CustomEnum(
+inline fun <reified T, E> CustomEnum(
     enumClass: KClass<E>,
     description: String
-): CustomEnum<E, T> where E : Enum<E>, E : EnumApi<T> {
-    val externalType = when (T::class) {
-        Int::class -> EType.Int
-        String::class -> EType.String
-        Boolean::class -> EType.Boolean
-        else -> error("Unsupported external type.")
-    } as EType<T>
-    return CustomEnum(enumClass, externalType, descriptionRes = null, description = description)
-}
+) where E : Enum<E>, E : EnumApi<T> = CustomEnum(enumClass, T::class.java, descriptionRes = null, description = description)
 
 /**
  * An entry from the enum.
  *
  * DO NOT CONSTRUCT DIRECTLY. Use the helper methods instead.
 */
-class CustomEnum<EnumType, ExternalType : Any> constructor (
+class CustomEnum<EnumType, ExternalType> constructor (
     val enumClass: KClass<EnumType>,
-    override val externalType: EType<ExternalType>,
+    private val valueType: Class<ExternalType>,
     @field:StringRes val descriptionRes: Int?,
     val description: String?,
 ) : FiniteOptionsType<EnumType, ExternalType> where EnumType : Enum<EnumType>, EnumType : EnumApi<ExternalType> { // todo: support internal type
+    override fun getType(): Class<ExternalType> = valueType
 
     init {
         val isStringApi = EnumApiWithString::class.java.isAssignableFrom(enumClass.java)

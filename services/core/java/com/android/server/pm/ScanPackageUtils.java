@@ -309,10 +309,7 @@ final class ScanPackageUtils {
         // The native libs of Apex is located in apex_payload.img, don't need to parse it from
         // the original apex file
         if (!isApex) {
-            // Note that we scan APKs in updated APEXes as new installs, but such APKs should not
-            // skip ABI derivation or restoration. They don't go through the regular installation
-            // path where ABI is normally derived.
-            if ((scanFlags & (SCAN_NEW_INSTALL | SCAN_AS_APK_IN_APEX)) != SCAN_NEW_INSTALL) {
+            if ((scanFlags & SCAN_NEW_INSTALL) == 0) {
                 if (needToDeriveAbi) {
                     Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "derivePackageAbi");
                     try {

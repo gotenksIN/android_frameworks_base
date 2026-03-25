@@ -30,11 +30,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
-import android.hardware.input.InputManagerGlobal;
 import android.os.RemoteException;
 import android.util.ArraySet;
 import android.util.TypedValue;
-import android.view.InputDevice;
 import android.window.TaskFragmentOrganizer;
 import android.window.WindowContainerTransaction;
 
@@ -48,12 +46,10 @@ import java.util.Set;
 public class AppCompatEmbeddingRuleController {
     private static final int DEFAULT_MIN_DP = 600;
 
-    /**
-     * Whether we enable the virtual gamepad rule. If this is false, the virtual gamepad is disabled
-     * for the entire app session.
-     */
+    private static boolean sIsVirtualGamepadEnabled;
+
     @VisibleForTesting
-    static boolean sIsVirtualGamepadRuleEnabled;
+    static boolean sIsVirtualGamepadAllowedByApp;
 
     /**
      * Whether we have seen gamepad user opt-out in the current session.
@@ -63,12 +59,13 @@ public class AppCompatEmbeddingRuleController {
      * is not supported.
      */
     @VisibleForTesting
-    static boolean sIsVirtualGamepadOptOutSeenInSession;
+    static boolean sIsVirtualGamepadOptOutInSession;
 
     /** Initializes the controller. Must be called before any other functions. */
     public static void init(@NonNull Context context) {
-        sIsVirtualGamepadRuleEnabled =
-                isVirtualGamepadRuleEnabled(context, context.getPackageName(), context.getUserId());
+        sIsVirtualGamepadAllowedByApp = isVirtualGamepadAllowedByApp(context);
+        sIsVirtualGamepadEnabled =
+                isVirtualGamepadEnabled(context.getPackageName(), context.getUserId());
     }
 
     /** Loads {@link EmbeddingRule}s if any app compat override rules apply to the app. */
@@ -80,14 +77,13 @@ public class AppCompatEmbeddingRuleController {
             return rules;
         }
 
-        if (sIsVirtualGamepadRuleEnabled) {
+        if (sIsVirtualGamepadEnabled) {
             final EmbeddingRule rule = createVirtualGamepadOverrideRule(
                     context.getResources().getString(R.string.config_virtual_gamepad_package_name),
                     context.getResources().getString(R.string.config_virtual_gamepad_activity_name),
                     defaultMinSize(context),
                     context.getPackageName(),
-                    context.getUserId(),
-                    context.getApplicationInfo().uid);
+                    context.getUserId());
             if (rule != null) {
                 rules.add(rule);
             }
@@ -101,7 +97,7 @@ public class AppCompatEmbeddingRuleController {
     @Nullable
     public static EmbeddingRule createVirtualGamepadOverrideRule(
             @NonNull String packageName, @NonNull String activityName, int minSizePx,
-            @NonNull String selfPackageName, int userId, int uid) {
+            @NonNull String selfPackageName, int userId) {
         if (packageName.isEmpty() || activityName.isEmpty()) {
             return null;
         }
@@ -109,8 +105,8 @@ public class AppCompatEmbeddingRuleController {
         final Intent placeholderIntent = new Intent();
         placeholderIntent.setClassName(packageName, activityName);
         placeholderIntent.putExtra(Intent.EXTRA_PACKAGE_NAME, selfPackageName);
-        placeholderIntent.putExtra(Intent.EXTRA_UID, uid);
 
+        // TODO(b/454729069) confirm the desired split ratio and whether to use hinge split
         final SplitAttributes defaultAttributes = new SplitAttributes.Builder()
                 .setLayoutDirection(SplitAttributes.LayoutDirection.TOP_TO_BOTTOM)
                 .build();
@@ -142,7 +138,7 @@ public class AppCompatEmbeddingRuleController {
             @NonNull SplitPresenter presenter,
             @NonNull TaskFragmentContainer container,
             @NonNull WindowContainerTransaction wct) {
-        if (sIsVirtualGamepadRuleEnabled) {
+        if (sIsVirtualGamepadEnabled) {
             // Ensure isolated navigation and always-on-top behavior of the gamepad placeholder.
             presenter.setTaskFragmentPinned(wct, container, true /* pinned */);
         }
@@ -170,71 +166,20 @@ public class AppCompatEmbeddingRuleController {
         }
     }
 
-
-    /**
-     * Returns whether we should enable the gamepad rule.
-     *
-     * This is checked at the beginning of the app process. If this is false, we disable the gamepad
-     * for the entire app session.
-     *
-     * This returns false if (1) the app opts out from the gamepad, (2) the gamepad compat change is
-     * not enabled, or (3) the user opts out from the gamepad. Note that user opt-in will only take
-     * effect when the game is launched next time.
-     */
-    @VisibleForTesting
-    static boolean isVirtualGamepadRuleEnabled(@NonNull Context context,
-            @NonNull String packageName, int userId) {
-        if (!CompatChanges.isChangeEnabled(OVERRIDE_ENABLE_VIRTUAL_GAMEPAD)) {
-            return false;
-        }
-        if (!isVirtualGamepadAllowedByApp(context)) {
-            return false;
-        }
-        int userOption = getVirtualGamepadUserOption(packageName, userId);
-        if (userOption == PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_OPT_OUT) {
-            sIsVirtualGamepadOptOutSeenInSession = true;
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Returns true if we need to enable the virtual gamepad.
-     *
-     * This method checks the runtime properties that affects gamepad availability in addition to
-     * the static properties checked in {@link #isVirtualGamepadRuleEnabled(Context, String, int)}.
-     */
     @VisibleForTesting
     static boolean isVirtualGamepadEnabled(@NonNull String packageName, int userId) {
-        if (!sIsVirtualGamepadRuleEnabled) {
+        if (!sIsVirtualGamepadAllowedByApp) {
             return false;
         }
-        if (sIsVirtualGamepadOptOutSeenInSession) {
+        if (sIsVirtualGamepadOptOutInSession) {
             return false;
         }
         int userOption = getVirtualGamepadUserOption(packageName, userId);
         if (userOption == PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_OPT_OUT) {
-            sIsVirtualGamepadOptOutSeenInSession = true;
+            sIsVirtualGamepadOptOutInSession = true;
             return false;
         }
-        return !isPhysicalGamepadConnected();
-    }
-
-    private static boolean isPhysicalGamepadConnected() {
-        final InputManagerGlobal inputManager = InputManagerGlobal.getInstance();
-        for (int deviceId : inputManager.getInputDeviceIds()) {
-            final InputDevice device = inputManager.getInputDevice(deviceId);
-            if (device != null && !device.isVirtual() && isGamepad(device)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isGamepad(@NonNull InputDevice device) {
-        final int sources = device.getSources();
-        return (sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
-                || (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+        return CompatChanges.isChangeEnabled(OVERRIDE_ENABLE_VIRTUAL_GAMEPAD);
     }
 
     private static boolean isVirtualGamepadAllowedByApp(@NonNull Context context) {

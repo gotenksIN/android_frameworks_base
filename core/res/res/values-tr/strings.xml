@@ -1506,7 +1506,7 @@
     <string name="usb_power_notification_message" msgid="7284765627437897702">"Bağlı cihaz şarj ediliyor. Diğer seçenekler için dokunun."</string>
     <string name="usb_unsupported_audio_accessory_title" msgid="2335775548086533065">"Analog ses aksesuarı algılandı"</string>
     <string name="usb_unsupported_audio_accessory_message" msgid="1300168007129796621">"Takılan cihaz bu telefonla uyumlu değil. Daha fazla bilgi edinmek için dokunun."</string>
-    <string name="adb_active_notification_title" msgid="408390247354560331">"USB hata ayıklama bağlı"</string>
+    <string name="adb_active_notification_title" msgid="408390247354560331">"USB üzerinden hata ayıklama bağlandı"</string>
     <string name="adb_active_notification_message" msgid="5617264033476778211">"USB üzerinden hata ayıklamayı kapatmak için dokunun"</string>
     <string name="adb_active_notification_message" product="tv" msgid="6624498401272780855">"USB hata ayıklamasını devre dışı bırakmak için seçin."</string>
     <string name="adbwifi_active_notification_title" msgid="6147343659168302473">"Kablosuz hata ayıklama bağlı"</string>
@@ -2114,9 +2114,12 @@
     <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
     <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
     <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
-    <string name="notification_history_metric_subtext" msgid="7408216222655116821">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>: <xliff:g id="METRIC_VALUE">%2$s</xliff:g>"</string>
-    <string name="notification_metric_running_timer" msgid="1096459900744921213">"Aktif Zamanlayıcı"</string>
-    <string name="notification_metric_running_stopwatch" msgid="8039546029949295377">"Aktif Kronometre"</string>
+    <!-- no translation found for notification_history_metric_subtext (7408216222655116821) -->
+    <skip />
+    <!-- no translation found for notification_metric_running_timer (1096459900744921213) -->
+    <skip />
+    <!-- no translation found for notification_metric_running_stopwatch (8039546029949295377) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Yanıtla"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Video"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Reddet"</string>
@@ -2661,7 +2664,7 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Uydu üzerinden mesajlaşmak için Google Mesajlar\'ı varsayılan mesajlaşma uygulamanız olarak ayarlayın"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Uydu üzerinden mesajlaşma özelliği kullanılamıyor"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Uydu üzerinden mesajlaşma özelliğinin bu ülkede veya bölgede kullanılıp kullanılamadığını kontrol etmek için konum ayarlarını açın"</string>
-    <string name="satellite_indicator" msgid="6846063647532086110">"UYDU"</string>
+    <string name="satellite_indicator" msgid="6846063647532086110">"UYD"</string>
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Parmak İzi Kilidi\'ni tekrar kurun"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> artık tanınamayacak."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> ve <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> artık tanınamayacak."</string>
@@ -2706,7 +2709,7 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"TV\'yi kapatmak için güç düğmesine uzun basın"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Sistem Kaynağı Uyarıları"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Aşırı Kaynak Kullanımı"</string>
-    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"\"<xliff:g id="APP_NAME">%1$s</xliff:g>\" uygulaması aşırı kaynak kullanımı nedeniyle devre dışı bırakıldı. Bunu, Ayarlar\'daki Uygulamalar menüsünden tekrar etkinleştirebilirsiniz.\""</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"\"<xliff:g id="APP_NAME">%1$s</xliff:g>\" uygulaması çok fazla kaynak kullanıyor."</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Ebeveyniniz güncelleme yaptı"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> şimdilik kaldırıldı"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> artık kullanılabilir"</string>

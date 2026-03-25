@@ -16,7 +16,6 @@
 
 package com.android.server.pm;
 
-import static android.app.admin.DevicePolicyManager.MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED;
 import static android.content.Intent.ACTION_SCREEN_OFF;
 import static android.content.Intent.ACTION_SCREEN_ON;
 import static android.content.Intent.EXTRA_USER_ID;
@@ -81,7 +80,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.StatsManager;
 import android.app.admin.DevicePolicyEventLogger;
-import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -9313,13 +9311,10 @@ public class UserManagerService extends IUserManager.Stub {
     @GuardedBy("mUsersLock")
     @VisibleForTesting
     boolean isNonRemovableLastAdminUserLU(UserInfo userInfo) {
-        var dpm = mContext.getSystemService(DevicePolicyManager.class);
-        // If device is undergoing the multiuser managed device provisioning, then the user is not
-        // a non-removable last admin, because the device is or will be managed.
-        boolean isManagedDevice = Binder.withCleanCallingIdentity(() ->
-                dpm.getMultiuserManagedDeviceProvisioningState()
-                        != MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED);
-        if (isManagedDevice) {
+        var dpmi = getDevicePolicyManagerInternal();
+        if (dpmi != null && dpmi.isDeviceOrganizationManaged()) {
+            // If device is organization managed, then the user is not a non-removable last admin,
+            // because the device can still be managed remotely without the last admin.
             return false;
         }
         return getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)

@@ -28,7 +28,6 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.Action
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.DraftFilterModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.IncludedAppsModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleValue
@@ -50,12 +49,12 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
         kosmos.runTest {
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.PreExisting(
-                        id = 10,
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter = DraftFilterModel(contacts = null, includedApps = null),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = null,
+                        includedApps = null,
+                    )
                 )
 
             val ruleDisplay =
@@ -82,15 +81,12 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
                 )
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts = RuleValue.Specified(ContactsModel(listOf(contact))),
-                                includedApps = null,
-                            ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = RuleValue.Specified(ContactsModel(listOf(contact))),
+                        includedApps = null,
+                    )
                 )
 
             val ruleDisplay =
@@ -122,15 +118,12 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
 
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts = RuleValue.Ambiguous("who is it?"),
-                                includedApps = null,
-                            ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = RuleValue.Ambiguous("who is it?"),
+                        includedApps = null,
+                    )
                 )
 
             val ruleDisplay =
@@ -168,16 +161,12 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
                 )
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.PreExisting(
-                        id = 10,
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts = null,
-                                includedApps = RuleValue.Specified(IncludedAppsModel(listOf(app))),
-                            ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = null,
+                        includedApps = RuleValue.Specified(IncludedAppsModel(listOf(app))),
+                    )
                 )
 
             val ruleDisplay =
@@ -214,18 +203,12 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
                 )
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts =
-                                    RuleValue.Specified(
-                                        ContactsModel(listOf(contact, CONTACT_CAT))
-                                    ),
-                                includedApps = null,
-                            ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = RuleValue.Specified(ContactsModel(listOf(contact, CONTACT_CAT))),
+                        includedApps = null,
+                    )
                 )
 
             val ruleDisplay =
@@ -258,18 +241,15 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
                 )
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                includedApps =
-                                    RuleValue.Specified(
-                                        IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT))
-                                    ),
-                                contacts = null,
+                        includedApps =
+                            RuleValue.Specified(
+                                IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT))
                             ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = null,
+                    )
                 )
 
             val ruleDisplay =
@@ -309,18 +289,15 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
                 )
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts = RuleValue.Specified(ContactsModel(listOf(contact))),
-                                includedApps =
-                                    RuleValue.Specified(
-                                        IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT))
-                                    ),
+                        contacts = RuleValue.Specified(ContactsModel(listOf(contact))),
+                        includedApps =
+                            RuleValue.Specified(
+                                IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT))
                             ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                    )
                 )
 
             val ruleDisplay =
@@ -357,17 +334,17 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
             var onExitInvoked = false
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.PreExisting(
-                        id = 12,
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter = DraftFilterModel(),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = null,
+                        includedApps = null,
+                    )
                 )
 
             underTest.onAppsSaved(listOf(APP_CHAT_CAT, APP_POST_CAT)) { onExitInvoked = true }
 
-            assertThat(underTest.rule.filter.includedApps)
+            assertThat(underTest.rule.includedApps)
                 .isEqualTo(
                     RuleValue.Specified(IncludedAppsModel(listOf(APP_CHAT_CAT, APP_POST_CAT)))
                 )
@@ -380,23 +357,20 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
             var onExitInvoked = false
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts = null,
-                                includedApps =
-                                    RuleValue.Specified(
-                                        IncludedAppsModel(listOf(APP_CHAT_CAT, APP_POST_CAT))
-                                    ),
+                        contacts = null,
+                        includedApps =
+                            RuleValue.Specified(
+                                IncludedAppsModel(listOf(APP_CHAT_CAT, APP_POST_CAT))
                             ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                    )
                 )
 
             underTest.onAppsSaved(newApps = emptyList()) { onExitInvoked = true }
 
-            assertThat(underTest.rule.filter.includedApps).isNull()
+            assertThat(underTest.rule.includedApps).isNull()
             assertThat(onExitInvoked).isTrue()
         }
 
@@ -406,13 +380,17 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
             var onExitInvoked = false
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.New(action = ActionModel.Highlight, filter = DraftFilterModel()),
-                    onNavigateToCurrentRulesScreen = {},
+                    DraftRuleModel(
+                        isNew = false,
+                        action = ActionModel.Highlight,
+                        contacts = null,
+                        includedApps = null,
+                    )
                 )
 
             underTest.onContactsSaved(listOf(CONTACT_CAT)) { onExitInvoked = true }
 
-            assertThat(underTest.rule.filter.contacts)
+            assertThat(underTest.rule.contacts)
                 .isEqualTo(RuleValue.Specified(ContactsModel(listOf(CONTACT_CAT))))
             assertThat(onExitInvoked).isTrue()
         }
@@ -423,21 +401,17 @@ class NotificationRuleEditViewModelTest : SysuiTestCase() {
             var onExitInvoked = false
             val underTest =
                 notificationRuleEditViewModelFactory.create(
-                    DraftRuleModel.PreExisting(
-                        id = 10,
+                    DraftRuleModel(
+                        isNew = false,
                         action = ActionModel.Highlight,
-                        filter =
-                            DraftFilterModel(
-                                contacts = RuleValue.Specified(ContactsModel(listOf(CONTACT_CAT))),
-                                includedApps = null,
-                            ),
-                    ),
-                    onNavigateToCurrentRulesScreen = {},
+                        contacts = RuleValue.Specified(ContactsModel(listOf(CONTACT_CAT))),
+                        includedApps = null,
+                    )
                 )
 
             underTest.onContactsSaved(newContacts = emptyList()) { onExitInvoked = true }
 
-            assertThat(underTest.rule.filter.contacts).isNull()
+            assertThat(underTest.rule.contacts).isNull()
             assertThat(onExitInvoked).isTrue()
         }
 

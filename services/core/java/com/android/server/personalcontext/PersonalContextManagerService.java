@@ -111,18 +111,6 @@ public class PersonalContextManagerService extends SystemService {
     @VisibleForTesting
     static final String ROLE_SYSTEM_UI_INTELLIGENCE = "android.app.role.SYSTEM_UI_INTELLIGENCE";
 
-    /**
-     * Default value for the per-app personal context mode setting, if
-     * {@link Settings.Secure.PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT} is not present and the app's
-     * setting value has not been manually changed.
-     *
-     * <p>0 means disabled, 1 means enabled.
-     *
-     * @see PersonalContextManager#isPersonalContextModeEnabled(String)
-     */
-    // TODO(b/481494584): flip the default to disabled (0).
-    public static final int PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT_VALUE = 1;
-
     static final SecretKeySpec HINT_SIGNING_KEY;
 
     static {
@@ -193,7 +181,7 @@ public class PersonalContextManagerService extends SystemService {
          * @return A new {@link EmbeddedInsightRenderer} instance.
          */
         EmbeddedInsightRenderer createEmbeddedInsightRenderer(
-                Context userContext, AccessController accessController, Executor executor);
+                Context userContext, Executor executor);
     }
 
     // TODO(b/454430085): Inject these fields.
@@ -239,7 +227,7 @@ public class PersonalContextManagerService extends SystemService {
     @Override
     public void onStart() {
         publishBinderService(
-                Context.PERSONAL_CONTEXT_SERVICE,
+                PersonalContextManager.PERSONAL_CONTEXT_SERVICE,
                 new BinderService(this, mPackageManager));
         publishLocalService(PersonalContextManagerInternal.class, mInternalService);
         Slog.i(TAG, "Personal Context Service started");
@@ -276,7 +264,7 @@ public class PersonalContextManagerService extends SystemService {
                                     new ContextActionResolver(userContext)));
             final EmbeddedInsightRenderer embeddedInsightRenderer =
                     mEmbeddedInsightRendererFactory.createEmbeddedInsightRenderer(
-                            userContext, mAccessController, Executors.newSingleThreadExecutor());
+                            userContext, Executors.newSingleThreadExecutor());
 
             TextClassificationActionRenderer textClassificationActionRenderer;
             PersonalContextBridge tcPersonalContextBridge =
@@ -732,20 +720,10 @@ public class PersonalContextManagerService extends SystemService {
                                 int personalContextMode =
                                         mPackageManager.getPersonalContextMode(
                                                 packageName, callingUid, userId);
-                                if (personalContextMode
-                                        == PackageManager.PERSONAL_CONTEXT_MODE_UNSET) {
-                                    // Mode is unset for this app, check the default value.
-                                    return Settings.Secure.getIntForUser(
-                                                    getService().getContext().getContentResolver(),
-                                                    Settings.Secure
-                                                            .PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT,
-                                                    PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT_VALUE,
-                                                    userId)
-                                            == 1;
-                                } else {
-                                    return personalContextMode
-                                            == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
-                                }
+                                return personalContextMode
+                                        == PackageManager.PERSONAL_CONTEXT_MODE_UNSET
+                                        || personalContextMode
+                                        == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
                             }));
         }
 
@@ -965,7 +943,7 @@ public class PersonalContextManagerService extends SystemService {
 
                         if (Flags.enforcePersonalContextAllowlistAccessControl()) {
                             service.checkUidAccess(callingUid,
-                                    AccessController.ACCESS_PUBLISH_HINTS);
+                                    AccessController.ACCESS_PUBLISH_INSIGHTS);
                         }
                         getService()
                                 .publishInsightSurfaceHints(

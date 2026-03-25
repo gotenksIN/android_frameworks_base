@@ -22,7 +22,6 @@ import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.preferencesapi.resolveString
 import com.android.settingslib.metadata.preferencesapi.safe
 import com.android.settingslib.metadata.preferencesapi.SafetyAnnotated
-import com.android.settingslib.metadata.preferencesapi.types.EType
 
 /**
  * The context for a GeneratedType, providing access to the [Context] and any necessary
@@ -54,41 +53,25 @@ inline fun <reified T : Any> GeneratedType(
     @StringRes description: Int,
     unit: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
-): GeneratedType<T> {
-    val externalType = when (T::class) {
-        Int::class -> EType.Int
-        String::class -> EType.String
-        Boolean::class -> EType.Boolean
-        else -> error("Unsupported external type.")
-    } as EType<T>
-    return GeneratedType(externalType, descriptionRes = description, description = null, unit = unit, lambda = lambda)
-}
+): GeneratedType<T> = GeneratedType(T::class.java, descriptionRes = description, description = null, unit = unit, lambda = lambda)
 
 inline fun <reified T : Any> GeneratedType(
         description: String,
         unit: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
-): GeneratedType<T> {
-    val externalType = when (T::class) {
-        Int::class -> EType.Int
-        String::class -> EType.String
-        Boolean::class -> EType.Boolean
-        else -> error("Unsupported external type.")
-    } as EType<T>
-    return GeneratedType(externalType, descriptionRes = null, description = description, unit = unit, lambda = lambda)
-}
+): GeneratedType<T> = GeneratedType(T::class.java, descriptionRes = null, description = description, unit = unit, lambda = lambda)
 
 inline fun GeneratedParameterType(
     @StringRes description: Int,
     unit: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<String>>
-): GeneratedType<String> = GeneratedType(EType.String, descriptionRes = description, description = null, unit = unit, lambda = lambda)
+): GeneratedType<String> = GeneratedType(String::class.java, descriptionRes = description, description = null, unit = unit, lambda = lambda)
 
 inline fun GeneratedParameterType(
         description: String,
         unit: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<String>>
-): GeneratedType<String> = GeneratedType(EType.String, descriptionRes = null, description = description, unit = unit, lambda = lambda)
+): GeneratedType<String> = GeneratedType(String::class.java, descriptionRes = null, description = description, unit = unit, lambda = lambda)
 
 
 /**
@@ -98,7 +81,7 @@ inline fun GeneratedParameterType(
  * automatically infer the type.
  */
 class GeneratedType<ExternalType : Any> constructor(
-    override val externalType: EType<ExternalType>,
+    private val keyType: Class<ExternalType>,
     @field:StringRes val descriptionRes: Int?,
     val description: String?,
     private val lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<ExternalType>>,
@@ -116,6 +99,8 @@ class GeneratedType<ExternalType : Any> constructor(
         unit?.let { put("unit", it) }
     })
 
+    override fun getType(): Class<ExternalType> = keyType
+
     /** Get the description as a string using the provided context. */
     override fun getDescription(context: Context): String =
         resolveString(context, descriptionRes, description)
@@ -124,5 +109,5 @@ class GeneratedType<ExternalType : Any> constructor(
         it.value to it.description
     }
 
-    override fun getKey(): String = "GeneratedType:${descriptionRes ?: description?.hashCode() ?: 0}"
+    override fun getKey(): String = "GeneratedType:${System.identityHashCode(lambda)}"
 }

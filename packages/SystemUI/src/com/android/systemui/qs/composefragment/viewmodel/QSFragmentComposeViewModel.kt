@@ -83,6 +83,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.io.PrintWriter
 import javax.inject.Named
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -500,7 +501,7 @@ constructor(
 
     fun onMediaSwipeToDismiss() = mediaCarouselInteractor.onSwipeToDismiss()
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         initMediaHosts() // init regardless of using media (same as current QS).
         coroutineScope {
             launch { hydrateSquishinessInteractor() }
@@ -514,6 +515,7 @@ constructor(
             launch { quickQuickSettingsViewModel.activate() }
             launch { qqsMediaInRowViewModel.activate() }
             launch { qsMediaInRowViewModel.activate() }
+            awaitCancellation()
         }
     }
 

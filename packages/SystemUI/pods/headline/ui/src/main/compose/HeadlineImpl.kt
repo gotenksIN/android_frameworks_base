@@ -16,21 +16,19 @@
 
 package com.android.systemui.headline.ui.compose
 
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import android.widget.ImageView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LocalContentColor
@@ -45,20 +43,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.approachLayout
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrain
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toSize
-import androidx.compose.ui.viewinterop.AndroidView
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.SceneKey
@@ -75,17 +67,15 @@ import com.android.systemui.headline.ui.viewmodel.HeadlineItemContent
 import com.android.systemui.headline.ui.viewmodel.HeadlineViewModel
 import com.android.systemui.headline.ui.viewmodel.HeadlineViewModel.Companion.GoneScene
 import com.android.systemui.headline.ui.viewmodel.toHeadlineItemKey
-import com.android.systemui.statusbar.chips.ui.viewmodel.formatTimeRemainingData
-import com.android.systemui.statusbar.chips.ui.viewmodel.rememberChronometerState
-import com.android.systemui.statusbar.chips.ui.viewmodel.rememberTimeRemainingState
-import com.android.systemui.statusbar.chips.ui.viewmodel.toFormatter
+import com.android.systemui.lifecycle.rememberViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 /** Implementation of the [Headline] composer. */
 public class HeadlineImpl @Inject constructor() : Headline {
     @Composable
-    override fun Content(viewModel: HeadlineViewModel, modifier: Modifier) {
+    override fun Content(viewModelFactory: HeadlineViewModel.Factory, modifier: Modifier) {
+        val viewModel = rememberViewModel("HeadlineImpl") { viewModelFactory.create() }
         Headline(viewModel, modifier = modifier.height(HeadlineHeight))
     }
 }
@@ -101,10 +91,7 @@ public fun Headline(viewModel: HeadlineViewModel, modifier: Modifier = Modifier)
         SceneTransitionLayout(
             state = viewModel.state,
             transitions = HeadlineTransitions,
-            modifier =
-                modifier.onPlaced {
-                    viewModel.uiBounds = Rect(it.positionInRoot(), it.size.toSize())
-                },
+            modifier = modifier,
             debugName = "Headline",
         ) {
             scene(GoneScene) { GoneScene() }
@@ -117,13 +104,7 @@ public fun Headline(viewModel: HeadlineViewModel, modifier: Modifier = Modifier)
                     key = item.key.toSceneKey(),
                     userActions = userActions(previousItem, nextItem),
                 ) {
-                    HeadlineItemScene(
-                        item,
-                        previousItem,
-                        nextItem,
-                        viewModel::onItemClicked,
-                        viewModel::iconView,
-                    )
+                    HeadlineItemScene(item, previousItem, nextItem, viewModel::onItemClicked)
                 }
             }
         }
@@ -140,11 +121,11 @@ private fun ContentScope.GoneScene(modifier: Modifier = Modifier) {
     val elementKey = otherContent?.let { it as SceneKey }?.toHeadlineItemKey()?.toPillElementKey()
 
     // Draw the largest possible circle that is centered and fits the max parent constraints.
-    Box(modifier.fillMaxHeight()) {
+    Box(modifier.fillMaxSize()) {
         Box(
             Modifier.align(Alignment.Center)
                 .thenIf(elementKey != null) { Modifier.element(elementKey!!) }
-                .size(GoneSceneSize)
+                .aspectRatio(1f)
                 .drawBehind { drawCircle(Color.Black) }
         )
     }
@@ -156,10 +137,9 @@ private fun ContentScope.HeadlineItemScene(
     previousItem: HeadlineItem?,
     nextItem: HeadlineItem?,
     onItemClicked: (HeadlineItem) -> Unit,
-    iconViewStore: (key: String) -> ImageView?,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier) {
+    Box(modifier.fillMaxWidth()) {
         Box(Modifier.align(Alignment.Center).padding(horizontal = DotIndicatorOffset)) {
             // Dot indicator before the pill.
             DotIndicator(
@@ -188,14 +168,12 @@ private fun ContentScope.HeadlineItemScene(
                     startContent = {
                         HeadlineItemContents(
                             key = item.key.toStartContentElementKey(),
-                            iconViewStore = iconViewStore,
                             contents = item.startContents,
                         )
                     },
                     endContent = {
                         HeadlineItemContents(
                             key = item.key.toEndContentElementKey(),
-                            iconViewStore = iconViewStore,
                             contents = item.endContents,
                             isReversed = true,
                         )
@@ -304,7 +282,6 @@ private fun HeadlinePill(
 private fun ContentScope.HeadlineItemContents(
     key: ElementKey,
     contents: List<HeadlineItemContent>,
-    iconViewStore: (key: String) -> ImageView?,
     modifier: Modifier = Modifier,
     isReversed: Boolean = false,
 ) {
@@ -315,93 +292,27 @@ private fun ContentScope.HeadlineItemContents(
     ) {
         contents.forEachIndexed { i, content ->
             when (content) {
-                is HeadlineItemContent.IconItem -> {
-                    Icon(content.icon)
+                is HeadlineItemContent.TextItem -> {
+                    content.text.load()?.let {
+                        // Ensure that there is a minimum spacing between a Text and its siblings.
+                        val textModifier =
+                            when {
+                                isReversed && i < contents.lastIndex -> Modifier.padding(end = 4.dp)
+                                !isReversed && i > 0 -> Modifier.padding(start = 4.dp)
+                                else -> Modifier
+                            }
+                        Text(
+                            modifier = textModifier,
+                            text = it,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                is HeadlineItemContent.ImageViewItem -> {
-                    StatusBarIcon { iconViewStore(content.iconKey) }
-                }
-                is HeadlineItemContent.TextBasedContent -> {
-                    TextBasedHeadlineItem(
-                        content = content,
-                        isReversed = isReversed,
-                        isFirst = i == 0,
-                        isLast = i == contents.lastIndex,
-                    )
-                }
+                is HeadlineItemContent.IconItem -> Icon(content.icon)
             }
         }
     }
-}
-
-@Composable
-private fun TextBasedHeadlineItem(
-    content: HeadlineItemContent.TextBasedContent,
-    isReversed: Boolean,
-    isFirst: Boolean,
-    isLast: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val text: String? =
-        when (content) {
-            is HeadlineItemContent.TextBasedContent.TextItem -> {
-                content.text.load()
-            }
-            is HeadlineItemContent.TextBasedContent.ShortTimeDelta -> {
-                val timeRemainingState =
-                    rememberTimeRemainingState(
-                        futureTimeMillis = content.time,
-                        timeSource = content.timeSource,
-                    )
-                timeRemainingState.timeRemainingData?.let { formatTimeRemainingData(it) }
-            }
-            is HeadlineItemContent.TextBasedContent.TimerItem -> {
-                val timerState =
-                    rememberChronometerState(
-                        chronometer = content.timer.value,
-                        formatter = content.timer.format.toFormatter(),
-                        timeSource = content.timer.timeSource,
-                    )
-                timerState.currentTimeText
-            }
-        }
-
-    text?.let {
-        // Ensure that there is a minimum spacing between a Text and its siblings.
-        val textModifier =
-            when {
-                isReversed && !isLast -> modifier.padding(end = 4.dp)
-                !isReversed && !isFirst -> modifier.padding(start = 4.dp)
-                else -> modifier
-            }
-
-        Text(modifier = textModifier, text = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun StatusBarIcon(modifier: Modifier = Modifier, iconFactory: () -> ImageView?) {
-    val context = LocalContext.current
-    AndroidView(
-        modifier = modifier,
-        factory = { _ ->
-            // Use a wrapper frame layout so that we still return a view even if the icon is null
-            val wrapperFrameLayout = FrameLayout(context)
-
-            val icon = iconFactory.invoke()
-            if (icon != null) {
-                // If needed, remove the icon from its old parent (views can only be attached
-                // to 1 parent at a time)
-                (icon.parent as? ViewGroup)?.apply {
-                    this.removeView(icon)
-                    this.removeTransientView(icon)
-                }
-                wrapperFrameLayout.addView(icon)
-            }
-
-            wrapperFrameLayout
-        },
-    )
 }
 
 /**
@@ -446,4 +357,3 @@ private fun Modifier.noResizeContentDuringTransitions(
 private val HeadlineHeight: Dp = 36.dp
 private val DotIndicatorSize = 8.dp
 private val DotIndicatorOffset = DotIndicatorSize * 1.5f
-private val GoneSceneSize = 30.dp

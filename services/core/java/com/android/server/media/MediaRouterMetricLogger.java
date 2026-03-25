@@ -458,16 +458,6 @@ final class MediaRouterMetricLogger {
     }
 
     /**
-     * Logs when an app calls the legacy setBluetoothA2dpOn API.
-     */
-    public void logSetBluetoothA2dpOnReported(int uid, boolean on) {
-        MediaRouterStatsLog.write(
-                MediaRouterStatsLog.MEDIA_ROUTER_SET_BLUETOOTH_A2DP_ON_REPORTED,
-                uid,
-                on);
-    }
-
-    /**
      * Converts {@link TransferReason} from {@link RoutingSessionInfo} to the transfer reason enum
      * defined for logging.
      *

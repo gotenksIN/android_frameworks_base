@@ -1008,7 +1008,7 @@ public final class Debug
 // QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     /**
      * This class is used to retrieved process allocated dma buffer
-     * @hide
+     * {@hide}
      */
     public static class DmaBuffer{
         public long inode;

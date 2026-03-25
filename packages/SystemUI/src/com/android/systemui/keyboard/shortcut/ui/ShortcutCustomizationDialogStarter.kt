@@ -44,6 +44,7 @@ import com.android.systemui.statusbar.phone.create
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -59,7 +60,7 @@ constructor(
     private var dialog: Dialog? = null
     private val viewModel = viewModelFactory.create()
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
             launch {
                 viewModel.shortcutCustomizationUiState.collect { uiState ->
@@ -80,6 +81,7 @@ constructor(
             }
             launch { viewModel.activate() }
         }
+        awaitCancellation()
     }
 
     fun onShortcutCustomizationRequested(requestInfo: ShortcutCustomizationRequestInfo) {

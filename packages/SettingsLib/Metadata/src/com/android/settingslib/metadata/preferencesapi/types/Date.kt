@@ -21,11 +21,10 @@ import androidx.annotation.StringRes
 import com.android.settingslib.metadata.R
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import com.android.settingslib.metadata.preferencesapi.types.EType
 
 /** A date value of the form YYYY-MM-DD. */
 object Date: ApiType<LocalDate, String> {
-  override val externalType = EType.String
+  override fun getType(): Class<String> = String::class.java
   override fun getDescription(context: Context): String = "A date in the form YYYY-MM-DD"
   override fun getKey(): String = "Date"
 

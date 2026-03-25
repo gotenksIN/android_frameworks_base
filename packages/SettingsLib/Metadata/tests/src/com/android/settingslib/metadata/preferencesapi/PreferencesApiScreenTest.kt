@@ -31,6 +31,7 @@ import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.ENTERPRISE_RESTRICTION
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.HARDWARE_UNSUPPORTED
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.INVALID_PREFERENCE
+import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.MISSING_PERMISSION
 import com.android.settingslib.metadata.preferencesapi.Utils.EXCEPTION_MESSAGE_NO_PARAMETER_DEFINED
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageAlreadyDefined
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleDefines
@@ -43,7 +44,7 @@ import com.android.settingslib.metadata.preferencesapi.preconditions.Custom
 import com.android.settingslib.metadata.preferencesapi.preconditions.EnterpriseRestriction
 import com.android.settingslib.metadata.preferencesapi.preconditions.HardwareUnsupported
 import com.android.settingslib.metadata.preferencesapi.preconditions.InvalidPreference
-import com.android.settingslib.metadata.preferencesapi.preconditions.PreconditionStability
+import com.android.settingslib.metadata.preferencesapi.preconditions.MissingPermission
 import com.android.settingslib.metadata.preferencesapi.types.AnyBoolean
 import com.android.settingslib.metadata.preferencesapi.types.AnyInt
 import com.android.settingslib.metadata.preferencesapi.types.GeneratedParameterType
@@ -400,7 +401,7 @@ class PreferencesApiScreenTest {
                             preconditions(R.string.preconditions_description1) {
                                 when (preconditionsCase) {
                                     ALLOWED -> Allowed
-                                    CUSTOM -> Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
+                                    CUSTOM -> Custom(R.string.preconditions_custom_message)
                                     ENTERPRISE_RESTRICTION ->
                                         EnterpriseRestriction(
                                             R.string.preconditions_enterprise_restriction_message
@@ -414,6 +415,11 @@ class PreferencesApiScreenTest {
                                             "",
                                             "",
                                             R.string.preconditions_invalid_preference_message,
+                                        )
+                                    MISSING_PERMISSION ->
+                                        MissingPermission(
+                                            listOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                                            R.string.preconditions_missing_permission_message,
                                         )
                                 }
                             }
@@ -484,6 +490,16 @@ class PreferencesApiScreenTest {
                                 context.getString(R.string.preconditions_invalid_preference_message)
                             )
                     }
+                    MISSING_PERMISSION -> {
+                        assertThat(
+                                (preference.get.preconditions?.check(apiOperationContext)
+                                        as MissingPermission)
+                                    .getReason(context)
+                            )
+                            .isEqualTo(
+                                context.getString(R.string.preconditions_missing_permission_message)
+                            )
+                    }
                 }
             }
         }
@@ -519,7 +535,7 @@ class PreferencesApiScreenTest {
                             preconditions(preconditionDescription) {
                                 when (preconditionsCase) {
                                     ALLOWED -> Allowed
-                                    CUSTOM -> Custom(customPreconditionsMessage, stability = PreconditionStability.UNSTABLE)
+                                    CUSTOM -> Custom(customPreconditionsMessage)
                                     ENTERPRISE_RESTRICTION ->
                                         EnterpriseRestriction(
                                             enterpriseRestrictionPreconditionsMessage
@@ -531,6 +547,11 @@ class PreferencesApiScreenTest {
                                             "",
                                             "",
                                             invalidPreferencePreconditionsMessage,
+                                        )
+                                    MISSING_PERMISSION ->
+                                        MissingPermission(
+                                            listOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                                            missingPermissionPreconditionsMessage,
                                         )
                                 }
                             }
@@ -591,6 +612,14 @@ class PreferencesApiScreenTest {
                             )
                             .isEqualTo(invalidPreferencePreconditionsMessage)
                     }
+                    MISSING_PERMISSION -> {
+                        assertThat(
+                                (preference.get.preconditions?.check(apiOperationContext)
+                                        as MissingPermission)
+                                    .getReason(context)
+                            )
+                            .isEqualTo(missingPermissionPreconditionsMessage)
+                    }
                 }
             }
         }
@@ -632,7 +661,7 @@ class PreferencesApiScreenTest {
                                 if (sum % 2 == 0) {
                                     Allowed
                                 } else {
-                                    Custom(R.string.value_preconditions_disallow_custom_reason, stability = PreconditionStability.UNSTABLE)
+                                    Custom(R.string.value_preconditions_disallow_custom_reason)
                                 }
                             }
 
@@ -1477,7 +1506,7 @@ class PreferencesApiScreenTest {
                             set {
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
+                                        Custom(R.string.preconditions_custom_message)
                                     }
                                 }
 
@@ -1515,7 +1544,7 @@ class PreferencesApiScreenTest {
                             set {
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
+                                        Custom(R.string.preconditions_custom_message)
                                     }
                                     valuePreconditions(R.string.warning_preconditions_description1) { value ->
                                         Allowed
@@ -1611,7 +1640,7 @@ class PreferencesApiScreenTest {
 
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
+                                        Custom(R.string.preconditions_custom_message)
                                     }
                                     warn(R.string.warning_message1)
                                 }
@@ -1764,7 +1793,7 @@ class PreferencesApiScreenTest {
                             set {
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
+                                        Custom(R.string.preconditions_custom_message)
                                     }
                                     warn(R.string.warning_message1)
                                 }
@@ -1873,7 +1902,7 @@ class PreferencesApiScreenTest {
                 ) {
                 init {
                     preconditions(R.string.preconditions_description1) {
-                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
+                        Custom(R.string.preconditions_custom_message)
                     }
                 }
             }
@@ -2106,6 +2135,7 @@ class PreferencesApiScreenTest {
             ENTERPRISE_RESTRICTION,
             HARDWARE_UNSUPPORTED,
             INVALID_PREFERENCE,
+            MISSING_PERMISSION,
             CUSTOM,
         }
     }

@@ -28,7 +28,6 @@ import com.android.systemui.keyguard.ui.viewmodel.deviceEntryIconViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.log.logcatLogBuffer
-import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 import kotlinx.coroutines.Dispatchers
 
 val Kosmos.lockIconElementProvider by
@@ -38,7 +37,6 @@ val Kosmos.lockIconElementProvider by
             applicationScope = applicationCoroutineScope,
             mainDispatcher = Dispatchers.Main,
             windowManager = testableWindowManager,
-            windowRootViewBlurInteractor = windowRootViewBlurInteractor,
             featureFlags = featureFlagsClassic,
             deviceEntryIconViewModel = { deviceEntryIconViewModel },
             deviceEntryForegroundViewModel = { deviceEntryForegroundIconViewModel },

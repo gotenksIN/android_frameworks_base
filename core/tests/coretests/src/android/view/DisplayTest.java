@@ -16,7 +16,6 @@
 
 package android.view;
 
-import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
 import android.util.DebugUtils;
@@ -85,12 +84,6 @@ public class DisplayTest {
                 Display.STATE_VR,
                 Display.STATE_ON_SUSPEND
         );
-    }
-
-    @Test
-    public void stateReasonToString() {
-        assertThat(Display.stateReasonToString(Display.STATE_REASON_ACCESSIBILITY))
-                .isEqualTo("ACCESSIBILITY");
     }
 
     private void assertOnlyTrueForStates(IntFunction<Boolean> function, int... trueStates) {

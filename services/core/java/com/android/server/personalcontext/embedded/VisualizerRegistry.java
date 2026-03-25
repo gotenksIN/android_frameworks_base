@@ -25,7 +25,6 @@ import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.os.UserHandle;
-import android.service.personalcontext.Flags;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 import android.service.personalcontext.embedded.InsightSurfaceVisualizerService;
@@ -37,7 +36,6 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.content.PackageMonitor;
-import com.android.server.personalcontext.AccessController;
 
 import com.google.android.collect.Lists;
 
@@ -123,15 +121,12 @@ public class VisualizerRegistry {
         void queueAction(Runnable action);
     }
 
-    @VisibleForTesting
-    static final class DefaultInjector implements Injector {
+    private static final class DefaultInjector implements Injector {
         private final Context mContext;
-        private final AccessController mAccessController;
         private final Executor mExecutor;
 
-        DefaultInjector(Context context, AccessController accessController, Executor executor) {
+        DefaultInjector(Context context, Executor executor) {
             mContext = context;
-            mAccessController = accessController;
             mExecutor = executor;
         }
 
@@ -142,6 +137,7 @@ public class VisualizerRegistry {
 
         @Override
         public List<ServiceInfo> fetchVisualizerServiceInfos(@Nullable String packageName) {
+            // TODO(b/467129462): Introduce an allow list to further restrict connected services.
             final Intent intent = new Intent(InsightSurfaceVisualizerService.SERVICE_INTERFACE);
             intent.setPackage(packageName);
             final List<ResolveInfo> services =
@@ -150,21 +146,8 @@ public class VisualizerRegistry {
             for (ResolveInfo resolveInfo : services) {
                 if (!BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE
                         .equals(resolveInfo.serviceInfo.permission)) {
-                    Slog.w(TAG, resolveInfo.serviceInfo.packageName
-                            + " does not have the BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE "
-                            + "permission");
                     continue;
                 }
-
-                if (Flags.enforcePersonalContextAllowlistAccessControl()
-                        && !mAccessController.hasAccess(
-                                resolveInfo.serviceInfo.packageName,
-                                AccessController.ACCESS_REGISTER_VISUALIZER)) {
-                    Slog.w(TAG, resolveInfo.serviceInfo.packageName
-                            + " does not have access to register a visualizer.");
-                    continue;
-                }
-
                 result.add(resolveInfo.serviceInfo);
             }
 
@@ -191,8 +174,8 @@ public class VisualizerRegistry {
         }
     }
 
-    VisualizerRegistry(Context context, AccessController accessController, Executor executor) {
-        this(new DefaultInjector(context, accessController, executor));
+    VisualizerRegistry(Context context, Executor executor) {
+        this(new DefaultInjector(context, executor));
     }
 
     /** Construct a new {@link VisualizerRegistry}. Provided for testing. */

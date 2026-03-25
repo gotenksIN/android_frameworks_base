@@ -25,7 +25,6 @@ public abstract class BitmapOffloadInternal {
     }
 
     public abstract Uri offloadBitmap(@BitmapOffload.BitmapSource int source, Bitmap bitmap);
-    public abstract void removeBitmap(Uri uri);
     public abstract void registerPermissionHandler(@BitmapOffload.BitmapSource int source,
             PermissionHandler handler);
     public abstract boolean checkPermission(@BitmapOffload.BitmapSource int source, Uri uri,

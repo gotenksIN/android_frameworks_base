@@ -986,7 +986,6 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             ret.setScannedAsStoppedSystemApp(p.isScannedAsStoppedSystemApp());
             ret.setInstallSource(p.getInstallSource());
             ret.setSharedUserAppId(p.getSharedUserAppId());
-            ret.setApexModuleName(p.getApexModuleName());
         }
         mDisabledSysPackages.remove(name);
         return ret;

@@ -18,7 +18,6 @@ package com.android.systemui.statusbar.notification.row
 
 import android.annotation.AttrRes
 import android.annotation.StyleRes
-import android.app.Notification
 import android.content.Context
 import android.util.AttributeSet
 import android.view.View
@@ -26,11 +25,6 @@ import android.view.View
 /** Provider for [AutomationNotificationBackground] */
 interface AutomationNotificationBackgroundProvider {
     fun get(sysUiContext: Context): AutomationNotificationBackground?
-}
-
-/** Interface for adding a constraint on automation ui eligibility. */
-interface AutomationNotificationUiEligibilityChecker {
-    fun isEligible(notification: Notification): Boolean
 }
 
 /** Abstract parent class for the automation notification background view. */

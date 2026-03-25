@@ -16,7 +16,9 @@
 
 package com.android.systemui.qs.panels.ui.viewmodel
 
-import com.android.systemui.lifecycle.HydratedActivatable
+import androidx.compose.runtime.getValue
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.qs.panels.domain.interactor.GridLayoutTypeInteractor
 import com.android.systemui.qs.panels.shared.model.GridLayoutType
 import com.android.systemui.qs.panels.ui.compose.GridLayout
@@ -33,17 +35,26 @@ constructor(
     gridLayoutMap: Map<GridLayoutType, @JvmSuppressWildcards GridLayout>,
     tilesInteractor: CurrentTilesInteractor,
     @Named("Default") defaultGridLayout: GridLayout,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("TileGridViewModel")
 
     val gridLayout by
-        gridLayoutTypeInteractor.layout
-            .map { gridLayoutMap[it] ?: defaultGridLayout }
-            .hydratedStateOf(initialValue = defaultGridLayout)
+        hydrator.hydratedStateOf(
+            traceName = "gridLayout",
+            source = gridLayoutTypeInteractor.layout.map { gridLayoutMap[it] ?: defaultGridLayout },
+            initialValue = defaultGridLayout,
+        )
 
-    private val tileModels by tilesInteractor.currentTiles.hydratedStateOf()
+    private val tileModels by
+        hydrator.hydratedStateOf(traceName = "tileModels", source = tilesInteractor.currentTiles)
 
     val tileViewModels: List<TileViewModel>
         get() = tileModels.map { TileViewModel(it.tile, it.spec, it.expandable) }
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

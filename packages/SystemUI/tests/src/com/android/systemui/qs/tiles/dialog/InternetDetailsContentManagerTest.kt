@@ -28,12 +28,9 @@ import android.telephony.telephonyManager
 import android.testing.TestableLooper.RunWithLooper
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.view.ViewCompat
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.annotation.UiThreadTest
 import androidx.test.filters.SmallTest
@@ -77,7 +74,8 @@ import platform.test.runner.parameterized.Parameters
 )
 @UiThreadTest
 class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : SysuiTestCase() {
-    @get:Rule val expect: Expect = Expect.create()
+    @get:Rule
+    val expect: Expect = Expect.create()
 
     private val kosmos = testKosmos()
     private val handler: Handler = kosmos.fakeExecutorHandler
@@ -202,7 +200,7 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
     fun hideWifiViews_WifiViewsGone() {
         internetDetailsContentManager.hideWifiViews()
 
-        assertThat(internetDetailsContentManager.isProgressBarAnimating).isFalse()
+        assertThat(internetDetailsContentManager.isProgressBarVisible).isFalse()
         assertThat(wifiToggle!!.visibility).isEqualTo(View.GONE)
         assertThat(connectedWifi!!.visibility).isEqualTo(View.GONE)
         assertThat(wifiList!!.visibility).isEqualTo(View.GONE)
@@ -684,27 +682,6 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
     }
 
     @Test
-    fun updateContent_showSecondaryDataSub_twice_noCrash() {
-        whenever(internetDetailsContentController.activeAutoSwitchNonDdsSubId).thenReturn(1)
-        whenever(internetDetailsContentController.hasActiveSubIdOnDds()).thenReturn(true)
-        whenever(internetDetailsContentController.isAirplaneModeEnabled).thenReturn(false)
-
-        // First call inflates the stub
-        internetDetailsContentManager.updateContent(true)
-        bgExecutor.runAllReady()
-
-        // Second call should not attempt to inflate the stub again and should not crash
-        internetDetailsContentManager.updateContent(true)
-        bgExecutor.runAllReady()
-    }
-
-    @Test
-    fun internetContentData_nullValue_noCrash() {
-        // Use value instead of postValue to trigger the observer immediately on the UI thread
-        internetDetailsContentManager.internetContentData.value = null
-    }
-
-    @Test
     fun updateContent_showSecondaryDataSub() {
         whenever(internetDetailsContentController.activeAutoSwitchNonDdsSubId).thenReturn(1)
         whenever(internetDetailsContentController.hasActiveSubIdOnDds()).thenReturn(true)
@@ -853,53 +830,21 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
     }
 
     @Test
-    fun onWifiScan_isScanTrue_setProgressBarAnimatingTrue() {
-        val progressBar =
-            contentView.requireViewById<android.widget.ProgressBar>(R.id.wifi_searching_progress)
-        internetDetailsContentManager.isProgressBarAnimating = false
+    fun onWifiScan_isScanTrue_setProgressBarVisibleTrue() {
+        internetDetailsContentManager.isProgressBarVisible = false
 
         internetDetailsContentManager.internetDetailsCallback.onWifiScan(true)
 
-        assertThat(internetDetailsContentManager.isProgressBarAnimating).isTrue()
-        assertThat(progressBar.visibility).isEqualTo(View.VISIBLE)
-        assertThat(progressBar.isIndeterminate).isTrue()
+        assertThat(internetDetailsContentManager.isProgressBarVisible).isTrue()
     }
 
     @Test
-    fun onWifiScan_isScanFalse_setProgressBarAnimatingFalse() {
-        val progressBar =
-            contentView.requireViewById<android.widget.ProgressBar>(R.id.wifi_searching_progress)
-        internetDetailsContentManager.isProgressBarAnimating = true
+    fun onWifiScan_isScanFalse_setProgressBarVisibleFalse() {
+        internetDetailsContentManager.isProgressBarVisible = true
 
         internetDetailsContentManager.internetDetailsCallback.onWifiScan(false)
 
-        assertThat(internetDetailsContentManager.isProgressBarAnimating).isFalse()
-        assertThat(progressBar.visibility).isEqualTo(View.VISIBLE)
-        assertThat(progressBar.isIndeterminate).isFalse()
-        assertThat(progressBar.progress).isEqualTo(progressBar.max)
-    }
-
-    @Test
-    fun onWifiScan_isScanFalse_applyStaticColorTint() {
-        val progressBar =
-            contentView.requireViewById<android.widget.ProgressBar>(R.id.wifi_searching_progress)
-
-        internetDetailsContentManager.internetDetailsCallback.onWifiScan(true)
-        internetDetailsContentManager.internetDetailsCallback.onWifiScan(false)
-
-        assertThat(progressBar.progressTintList).isNotNull()
-    }
-
-    @Test
-    fun onWifiScan_isScanTrue_removeStaticColorTint() {
-        val progressBar =
-            contentView.requireViewById<android.widget.ProgressBar>(R.id.wifi_searching_progress)
-
-        internetDetailsContentManager.internetDetailsCallback.onWifiScan(true)
-        internetDetailsContentManager.internetDetailsCallback.onWifiScan(false)
-        internetDetailsContentManager.internetDetailsCallback.onWifiScan(true)
-
-        assertThat(progressBar.progressTintList).isNull()
+        assertThat(internetDetailsContentManager.isProgressBarVisible).isFalse()
     }
 
     @Test
@@ -961,7 +906,7 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
     @Test
     fun turnOffProgressBarWhenWifiDisabled() {
         whenever(internetDetailsContentController.isWifiEnabled).thenReturn(false)
-        internetDetailsContentManager.isProgressBarAnimating = true
+        internetDetailsContentManager.isProgressBarVisible = true
 
         internetDetailsContentManager.updateContent(false)
 
@@ -969,7 +914,7 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
         internetDetailsContentManager.internetContentData.observe(
             internetDetailsContentManager.lifecycleOwner!!
         ) {
-            assertThat(internetDetailsContentManager.isProgressBarAnimating).isFalse()
+            assertThat(internetDetailsContentManager.isProgressBarVisible).isFalse()
         }
     }
 
@@ -994,7 +939,6 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
     }
 
     @Test
-    @DisableFlags(com.android.internal.telephony.flags.Flags.FLAG_NEW_SATELLITE_ICON)
     fun updateContent_satelliteConnected_showSatelliteUIAndConnected() {
         whenever(internetDetailsContentController.getCurrentSatelliteState())
             .thenReturn(InternetDetailsContentController.SATELLITE_CONNECTED)
@@ -1015,40 +959,6 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
             assertThat(mobileSummary.visibility).isEqualTo(View.VISIBLE)
             assertThat(mobileSummary.text)
                 .isEqualTo(mContext.getText(R.string.mobile_data_connection_active))
-        }
-    }
-
-    @Test
-    @EnableFlags(com.android.internal.telephony.flags.Flags.FLAG_NEW_SATELLITE_ICON)
-    fun updateContent_satelliteConnected_showSatelliteUIAndConnectedWithNewString() {
-        whenever(internetDetailsContentController.getCurrentSatelliteState())
-            .thenReturn(InternetDetailsContentController.SATELLITE_CONNECTED)
-        whenever(internetDetailsContentController.hasActiveSubIdOnDds()).thenReturn(true)
-        mobileDataLayout!!.visibility = View.GONE
-
-        internetDetailsContentManager.updateContent(true)
-        bgExecutor.runAllReady()
-
-        internetDetailsContentManager.internetContentData.observe(
-            internetDetailsContentManager.lifecycleOwner!!
-        ) {
-            assertThat(mobileDataLayout!!.visibility).isEqualTo(View.VISIBLE)
-            val mobileTitle = contentView.requireViewById<TextView>(R.id.mobile_title)
-            assertThat(mobileTitle.text)
-                .isEqualTo(mContext.getText(R.string.satellite_network_title_text))
-            val mobileSummary = contentView.requireViewById<TextView>(R.id.mobile_summary)
-            assertThat(mobileSummary.visibility).isEqualTo(View.VISIBLE)
-
-            val strConnected = mContext.getString(R.string.mobile_data_connection_active)
-            val strSat = mContext.getString(com.android.internal.R.string.satellite_indicator)
-            assertThat(mobileSummary.text)
-                .isEqualTo(
-                    mContext.getString(
-                        com.android.settingslib.R.string.preference_summary_default_combination,
-                        strConnected,
-                        strSat,
-                    )
-                )
         }
     }
 
@@ -1101,24 +1011,6 @@ class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : Sysui
             expect.that(connectedWifi!!.visibility).isEqualTo(View.GONE)
             expect.that(wifiList!!.visibility).isEqualTo(View.GONE)
             expect.that(seeAll!!.visibility).isEqualTo(View.GONE)
-        }
-    }
-
-    fun testButtonsAnnounceAsButton() {
-        // Test Share Wi-Fi button
-        val shareWifiNodeInfo = AccessibilityNodeInfoCompat.obtain()
-        ViewCompat.onInitializeAccessibilityNodeInfo(sharedWifiButton!!, shareWifiNodeInfo)
-        assertThat(shareWifiNodeInfo.className).isEqualTo(Button::class.java.name)
-
-        val seeAllNodeInfo = AccessibilityNodeInfoCompat.obtain()
-        ViewCompat.onInitializeAccessibilityNodeInfo(seeAll!!, seeAllNodeInfo)
-        assertThat(seeAllNodeInfo.className).isEqualTo(Button::class.java.name)
-
-        // Test Add Network Button
-        addNetworkButton?.let { button ->
-            val addNetworkNodeInfo = AccessibilityNodeInfoCompat.obtain()
-            ViewCompat.onInitializeAccessibilityNodeInfo(button, addNetworkNodeInfo)
-            assertThat(addNetworkNodeInfo.className).isEqualTo(Button::class.java.name)
         }
     }
 

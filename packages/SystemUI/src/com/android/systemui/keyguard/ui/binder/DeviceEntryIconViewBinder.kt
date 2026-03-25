@@ -30,7 +30,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.Flags
-import com.android.systemui.Flags.enableLockscreenBlur
 import com.android.systemui.common.ui.view.TouchHandlingView
 import com.android.systemui.keyguard.ui.view.DeviceEntryIconView
 import com.android.systemui.keyguard.ui.viewmodel.DeviceEntryBackgroundViewModel
@@ -41,10 +40,8 @@ import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.VibratorHelper
 import com.android.systemui.util.kotlin.DisposableHandles
-import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import com.google.android.msdl.data.model.MSDLToken
 import com.google.android.msdl.domain.MSDLPlayer
-import kotlin.math.min
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
@@ -64,7 +61,6 @@ object DeviceEntryIconViewBinder {
     fun bind(
         applicationScope: CoroutineScope,
         mainImmediateDispatcher: CoroutineDispatcher,
-        windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
         view: DeviceEntryIconView,
         viewModel: DeviceEntryIconViewModel,
         fgViewModel: DeviceEntryForegroundViewModel,
@@ -84,8 +80,11 @@ object DeviceEntryIconViewBinder {
                     view: View,
                     x: Int,
                     y: Int,
+                    isA11yAction: Boolean,
                 ) {
-                    if (falsingManager.isFalseLongTap(FalsingManager.LOW_PENALTY)) {
+                    if (
+                        !isA11yAction && falsingManager.isFalseLongTap(FalsingManager.LOW_PENALTY)
+                    ) {
                         Log.d(
                             TAG,
                             "Long press rejected because it is not a11yAction " +
@@ -254,33 +253,8 @@ object DeviceEntryIconViewBinder {
         disposables +=
             bgView.repeatWhenAttached(mainImmediateDispatcher) {
                 repeatOnLifecycle(Lifecycle.State.CREATED) {
-                    if (enableLockscreenBlur()) {
-                        bgView.background =
-                            bgView.viewRootImpl.createBackgroundBlurDrawable().apply {
-                                setCornerRadius(min(bgView.width, bgView.height).toFloat() / 2f)
-                                setBlurRadius(
-                                    bgView.context.resources.getDimensionPixelOffset(
-                                        R.dimen.fingerprint_icon_blur_radius
-                                    )
-                                )
-                                setVisible(false, false)
-                            }
-
-                        launch("$TAG#windowRootViewBlurInteractor.isBlurCurrentlySupported") {
-                            windowRootViewBlurInteractor.isBlurCurrentlySupported.collect {
-                                isSupported ->
-                                bgView.background?.setVisible(isSupported, false)
-                            }
-                        }
-                    }
-
                     launch("$TAG#bgViewModel.alpha") {
-                        bgViewModel.alpha.collect { alpha ->
-                            bgView.alpha = alpha
-                            if (enableLockscreenBlur()) {
-                                bgView.background?.alpha = (255 * alpha).toInt()
-                            }
-                        }
+                        bgViewModel.alpha.collect { alpha -> bgView.alpha = alpha }
                     }
                     launch("$TAG#bgViewModel.color") {
                         bgViewModel.color.collect { color ->

@@ -26,8 +26,6 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.qs.QSTile
 import com.android.systemui.qs.FakeQSFactory
 import com.android.systemui.qs.FakeQSTile
-import com.android.systemui.qs.flags.QsSplitInternetTile
-import com.android.systemui.qs.panels.domain.interactor.iconTilesInteractor
 import com.android.systemui.qs.pipeline.data.model.RestoreData
 import com.android.systemui.qs.pipeline.data.repository.FakeDefaultTilesRepository
 import com.android.systemui.qs.pipeline.data.repository.MinimumTilesFixedRepository
@@ -59,11 +57,7 @@ class NoLowNumberOfTilesTest : SysuiTestCase() {
 
     private val USER_0_INFO = UserInfo(0, "zero", "", UserInfo.FLAG_ADMIN or UserInfo.FLAG_FULL)
 
-    private val defaultTiles =
-        listOf(
-            TileSpec.create(if (QsSplitInternetTile.isEnabled) "wifi" else "internet"),
-            TileSpec.create("bt"),
-        )
+    private val defaultTiles = listOf(TileSpec.create("internet"), TileSpec.create("bt"))
 
     private val kosmos =
         testKosmos().apply {
@@ -93,7 +87,7 @@ class NoLowNumberOfTilesTest : SysuiTestCase() {
     fun setUp() {
         with(kosmos) {
             restoreReconciliationInteractor.start()
-            autoAddInteractor.init(kosmos.currentTilesInteractor, kosmos.iconTilesInteractor)
+            autoAddInteractor.init(kosmos.currentTilesInteractor)
         }
     }
 

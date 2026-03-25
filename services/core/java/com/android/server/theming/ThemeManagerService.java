@@ -60,7 +60,6 @@ public class ThemeManagerService extends SystemService {
     private final ThemeStateManager mStateManager;
     private final ThemeUserLifecycle mUserLifecycle;
     private final ThemeEventObserver mEventObserver;
-    private final ThemeInitializationObserver mInitializationObserver;
     private final ThemeWallpaperManager mThemeWallpaperManager;
     private final ThemeEnvironment mEnvironment;
 
@@ -87,27 +86,22 @@ public class ThemeManagerService extends SystemService {
         ThemeSettingsManager themeSettingsManager = new ThemeSettingsManager(mThemeWallpaperManager,
                 mEnvironment.getConfig());
 
-        mUserLifecycle = userLifecycle != null ? userLifecycle : new ThemeUserLifecycle(context,
-                mEnvironment);
-        mEventObserver = eventObserver != null ? eventObserver : new ThemeEventObserver(context,
-                mEnvironment);
-
         mImpl = new ThemeManagerImpl(context, themeSettingsManager, mStateManager, overlayHelper,
-                mEnvironment, mThemeWallpaperManager, systemPropertiesReader, mUserLifecycle,
-                mEventObserver);
+                mEnvironment, mThemeWallpaperManager, systemPropertiesReader);
         mPublic = new ThemeBinderService(context, mImpl);
 
-        mInitializationObserver = new ThemeInitializationObserver(context, mImpl,
-                mThemeWallpaperManager,
-                mEnvironment);
+        mUserLifecycle = userLifecycle != null ? userLifecycle : new ThemeUserLifecycle(context,
+                mEnvironment, mImpl);
+        mEventObserver = eventObserver != null ? eventObserver : new ThemeEventObserver(context,
+                mImpl, mEnvironment);
+
+        mImpl.setup(mUserLifecycle);
     }
 
     @Override
     public void onStart() {
         publishLocalService(ThemeManagerInternal.class, mImpl);
         publishBinderService(Context.THEME_SERVICE, mPublic.asBinder());
-
-        mInitializationObserver.onStart();
     }
 
     @Override
@@ -121,10 +115,10 @@ public class ThemeManagerService extends SystemService {
             mStateManager.onServicesReady();
             mEventObserver.onServicesReady(mThemeWallpaperManager);
 
-            mInitializationObserver.registerListeners();
+            // ThemeUserLifecycle does not require any service
+            mUserLifecycle.registerListeners();
+            mEventObserver.registerListeners();
         }
-
-        mInitializationObserver.onBootPhase(phase);
     }
 
     @Override

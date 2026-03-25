@@ -14,15 +14,25 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright (C) 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.android.systemui.keyguard.domain.interactor
 
-import android.app.ActivityManager.RunningTaskInfo
-import android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM
-import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
-import android.platform.test.flag.junit.FlagsParameterization
-import android.service.dreams.Flags.FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.SysuiTestCase
@@ -32,16 +42,13 @@ import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.data.repository.keyguardOcclusionRepository
-import com.android.systemui.keyguard.domain.model.OcclusionStateModel
 import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.TransitionState
-import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.collectValues
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
-import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
 import com.android.systemui.power.domain.interactor.powerInteractor
@@ -52,73 +59,26 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
+import junit.framework.Assert.assertFalse
+import junit.framework.Assert.assertTrue
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runCurrent
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import platform.test.runner.parameterized.ParameterizedAndroidJunit4
-import platform.test.runner.parameterized.Parameters
 
 @SmallTest
-@RunWith(ParameterizedAndroidJunit4::class)
-class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestCase() {
+@RunWith(AndroidJUnit4::class)
+class KeyguardOcclusionInteractorTest : SysuiTestCase() {
 
-    private val kosmos = testKosmos().useUnconfinedTestDispatcher()
+    private val kosmos = testKosmos()
 
-    private val Kosmos.underTest: KeyguardOcclusionInteractor by
-        Kosmos.Fixture { keyguardOcclusionInteractor }
+    private lateinit var underTest: KeyguardOcclusionInteractor
 
-    companion object {
-        @JvmStatic
-        @Parameters(name = "{0}")
-        fun getParams(): List<FlagsParameterization> {
-            return FlagsParameterization.allCombinationsOf(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
-        }
+    @Before
+    fun setUp() {
+        underTest = kosmos.keyguardOcclusionInteractor
     }
-
-    init {
-        mSetFlagsRule.setFlagsParameterization(flags)
-    }
-
-    @Test
-    @EnableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
-    fun occlusionState_whenNotOccluded_isNone() =
-        kosmos.runTest {
-            val occlusionState by collectLastValue(underTest.occlusionState)
-            keyguardOcclusionRepository.setOccludedFromWm(false)
-            assertThat(occlusionState).isEqualTo(OcclusionStateModel.NONE)
-        }
-
-    @Test
-    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
-    fun occlusionState_whenOccluded_flagOff_isLegacy() =
-        kosmos.runTest {
-            val occlusionState by collectLastValue(underTest.occlusionState)
-            powerInteractor.setAwakeForTest()
-            keyguardOcclusionRepository.setOccludedFromWm(true)
-            assertThat(occlusionState).isEqualTo(OcclusionStateModel.LEGACY_OCCLUDED_GENERIC)
-        }
-
-    @Test
-    @EnableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
-    fun occlusionState_whenOccludedByApp_flagOn_isApp() =
-        kosmos.runTest {
-            val occlusionState by collectLastValue(underTest.occlusionState)
-            powerInteractor.setAwakeForTest()
-            val taskInfo = RunningTaskInfo().apply { topActivityType = ACTIVITY_TYPE_STANDARD }
-            keyguardOcclusionRepository.setOccludedFromRemoteAnimation(true, taskInfo)
-            assertThat(occlusionState).isEqualTo(OcclusionStateModel.APP)
-        }
-
-    @Test
-    @EnableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
-    fun occlusionState_whenOccludedByDream_flagOn_isDream() =
-        kosmos.runTest {
-            val occlusionState by collectLastValue(underTest.occlusionState)
-            powerInteractor.setAwakeForTest()
-            val taskInfo = RunningTaskInfo().apply { topActivityType = ACTIVITY_TYPE_DREAM }
-            keyguardOcclusionRepository.setOccludedFromRemoteAnimation(true, taskInfo)
-            assertThat(occlusionState).isEqualTo(OcclusionStateModel.DREAM)
-        }
 
     @Test
     fun transitionFromPowerGesture_whileGoingToSleep_isTrue() =
@@ -133,7 +93,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
 
             powerInteractor.onCameraLaunchGestureDetected()
 
-            assertThat(underTest.shouldTransitionFromPowerButtonGesture()).isTrue()
+            assertTrue(underTest.shouldTransitionFromPowerButtonGesture())
         }
 
     @Test
@@ -148,7 +108,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
 
             powerInteractor.onCameraLaunchGestureDetected()
 
-            assertThat(underTest.shouldTransitionFromPowerButtonGesture()).isTrue()
+            assertTrue(underTest.shouldTransitionFromPowerButtonGesture())
         }
 
     @Test
@@ -169,7 +129,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
 
             powerInteractor.onCameraLaunchGestureDetected()
 
-            assertThat(underTest.shouldTransitionFromPowerButtonGesture()).isFalse()
+            assertFalse(underTest.shouldTransitionFromPowerButtonGesture())
         }
 
     @Test
@@ -189,7 +149,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
 
             powerInteractor.onCameraLaunchGestureDetected()
 
-            assertThat(underTest.shouldTransitionFromPowerButtonGesture()).isFalse()
+            assertFalse(underTest.shouldTransitionFromPowerButtonGesture())
         }
 
     @Test
@@ -206,13 +166,13 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
             powerInteractor.onCameraLaunchGestureDetected()
             powerInteractor.setAwakeForTest()
 
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             assertThat(values).containsExactly(false, true)
 
-            keyguardOcclusionRepository.setOccludedFromWm(false)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(false)
             assertThat(values).containsExactly(false, true, false)
 
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             assertThat(values)
                 .containsExactly(
                     false,
@@ -244,7 +204,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
             )
 
             powerInteractor.onCameraLaunchGestureDetected()
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             powerInteractor.setAwakeForTest()
 
             fakeKeyguardTransitionRepository.sendTransitionSteps(
@@ -275,7 +235,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
             )
 
             powerInteractor.onCameraLaunchGestureDetected()
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             powerInteractor.setAwakeForTest()
 
             setSceneTransition(Transition(Scenes.Lockscreen, Scenes.Gone), skipChangeScene = true)
@@ -306,7 +266,9 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
 
             // Re-lock device:
             powerInteractor.setAsleepForTest()
+            testScope.runCurrent()
             kosmos.lockAfterDelayInteractor.timeoutElapsedForTesting()
+            testScope.runCurrent()
             assertThat(occludingActivityWillDismissKeyguard).isFalse()
         }
 
@@ -323,7 +285,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
                 throughTransitionState = TransitionState.RUNNING,
             )
 
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
 
             assertThat(values).isTrue()
         }
@@ -343,6 +305,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
                 unlockStateInt = BiometricUnlockController.MODE_DISMISS,
                 biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
+            testScope.runCurrent()
 
             sceneInteractor.changeScene(Scenes.Gone, "reason")
             sceneInteractor.setTransitionState(flowOf(ObservableTransitionState.Idle(Scenes.Gone)))
@@ -353,7 +316,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
                 testScope = testScope,
             )
 
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             assertThat(values).isFalse()
         }
 
@@ -365,7 +328,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
             setSceneTransition(Transition(Scenes.Gone, Scenes.Lockscreen))
             powerInteractor.setAsleepForTest()
 
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             assertThat(values).isFalse()
         }
 
@@ -377,7 +340,7 @@ class KeyguardOcclusionInteractorTest(flags: FlagsParameterization) : SysuiTestC
             setSceneTransition(Transition(Scenes.Gone, Scenes.Lockscreen))
             powerInteractor.setAsleepForTest()
 
-            keyguardOcclusionRepository.setOccludedFromWm(true)
+            keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true)
             powerInteractor.setAwakeForTest()
             assertThat(values).isTrue()
         }

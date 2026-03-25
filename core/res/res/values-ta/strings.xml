@@ -2114,9 +2114,12 @@
     <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
     <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
     <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
-    <string name="notification_history_metric_subtext" msgid="7408216222655116821">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>: <xliff:g id="METRIC_VALUE">%2$s</xliff:g>"</string>
-    <string name="notification_metric_running_timer" msgid="1096459900744921213">"செயலிலுள்ள டைமர்"</string>
-    <string name="notification_metric_running_stopwatch" msgid="8039546029949295377">"செயலிலுள்ள ஸ்டாப்வாட்ச்"</string>
+    <!-- no translation found for notification_history_metric_subtext (7408216222655116821) -->
+    <skip />
+    <!-- no translation found for notification_metric_running_timer (1096459900744921213) -->
+    <skip />
+    <!-- no translation found for notification_metric_running_stopwatch (8039546029949295377) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"பதிலளி"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"வீடியோ"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"நிராகரி"</string>
@@ -2706,7 +2709,7 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"டிவியை ஆஃப் செய்ய பவர் பட்டனை அழுத்திப் பிடியுங்கள்"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"சிஸ்டம் ஆதாரம் தொடர்பான விழிப்பூட்டல்கள்"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ஆதாரத்தை அதிகளவில் பயன்படுத்துதல்"</string>
-    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"அதிகப்படியான ஆதாரங்களைப் பயன்படுத்தியதால் <xliff:g id="APP_NAME">%1$s</xliff:g> ஆப்ஸ் முடக்கப்பட்டுள்ளது. அமைப்புகளுக்குச் சென்று ஆப்ஸ் மெனுவில் அதை மீண்டும் ஆன் செய்யலாம்."</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"\'<xliff:g id="APP_NAME">%1$s</xliff:g> ஆப்ஸ் மிக அதிகளவிலான ஆதாரங்களைப் பயன்படுத்துகிறது\"."</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"பெற்றோர் செய்துள்ள மாற்றம்"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ஆப்ஸ் இப்போதைக்கு அகற்றப்பட்டது"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"இப்போது <xliff:g id="APP_NAME">%1$s</xliff:g> கிடைக்கிறது"</string>

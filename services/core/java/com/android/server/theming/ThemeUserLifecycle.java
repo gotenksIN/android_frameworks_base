@@ -44,17 +44,14 @@ public class ThemeUserLifecycle {
 
     private final Context mContext;
     private final ThemeEnvironment mEnvironment;
-    private ThemeEventDispatcher mDispatcher;
+    private final ThemeManagerImpl mImpl;
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    ThemeUserLifecycle(@NonNull Context context, @NonNull ThemeEnvironment environment) {
+    ThemeUserLifecycle(@NonNull Context context, @NonNull ThemeEnvironment environment,
+            @NonNull ThemeManagerImpl impl) {
         mContext = context;
         mEnvironment = environment;
-    }
-
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    void setDispatcher(ThemeEventDispatcher delegate) {
-        mDispatcher = delegate;
+        mImpl = impl;
     }
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
@@ -88,7 +85,7 @@ public class ThemeUserLifecycle {
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void onUserStarting(@NonNull SystemService.TargetUser user) {
         Slog.d(TAG, "User: " + user.getUserIdentifier() + " starting");
-        mDispatcher.onUserStart(user.getUserHandle().getIdentifier());
+        mImpl.onUserStart(user.getUserHandle().getIdentifier());
     }
 
     /**
@@ -102,8 +99,7 @@ public class ThemeUserLifecycle {
             @NonNull SystemService.TargetUser to) {
         Slog.d(TAG, "User switch from:" + (from != null ? from.getUserIdentifier() : "-") + " to: "
                 + to.getUserIdentifier());
-        mDispatcher.onUserSwitching(from != null ? from.getUserIdentifier() : 0,
-                to.getUserIdentifier());
+        mImpl.onUserSwitching(from != null ? from.getUserIdentifier() : 0, to.getUserIdentifier());
     }
 
     /**
@@ -122,7 +118,7 @@ public class ThemeUserLifecycle {
      */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public boolean loadUserStateAndNotifyStateManager(@UserIdInt int userId) {
-        mDispatcher.onUserStart(userId);
+        mImpl.onUserStart(userId);
         return true; // Simplified return, actual check in Impl/StateManager
     }
 
@@ -137,6 +133,6 @@ public class ThemeUserLifecycle {
         }
 
         Slog.d(TAG, "User: " + newUserOrProfileId + " added to parent: " + parentId);
-        mDispatcher.onProfileAdded(parentId, newUserOrProfileId);
+        mImpl.onProfileAdded(parentId, newUserOrProfileId);
     }
 }

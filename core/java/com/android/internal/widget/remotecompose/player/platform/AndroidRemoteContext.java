@@ -40,6 +40,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * An implementation of Context for Android.
@@ -110,7 +111,7 @@ public class AndroidRemoteContext extends RemoteContext {
         /**
          * Create a new EdgeEffect
          *
-         * @return EdgeEffect
+         * @return
          */
         @NonNull
         EdgeEffect create();
@@ -119,7 +120,7 @@ public class AndroidRemoteContext extends RemoteContext {
     /**
      * Set a builder for EdgeEffects
      *
-     * @param builder EdgeEffectBuilder
+     * @param builder
      */
     public void setEdgeEffectBuilder(@NonNull EdgeEffectBuilder builder) {
         mEdgeEffectBuilder = builder;
@@ -160,27 +161,23 @@ public class AndroidRemoteContext extends RemoteContext {
         }
     }
 
-    HashMap<String, ArrayList<VarName>> mVarNameHashMap = new HashMap<>();
+    HashMap<String, VarName> mVarNameHashMap = new HashMap<>();
 
     /**
      * Returns the id of a variable
      *
-     * @param name name of variable
-     * @return id of variable
+     * @param name
+     * @return
      */
     public int getVariableId(@NonNull String name) {
-        ArrayList<VarName> list = mVarNameHashMap.get(name);
-        if (list == null || list.isEmpty()) {
-            throw new java.util.NoSuchElementException("Variable " + name + " not found");
-        }
-        return list.get(0).mId;
+        return Objects.requireNonNull(mVarNameHashMap.get(name)).mId;
     }
 
     /**
      * Returns the content of a name variable
      *
-     * @param name name of variable
-     * @return content of variable
+     * @param name
+     * @return
      */
     public @Nullable String getStringVariableName(@NonNull String name) {
         int id = getVariableId(name);
@@ -189,38 +186,24 @@ public class AndroidRemoteContext extends RemoteContext {
 
     @Override
     public void loadVariableName(@NonNull String varName, int varId, int varType) {
-        ArrayList<VarName> list = mVarNameHashMap.get(varName);
-        if (list == null) {
-            list = new ArrayList<>();
-            mVarNameHashMap.put(varName, list);
-        }
-        // Avoid duplicates if re-initializing the same document
-        for (int i = 0; i < list.size(); i++) {
-            if (list.get(i).mId == varId) {
-                return;
-            }
-        }
-        list.add(new VarName(varName, varId, varType));
+        mVarNameHashMap.put(varName, new VarName(varName, varId, varType));
     }
 
     @Override
     public void setNamedStringOverride(@NonNull String stringName, @NonNull String value) {
-        ArrayList<VarName> list = mVarNameHashMap.get(stringName);
-        if (list != null) {
-            for (VarName var : list) {
-                overrideText(var.mId, value);
-            }
+        if (mVarNameHashMap.get(stringName) != null) {
+            int id = mVarNameHashMap.get(stringName).mId;
+            overrideText(id, value);
         }
     }
 
     @Override
     public void clearNamedStringOverride(@NonNull String stringName) {
-        ArrayList<VarName> list = mVarNameHashMap.get(stringName);
-        if (list != null) {
-            for (VarName var : list) {
-                clearDataOverride(var.mId);
-            }
+        if (mVarNameHashMap.get(stringName) != null) {
+            int id = mVarNameHashMap.get(stringName).mId;
+            clearDataOverride(id);
         }
+        mVarNameHashMap.put(stringName, null);
     }
 
     @Override
@@ -235,73 +218,63 @@ public class AndroidRemoteContext extends RemoteContext {
 
     @Override
     public void setNamedIntegerOverride(@NonNull String integerName, int value) {
-        ArrayList<VarName> list = mVarNameHashMap.get(integerName);
-        if (list != null) {
-            for (VarName var : list) {
-                overrideInt(var.mId, value);
-            }
+        if (mVarNameHashMap.get(integerName) != null) {
+            int id = mVarNameHashMap.get(integerName).mId;
+            overrideInt(id, value);
         }
     }
 
     @Override
     public void clearNamedIntegerOverride(@NonNull String integerName) {
-        ArrayList<VarName> list = mVarNameHashMap.get(integerName);
-        if (list != null) {
-            for (VarName var : list) {
-                clearIntegerOverride(var.mId);
-            }
+        if (mVarNameHashMap.get(integerName) != null) {
+            int id = mVarNameHashMap.get(integerName).mId;
+            clearIntegerOverride(id);
         }
+        mVarNameHashMap.put(integerName, null);
     }
 
     @Override
     public void setNamedFloatOverride(@NonNull String floatName, float value) {
-        ArrayList<VarName> list = mVarNameHashMap.get(floatName);
-        if (list != null) {
-            for (VarName var : list) {
-                overrideFloat(var.mId, value);
-            }
+        if (mVarNameHashMap.get(floatName) != null) {
+            int id = mVarNameHashMap.get(floatName).mId;
+            overrideFloat(id, value);
         }
     }
 
     @Override
     public void clearNamedFloatOverride(@NonNull String floatName) {
-        ArrayList<VarName> list = mVarNameHashMap.get(floatName);
-        if (list != null) {
-            for (VarName var : list) {
-                clearFloatOverride(var.mId);
-            }
+        if (mVarNameHashMap.get(floatName) != null) {
+            int id = mVarNameHashMap.get(floatName).mId;
+            clearFloatOverride(id);
         }
+        mVarNameHashMap.put(floatName, null);
     }
 
     @Override
     public void setNamedLong(@NonNull String name, long value) {
-        ArrayList<VarName> list = mVarNameHashMap.get(name);
-        if (list != null) {
-            for (VarName var : list) {
-                LongConstant longConstant = (LongConstant) mRemoteComposeState.getObject(var.mId);
-                longConstant.setValue(value);
-            }
+        VarName entry = mVarNameHashMap.get(name);
+        if (entry != null) {
+            int id = entry.mId;
+            LongConstant longConstant = (LongConstant) mRemoteComposeState.getObject(id);
+            longConstant.setValue(value);
         }
     }
 
     @Override
     public void setNamedDataOverride(@NonNull String dataName, @NonNull Object value) {
-        ArrayList<VarName> list = mVarNameHashMap.get(dataName);
-        if (list != null) {
-            for (VarName var : list) {
-                overrideData(var.mId, value);
-            }
+        if (mVarNameHashMap.get(dataName) != null) {
+            int id = mVarNameHashMap.get(dataName).mId;
+            overrideData(id, value);
         }
     }
 
     @Override
     public void clearNamedDataOverride(@NonNull String dataName) {
-        ArrayList<VarName> list = mVarNameHashMap.get(dataName);
-        if (list != null) {
-            for (VarName var : list) {
-                clearDataOverride(var.mId);
-            }
+        if (mVarNameHashMap.get(dataName) != null) {
+            int id = mVarNameHashMap.get(dataName).mId;
+            clearDataOverride(id);
         }
+        mVarNameHashMap.put(dataName, null);
     }
 
     /**
@@ -311,11 +284,9 @@ public class AndroidRemoteContext extends RemoteContext {
      */
     @Override
     public void setNamedColorOverride(@NonNull String colorName, int color) {
-        ArrayList<VarName> list = mVarNameHashMap.get(colorName);
-        if (list != null) {
-            for (VarName var : list) {
-                mRemoteComposeState.overrideColor(var.mId, color);
-            }
+        if (mVarNameHashMap.get(colorName) != null) {
+            int id = mVarNameHashMap.get(colorName).mId;
+            mRemoteComposeState.overrideColor(id, color);
         }
     }
 

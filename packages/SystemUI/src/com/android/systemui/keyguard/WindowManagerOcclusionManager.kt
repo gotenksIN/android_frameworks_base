@@ -140,8 +140,8 @@ constructor(
                             occludeTransitionFinishedCallback = null
                         }
                     }
-                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
-                    onTop = true,
+                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
+                    showWhenLockedActivityOnTop = true,
                     taskInfo = info?.changes?.firstOrNull { it.mode == TRANSIT_OPEN }?.taskInfo,
                 )
                 delegate =
@@ -194,8 +194,8 @@ constructor(
                             occludeAnimationFinishedCallback = null
                         }
                     }
-                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
-                    onTop = true,
+                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
+                    showWhenLockedActivityOnTop = true,
                     taskInfo = apps.firstOrNull()?.taskInfo,
                 )
                 activityTransitionAnimator
@@ -245,8 +245,8 @@ constructor(
                             unoccludeAnimationFinishedCallback = null
                         }
                     }
-                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
-                    onTop = false,
+                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
+                    showWhenLockedActivityOnTop = false,
                     taskInfo = apps.firstOrNull()?.taskInfo,
                 )
                 interactionJankMonitor.begin(
@@ -390,8 +390,8 @@ constructor(
                     return
                 }
 
-                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
-                    onTop = true,
+                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
+                    showWhenLockedActivityOnTop = true,
                     taskInfo = taskInfo!!, // Safe due to the check above
                 )
 
@@ -421,7 +421,7 @@ constructor(
      */
     fun onKeyguardServiceSetOccluded(occluded: Boolean) {
         Log.d(TAG, "#onKeyguardServiceSetOccluded($occluded)")
-        keyguardOcclusionInteractor.setOccludedFromWm(occluded)
+        keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(occluded)
     }
 
     @VisibleForTesting

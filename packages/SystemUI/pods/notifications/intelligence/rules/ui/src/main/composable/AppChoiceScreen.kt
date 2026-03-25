@@ -38,7 +38,7 @@ fun AppChoiceScreen(viewState: RulesScreenViewState.EditField.Apps, onDismissReq
     val viewModel = viewState.viewModel
 
     val initialSelection: List<AppModel> =
-        when (val apps = viewModel.rule.filter.includedApps) {
+        when (val apps = viewModel.rule.includedApps) {
             is RuleValue.Specified -> apps.value.apps
             is RuleValue.Ambiguous -> emptyList()
             null -> emptyList()
@@ -50,7 +50,7 @@ fun AppChoiceScreen(viewState: RulesScreenViewState.EditField.Apps, onDismissReq
             value = viewModel.fetchInstalledApps(context)
         }
 
-    EditScreenWithSearch(
+    EditScreen(
         title = stringResource(R.string.notification_rules_field_app),
         initialSelection = initialSelection,
         onSelectionSaved = { viewState.onAppsSaved(it) },

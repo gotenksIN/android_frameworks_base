@@ -131,8 +131,6 @@ public final class MediaRouterService extends IMediaRouterService.Stub
     @GuardedBy("mLock")
     private int mCurrentActiveUserId = -1;
 
-    private final MediaRouterMetricLogger mMetricLogger = new MediaRouterMetricLogger();
-
     private final IAudioService mAudioService;
     private final AudioPlayerStateMonitor mAudioPlayerStateMonitor;
     private final Handler mHandler;
@@ -155,7 +153,7 @@ public final class MediaRouterService extends IMediaRouterService.Stub
         handlerThread.start();
         mLooper = handlerThread.getLooper();
         mHandler = new Handler(mLooper);
-        mService2 = new MediaRouter2ServiceImpl(context, mLooper, mMetricLogger);
+        mService2 = new MediaRouter2ServiceImpl(context, mLooper);
         mContext = context;
         Watchdog.getInstance().addMonitor(this);
         Resources res = context.getResources();
@@ -304,9 +302,6 @@ public final class MediaRouterService extends IMediaRouterService.Stub
         if (client == null) {
             throw new IllegalArgumentException("client must not be null");
         }
-
-        final int uid = Binder.getCallingUid();
-        mMetricLogger.logSetBluetoothA2dpOnReported(uid, on);
 
         final long token = Binder.clearCallingIdentity();
         try {

@@ -19,7 +19,8 @@ package com.android.systemui.statusbar.systemstatusicons.ethernet.ui.viewmodel
 import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.statusbar.pipeline.ethernet.domain.EthernetInteractor
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconViewModel
@@ -34,19 +35,25 @@ import dagger.assisted.AssistedInject
 class EthernetIconViewModel
 @AssistedInject
 constructor(@Assisted context: Context, interactor: EthernetInteractor) :
-    SystemStatusIconViewModel.Default, HydratedActivatable() {
+    SystemStatusIconViewModel.Default, ExclusiveActivatable() {
 
     init {
         /* check if */ SystemStatusIconsInCompose.isUnexpectedlyInLegacyMode()
     }
 
+    private val hydrator = Hydrator("EthernetIconViewModel.hydrator")
+
     override val slotName = context.getString(com.android.internal.R.string.status_bar_ethernet)
 
     override val icon: Icon? by
-        interactor.icon.hydratedStateOf(traceName = null, initialValue = null)
+        hydrator.hydratedStateOf(traceName = null, initialValue = null, source = interactor.icon)
 
     override val visible: Boolean
         get() = icon != null
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

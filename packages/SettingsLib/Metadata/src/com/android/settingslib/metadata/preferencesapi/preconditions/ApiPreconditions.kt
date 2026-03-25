@@ -30,18 +30,17 @@ object Allowed : ApiPreconditions
  * Every implementation of `Disallowed` needs to provide A human-readable `reason` explaining why
  * the precondition failed.
  */
-abstract class Disallowed private constructor(
+open class Disallowed private constructor(
     @StringRes val reasonRes: Int?,
-    val reason: String?,
-    val stability: PreconditionStability
+    val reason: String?
 ) : ApiPreconditions {
     init {
         require(reasonRes != null || reason != null)
     }
 
-    constructor(@StringRes reason: Int, stability: PreconditionStability) : this(reasonRes = reason, reason = null, stability = stability)
+    constructor(@StringRes reason: Int) : this(reasonRes = reason, reason = null)
 
-    constructor(reason: String, stability: PreconditionStability) : this(reasonRes = null, reason = reason, stability = stability)
+    constructor(reason: String) : this(reasonRes = null, reason = reason)
 
     /** Get the reason as a string using the provided context. */
     fun getReason(context: Context): String = resolveString(context, reasonRes, reason)

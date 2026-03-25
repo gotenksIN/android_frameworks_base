@@ -926,9 +926,6 @@
     <!-- Flag to enable privacy chip animation, it shall be true for normal case -->
     <bool name="config_enablePrivacyChipAnimation">true</bool>
 
-    <!-- Flag to enable connected display chip, true by default -->
-    <bool name="config_isStatusBarConnectedDisplayChipEnabled">true</bool>
-
     <!-- How often in milliseconds to jitter the dream overlay in order to avoid burn-in. -->
     <integer name="config_dreamOverlayBurnInProtectionUpdateIntervalMillis">1000</integer>
 
@@ -1238,10 +1235,4 @@
     revealing the blur underneath, or fully opaque.
     -->
     <bool name="config_translucentStandalonePowerMenu">true</bool>
-
-    <!--
-    Certain devices may not ever want to show lockscreen content, and should be directed
-    immediately to a bouncer.
-    -->
-    <bool name="config_alwaysShowBouncerWhenLocked">false</bool>
 </resources>

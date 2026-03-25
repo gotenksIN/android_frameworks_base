@@ -17,9 +17,13 @@
 package com.android.systemui.shade.ui.composable
 
 import android.annotation.SuppressLint
+import androidx.annotation.VisibleForTesting
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeContent
@@ -42,6 +46,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -61,6 +68,8 @@ import com.android.systemui.shade.ui.composable.OverlayShade.Colors
 import com.android.systemui.shade.ui.composable.OverlayShade.Dimensions
 import com.android.systemui.shade.ui.composable.OverlayShade.rememberShadeExpansionMotion
 import kotlin.math.min
+import platform.test.motion.compose.values.MotionTestValueKey
+import platform.test.motion.compose.values.motionTestValues
 
 /** Renders a lightweight shade UI container, as an overlay. */
 @Composable
@@ -87,7 +96,7 @@ fun ContentScope.OverlayShade(
         }
 
     Box(modifier) {
-        OverlayScrim(showBackgroundColor = enableTransparency, onClicked = onScrimClicked)
+        Scrim(showBackgroundColor = enableTransparency, onClicked = onScrimClicked)
 
         Box(
             modifier =
@@ -158,6 +167,43 @@ fun ContentScope.OverlayShade(
             header()
         }
     }
+}
+
+@Composable
+private fun ContentScope.Scrim(
+    showBackgroundColor: Boolean,
+    onClicked: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val closeOverlayActionLabel = stringResource(R.string.accessibility_close_overlay_action)
+    val closeOverlayBoundingBoxDescription =
+        stringResource(R.string.accessibility_close_overlay_box_description)
+
+    val scrimBackgroundColor = Colors.ScrimBackground
+    Spacer(
+        modifier =
+            modifier
+                .element(OverlayShade.Elements.Scrim)
+                .motionTestValues {
+                    OverlayShade.Elements.Scrim.currentAlpha()?.let { alpha ->
+                        alpha exportAs OverlayShadeMotionTestKeys.scrimAlpha
+                    }
+                }
+                .fillMaxSize()
+                .thenIf(showBackgroundColor) { Modifier.background(scrimBackgroundColor) }
+                .clickable(
+                    onClick = onClicked,
+                    interactionSource = null,
+                    indication = null,
+                    onClickLabel = closeOverlayActionLabel,
+                )
+                .semantics { contentDescription = closeOverlayBoundingBoxDescription }
+    )
+}
+
+@VisibleForTesting
+object OverlayShadeMotionTestKeys {
+    val scrimAlpha = MotionTestValueKey<Float>("scrim_alpha")
 }
 
 @Composable

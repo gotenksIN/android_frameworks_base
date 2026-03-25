@@ -35,8 +35,6 @@ import android.view.View;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
-import com.android.server.personalcontext.AccessController;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,8 +50,6 @@ public class EmbeddedInsightRendererTest {
     private ClientRegistry mClientRegistry;
     @Mock
     private VisualizerRegistry mVisualizerRegistry;
-    @Mock
-    AccessController mAccessController;
     private EmbeddedInsightRenderer mEmbeddedInsightRenderer;
 
     @Before

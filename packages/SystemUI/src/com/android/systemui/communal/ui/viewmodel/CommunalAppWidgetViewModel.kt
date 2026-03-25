@@ -34,6 +34,7 @@ import dagger.Lazy
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -80,7 +81,7 @@ constructor(
         }
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScopeTraced("$TAG#onActivated") {
             requests.receiveAsFlow().collect { request ->
                 when (request) {
@@ -98,6 +99,8 @@ constructor(
                 }
             }
         }
+
+        awaitCancellation()
     }
 
     private suspend fun handleSetListener(appWidgetId: Int, listener: AppWidgetHostListener) =

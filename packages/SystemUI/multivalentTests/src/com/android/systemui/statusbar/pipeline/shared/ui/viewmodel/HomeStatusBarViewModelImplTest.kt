@@ -569,10 +569,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         kosmos.runTest {
             // home status bar not allowed
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
-                false,
-                taskInfo = null,
-            )
+            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(false, taskInfo = null)
 
             assertThat(underTest.ongoingActivityChips.areChipsAllowed).isFalse()
         }
@@ -911,7 +908,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
             if (SceneContainerFlag.isEnabled) {
                 kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-                kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
+                kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(
                     true,
                     taskInfo = null,
                 )
@@ -1449,7 +1446,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
-    fun onShadeExpansionIntent_notConsumed_setsTargetDisplayAndIntent() =
+    fun onShadeExpansionIntent_setsTargetDisplay() =
         kosmos.runTest {
             displayRepository.addDisplays(display(id = EXTERNAL_DISPLAY, type = TYPE_EXTERNAL))
 
@@ -1459,27 +1456,8 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             val eventX = 123f
             val statusBarWidth = 1080
 
-            underTest.onShadeExpansionIntent(eventX, statusBarWidth, isConsumed = false)
-
+            underTest.onShadeExpansionIntent(eventX, statusBarWidth)
             assertThat(displayId).isEqualTo(EXTERNAL_DISPLAY)
-            assertThat(statusBarTouchShadeDisplayPolicy.consumeExpansionIntent()).isNotNull()
-        }
-
-    @Test
-    fun onShadeExpansionIntent_isConsumed_setsTargetDisplayOnly() =
-        kosmos.runTest {
-            displayRepository.addDisplays(display(id = EXTERNAL_DISPLAY, type = TYPE_EXTERNAL))
-
-            val underTest = homeStatusBarViewModelFactory(EXTERNAL_DISPLAY)
-            val displayId by collectLastValue(statusBarTouchShadeDisplayPolicy.displayId)
-
-            val eventX = 123f
-            val statusBarWidth = 1080
-
-            underTest.onShadeExpansionIntent(eventX, statusBarWidth, isConsumed = true)
-
-            assertThat(displayId).isEqualTo(EXTERNAL_DISPLAY)
-            assertThat(statusBarTouchShadeDisplayPolicy.consumeExpansionIntent()).isNull()
         }
 
     @Test

@@ -17,6 +17,7 @@
 package com.android.systemui.shade.ui.viewmodel
 
 import androidx.annotation.FloatRange
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.LifecycleOwner
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.scene.content.state.TransitionState
@@ -24,7 +25,8 @@ import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.keyguard.ui.transitions.BlurConfig
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager.Companion.LOCATION_QQS
 import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
@@ -49,6 +51,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -80,51 +83,65 @@ constructor(
     windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     mediaInRowInLandscapeViewModelFactory: MediaInRowInLandscapeViewModel.Factory,
     shadeStatusBarComponentsInteractor: ShadeStatusBarComponentsInteractor,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("ShadeSceneContentViewModel.hydrator")
 
     /**
      * Whether the shade container transparency effect should be enabled (`true`), or whether to
      * render a fully-opaque shade container (`false`).
      */
     val isTransparencyEnabled: Boolean by
-        if (Flags.notificationShadeBlur()) {
-                windowRootViewBlurInteractor.isBlurCurrentlySupported
-            } else {
-                MutableStateFlow(false)
-            }
-            .hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "isTransparencyEnabled",
+            source =
+                if (Flags.notificationShadeBlur()) {
+                    windowRootViewBlurInteractor.isBlurCurrentlySupported
+                } else {
+                    MutableStateFlow(false)
+                },
+        )
 
-    val shadeMode: ShadeMode by shadeModeInteractor.shadeMode.hydratedStateOf()
+    val shadeMode: ShadeMode by
+        hydrator.hydratedStateOf(traceName = "shadeMode", source = shadeModeInteractor.shadeMode)
 
     /** Whether clicking on the empty area of the shade should do something. */
     val isEmptySpaceClickable: Boolean by
-        deviceEntryInteractor.isDeviceEntered
-            .map { !it }
-            .hydratedStateOf(initialValue = !deviceEntryInteractor.isDeviceEntered.value)
+        hydrator.hydratedStateOf(
+            traceName = "isEmptySpaceClickable",
+            initialValue = !deviceEntryInteractor.isDeviceEntered.value,
+            source = deviceEntryInteractor.isDeviceEntered.map { !it },
+        )
 
     val showMediaInRow: Boolean
         get() = qqsMediaInRowViewModel.shouldMediaShowInRow
 
     val showMedia: Boolean by
-        // mediaCarouselInteractor.hasAnyMedia if in SplitShade.
-        mediaCarouselInteractor.hasActiveMedia.hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "isMediaVisible",
+            // mediaCarouselInteractor.hasAnyMedia if in SplitShade.
+            source = mediaCarouselInteractor.hasActiveMedia,
+        )
 
     val isQsEnabled: Boolean by
-        shadeStatusBarComponentsInteractor.disableFlags
-            .map { it.isQuickSettingsEnabled() }
-            .hydratedStateOf(
-                initialValue =
-                    shadeStatusBarComponentsInteractor.disableFlags.value.isQuickSettingsEnabled()
-            )
+        hydrator.hydratedStateOf(
+            traceName = "isQsEnabled",
+            initialValue =
+                shadeStatusBarComponentsInteractor.disableFlags.value.isQuickSettingsEnabled(),
+            source =
+                shadeStatusBarComponentsInteractor.disableFlags.map { it.isQuickSettingsEnabled() },
+        )
 
     /**
      * Amount of X-axis translation to apply to various elements as the unfolded foldable is folded
      * slightly, in pixels.
      */
     val unfoldTranslationXForStartSide: Float by
-        unfoldTransitionInteractor
-            .unfoldTranslationX(isOnStartSide = true)
-            .hydratedStateOf(initialValue = 0f)
+        hydrator.hydratedStateOf(
+            traceName = "unfoldTranslationXForStartSide",
+            initialValue = 0f,
+            source = unfoldTransitionInteractor.unfoldTranslationX(isOnStartSide = true),
+        )
 
     fun onMediaSwipeToDismiss() = mediaCarouselInteractor.onSwipeToDismiss()
 
@@ -133,8 +150,12 @@ constructor(
     private val qqsMediaInRowViewModel =
         mediaInRowInLandscapeViewModelFactory.create(LOCATION_QQS, qqsMediaUiBehavior)
 
-    override suspend fun onActivated() {
-        coroutineScope { launch { qqsMediaInRowViewModel.activate() } }
+    override suspend fun onActivated(): Nothing {
+        coroutineScope {
+            launch { hydrator.activate() }
+            launch { qqsMediaInRowViewModel.activate() }
+            awaitCancellation()
+        }
     }
 
     /**

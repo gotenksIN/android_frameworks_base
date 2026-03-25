@@ -70,7 +70,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.UserHandle;
@@ -571,13 +570,6 @@ public class VirtualDeviceInternal {
         }
     }
 
-    void setCurrentThermalStatus(@PowerManager.ThermalStatus int status) {
-        try {
-            mVirtualDevice.setCurrentThermalStatus(status);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
     void addActivityListener(
             @CallbackExecutor @NonNull Executor executor,
             @NonNull VirtualDeviceManager.ActivityListener listener) {

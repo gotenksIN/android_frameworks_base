@@ -18,7 +18,6 @@ package com.android.systemui.deviceentry.domain.interactor
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.Back
-import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.Swipe
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
@@ -26,7 +25,6 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
-import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.fakeMobileConnectionsRepository
@@ -44,36 +42,34 @@ class RestrictedModeInteractorTest : SysuiTestCase() {
     val underTest: RestrictedModeInteractor by lazy { kosmos.restrictedModeInteractor }
 
     @Test
-    fun filterUserActions_filtersOutAllActionThatNavigateAwayFromBouncer() =
+    fun filterUserActions_filtersOutAllActionThatNavigateAwayFromBouncerOrLockscreen() =
         kosmos.runTest {
             val unfilteredFlow = MutableStateFlow<Map<UserAction, UserActionResult>>(emptyMap())
             val filteredFlow by collectLastValue(underTest.filteredUserActions(unfilteredFlow))
 
             fakeMobileConnectionsRepository.isAnySimSecure.value = false
-            kosmos.sceneInteractor.changeScene(Scenes.Lockscreen, "test")
-            runCurrent()
-
             val unfilteredActions =
                 mapOf(
                     Back to Scenes.Shade,
-                    Swipe.Up to UserActionResult.HideOverlay(Overlays.Bouncer),
+                    Swipe.Down to Scenes.QuickSettings,
+                    Swipe.Up to Overlays.Bouncer,
                     Swipe.Left to Scenes.Lockscreen,
-                    Swipe.Right to UserActionResult.ShowOverlay(Overlays.Bouncer),
+                    Swipe.Right to Scenes.Occluded,
                     Swipe.Start to Scenes.Dream,
+                    Swipe.End to Scenes.Gone,
                 )
             unfilteredFlow.value = unfilteredActions
             runCurrent()
 
             assertThat(filteredFlow).isEqualTo(unfilteredActions)
 
-            // Now the filtered results should be active and remove the HideOverlay(Bouncer)
             fakeMobileConnectionsRepository.isAnySimSecure.value = true
-
+            runCurrent()
             val expectedFilteredActions =
                 mapOf(
-                    Back to Scenes.Shade,
+                    Swipe.Up to Overlays.Bouncer,
                     Swipe.Left to Scenes.Lockscreen,
-                    Swipe.Right to UserActionResult.ShowOverlay(Overlays.Bouncer),
+                    Swipe.Right to Scenes.Occluded,
                     Swipe.Start to Scenes.Dream,
                 )
 
@@ -81,34 +77,42 @@ class RestrictedModeInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun modifyOverlays_notActive_doesNotHideBouncerOverlayWhenOccluded() =
+    fun isSceneChangeAllowed_allowsOnlyLockscreenAndOccludedSceneChanges() =
         kosmos.runTest {
             fakeMobileConnectionsRepository.isAnySimSecure.value = false
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Shade)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.QuickSettings)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Dream)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Communal)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Gone)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Lockscreen)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Occluded)).isTrue()
 
-            kosmos.sceneInteractor.showOverlay(Overlays.Bouncer, "test")
+            fakeMobileConnectionsRepository.isAnySimSecure.value = true
             runCurrent()
-            assertThat(kosmos.sceneInteractor.currentOverlays.value)
-                .isEqualTo(setOf(Overlays.Bouncer))
 
-            underTest.modifyOverlaysOnSceneChange(Scenes.Occluded)
-            runCurrent()
-            assertThat(kosmos.sceneInteractor.currentOverlays.value)
-                .isEqualTo(setOf(Overlays.Bouncer))
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Shade)).isFalse()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.QuickSettings)).isFalse()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Dream)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Communal)).isFalse()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Gone)).isFalse()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Lockscreen)).isTrue()
+            assertThat(underTest.isSceneChangeAllowed(Scenes.Occluded)).isTrue()
         }
 
     @Test
-    fun modifyOverlays_active_HidesBouncerOverlayWhenOccluded() =
+    fun isOverlayChangeAllowed_allowsOnlyBouncerOverlayChanges() =
         kosmos.runTest {
+            fakeMobileConnectionsRepository.isAnySimSecure.value = false
+            assertThat(underTest.isOverlayChangeAllowed(Overlays.Bouncer)).isTrue()
+            assertThat(underTest.isOverlayChangeAllowed(Overlays.NotificationsShade)).isTrue()
+            assertThat(underTest.isOverlayChangeAllowed(Overlays.QuickSettingsShade)).isTrue()
+
             fakeMobileConnectionsRepository.isAnySimSecure.value = true
-
-            kosmos.sceneInteractor.showOverlay(Overlays.Bouncer, "test")
             runCurrent()
-            assertThat(kosmos.sceneInteractor.currentOverlays.value)
-                .isEqualTo(setOf(Overlays.Bouncer))
 
-            underTest.modifyOverlaysOnSceneChange(Scenes.Occluded)
-            runCurrent()
-            assertThat(kosmos.sceneInteractor.currentOverlays.value)
-                .isEqualTo(emptySet<OverlayKey>())
+            assertThat(underTest.isOverlayChangeAllowed(Overlays.Bouncer)).isTrue()
+            assertThat(underTest.isOverlayChangeAllowed(Overlays.NotificationsShade)).isFalse()
+            assertThat(underTest.isOverlayChangeAllowed(Overlays.QuickSettingsShade)).isFalse()
         }
 }

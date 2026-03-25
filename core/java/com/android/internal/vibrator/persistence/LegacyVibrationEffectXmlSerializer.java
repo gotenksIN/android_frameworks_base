@@ -182,9 +182,8 @@ public final class LegacyVibrationEffectXmlSerializer {
                 serializedWaveformBuilder.setRepeatIndexToCurrentEntry();
             }
 
-            serializedWaveformBuilder.addDurationAmplitudeAndStartTime(
-                    segment.getDuration(), toAmplitudeInt(segment.getAmplitude()),
-                    segment.getStartTimeMillis());
+            serializedWaveformBuilder.addDurationAndAmplitude(
+                    segment.getDuration(), toAmplitudeInt(segment.getAmplitude()));
         }
 
         return new SerializedComposedEffect(serializedWaveformBuilder.build());

@@ -17,9 +17,11 @@
 package com.android.systemui.qs.ui.viewmodel
 
 import android.view.Display
+import androidx.compose.runtime.getValue
 import com.android.systemui.brightness.ui.viewmodel.BrightnessSliderViewModel
 import com.android.systemui.display.data.repository.DisplayTypeRepository
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager.Companion.LOCATION_QS
 import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
@@ -34,6 +36,7 @@ import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -51,18 +54,22 @@ constructor(
     val mediaViewModelFactory: MediaViewModel.Factory,
     mediaInRowInLandscapeViewModelFactory: MediaInRowInLandscapeViewModel.Factory,
     @ShadeDisplayAware shadeDisplayTypeRepository: DisplayTypeRepository,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("QuickSettingsContainerViewModel.hydrator")
 
     val isBrightnessSliderVisible by
-        shadeDisplayTypeRepository.displayType
-            // The shade could be on an external display: in that case the slider shouldn't
-            // be visible.
-            .map { it == Display.TYPE_INTERNAL }
-            .hydratedStateOf(
-                initialValue = shadeDisplayTypeRepository.displayType.value == Display.TYPE_INTERNAL
-            )
+        hydrator.hydratedStateOf(
+            traceName = "isBrightnessSliderVisible",
+            initialValue = shadeDisplayTypeRepository.displayType.value == Display.TYPE_INTERNAL,
+            source =
+                // The shade could be on an external display: in that case the slider shouldn't
+                // be visible.
+                shadeDisplayTypeRepository.displayType.map { it == Display.TYPE_INTERNAL },
+        )
 
-    val isEditing by editModeViewModel.isEditing.hydratedStateOf()
+    val isEditing by
+        hydrator.hydratedStateOf(source = editModeViewModel.isEditing, traceName = "isEditing")
 
     val brightnessSliderViewModel =
         brightnessSliderViewModelFactory.create(supportsBrightnessMirroring)
@@ -71,7 +78,11 @@ constructor(
 
     val tileGridViewModel = tileGridViewModelFactory.create()
 
-    val showMedia: Boolean by mediaCarouselInteractor.hasAnyMedia.hydratedStateOf()
+    val showMedia: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "showMedia",
+            source = mediaCarouselInteractor.hasAnyMedia,
+        )
 
     val showMediaInRow: Boolean
         get() = qsMediaInRowViewModel.shouldMediaShowInRow
@@ -81,12 +92,14 @@ constructor(
     private val qsMediaInRowViewModel =
         mediaInRowInLandscapeViewModelFactory.create(LOCATION_QS, mediaUiBehavior)
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
+            launch { hydrator.activate() }
             launch { brightnessSliderViewModel.activate() }
             launch { shadeHeaderViewModel.activate() }
             launch { tileGridViewModel.activate() }
             launch { qsMediaInRowViewModel.activate() }
+            awaitCancellation()
         }
     }
 

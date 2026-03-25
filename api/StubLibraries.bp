@@ -331,10 +331,7 @@ java_defaults {
 
 java_defaults {
     name: "android-non-updatable_from_source_defaults",
-    libs: [
-        "stub-annotations",
-        "DevicePolicyAnnotation",
-    ],
+    libs: ["stub-annotations"],
     static_libs: ["framework-res-package-jar"], // Export package of framework-res
 }
 

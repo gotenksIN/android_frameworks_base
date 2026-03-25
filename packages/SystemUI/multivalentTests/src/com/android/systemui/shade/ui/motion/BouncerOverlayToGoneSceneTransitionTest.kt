@@ -253,7 +253,6 @@ class BouncerOverlayToGoneSceneTransitionTest : SysuiTestCase() {
             WithStatusIconContext(kosmos.tintedIconManagerFactory) {
                 ObserveReadsRoot {
                     BouncerSceneContainer(
-                        viewModel = vm,
                         state = bouncerSceneContainerState,
                         bouncerOverlay = bouncerOverlay,
                         toBouncerTransitionViewModel = kosmos.toBouncerTransitionViewModel,

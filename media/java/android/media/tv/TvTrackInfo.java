@@ -93,13 +93,12 @@ public final class TvTrackInfo implements Parcelable {
     public static final String EXTRA_BUNDLE_KEY_AUDIO_ANALOG_AUDIO_MODE = "analog_audio_mode";
 
     /**
-     * Key for the audio track's AC-4 Audio Preselection Descriptor (APD) String.
-     * Expected value: String, extracted from the broadcast stream, such as eng-French commentary;
-     * if the value is null, the audio track is not a AC-4 track.
+     * Key to check if audio track is AC-4 Audio Presentation Descriptor (APD) type.
+     * Expected value: true or false.
      *
      * @hide
      */
-    public static final String EXTRA_BUNDLE_KEY_AUDIO_AC4_APD_TYPE = "extra_audio_ac4_apd_type";
+    public static final String EXTRA_BUNDLE_KEY_AUDIO_IS_AC4_APD = "extra_audio_is_ac4_apd";
 
     /**
      * Key for the audio track type specifically for the visual or hearing impaired.

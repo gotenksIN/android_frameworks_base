@@ -32,7 +32,6 @@ import android.platform.test.flag.junit.FlagsParameterization
 import android.platform.test.flag.junit.SetFlagsRule
 import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
-import android.view.Display.DEFAULT_DISPLAY
 import android.view.View
 import android.widget.FrameLayout
 import android.window.WindowContainerToken
@@ -45,7 +44,6 @@ import com.android.testing.wm.util.MockToken
 import com.android.wm.shell.Flags
 import com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_ANYTHING
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
-import com.android.wm.shell.Flags.FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY
 import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.bubbles.Bubbles.BubbleMetadataFlagListener
@@ -178,7 +176,6 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
         verify(listenerCallback, never()).onTaskCreated()
     }
 
-    @EnableFlags(FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY)
     @Test
     fun onInitialized_pendingIntentChatBubble() {
         val target = Intent(context, TestActivity::class.java)
@@ -215,11 +212,11 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
         assertThat((intentFlags and Intent.FLAG_ACTIVITY_NEW_DOCUMENT) != 0).isTrue()
         assertThat((intentFlags and Intent.FLAG_ACTIVITY_MULTIPLE_TASK) != 0).isTrue()
         assertThat(optionsCaptor.lastValue.launchedFromBubble).isTrue()
-        assertThat(optionsCaptor.lastValue.launchDisplayId).isEqualTo(DEFAULT_DISPLAY)
-        assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
+        if (!BubbleFlagHelper.enableRootTaskForBubble()) {
+            assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
+        }
     }
 
-    @EnableFlags(FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY)
     @Test
     fun onInitialized_shortcutChatBubble() {
         val shortcutInfo = ShortcutInfo.Builder(context).setId("mockShortcutId").build()
@@ -241,11 +238,12 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
             .startShortcutActivity(any(), eq(shortcutInfo), optionsCaptor.capture(), any())
         assertThat(optionsCaptor.lastValue.launchedFromBubble).isTrue()
         assertThat(optionsCaptor.lastValue.isApplyActivityFlagsForBubbles).isTrue()
-        assertThat(optionsCaptor.lastValue.launchDisplayId).isEqualTo(DEFAULT_DISPLAY)
-        assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
+        if (!BubbleFlagHelper.enableRootTaskForBubble()) {
+            assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
+        }
     }
 
-    @EnableFlags(FLAG_ENABLE_BUBBLE_ANYTHING, FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY)
+    @EnableFlags(FLAG_ENABLE_BUBBLE_ANYTHING)
     @Test
     fun onInitialized_shortcutBubble() {
         val shortcutInfo = ShortcutInfo.Builder(context).setId("mockShortcutId").build()
@@ -268,13 +266,11 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
         assertThat(optionsCaptor.lastValue.launchedFromBubble).isFalse() // chat only
         assertThat(optionsCaptor.lastValue.isApplyActivityFlagsForBubbles).isFalse() // chat only
         assertThat(optionsCaptor.lastValue.isApplyMultipleTaskFlagForShortcut).isTrue()
-        assertThat(optionsCaptor.lastValue.launchDisplayId).isEqualTo(DEFAULT_DISPLAY)
         if (!BubbleFlagHelper.enableRootTaskForBubble()) {
             assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
         }
     }
 
-    @EnableFlags(FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY)
     @Test
     fun onInitialized_appBubble_intent() {
         val b = createAppBubble()
@@ -294,13 +290,11 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
 
         assertThat(optionsCaptor.lastValue.launchedFromBubble).isFalse() // chat only
         assertThat(optionsCaptor.lastValue.isApplyActivityFlagsForBubbles).isFalse() // chat only
-        assertThat(optionsCaptor.lastValue.launchDisplayId).isEqualTo(DEFAULT_DISPLAY)
         if (!BubbleFlagHelper.enableRootTaskForBubble()) {
             assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
         }
     }
 
-    @EnableFlags(FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY)
     @Test
     fun onInitialized_appBubble_pendingIntent() {
         val b = createAppBubble(usePendingIntent = true)
@@ -320,13 +314,11 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
 
         assertThat(optionsCaptor.lastValue.launchedFromBubble).isFalse() // chat only
         assertThat(optionsCaptor.lastValue.isApplyActivityFlagsForBubbles).isFalse() // chat only
-        assertThat(optionsCaptor.lastValue.launchDisplayId).isEqualTo(DEFAULT_DISPLAY)
         if (!BubbleFlagHelper.enableRootTaskForBubble()) {
             assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
         }
     }
 
-    @EnableFlags(FLAG_LAUNCH_BUBBLE_ON_MAIN_DISPLAY)
     @Test
     fun onInitialized_noteBubble() {
         val b = createNoteBubble()
@@ -346,7 +338,6 @@ class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
 
         assertThat(optionsCaptor.lastValue.launchedFromBubble).isFalse() // chat only
         assertThat(optionsCaptor.lastValue.isApplyActivityFlagsForBubbles).isFalse() // chat only
-        assertThat(optionsCaptor.lastValue.launchDisplayId).isEqualTo(DEFAULT_DISPLAY)
         if (!BubbleFlagHelper.enableRootTaskForBubble()) {
             assertThat(optionsCaptor.lastValue.taskAlwaysOnTop).isTrue()
         }

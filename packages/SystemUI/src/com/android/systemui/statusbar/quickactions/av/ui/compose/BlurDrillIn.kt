@@ -19,7 +19,6 @@ package com.android.systemui.statusbar.quickactions.av.ui.compose
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,7 +58,6 @@ fun BlurDrillIn(
             buttonFactory = { shape: Shape, buttonViewModel: ButtonViewModel ->
                 BlurSelectionButton(shape = shape, viewModel = buttonViewModel)
             },
-            splitSections = true,
         )
     }
 }
@@ -74,14 +72,7 @@ private fun BlurSelectionButton(shape: Shape, viewModel: ButtonViewModel) {
                 Icon(painter = painterResource(id = it), contentDescription = null)
             }
         },
-        headlineContent = {
-            viewModel.state.mainTitle?.let {
-                Text(
-                    text = stringResource(it),
-                    style = MaterialTheme.typography.titleSmallEmphasized,
-                )
-            }
-        },
+        headlineContent = { viewModel.state.mainTitle?.let { Text(text = stringResource(it)) } },
         colors = itemColors(viewModel.state.isEnabled),
         modifier =
             Modifier.clip(shape = shape)

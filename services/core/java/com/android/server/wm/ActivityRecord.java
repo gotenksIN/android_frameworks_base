@@ -61,7 +61,6 @@ import static android.content.Intent.CATEGORY_SECONDARY_HOME;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_NO_HISTORY;
 import static android.content.pm.ActivityInfo.CONFIG_ASSETS_PATHS;
-import static android.content.pm.ActivityInfo.CONFIG_DENSITY;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_RESOURCES_UNUSED;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_LAYOUT;
@@ -4176,36 +4175,20 @@ public final class ActivityRecord extends WindowToken {
             mAtmService.getLockTaskController().clearLockedTask(task);
         }
 
-        if (mState != RESUMED && task != null && !task.mInRemoveTask
+        // Transfer the launch cookie to the next running activity above this in the same task.
+        if (mLaunchCookie != null && mState != RESUMED && task != null && !task.mInRemoveTask
                 && !task.isClearingToReuseTask()) {
-            // Transfer the launch cookie to the next running activity above this in the same task.
-            if (mLaunchCookie != null) {
-                final ActivityRecord nextCookieTarget = findNextRunningActivity(
-                        r -> r.mLaunchCookie == null);
-                if (nextCookieTarget != null) {
-                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
-                            "Transferring launch cookie=%s on finish from=%s(%d) to=%s(%d)",
-                            mLaunchCookie, packageName, System.identityHashCode(this),
-                            nextCookieTarget.packageName,
-                            System.identityHashCode(nextCookieTarget));
-                    nextCookieTarget.mLaunchCookie = mLaunchCookie;
-                    mLaunchCookie = null;
-                }
-            }
-
-            // Similarly, transfer the override task transition flag.
-            if (mOverrideTaskTransition) {
-                final ActivityRecord nextOverrideTarget = findNextRunningActivity(
-                        r -> !r.mOverrideTaskTransition);
-                if (nextOverrideTarget != null) {
-                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
-                            "Transferring override task transition flag on finish"
-                                    + " from=%s(%d) to=%s(%d)",
-                            packageName, System.identityHashCode(this),
-                            nextOverrideTarget.packageName,
-                            System.identityHashCode(nextOverrideTarget));
-                    nextOverrideTarget.mOverrideTaskTransition = true;
-                }
+            final ActivityRecord nextCookieTarget = task.getActivity(
+                    // Intend to only associate the same app by checking uid.
+                    r -> r.mLaunchCookie == null && !r.finishing && r.isUid(getUid()),
+                    this, false /* includeBoundary */, false /* traverseTopToBottom */);
+            if (nextCookieTarget != null) {
+                ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
+                        "Transferring launch cookie=%s on finish from=%s(%d) to=%s(%d)",
+                        mLaunchCookie, packageName, System.identityHashCode(this),
+                        nextCookieTarget.packageName, System.identityHashCode(nextCookieTarget));
+                nextCookieTarget.mLaunchCookie = mLaunchCookie;
+                mLaunchCookie = null;
             }
         }
 
@@ -4224,23 +4207,6 @@ public final class ActivityRecord extends WindowToken {
         if (mDisplayContent != null) {
             mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         }
-    }
-
-    /**
-     * Finds the next non-finishing activity in this task that belongs to the same app (UID)
-     * and satisfies the given filter. The search proceeds downwards from this activity.
-     *
-     * @param filter The predicate to evaluate against each candidate activity.
-     * @return The next eligible {@link ActivityRecord}, or {@code null} if none is found.
-     */
-    private ActivityRecord findNextRunningActivity(@NonNull Predicate<ActivityRecord> filter) {
-        if (task == null) {
-            return null;
-        }
-        return task.getActivity(
-                // Intend to only associate the same app by checking uid.
-                r -> !r.finishing && r.isUid(getUid()) && filter.test(r),
-                this, false /* includeBoundary */, false /* traverseTopToBottom */);
     }
 
     /**
@@ -6766,6 +6732,7 @@ public final class ActivityRecord extends WindowToken {
         // stop tracking
         mSplashScreenStyleSolidColor = true;
 
+        mAtmService.mBackNavigationController.removePredictiveSurfaceIfNeeded(this);
         if (mStartingWindow != null) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Finish starting %s"
                     + ": first real window is shown, no animation", win.mToken);
@@ -6793,7 +6760,6 @@ public final class ActivityRecord extends WindowToken {
         }
 
         updateReportedVisibilityLocked();
-        mAtmService.mBackNavigationController.removePredictiveSurfaceIfNeeded(this);
     }
 
     /** Sets whether something has been visible in the task. */
@@ -9051,11 +9017,6 @@ public final class ActivityRecord extends WindowToken {
         if (shouldSkipActivityRelaunchWhenDocking() && onlyDeskInUiModeChanged(changesConfig)
                 && !hasDeskResources()) {
             skipRelaunchConfigMask |= CONFIG_UI_MODE;
-        }
-
-        // Don't restart due to density changes when in picture-in-picture.
-        if (getWindowingMode() == WINDOWING_MODE_PINNED) {
-            skipRelaunchConfigMask |= CONFIG_DENSITY;
         }
 
         // Some apps relaunch unexpectedly with display move and crash.

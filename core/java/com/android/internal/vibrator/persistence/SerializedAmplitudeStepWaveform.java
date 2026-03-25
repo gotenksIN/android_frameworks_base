@@ -18,7 +18,6 @@ package com.android.internal.vibrator.persistence;
 
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_AMPLITUDE;
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_DURATION_MS;
-import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_START_TIME_MS;
 import static com.android.internal.vibrator.persistence.XmlConstants.NAMESPACE;
 import static com.android.internal.vibrator.persistence.XmlConstants.TAG_REPEATING;
 import static com.android.internal.vibrator.persistence.XmlConstants.TAG_WAVEFORM_EFFECT;
@@ -27,8 +26,6 @@ import static com.android.internal.vibrator.persistence.XmlConstants.VALUE_AMPLI
 
 import android.annotation.NonNull;
 import android.os.VibrationEffect;
-import android.os.vibrator.StepSegment;
-import android.os.vibrator.VibrationEffectSegment;
 import android.util.IntArray;
 import android.util.LongArray;
 
@@ -37,9 +34,7 @@ import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.function.BiConsumer;
 
 /**
@@ -51,33 +46,19 @@ import java.util.function.BiConsumer;
 @android.ravenwood.annotation.RavenwoodKeepWholeClass
 final class SerializedAmplitudeStepWaveform implements SerializedSegment {
 
-    /** Interface for building step segments with duration, amplitude and start time. */
-    interface StepSegmentBuilder {
-        void addDurationAmplitudeAndStartTime(long durationMs, int amplitude, long startTimeMillis);
-    }
-
     @NonNull private final long[] mTimings;
     @NonNull private final int[] mAmplitudes;
-    @NonNull private final long[] mStartTimesMillis;
     private final int mRepeatIndex;
 
-    private SerializedAmplitudeStepWaveform(long[] timings, int[] amplitudes,
-            long[] startTimesMillis, int repeatIndex) {
+    private SerializedAmplitudeStepWaveform(long[] timings, int[] amplitudes, int repeatIndex) {
         mTimings = timings;
         mAmplitudes = amplitudes;
-        mStartTimesMillis = startTimesMillis;
         mRepeatIndex = repeatIndex;
     }
 
     @Override
     public void deserializeIntoComposition(@NonNull VibrationEffect.Composition composition) {
-        List<StepSegment> segments = new ArrayList<>();
-        for (int i = 0; i < mTimings.length; i++) {
-            float parsedAmplitude = mAmplitudes[i] == VibrationEffect.DEFAULT_AMPLITUDE
-                    ? VibrationEffect.DEFAULT_AMPLITUDE : (float) mAmplitudes[i] / 255f;
-            segments.add(new StepSegment(parsedAmplitude, (int) mTimings[i], mStartTimesMillis[i]));
-        }
-        composition.addEffect(new VibrationEffect.Composed(segments, mRepeatIndex));
+        composition.addEffect(VibrationEffect.createWaveform(mTimings, mAmplitudes, mRepeatIndex));
     }
 
     @Override
@@ -108,9 +89,6 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
         }
 
         serializer.attributeLong(NAMESPACE, ATTRIBUTE_DURATION_MS, mTimings[index]);
-        if (mStartTimesMillis[index] >= 0) {
-            serializer.attributeLong(NAMESPACE, ATTRIBUTE_START_TIME_MS, mStartTimesMillis[index]);
-        }
         serializer.endTag(NAMESPACE, TAG_WAVEFORM_ENTRY);
     }
 
@@ -119,24 +97,19 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
         return "SerializedAmplitudeStepWaveform{"
                 + "timings=" + Arrays.toString(mTimings)
                 + ", amplitudes=" + Arrays.toString(mAmplitudes)
-                + ", startTimesMillis=" + Arrays.toString(mStartTimesMillis)
                 + ", repeatIndex=" + mRepeatIndex
                 + '}';
     }
 
     /** Builder for {@link SerializedAmplitudeStepWaveform}. */
-    static final class Builder implements StepSegmentBuilder {
+    static final class Builder {
         private final LongArray mTimings = new LongArray();
         private final IntArray mAmplitudes = new IntArray();
-        private final LongArray mStartTimesMillis = new LongArray();
         private int mRepeatIndex = -1;
 
-        @Override
-        public void addDurationAmplitudeAndStartTime(long durationMs, int amplitude,
-                long startTimeMillis) {
+        void addDurationAndAmplitude(long durationMs, int amplitude) {
             mTimings.add(durationMs);
             mAmplitudes.add(amplitude);
-            mStartTimesMillis.add(startTimeMillis);
         }
 
         void setRepeatIndexToCurrentEntry() {
@@ -154,8 +127,7 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
 
         SerializedAmplitudeStepWaveform build() {
             return new SerializedAmplitudeStepWaveform(
-                    mTimings.toArray(), mAmplitudes.toArray(), mStartTimesMillis.toArray(),
-                    mRepeatIndex);
+                    mTimings.toArray(), mAmplitudes.toArray(), mRepeatIndex);
         }
     }
 
@@ -174,7 +146,7 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
             // Read all nested tag that is not a repeating tag as a waveform entry.
             while (XmlReader.readNextTagWithin(parser, outerDepth)
                     && !TAG_REPEATING.equals(parser.getName())) {
-                parseWaveformEntry(parser, waveformBuilder);
+                parseWaveformEntry(parser, waveformBuilder::addDurationAndAmplitude);
             }
 
             // If found a repeating tag, read its content.
@@ -192,11 +164,11 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
             return waveformBuilder.build();
         }
 
-        static void parseWaveformEntry(TypedXmlPullParser parser, StepSegmentBuilder builder)
-                throws XmlParserException, IOException {
+        static void parseWaveformEntry(TypedXmlPullParser parser,
+                BiConsumer<Integer, Integer> builder) throws XmlParserException, IOException {
             XmlValidator.checkStartTag(parser, TAG_WAVEFORM_ENTRY);
             XmlValidator.checkTagHasNoUnexpectedAttributes(
-                    parser, ATTRIBUTE_DURATION_MS, ATTRIBUTE_AMPLITUDE, ATTRIBUTE_START_TIME_MS);
+                    parser, ATTRIBUTE_DURATION_MS, ATTRIBUTE_AMPLITUDE);
 
             String rawAmplitude = parser.getAttributeValue(NAMESPACE, ATTRIBUTE_AMPLITUDE);
             int amplitude = VALUE_AMPLITUDE_DEFAULT.equals(rawAmplitude)
@@ -204,13 +176,8 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
                     : XmlReader.readAttributeIntInRange(
                             parser, ATTRIBUTE_AMPLITUDE, 0, VibrationEffect.MAX_AMPLITUDE);
             int durationMs = XmlReader.readAttributeIntNonNegative(parser, ATTRIBUTE_DURATION_MS);
-            long startTimeMillis = -1;
-            if (parser.getAttributeIndex(NAMESPACE, ATTRIBUTE_START_TIME_MS) >= 0) {
-                startTimeMillis = XmlReader.readAttributeIntInRange(
-                        parser, ATTRIBUTE_START_TIME_MS, 0, Integer.MAX_VALUE);
-            }
 
-            builder.addDurationAmplitudeAndStartTime(durationMs, amplitude, startTimeMillis);
+            builder.accept(durationMs, amplitude);
 
             // Consume tag
             XmlReader.readEndTag(parser);
@@ -226,7 +193,7 @@ final class SerializedAmplitudeStepWaveform implements SerializedSegment {
             boolean hasEntry = false;
             int outerDepth = parser.getDepth();
             while (XmlReader.readNextTagWithin(parser, outerDepth)) {
-                parseWaveformEntry(parser, waveformBuilder);
+                parseWaveformEntry(parser, waveformBuilder::addDurationAndAmplitude);
                 hasEntry = true;
             }
 

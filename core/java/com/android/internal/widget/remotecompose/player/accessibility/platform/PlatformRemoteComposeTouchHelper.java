@@ -63,7 +63,9 @@ public class PlatformRemoteComposeTouchHelper extends ExploreByTouchHelper {
         this.mHost = host;
     }
 
-    /** access the helper */
+    /**
+     * access the helper
+     */
     public static PlatformRemoteComposeTouchHelper forRemoteComposePlayer(
             View player, @NonNull CoreDocument coreDocument) {
         return new PlatformRemoteComposeTouchHelper(
@@ -113,7 +115,9 @@ public class PlatformRemoteComposeTouchHelper extends ExploreByTouchHelper {
         }
     }
 
-    /** returns the list of visible children */
+    /**
+     * returns the list of visible children
+     */
     @SuppressWarnings("JdkImmutableCollections")
     public List<Integer> getVisibleChildVirtualViews() {
         Component rootComponent = mRemoteDocA11y.findComponentById(RootId);

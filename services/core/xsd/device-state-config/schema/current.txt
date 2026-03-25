@@ -1,5 +1,4 @@
-// Signature format: 6.0
-// - style=java
+// Signature format: 2.0
 package com.android.server.policy.devicestate.config {
 
   public class Conditions {
@@ -30,7 +29,7 @@ package com.android.server.policy.devicestate.config {
 
   public class Flags {
     ctor public Flags();
-    method @Nullable public java.util.List<String> getFlag();
+    method @Nullable public java.util.List<java.lang.String> getFlag();
   }
 
   public class LidSwitchCondition {
@@ -53,7 +52,7 @@ package com.android.server.policy.devicestate.config {
 
   public class Properties {
     ctor public Properties();
-    method @Nullable public java.util.List<String> getProperty();
+    method @Nullable public java.util.List<java.lang.String> getProperty();
   }
 
   public class SensorCondition {

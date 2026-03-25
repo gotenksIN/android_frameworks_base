@@ -673,10 +673,6 @@ public abstract class BaseShortcutManagerTest {
                 int flags, Bundle options, String ownerPackage, int ownerUserId) {
             return new PendingIntent(mock(IIntentSender.class));
         }
-
-        public void unregisterSettingsObserver() {
-            super.unregisterSettingsObserver();
-        }
     }
 
     protected class LauncherAppsTestable extends LauncherApps {
@@ -1194,9 +1190,6 @@ public abstract class BaseShortcutManagerTest {
         mService = null;
         mManager = null;
         mInternal = null;
-        if (mLauncherAppImpl != null) {
-            mLauncherAppImpl.unregisterSettingsObserver();
-        }
         mLauncherAppImpl = null;
         mLauncherApps = null;
         mLauncherAppsMap.clear();

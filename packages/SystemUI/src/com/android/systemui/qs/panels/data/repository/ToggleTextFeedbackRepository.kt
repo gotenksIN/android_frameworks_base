@@ -47,7 +47,7 @@ class ToggleTextFeedbackRepository @Inject constructor() : ExclusiveActivatable(
             TextFeedbackRequestModel.FeedbackForTile(tile) to seqNumber.getAndIncrement()
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         _textFeedback.subscriptionCount.collect {
             if (it == 0) {
                 clearTextFeedback()

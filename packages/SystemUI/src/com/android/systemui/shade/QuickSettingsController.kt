@@ -16,8 +16,6 @@
 
 package com.android.systemui.shade
 
-import android.view.MotionEvent
-
 interface QuickSettingsController {
     /** Returns whether or not QuickSettings is expanded. */
     val expanded: Boolean
@@ -27,7 +25,7 @@ interface QuickSettingsController {
 
     /** Returns Whether we should intercept a gesture to open Quick Settings. */
     @Deprecated("specific to legacy touch handling")
-    fun shouldQuickSettingsIntercept(x: Float, y: Float, yDiff: Float, event: MotionEvent?): Boolean
+    fun shouldQuickSettingsIntercept(x: Float, y: Float, yDiff: Float): Boolean
 
     /** Closes the Qs customizer. */
     fun closeQsCustomizer()

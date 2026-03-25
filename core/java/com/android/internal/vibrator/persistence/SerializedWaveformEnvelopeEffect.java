@@ -20,14 +20,12 @@ import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_A
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_DURATION_MS;
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_FREQUENCY_HZ;
 import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_INITIAL_FREQUENCY_HZ;
-import static com.android.internal.vibrator.persistence.XmlConstants.ATTRIBUTE_START_TIME_MS;
 import static com.android.internal.vibrator.persistence.XmlConstants.NAMESPACE;
 import static com.android.internal.vibrator.persistence.XmlConstants.TAG_CONTROL_POINT;
 import static com.android.internal.vibrator.persistence.XmlConstants.TAG_WAVEFORM_ENVELOPE_EFFECT;
 
 import android.annotation.NonNull;
 import android.os.VibrationEffect;
-import android.os.vibrator.VibrationEffectSegment;
 
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
@@ -49,17 +47,10 @@ final class SerializedWaveformEnvelopeEffect implements SerializedComposedEffect
 
     private final WaveformControlPoint[] mControlPoints;
     private final float mInitialFrequency;
-    private final long mStartTimeMillis;
 
     SerializedWaveformEnvelopeEffect(WaveformControlPoint[] controlPoints, float initialFrequency) {
-        this(controlPoints, initialFrequency, -1);
-    }
-
-    SerializedWaveformEnvelopeEffect(WaveformControlPoint[] controlPoints, float initialFrequency,
-            long startTimeMillis) {
         mControlPoints = controlPoints;
         mInitialFrequency = initialFrequency;
-        mStartTimeMillis = startTimeMillis;
     }
 
     @Override
@@ -68,10 +59,6 @@ final class SerializedWaveformEnvelopeEffect implements SerializedComposedEffect
 
         if (!Float.isNaN(mInitialFrequency)) {
             serializer.attributeFloat(NAMESPACE, ATTRIBUTE_INITIAL_FREQUENCY_HZ, mInitialFrequency);
-        }
-
-        if (mStartTimeMillis >= 0) {
-            serializer.attributeLong(NAMESPACE, ATTRIBUTE_START_TIME_MS, mStartTimeMillis);
         }
 
         for (WaveformControlPoint point : mControlPoints) {
@@ -97,15 +84,7 @@ final class SerializedWaveformEnvelopeEffect implements SerializedComposedEffect
         for (WaveformControlPoint point : mControlPoints) {
             builder.addControlPoint(point.mAmplitude, point.mFrequency, point.mDurationMs);
         }
-        VibrationEffect effect = builder.build();
-        if (mStartTimeMillis >= 0 && effect instanceof VibrationEffect.Composed composed) {
-            List<VibrationEffectSegment> segments = new ArrayList<>(composed.getSegments());
-            if (!segments.isEmpty()) {
-                segments.set(0, segments.get(0).applyStartTime(mStartTimeMillis));
-                effect = new VibrationEffect.Composed(segments, composed.getRepeatIndex());
-            }
-        }
-        composition.addEffect(effect);
+        composition.addEffect(builder.build());
     }
 
     @Override
@@ -113,14 +92,12 @@ final class SerializedWaveformEnvelopeEffect implements SerializedComposedEffect
         return "SerializedWaveformEnvelopeEffect{"
                 + "InitialFrequency=" + (Float.isNaN(mInitialFrequency) ? "" : mInitialFrequency)
                 + ", controlPoints=" + Arrays.toString(mControlPoints)
-                + ", startTimeMillis=" + mStartTimeMillis
                 + '}';
     }
 
     static final class Builder {
         private final List<WaveformControlPoint> mControlPoints;
         private float mInitialFrequencyHz = Float.NaN;
-        private long mStartTimeMillis = -1;
 
         Builder() {
             mControlPoints = new ArrayList<>();
@@ -130,18 +107,13 @@ final class SerializedWaveformEnvelopeEffect implements SerializedComposedEffect
             mInitialFrequencyHz = frequencyHz;
         }
 
-        void setStartTimeMillis(long startTimeMillis) {
-            mStartTimeMillis = startTimeMillis;
-        }
-
         void addControlPoint(float amplitude, float frequencyHz, long durationMs) {
             mControlPoints.add(new WaveformControlPoint(amplitude, frequencyHz, durationMs));
         }
 
         SerializedWaveformEnvelopeEffect build() {
             return new SerializedWaveformEnvelopeEffect(
-                    mControlPoints.toArray(new WaveformControlPoint[0]), mInitialFrequencyHz,
-                    mStartTimeMillis);
+                    mControlPoints.toArray(new WaveformControlPoint[0]), mInitialFrequencyHz);
         }
     }
 
@@ -152,18 +124,12 @@ final class SerializedWaveformEnvelopeEffect implements SerializedComposedEffect
         static SerializedWaveformEnvelopeEffect parseNext(@NonNull TypedXmlPullParser parser,
                 @XmlConstants.Flags int flags) throws XmlParserException, IOException {
             XmlValidator.checkStartTag(parser, TAG_WAVEFORM_ENVELOPE_EFFECT);
-            XmlValidator.checkTagHasNoUnexpectedAttributes(parser, ATTRIBUTE_INITIAL_FREQUENCY_HZ,
-                    ATTRIBUTE_START_TIME_MS);
+            XmlValidator.checkTagHasNoUnexpectedAttributes(parser, ATTRIBUTE_INITIAL_FREQUENCY_HZ);
 
             Builder builder = new Builder();
             builder.setInitialFrequencyHz(
                     XmlReader.readAttributePositiveFloat(parser, ATTRIBUTE_INITIAL_FREQUENCY_HZ,
                             Float.NaN));
-            if (parser.getAttributeIndex(NAMESPACE, ATTRIBUTE_START_TIME_MS) >= 0) {
-                builder.setStartTimeMillis(
-                        XmlReader.readAttributeIntInRange(parser, ATTRIBUTE_START_TIME_MS,
-                                0, Integer.MAX_VALUE));
-            }
 
             int outerDepth = parser.getDepth();
 

@@ -101,9 +101,9 @@ public class AgentAuthService implements AgentAuthServiceInternal {
             // check for valid VDM managed local agents first
             if (mVirtualDeviceManager != null
                     && mVirtualDeviceManager.isValidVirtualDeviceId(deviceId)) {
-                // TODO: delete this block when flag is removed
+                // TODO: delete this block when AAP flag is removed
                 if (isAutomotiveProjection(mVirtualDeviceManager.getVirtualDevice(deviceId))
-                        && !Flags.agentAuthAllowAutoProjected()) {
+                        && !Flags.agentAuthAllowAap()) {
                     Slog.w(TAG, "Skip AutomotiveProjection");
                     return !mKeyguardManager.isDeviceLocked(userId, Context.DEVICE_ID_DEFAULT);
                 }
@@ -302,7 +302,7 @@ public class AgentAuthService implements AgentAuthServiceInternal {
     private boolean requiresRecentUnlockOnHost(@Nullable VirtualDevice virtualDevice) {
         if (virtualDevice != null) {
             // only auto projected supports this, others use only the virtual device lock state
-            if (Flags.agentAuthAllowAutoProjected() && isAutomotiveProjection(virtualDevice)) {
+            if (Flags.agentAuthAllowAap() && isAutomotiveProjection(virtualDevice)) {
                 return true;
             }
         }

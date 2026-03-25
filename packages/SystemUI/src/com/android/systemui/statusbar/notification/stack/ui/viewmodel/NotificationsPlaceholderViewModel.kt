@@ -25,7 +25,8 @@ import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.Scale
 import com.android.systemui.Flags
 import com.android.systemui.dump.DumpManager
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.notifications.ui.NotificationPlaceholderStateStorage
 import com.android.systemui.notifications.ui.YSpace
 import com.android.systemui.scene.domain.interactor.SceneInteractor
@@ -48,6 +49,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.function.Consumer
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
@@ -71,7 +73,7 @@ constructor(
     dumpManager: DumpManager,
     private val wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
 ) :
-    HydratedActivatable(),
+    ExclusiveActivatable(),
     ActivatableFlowDumper by ActivatableFlowDumperImpl(
         dumpManager = dumpManager,
         tag = "NotificationsPlaceholderViewModel",
@@ -117,24 +119,33 @@ constructor(
         placeholderStateStorage.resetStackScale(contentKey)
     }
 
+    private val hydrator = Hydrator("NotificationsPlaceholderViewModel")
+
     /** The content key to use for the notification shade. */
     val notificationsShadeContentKey: ContentKey by
-        shadeModeInteractor.shadeMode
-            .map { getNotificationsShadeContentKey(it) }
-            .hydratedStateOf(
-                initialValue = getNotificationsShadeContentKey(shadeModeInteractor.shadeMode.value)
-            )
+        hydrator.hydratedStateOf(
+            traceName = "notificationsShadeContentKey",
+            initialValue = getNotificationsShadeContentKey(shadeModeInteractor.shadeMode.value),
+            source = shadeModeInteractor.shadeMode.map { getNotificationsShadeContentKey(it) },
+        )
 
     /** @see NotificationStackAppearanceInteractor.notificationStackHorizontalAlignment */
     val horizontalAlignment: Alignment.Horizontal by
-        shadeModeInteractor.notificationStackHorizontalAlignment.hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "horizontalAlignment",
+            source = shadeModeInteractor.notificationStackHorizontalAlignment,
+        )
 
     /**
      * Whether the current gesture is expanding a Notification. If true, the NSSL has already
      * consumed the swipe amount to increase the Notification's size.
      */
     val isCurrentGestureExpandingNotification: Boolean by
-        interactor.isCurrentGestureExpandingNotif.hydratedStateOf(initialValue = false)
+        hydrator.hydratedStateOf(
+            traceName = "isCurrentGestureExpandingNotif",
+            initialValue = false,
+            source = interactor.isCurrentGestureExpandingNotif,
+        )
 
     /** DEBUG: whether the placeholder should be made slightly visible for positional debugging. */
     val isVisualDebuggingEnabled: Boolean = Flags.notificationDebugDrawing()
@@ -142,15 +153,17 @@ constructor(
     /** DEBUG: whether the debug logging should be output. */
     val isDebugLoggingEnabled: Boolean = Flags.notificationDeveloperLogging()
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
             launch { activateFlowDumper() }
+            launch { hydrator.activate() }
 
             launch {
                 sceneInteractor.transitionStateFlow
                     .filter { it is ObservableTransitionState.Idle }
                     .collect { headsUpNotificationInteractor.onTransitionIdle() }
             }
+            awaitCancellation()
         }
     }
 

@@ -26,11 +26,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 
-class FakeAutoAddable(private val spec: TileSpec, override val autoAddTracking: AutoAddTracking) :
-    AutoAddable {
+class FakeAutoAddable(
+    private val spec: TileSpec,
+    override val autoAddTracking: AutoAddTracking,
+) : AutoAddable {
 
     private val signalsPerUser = mutableMapOf<Int, MutableStateFlow<AutoAddSignal?>>()
-
     private fun getFlow(userId: Int): MutableStateFlow<AutoAddSignal?> =
         signalsPerUser.getOrPut(userId) { MutableStateFlow(null) }
 
@@ -42,20 +43,12 @@ class FakeAutoAddable(private val spec: TileSpec, override val autoAddTracking: 
         getFlow(userId).value = AutoAddSignal.Remove(spec)
     }
 
-    fun sendAddSignal(
-        userId: Int,
-        position: Int = POSITION_AT_END,
-        size: AutoAddSignal.AutoAddSize = AutoAddSignal.AutoAddSize.DEFAULT,
-    ) {
-        getFlow(userId).value = AutoAddSignal.Add(spec, position, size)
+    fun sendAddSignal(userId: Int, position: Int = POSITION_AT_END) {
+        getFlow(userId).value = AutoAddSignal.Add(spec, position)
     }
 
     fun sendRemoveTrackingSignal(userId: Int) {
         getFlow(userId).value = AutoAddSignal.RemoveTracking(spec)
-    }
-
-    fun sendAddTrackingSignal(userId: Int) {
-        getFlow(userId).value = AutoAddSignal.AddTracking(spec)
     }
 
     override val description: String

@@ -350,7 +350,6 @@ constructor(
             }
             HideOverlayCommand.HideNone -> {}
         }
-        restrictedModeInteractor.get().modifyOverlaysOnSceneChange(toScene)
 
         if (
             !validateSceneChange(
@@ -406,8 +405,7 @@ constructor(
      * If [keyguardState] is provided, we'll notify KeyguardTransitionRepository to transition to
      * that state as part of this scene change.
      *
-     * Override the [hideOverlays] to avoid hiding any overlays or to specify which ones should be
-     * hidden.
+     * Override the [hideOverlays] to avoid hiding any overlays or to specify which ones should be hidden.
      */
     fun snapToScene(
         toScene: SceneKey,
@@ -847,6 +845,18 @@ constructor(
             return false
         }
 
+        if (!restrictedModeInteractor.get().isSceneChangeAllowed(toScene = to)) {
+            logger.logContentChangeRejection(
+                from = from,
+                to = to,
+                originalChangeReason = loggingReason,
+                rejectionReason =
+                    "Only scene changes to Lockscreen and Occluded are allowed " +
+                        "when the device is in restricted mode",
+            )
+            return false
+        }
+
         val inMidTransitionFromGone =
             (transitionStateFlow.value as? ObservableTransitionState.Transition)?.fromContent ==
                 Scenes.Gone
@@ -950,6 +960,17 @@ constructor(
                     to = to,
                     originalChangeReason = loggingReason,
                     rejectionReason = "Cannot show Bouncer when device already unlocked",
+                )
+                false
+            }
+
+            !restrictedModeInteractor.get().isOverlayChangeAllowed(to) -> {
+                logger.logContentChangeRejection(
+                    from = from,
+                    to = to,
+                    originalChangeReason = loggingReason,
+                    rejectionReason =
+                        "Cannot show any other overlays when device is in restricted mode.",
                 )
                 false
             }
@@ -1121,7 +1142,7 @@ constructor(
         /** A transition animation (for example, to show an activity) has ended. */
         data object TransitionAnimationEnd : Event
 
-        /** A transition animation (for example, to show an activity) has been canceled. */
+        /** A transition animation (for example, to show an activity) has been cancelled. */
         data object TransitionAnimationCancel : Event
 
         /** A change to the device provisioning state (setup wizard started or finished). */

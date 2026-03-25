@@ -16,8 +16,6 @@
 
 package com.android.server.am.psc;
 
-import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL;
-import static android.app.ActivityManager.PROCESS_CAPABILITY_NONE;
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 
 import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
@@ -26,15 +24,12 @@ import static com.android.server.am.psc.OomAdjusterImpl.Connection.CPU_TIME_TRAN
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import android.annotation.NonNull;
-import android.app.ActivityManager.ProcessCapability;
 import android.app.ActivityManager.ProcessState;
 import android.content.pm.ServiceInfo.ForegroundServiceType;
 
 import com.android.server.am.psc.OomAdjusterImpl.Connection.CpuTimeTransmissionType;
 
 import java.util.ArrayList;
-import java.util.function.Consumer;
 
 /** Container class for test-specific implementations of process graph node and edges. */
 final class TestGraphElements {
@@ -54,17 +49,15 @@ final class TestGraphElements {
         private final boolean mIsReceivingBroadcast;
         private final boolean mHasIntrinsicImplicitCpuTime;
         private final int mMaxAdj;
-        private final @ProcessState int mCurProcState;
+        private final @ProcessState int mProcState;
         private final ArrayList<TestServiceRecord> mServices;
-        private final ArrayList<GraphEdge> mIncomingEdges = new ArrayList<>();
-        private final ArrayList<GraphEdge> mOutgoingEdges = new ArrayList<>();
 
         private TestProcessNode(boolean isProcessRunning, boolean hasActiveInstrumentation,
                 boolean hasForegroundServices, boolean hasNonShortForegroundServices,
                 boolean cachedCompatChangeCameraMicrophoneCapability, boolean isCurAllowListed,
                 boolean hasForegroundActivities, boolean hasExecutingServices,
                 boolean isReceivingBroadcast, boolean hasIntrinsicImplicitCpuTime, int maxAdj,
-                @ProcessState int curProcState, ArrayList<TestServiceRecord> services) {
+                @ProcessState int procState, ArrayList<TestServiceRecord> services) {
             super(mock(ProcessRecordInternal.class));
             mIsProcessRunning = isProcessRunning;
             mHasActiveInstrumentation = hasActiveInstrumentation;
@@ -78,26 +71,8 @@ final class TestGraphElements {
             mIsReceivingBroadcast = isReceivingBroadcast;
             mHasIntrinsicImplicitCpuTime = hasIntrinsicImplicitCpuTime;
             mMaxAdj = maxAdj;
-            mCurProcState = curProcState;
+            mProcState = procState;
             mServices = services;
-        }
-
-        @Override
-        void forEachIncomingEdge(@NonNull Consumer<GraphEdge> consumer) {
-            mIncomingEdges.forEach(consumer);
-        }
-
-        @Override
-        public void forEachOutgoingEdge(@NonNull Consumer<GraphEdge> consumer) {
-            mOutgoingEdges.forEach(consumer);
-        }
-
-        void addIncomingEdge(@NonNull GraphEdge edge) {
-            mIncomingEdges.add(edge);
-        }
-
-        void addOutgoingEdge(@NonNull GraphEdge edge) {
-            mOutgoingEdges.add(edge);
         }
 
         @Override
@@ -157,8 +132,8 @@ final class TestGraphElements {
 
         @Override
         @ProcessState
-        int getCurProcState() {
-            return mCurProcState;
+        int getProcState() {
+            return mProcState;
         }
 
         @Override
@@ -194,7 +169,7 @@ final class TestGraphElements {
             private boolean mIsReceivingBroadcast = false;
             private boolean mHasIntrinsicImplicitCpuTime = false;
             private int mMaxAdj = UNKNOWN_ADJ;
-            private @ProcessState int mCurProcState = PROCESS_STATE_UNKNOWN;
+            private @ProcessState int mProcState = PROCESS_STATE_UNKNOWN;
             private final ArrayList<TestServiceRecord> mServices = new ArrayList<>();
 
             Builder withProcessRunning(boolean isProcessRunning) {
@@ -252,8 +227,8 @@ final class TestGraphElements {
                 return this;
             }
 
-            Builder withCurProcState(@ProcessState int procState) {
-                mCurProcState = procState;
+            Builder withProcState(@ProcessState int procState) {
+                mProcState = procState;
                 return this;
             }
 
@@ -267,89 +242,7 @@ final class TestGraphElements {
                         mHasForegroundServices, mHasNonShortForegroundServices,
                         mCachedCompatChangeCameraMicrophoneCapability, mIsCurAllowListed,
                         mHasForegroundActivities, mHasExecutingServices, mIsReceivingBroadcast,
-                        mHasIntrinsicImplicitCpuTime, mMaxAdj, mCurProcState, mServices);
-            }
-        }
-    }
-
-    /**
-     * System node used in tests.
-     */
-    static class TestSystemNode extends GraphNode {
-        private final ArrayList<GraphEdge> mOutgoingEdges = new ArrayList<>();
-
-        @Override
-        public void forEachOutgoingEdge(@NonNull Consumer<GraphEdge> consumer) {
-            mOutgoingEdges.forEach(consumer);
-        }
-
-        void addOutgoingEdge(@NonNull GraphEdge edge) {
-            mOutgoingEdges.add(edge);
-        }
-
-        @Override
-        public @ProcessCapability int getCapability() {
-            return PROCESS_CAPABILITY_ALL;
-        }
-    }
-
-    /**
-     * A test implementation of general {@link GraphEdge}. Uses a {@link Builder} pattern to set up
-     * various fields.
-     */
-    static class TestEdge extends GraphEdge {
-        private final @NonNull GraphNode mSource;
-        private final @NonNull TestProcessNode mTarget;
-        private final @ProcessCapability int mCapabilityFilter;
-
-        private TestEdge(@NonNull GraphNode source, @NonNull TestProcessNode target,
-                @ProcessCapability int capabilityFilter) {
-            mSource = source;
-            mTarget = target;
-            mCapabilityFilter = capabilityFilter;
-        }
-
-        @Override
-        @NonNull
-        GraphNode getSource() {
-            return mSource;
-        }
-
-        @Override
-        @NonNull
-        ProcessNode getTarget() {
-            return mTarget;
-        }
-
-        @Override
-        @ProcessCapability
-        int getCachedCapabilityFilter() {
-            return mCapabilityFilter;
-        }
-
-        @Override
-        @ProcessCapability
-        int evaluateCapabilityFilter() {
-            return mCapabilityFilter;
-        }
-
-        static class Builder {
-            private final @NonNull GraphNode mSource;
-            private final @NonNull TestProcessNode mTarget;
-            private @ProcessCapability int mCapabilityFilter = PROCESS_CAPABILITY_NONE;
-
-            Builder(@NonNull GraphNode source, @NonNull TestProcessNode target) {
-                mSource = source;
-                mTarget = target;
-            }
-
-            Builder withCapabilityFilter(@ProcessCapability int capabilityFilter) {
-                mCapabilityFilter = capabilityFilter;
-                return this;
-            }
-
-            TestEdge build() {
-                return new TestEdge(mSource, mTarget, mCapabilityFilter);
+                        mHasIntrinsicImplicitCpuTime, mMaxAdj, mProcState, mServices);
             }
         }
     }

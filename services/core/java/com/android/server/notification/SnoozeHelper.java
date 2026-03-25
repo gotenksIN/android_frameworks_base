@@ -55,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 
 /**
  * NotificationManagerService helper for handling snoozed notifications.
@@ -247,7 +246,7 @@ public final class SnoozeHelper {
         return key;
     }
 
-    protected NotificationRecord cancel(int userId, String pkg, String tag, int id) {
+    protected boolean cancel(int userId, String pkg, String tag, int id) {
         synchronized (mLock) {
             final Set<Map.Entry<String, NotificationRecord>> records =
                     mSnoozedNotifications.entrySet();
@@ -255,20 +254,18 @@ public final class SnoozeHelper {
                 final StatusBarNotification sbn = record.getValue().getSbn();
                 if (sbn.getPackageName().equals(pkg) && sbn.getUserId() == userId
                         && Objects.equals(sbn.getTag(), tag) && sbn.getId() == id) {
-                    NotificationRecord r = record.getValue();
-                    r.isCanceled = true;
-                    return r;
+                    record.getValue().isCanceled = true;
+                    return true;
                 }
             }
         }
-        return null;
+        return false;
     }
 
-    protected List<NotificationRecord> cancel(int userId, boolean includeCurrentProfiles) {
-        List<NotificationRecord> records = new ArrayList<>();
+    protected void cancel(int userId, boolean includeCurrentProfiles) {
         synchronized (mLock) {
             if (mSnoozedNotifications.size() == 0) {
-                return records;
+                return;
             }
             IntArray userIds = new IntArray();
             userIds.add(userId);
@@ -278,26 +275,22 @@ public final class SnoozeHelper {
             for (NotificationRecord r : mSnoozedNotifications.values()) {
                 if (userIds.binarySearch(r.getUserId()) >= 0) {
                     r.isCanceled = true;
-                    records.add(r);
                 }
             }
         }
-        return records;
     }
 
-    protected List<NotificationRecord> cancel(int userId, String pkg) {
-        List<NotificationRecord> records = new ArrayList<>();
+    protected boolean cancel(int userId, String pkg) {
         synchronized (mLock) {
             int n = mSnoozedNotifications.size();
             for (int i = 0; i < n; i++) {
                 final NotificationRecord r = mSnoozedNotifications.valueAt(i);
                 if (r.getSbn().getPackageName().equals(pkg) && r.getUserId() == userId) {
                     r.isCanceled = true;
-                    records.add(r);
                 }
             }
+            return true;
         }
-        return records;
     }
 
     /**
@@ -389,14 +382,12 @@ public final class SnoozeHelper {
         }
     }
 
-    protected List<NotificationRecord> clearData(int userId, String pkg) {
-        List<NotificationRecord> records = new ArrayList<>();
+    protected void clearData(int userId, String pkg) {
         synchronized (mLock) {
             int n = mSnoozedNotifications.size();
             for (int i = n - 1; i >= 0; i--) {
                 final NotificationRecord record = mSnoozedNotifications.valueAt(i);
                 if (record.getUserId() == userId && record.getSbn().getPackageName().equals(pkg)) {
-                    records.add(record);
                     mSnoozedNotifications.removeAt(i);
                     String trimmedKey = getTrimmedString(record.getKey());
                     mPersistedSnoozedNotificationsWithContext.remove(trimmedKey);
@@ -412,17 +403,14 @@ public final class SnoozeHelper {
                 }
             }
         }
-        return records;
     }
 
-    protected List<NotificationRecord> clearData(int userId) {
-        List<NotificationRecord> records = new ArrayList<>();
+    protected void clearData(int userId) {
         synchronized (mLock) {
             int n = mSnoozedNotifications.size();
             for (int i = n - 1; i >= 0; i--) {
                 final NotificationRecord record = mSnoozedNotifications.valueAt(i);
                 if (record.getUserId() == userId) {
-                    records.add(record);
                     mSnoozedNotifications.removeAt(i);
                     String trimmedKey = getTrimmedString(record.getKey());
                     mPersistedSnoozedNotificationsWithContext.remove(trimmedKey);
@@ -437,15 +425,6 @@ public final class SnoozeHelper {
                     };
                     runnable.run();
                 }
-            }
-        }
-        return records;
-    }
-
-    protected void visitUris(Consumer<Uri> visitor) {
-        synchronized (mLock) {
-            for (NotificationRecord r : mSnoozedNotifications.values()) {
-                r.getNotification().visitUris(visitor);
             }
         }
     }

@@ -402,8 +402,7 @@ class VintfHalVibratorManager {
         }
 
         private void clearSessions() {
-            if (!hasCapability(IVibratorManager.CAP_START_SESSIONS) && !hasCapability(
-                    IVibratorManager.CAP_HAPTIC_GENERATOR)) {
+            if (!hasCapability(IVibratorManager.CAP_START_SESSIONS)) {
                 Slog.w(TAG, "No capability to start sessions, ignoring clear sessions request.");
                 return;
             }

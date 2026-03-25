@@ -16,7 +16,7 @@
 
 package com.android.systemui.statusbar.quickactions.data.repository.impl
 
-import android.graphics.RectF
+import android.graphics.Rect
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
@@ -41,7 +41,8 @@ class QuickActionChipsRepositoryImplTest : SysuiTestCase() {
     private val panelModel =
         QuickActionPanelModel(
             chipId = QuickActionChipId.MediaControl,
-            anchorBounds = RectF(),
+            displayId = 0,
+            anchorBounds = Rect(),
             panelContentViewModelFactory = kosmos.mediaControlPopupViewModelFactory,
         )
 

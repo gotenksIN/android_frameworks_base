@@ -16,29 +16,46 @@
 
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 
+import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.model.MobileContentDescription
 
-class MobileIconStateImpl(viewModel: MobileIconViewModelCommon) :
-    MobileIconState,
-    HydratedActivatable(traceName = "MobileIconStateImpl[${viewModel.subscriptionId}].hydrator") {
+class MobileIconStateImpl(private val viewModel: MobileIconViewModelCommon) :
+    MobileIconState, ExclusiveActivatable() {
 
-    override val isVisible: Boolean by viewModel.isVisible.hydratedStateOf()
-    override val icon: SignalIconModel by viewModel.icon.hydratedStateOf(SignalIconModel.DEFAULT)
+    private val hydrator = Hydrator("MobileIconStateImpl[$subscriptionId].hydrator")
+
+    private val subscriptionId: Int
+        get() = viewModel.subscriptionId
+
+    override val isVisible: Boolean by hydrator.hydratedStateOf("isVisible", viewModel.isVisible)
+    override val icon: SignalIconModel by
+        hydrator.hydratedStateOf("icon", SignalIconModel.DEFAULT, viewModel.icon)
     override val contentDescription: MobileContentDescription? by
-        viewModel.contentDescription.hydratedStateOf(null)
-    override val roaming: Boolean by viewModel.roaming.hydratedStateOf(false)
-    override val networkTypeIcon: Icon.Resource? by viewModel.networkTypeIcon.hydratedStateOf(null)
+        hydrator.hydratedStateOf("contentDescription", null, viewModel.contentDescription)
+    override val roaming: Boolean by hydrator.hydratedStateOf("roaming", false, viewModel.roaming)
+    override val networkTypeIcon: Icon.Resource? by
+        hydrator.hydratedStateOf("networkTypeIcon", null, viewModel.networkTypeIcon)
     override val networkTypeBackground: Icon.Resource? by
-        viewModel.networkTypeBackground.hydratedStateOf()
-    override val activityInVisible: Boolean by viewModel.activityInVisible.hydratedStateOf(false)
-    override val activityOutVisible: Boolean by viewModel.activityOutVisible.hydratedStateOf(false)
+        hydrator.hydratedStateOf("networkTypeBackground", viewModel.networkTypeBackground)
+    override val activityInVisible: Boolean by
+        hydrator.hydratedStateOf("activityInVisible", false, viewModel.activityInVisible)
+    override val activityOutVisible: Boolean by
+        hydrator.hydratedStateOf("activityOutVisible", false, viewModel.activityOutVisible)
     override val activityContainerVisible: Boolean by
-        viewModel.activityContainerVisible.hydratedStateOf(false)
-    override val volteId: Int by viewModel.volteId.hydratedStateOf(0)
+        hydrator.hydratedStateOf(
+            "activityContainerVisible",
+            false,
+            viewModel.activityContainerVisible,
+        )
+    override val volteId: Int by hydrator.hydratedStateOf("volteId", 0, viewModel.volteId)
     override val showSignalStrengthIcon: Boolean by
-        viewModel.showSignalStrengthIcon.hydratedStateOf(true)
+        hydrator.hydratedStateOf("showSignalStrengthIcon", true, viewModel.showSignalStrengthIcon)
 
+    override suspend fun onActivated() {
+        hydrator.activate()
+    }
 }

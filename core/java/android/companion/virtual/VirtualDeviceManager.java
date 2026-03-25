@@ -82,7 +82,6 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.ArraySet;
@@ -766,42 +765,6 @@ public final class VirtualDeviceManager {
     }
 
     /**
-     * Returns whether the given package is allowed to be a computer control agent.
-     *
-     * @hide
-     */
-    @RequiresPermission(android.Manifest.permission.MANAGE_COMPUTER_CONTROL_CONSENT)
-    public boolean isPackageApprovedToRunComputerControlAutomation(@NonNull String packageName,
-            int userId) {
-        if (mService == null) {
-            return false;
-        }
-        try {
-            return mService.isPackageApprovedToRunComputerControlAutomation(packageName, userId);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Returns whether the given package is allowed to be automated by a computer control agent.
-     *
-     * @hide
-     */
-    @RequiresPermission(android.Manifest.permission.MANAGE_COMPUTER_CONTROL_CONSENT)
-    public boolean isPackageTargetableForComputerControlAutomation(@NonNull String packageName,
-            int userId) {
-        if (mService == null) {
-            return false;
-        }
-        try {
-            return mService.isPackageTargetableForComputerControlAutomation(packageName, userId);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * A representation of a virtual device.
      *
      * <p>A virtual device can have its own virtual displays, audio input/output, sensors, etc.
@@ -1434,28 +1397,6 @@ public final class VirtualDeviceManager {
                 throw new UnsupportedOperationException("Required flag is not enabled");
             }
             mVirtualDeviceInternal.setDisplayUiMode(displayId, uiMode);
-        }
-
-        /**
-         * Specifies the current thermal status of the device.
-         *
-         * <p>This status will be available to apps via
-         * {@link PowerManager#getCurrentThermalStatus(int)} if this virtual device's ID has been
-         * passed as {@code deviceId} argument, and to any registered
-         * {@link PowerManager.OnThermalStatusChangedListener}.</p>
-         *
-         * @param status the current thermal status
-         * @throws IllegalArgumentException if status is not one of the expected values
-         * @throws UnsupportedOperationException if the virtual device does not have
-         *         {@link VirtualDeviceParams#POLICY_TYPE_THERMAL} set to {@link
-         *         VirtualDeviceParams#DEVICE_POLICY_CUSTOM}.
-         */
-        @FlaggedApi(Flags.FLAG_DEVICE_AWARE_THERMAL_STATUS)
-        public void setCurrentThermalStatus(@PowerManager.ThermalStatus int status) {
-            if (!Flags.deviceAwareThermalStatus()) {
-                throw new UnsupportedOperationException("Required flag is not enabled");
-            }
-            mVirtualDeviceInternal.setCurrentThermalStatus(status);
         }
 
         /**

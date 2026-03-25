@@ -24,7 +24,6 @@ import android.content.res.ColorStateList
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.Typeface
-import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.util.Log
 import android.util.Size
@@ -1026,10 +1025,7 @@ private class AODPromotedNotificationViewUpdater(root: View) {
 
     private fun updateImageView(view: ImageView?, drawable: Drawable?) {
         view ?: return
-        // for AOD we are trying to get the best monochrome icon we can, so if
-        // this is an adaptive drawable (like a launcher icon) that has a monochrome version,
-        // show it here
-        view.setImageDrawable((drawable as? AdaptiveIconDrawable)?.monochrome ?: drawable)
+        view.setImageDrawable(drawable)
         view.isVisible = drawable != null
     }
 

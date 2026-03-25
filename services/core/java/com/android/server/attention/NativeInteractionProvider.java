@@ -39,17 +39,5 @@ public class NativeInteractionProvider implements InteractionProvider {
     }
 
     @Override
-    public List<InteractionState> getSourceInteractions() {
-        return getSourceInteractions(mNativePtr);
-    }
-
-    @Override
-    public void requestWakeupCallback(InteractionWakeupCallback callback) {
-        requestWakeupCallback(mNativePtr, callback);
-    }
-
-    private native List<InteractionState> getSourceInteractions(long nativePtr);
-
-    private native void requestWakeupCallback(long nativePtr, InteractionWakeupCallback callback);
-
+    public native List<InteractionState> getSourceInteractions();
 }

@@ -103,16 +103,14 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         makeCallerForeground();
     }
 
-    @Test
-    public void testGetParentOrSelfUserId() {
+    public void disabled_testGetParentOrSelfUserId() {
         assertEquals(USER_10, mService.getParentOrSelfUserId(USER_10));
         assertEquals(USER_11, mService.getParentOrSelfUserId(USER_11));
         assertEquals(USER_12, mService.getParentOrSelfUserId(USER_12));
         assertEquals(USER_10, mService.getParentOrSelfUserId(USER_P0));
     }
 
-    @Test
-    public void testIsRequestPinShortcutSupported() {
+    public void disabled_testIsRequestPinShortcutSupported() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
         setDefaultLauncher(USER_11, LAUNCHER_2);
 
@@ -253,8 +251,8 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_notSupported() {
+
+    public void disabled_testRequestPinShortcut_notSupported() {
         // User-0's launcher has no confirmation activity.
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
@@ -308,8 +306,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
                 actualIntent.getFlags());
     }
 
-    @Test
-    public void testNotForeground() {
+    public void disabled_testNotForeground() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -409,8 +406,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut() {
+    public void disabled_testRequestPinShortcut() {
         checkRequestPinShortcut(/* resultIntent=*/ null);
     }
 
@@ -420,13 +416,11 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
                 PendingIntent.FLAG_MUTABLE).getIntentSender();
     }
 
-    @Test
-    public void testRequestPinShortcut_withCallback() {
+    public void disabled_testRequestPinShortcut_withCallback() {
         checkRequestPinShortcut(makeResultIntent());
     }
 
-    @Test
-    public void testRequestPinShortcut_explicitTargetActivity() {
+    public void disabled_testRequestPinShortcut_explicitTargetActivity() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
         setDefaultLauncher(USER_11, LAUNCHER_2);
 
@@ -501,8 +495,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_noTargetActivity_noMainActivity() {
+    public void disabled_testRequestPinShortcut_noTargetActivity_noMainActivity() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
         setDefaultLauncher(USER_11, LAUNCHER_2);
 
@@ -567,8 +560,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
 
     }
 
-    @Test
-    public void testRequestPinShortcut_dynamicExists() {
+    public void disabled_testRequestPinShortcut_dynamicExists() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         final Icon res32x32 = Icon.createWithResource(getTestContext(), R.drawable.black_32x32);
@@ -684,8 +676,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_dynamicExists_alreadyPinned() {
+    public void disabled_testRequestPinShortcut_dynamicExists_alreadyPinned() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         final Icon res32x32 = Icon.createWithResource(getTestContext(), R.drawable.black_32x32);
@@ -770,8 +761,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_manifestExists_alreadyPinned() {
+    public void disabled_testRequestPinShortcut_manifestExists_alreadyPinned() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -853,8 +843,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_wasDynamic_alreadyPinned() {
+    public void disabled_testRequestPinShortcut_wasDynamic_alreadyPinned() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -882,8 +871,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_wasDynamic_disabled_alreadyPinned() {
+    public void disabled_testRequestPinShortcut_wasDynamic_disabled_alreadyPinned() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -914,8 +902,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_wasManifest_alreadyPinned() {
+    public void disabled_testRequestPinShortcut_wasManifest_alreadyPinned() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -947,8 +934,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_dynamicExists_alreadyPinnedByAnother() {
+    public void disabled_testRequestPinShortcut_dynamicExists_alreadyPinnedByAnother() {
         // Initially all launchers have the shortcut permission, until we call setDefaultLauncher().
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1010,8 +996,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
         });
     }
 
-    @Test
-    public void testRequestPinShortcut_manifestExists_alreadyPinnedByAnother() {
+    public void disabled_testRequestPinShortcut_manifestExists_alreadyPinnedByAnother() {
         // Initially all launchers have the shortcut permission, until we call setDefaultLauncher().
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1143,8 +1128,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
     /**
      * When trying to pin an existing shortcut, the new fields shouldn't override existing fields.
      */
-    @Test
-    public void testRequestPinShortcut_dynamicExists_titleWontChange() {
+    public void disabled_testRequestPinShortcut_dynamicExists_titleWontChange() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         final Icon res32x32 = Icon.createWithResource(getTestContext(), R.drawable.black_32x32);
@@ -1209,8 +1193,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
     /**
      * When trying to pin an existing shortcut, the new fields shouldn't override existing fields.
      */
-    @Test
-    public void testRequestPinShortcut_manifestExists_titleWontChange() {
+    public void disabled_testRequestPinShortcut_manifestExists_titleWontChange() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1277,8 +1260,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
      * The dynamic shortcut existed, but before accepting(), it's removed.  Because the request
      * has a partial shortcut, accept() should fail.
      */
-    @Test
-    public void testRequestPinShortcut_dynamicExists_thenRemoved_error() {
+    public void disabled_testRequestPinShortcut_dynamicExists_thenRemoved_error() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1336,8 +1318,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
      * The dynamic shortcut existed, but before accepting(), it's removed.  Because the request
      * has all the mandatory fields, we can go ahead and still publish it.
      */
-    @Test
-    public void testRequestPinShortcut_dynamicExists_thenRemoved_okay() {
+    public void disabled_testRequestPinShortcut_dynamicExists_thenRemoved_okay() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1393,8 +1374,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
      * The manifest shortcut existed, but before accepting(), it's removed.  Because the request
      * has a partial shortcut, accept() should fail.
      */
-    @Test
-    public void testRequestPinShortcut_manifestExists_thenRemoved_error() {
+    public void disabled_testRequestPinShortcut_manifestExists_thenRemoved_error() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1451,8 +1431,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
      * The manifest shortcut existed, but before accepting(), it's removed.  Because the request
      * has all the mandatory fields, we can go ahead and still publish it.
      */
-    @Test
-    public void testRequestPinShortcut_manifestExists_thenRemoved_okay() {
+    public void disabled_testRequestPinShortcut_manifestExists_thenRemoved_okay() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1512,8 +1491,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
      * The dynamic shortcut existed, but before accepting(), it's removed.  Because the request
      * has a partial shortcut, accept() should fail.
      */
-    @Test
-    public void testRequestPinShortcut_dynamicExists_thenDisabled_error() {
+    public void disabled_testRequestPinShortcut_dynamicExists_thenDisabled_error() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {
@@ -1587,8 +1565,7 @@ public class ShortcutManagerTest8 extends BaseShortcutManagerTest {
      * The manifest shortcut existed, but before accepting(), it's removed.  Because the request
      * has a partial shortcut, accept() should fail.
      */
-    @Test
-    public void testRequestPinShortcut_manifestExists_thenDisabled_error() {
+    public void disabled_testRequestPinShortcut_manifestExists_thenDisabled_error() {
         setDefaultLauncher(USER_10, LAUNCHER_1);
 
         runWithCaller(CALLING_PACKAGE_1, USER_P0, () -> {

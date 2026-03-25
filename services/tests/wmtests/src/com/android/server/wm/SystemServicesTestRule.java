@@ -31,7 +31,6 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyString;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doThrow;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.eq;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
@@ -58,7 +57,6 @@ import android.content.Context;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
-import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.res.Configuration;
 import android.database.ContentObserver;
@@ -81,6 +79,7 @@ import android.view.SurfaceControl;
 
 import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.protolog.PerfettoProtoLogImpl;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.protolog.WmProtoLogGroups;
 import com.android.server.AnimationThread;
@@ -197,7 +196,7 @@ public class SystemServicesTestRule implements TestRule {
     private void setUp() {
         if (ProtoLog.getSingleInstance() == null) {
             ProtoLog.init(WmProtoLogGroups.values());
-            ProtoLog.waitForInitialization();
+            PerfettoProtoLogImpl.waitForInitialization();
         }
 
         if (mOnBeforeServicesCreated != null) {
@@ -254,14 +253,6 @@ public class SystemServicesTestRule implements TestRule {
 
         mContext = getInstrumentation().getTargetContext();
         spyOn(mContext);
-
-        final PackageManager pm = spy(mContext.getPackageManager());
-        try {
-            doThrow(new PackageManager.NameNotFoundException()).when(pm).getPropertyAsUser(
-                    anyString(), nullable(String.class), nullable(String.class), anyInt());
-        } catch (PackageManager.NameNotFoundException e) {
-        }
-        doReturn(pm).when(mContext).getPackageManager();
 
         doReturn(null).when(mContext)
                 .registerReceiver(nullable(BroadcastReceiver.class), any(IntentFilter.class),

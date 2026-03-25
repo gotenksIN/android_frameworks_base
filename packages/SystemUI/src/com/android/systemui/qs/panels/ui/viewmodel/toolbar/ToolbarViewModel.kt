@@ -27,7 +27,8 @@ import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.classifier.domain.interactor.runIfNotFalseTap
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.globalactions.GlobalActionsDialogLite
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.qs.footer.domain.interactor.FooterActionsInteractor
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsButtonViewModel
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsButtonViewModel.PowerActionViewModel
@@ -47,8 +48,10 @@ import dagger.assisted.AssistedInject
 import javax.inject.Provider
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -68,9 +71,11 @@ constructor(
     private val hsum: HeadlessSystemUserMode,
     @ShadeDisplayAware appContext: Context,
     @Main private val mainDispatcher: CoroutineDispatcher,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
     private val qsThemedContext =
         ContextThemeWrapper(appContext, R.style.Theme_SystemUI_QuickSettings)
+    private val hydrator = Hydrator("ToolbarViewModel.hydrator")
+
     val powerButtonViewModel: FooterActionsButtonViewModel =
         PowerActionViewModel(context = qsThemedContext, onClick = ::onPowerButtonClicked)
 
@@ -82,17 +87,28 @@ constructor(
             )
 
     val userSwitcherViewModel: FooterActionsButtonViewModel? by
-        userSwitcherViewModel(qsThemedContext, footerActionsInteractor, ::onUserSwitcherClicked)
-            .hydratedStateOf(initialValue = null)
+        hydrator.hydratedStateOf(
+            traceName = "userSwitcherViewModel",
+            initialValue = null,
+            source =
+                userSwitcherViewModel(
+                    qsThemedContext,
+                    footerActionsInteractor,
+                    ::onUserSwitcherClicked,
+                ),
+        )
 
     val settingsButtonViewModel: FooterActionsButtonViewModel? by
-        selectedUserInteractor.selectedUser
-            .map { selectedUserId ->
-                SettingsActionViewModel(qsThemedContext, ::onSettingsButtonClicked).takeUnless {
-                    hsuQsChanges() && hsum.isHeadlessSystemUser(selectedUserId)
-                }
-            }
-            .hydratedStateOf(initialValue = null)
+        hydrator.hydratedStateOf(
+            traceName = "settingsButtonViewModel",
+            initialValue = null,
+            source =
+                selectedUserInteractor.selectedUser.map { selectedUserId ->
+                    SettingsActionViewModel(qsThemedContext, ::onSettingsButtonClicked).takeUnless {
+                        hsuQsChanges() && hsum.isHeadlessSystemUser(selectedUserId)
+                    }
+                },
+        )
 
     /**
      * Whether the inline power menu is visible on top of the QS panel.
@@ -122,11 +138,18 @@ constructor(
     var securityInfoShowCollapsed: Boolean by mutableStateOf(true)
         private set
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
             launch(context = mainDispatcher) {
-                globalActionsDialogLite = globalActionsDialogLiteProvider.get()
+                try {
+                    globalActionsDialogLite = globalActionsDialogLiteProvider.get()
+                    awaitCancellation()
+                } finally {
+                    globalActionsDialogLite?.destroy()
+                }
             }
+            launch { hydrator.activate() }
+
             if (useInlinePowerMenu) {
                 launch {
                     shadeInteractor.qsExpansion
@@ -151,11 +174,8 @@ constructor(
                         securityInfoShowCollapsed = true
                     }
             }
+            awaitCancellation()
         }
-    }
-
-    override suspend fun onDeactivated() {
-        globalActionsDialogLite?.destroy()
     }
 
     private var globalActionsDialogLite: GlobalActionsDialogLite? by mutableStateOf(null)

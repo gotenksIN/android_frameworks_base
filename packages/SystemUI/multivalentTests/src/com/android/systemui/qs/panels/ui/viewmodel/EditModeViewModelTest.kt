@@ -37,7 +37,6 @@ import com.android.systemui.plugins.qs.QSTile
 import com.android.systemui.qs.FakeQSFactory
 import com.android.systemui.qs.FakeQSTile
 import com.android.systemui.qs.QSEditEvent
-import com.android.systemui.qs.flags.QsSplitInternetTile
 import com.android.systemui.qs.panels.data.repository.stockTilesRepository
 import com.android.systemui.qs.panels.domain.interactor.FakeTileAvailabilityInteractor
 import com.android.systemui.qs.panels.domain.interactor.tileAvailabilityInteractorsMap
@@ -61,7 +60,6 @@ import com.android.systemui.qs.tiles.impl.flashlight.qsFlashlightTileConfig
 import com.android.systemui.qs.tiles.impl.internet.qsInternetTileConfig
 import com.android.systemui.qs.tiles.impl.sensorprivacy.qsCameraSensorPrivacyToggleTileConfig
 import com.android.systemui.qs.tiles.impl.sensorprivacy.qsMicrophoneSensorPrivacyToggleTileConfig
-import com.android.systemui.qs.tiles.impl.wifi.qsWifiTileConfig
 import com.android.systemui.settings.userTracker
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
@@ -89,7 +87,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
     private val configs =
         with(kosmos) {
             setOf(
-                if (QsSplitInternetTile.isEnabled) qsWifiTileConfig else qsInternetTileConfig,
+                qsInternetTileConfig,
                 qsFlashlightTileConfig,
                 qsBatterySaverTileConfig,
                 qsAlarmTileConfig,
@@ -314,7 +312,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
                 underTest.startEditing()
 
-                val newTile = TileSpec.create(internetTileName)
+                val newTile = TileSpec.create("internet")
                 val position = 1
                 currentTilesInteractor.addTile(newTile, position)
                 currentTiles.add(position, newTile)
@@ -342,7 +340,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 underTest.startEditing()
 
                 val nonCurrentSpecs = tiles!!.filterNot { it.isCurrent }.map { it.tileSpec }
-                val newTile = TileSpec.create(internetTileName)
+                val newTile = TileSpec.create("internet")
                 currentTilesInteractor.addTile(newTile)
 
                 assertThat(tiles!!.filterNot { it.isCurrent }.map { it.tileSpec })
@@ -511,7 +509,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                     mutableListOf(
                         TileSpec.create("flashlight"),
                         TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
+                        TileSpec.create("internet"),
                         TileSpec.create("alarm"),
                     )
                 currentTilesInteractor.setTiles(currentTiles)
@@ -521,7 +519,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 underTest.addTile(TileSpec.create("flashlight"), 3)
 
                 assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec.spec })
-                    .containsExactly("airplane", internetTileName, "alarm", "flashlight")
+                    .containsExactly("airplane", "internet", "alarm", "flashlight")
                     .inOrder()
             }
         }
@@ -535,7 +533,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                     mutableListOf(
                         TileSpec.create("flashlight"),
                         TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
+                        TileSpec.create("internet"),
                         TileSpec.create("alarm"),
                     )
                 currentTilesInteractor.setTiles(currentTiles)
@@ -545,7 +543,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                 underTest.addTile(TileSpec.create("alarm"), 0)
 
                 assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec.spec })
-                    .containsExactly("alarm", "flashlight", "airplane", internetTileName)
+                    .containsExactly("alarm", "flashlight", "airplane", "internet")
                     .inOrder()
             }
         }
@@ -585,7 +583,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         kosmos.runTest {
             val flashlightTile = TileSpec.create("flashlight")
             val airplaneTile = TileSpec.create("airplane")
-            val internetTile = TileSpec.create(internetTileName)
+            val internetTile = TileSpec.create("internet")
             val customTile = TileSpec.create(component2)
             currentTilesInteractor.setTiles(listOf(flashlightTile))
 
@@ -617,7 +615,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         kosmos.runTest {
             val flashlightTile = TileSpec.create("flashlight")
             val airplaneTile = TileSpec.create("airplane")
-            val internetTile = TileSpec.create(internetTileName)
+            val internetTile = TileSpec.create("internet")
             currentTilesInteractor.setTiles(listOf(flashlightTile, airplaneTile, internetTile))
 
             underTest.addTile(flashlightTile) // adding at the end, should use correct position
@@ -643,7 +641,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         kosmos.runTest {
             val flashlightTile = TileSpec.create("flashlight")
             val airplaneTile = TileSpec.create("airplane")
-            val internetTile = TileSpec.create(internetTileName)
+            val internetTile = TileSpec.create("internet")
             currentTilesInteractor.setTiles(listOf(flashlightTile, airplaneTile, internetTile))
 
             underTest.removeTile(airplaneTile)
@@ -661,7 +659,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         kosmos.runTest {
             val flashlightTile = TileSpec.create("flashlight")
             val airplaneTile = TileSpec.create("airplane")
-            val internetTile = TileSpec.create(internetTileName)
+            val internetTile = TileSpec.create("internet")
             val alarmTile = TileSpec.create("alarm")
 
             currentTilesInteractor.setTiles(listOf(flashlightTile, airplaneTile, internetTile))
@@ -702,7 +700,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                     mutableListOf(
                         TileSpec.create("flashlight"),
                         TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
+                        TileSpec.create("internet"),
                         TileSpec.create("alarm"),
                     )
                 currentTilesInteractor.setTiles(currentTiles)
@@ -730,7 +728,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                     mutableListOf(
                         TileSpec.create("flashlight"),
                         TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
+                        TileSpec.create("internet"),
                         TileSpec.create("alarm"),
                     )
                 currentTilesInteractor.setTiles(currentTiles)
@@ -762,8 +760,6 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         private val appName2 = "App2"
         private val tileService2 = "Tile Service 2"
         private val component2 = ComponentName("pkg2", "srv2")
-
-        private val internetTileName = if (QsSplitInternetTile.isEnabled) "wifi" else "internet"
 
         private fun TileSpec.missingConfigEditTileData(): EditTileData {
             return EditTileData(

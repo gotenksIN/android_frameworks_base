@@ -23,7 +23,6 @@ import android.annotation.UserIdInt;
 import android.app.WallpaperColors;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.theming.FieldColorSource;
 import android.content.theming.IThemeChangedCallback;
 import android.content.theming.IThemeSettingsCallback;
 import android.content.theming.ThemeInfo;
@@ -41,7 +40,6 @@ import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.os.BackgroundThread;
 import com.android.server.LocalServices;
 import com.android.server.UiModeManagerInternal;
 import com.android.systemui.monet.ColorScheme;
@@ -64,7 +62,7 @@ import java.util.Optional;
  * @hide
  */
 @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatcher {
+public class ThemeManagerImpl implements ThemeManagerInternal {
     private static final String TAG = "ThemeManagerInternal";
     private static final String KEY_COLOR_PALETTE_VERSION = "global_color_palette_version";
 
@@ -76,10 +74,7 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
     private final ThemeWallpaperManager mWallpaperManager;
     private final SystemPropertiesReader mPropertyReader;
 
-    private final ThemeUserLifecycle mUserLifecycle;
-    private final ThemeEventObserver mEventObserver;
-
-    private volatile boolean mIsThemeReady = false;
+    private ThemeUserLifecycle mUserLifecycle;
 
     private final Object mLock = new Object();
 
@@ -94,8 +89,7 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
     ThemeManagerImpl(Context context, ThemeSettingsManager themeSettingsManager,
             ThemeStateManager stateManager, ThemeOverlayHelper overlayHelper,
             ThemeEnvironment environment, ThemeWallpaperManager wallpaperManager,
-            SystemPropertiesReader propertyReader, ThemeUserLifecycle userLifecycle,
-            ThemeEventObserver eventObserver) {
+            SystemPropertiesReader propertyReader) {
         mContext = context;
         mStateManager = stateManager;
         mThemeSettingsManager = themeSettingsManager;
@@ -103,14 +97,25 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
         mEnvironment = environment;
         mWallpaperManager = wallpaperManager;
         mPropertyReader = propertyReader;
+    }
 
+    /**
+     * Sets the dependent components that require this Impl to be created first.
+     */
+    void setup(ThemeUserLifecycle userLifecycle) {
         mUserLifecycle = userLifecycle;
-        mEventObserver = eventObserver;
-        mUserLifecycle.setDispatcher(this);
-        mEventObserver.setDispatcher(this);
     }
 
     // API METHODS
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @RequiresPermission(Manifest.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE)
+    public boolean onBootAnimationDismissing() {
+        return initializeThemingSystem("BootAnimation");
+    }
 
     /**
      * {@inheritDoc}
@@ -320,20 +325,6 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
     }
 
     /**
-     * Checks if the user's theme relies on the home wallpaper.
-     *
-     * @param userId The ID of the user.
-     * @return true if the current theme requires wallpaper colors.
-     */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    public boolean requiresWallpaperForInitialization(int userId) {
-        mThemeSettingsManager.initializeDefaults();
-        ThemeSettings settings = mThemeSettingsManager.getSettingsOrDefault(userId,
-                mContext.getContentResolver());
-        return FieldColorSource.VALUE_HOME_WALLPAPER.equals(settings.colorSource());
-    }
-
-    /**
      * {@inheritDoc}
      */
     @Override
@@ -348,14 +339,11 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
     /**
      * Initializes the theming system.
      * Can be called opportunistically (e.g. on wallpaper change) or when boot animation dismisses.
-     *
-     * @return {@code true} if a theme update was triggered; {@code false} otherwise.
      */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     @RequiresPermission(Manifest.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE)
-    public boolean initializeThemingSystem() {
+    public boolean initializeThemingSystem(String reason) {
         if (!mEnvironment.isBooting()) return false;
-        Slog.i(TAG, "Starting theming system initialization.");
+        Slog.i(TAG, "Starting theming system initialization. Triggered by " + reason);
 
         // 1. Resolve and store device-wide default settings
         mThemeSettingsManager.initializeDefaults();
@@ -364,58 +352,20 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
         mOverlayHelper.cleanupLegacyOverlays(
                 Arrays.asList(mEnvironment.getConfig().legacyOverlays()));
 
-        // 3. Load the current user theme state (persistence/migration handled internally)
+        // 3. Mark environment as ready (Transitions isBooting from true -> false)
+        if (mUserLifecycle != null) mEnvironment.setBootingComplete(mUserLifecycle);
+
+        // 4. Load the current user theme state (persistence/migration handled internally)
         mUserLifecycle.loadCurrentUser();
 
-        // 4. Force color evaluation for everyone (handles OTAs and initial boot).
-        // If an update is needed, it will trigger it synchronously.
-        boolean updateRequested = mStateManager.evaluateAllUsers(
-                hasPaletteOutdated(), /*isSynchronous*/ true);
+        // 5. Force color evaluation for everyone (handles OTAs and initial boot).
+        mStateManager.evaluateAllUsers(hasPaletteOutdated(),
+                /*isSynchronous*/ true);
 
-        // 5. Register steady-state listeners now that initial state is resolved.
-        // We post this to ensure we don't hold any locks if these registrations
-        // call back into other system services.
-        BackgroundThread.getHandler().post(() -> {
-            mUserLifecycle.registerListeners();
-            mEventObserver.registerListeners();
-
-            // 6. Mark environment as ready (Transitions isBooting from true -> false)
-            mEnvironment.setBootingComplete(mUserLifecycle);
-        });
-
-        return updateRequested;
-    }
-
-    /**
-     * Checks if the theme is correctly applied for the given user and signals ready if so.
-     * Used by initialization helper.
-     */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    public boolean checkAndSignalReady(int userId) {
-        // Check if the overlay is correctly enabled in OMS
-        boolean overlayEnabled = mOverlayHelper.isOverlayEnabled(userId);
-
-        Slog.d(TAG,
-                "checkAndSignalReady for user " + userId + ": overlayEnabled=" + overlayEnabled);
-
-        // We trust the overlay manager's state. If the overlay is enabled, we are "ready"
-        // even if the resources haven't finished invalidating across all processes.
-        if (overlayEnabled) {
-            onThemingSystemReady();
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Marks the theming system as ready and notifies the Window Manager to proceed with
-     * the boot sequence if it was waiting for themes to be applied.
-     */
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    public void onThemingSystemReady() {
-        if (mIsThemeReady) return;
-        mIsThemeReady = true;
+        // 6. Log completion (listeners registered in onBootPhase)
         Slog.i(TAG, "Theming system initialization complete.");
+
+        return true;
     }
 
     /**
@@ -540,21 +490,6 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
                 settings.colorSource())) {
             List<Integer> seedColors = mWallpaperManager.getSeedColors(colors, true);
             mStateManager.onSeedColorChange(userId, seedColors, fromForegroundApp);
-
-            // Persist the new seed colors to settings if they have changed.
-            // This ensures getThemeSettings() returns the accurate current color.
-            List<Color> newColors = seedColors.stream().map(Color::valueOf).toList();
-            ThemeSettings newSettings = new ThemeSettings.Builder()
-                    .setThemeStyle(settings.themeStyle())
-                    .setColorSource(settings.colorSource())
-                    .setSeedColors(newColors)
-                    .build();
-
-            if (!settings.equals(newSettings)) {
-                if (mThemeSettingsManager.setSettings(userId, resolver, newSettings)) {
-                    notifySettingsChange(userId, settings, newSettings);
-                }
-            }
         }
     }
 

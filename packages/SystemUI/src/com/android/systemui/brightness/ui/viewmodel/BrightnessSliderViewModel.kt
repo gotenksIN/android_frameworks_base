@@ -31,7 +31,8 @@ import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.asIcon
 import com.android.systemui.graphics.ImageLoader
 import com.android.systemui.haptics.slider.compose.ui.SliderHapticsViewModel
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.res.R
 import com.android.systemui.settings.brightness.ui.BrightnessWarningToast
 import com.android.systemui.util.policy.PolicyRestriction
@@ -62,7 +63,7 @@ constructor(
     @Assisted val supportsMirroring: Boolean,
     private val brightnessWarningToast: BrightnessWarningToast,
     private val imageLoader: ImageLoader,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
 
     init {
         if (supportsMirroring) {
@@ -71,8 +72,14 @@ constructor(
         }
     }
 
+    private val hydrator = Hydrator("BrightnessSliderViewModel.hydrator")
+
     val currentBrightness by
-        screenBrightnessInteractor.gammaBrightness.hydratedStateOf(initialValue)
+        hydrator.hydratedStateOf(
+            "currentBrightness",
+            initialValue,
+            screenBrightnessInteractor.gammaBrightness,
+        )
 
     val maxBrightness = screenBrightnessInteractor.maxGammaBrightness
     val minBrightness = screenBrightnessInteractor.minGammaBrightness
@@ -126,12 +133,18 @@ constructor(
     }
 
     val showMirror by
-        if (supportsMirroring) {
+        hydrator.hydratedStateOf(
+            "showMirror",
+            if (supportsMirroring) {
                 brightnessMirrorShowingInteractorLazy.get().isShowing
             } else {
                 MutableStateFlow(false)
-            }
-            .hydratedStateOf()
+            },
+        )
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

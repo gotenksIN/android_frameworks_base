@@ -43,6 +43,7 @@ import dagger.multibindings.IntoMap
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -80,11 +81,12 @@ constructor(
         backgroundScope.launch { activate() }
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
             launch { hydrateRepository() }
             launch { showTooltipsAsNeeded() }
         }
+        awaitCancellation()
     }
 
     fun recordNotificationsShadeTooltipImpression() {

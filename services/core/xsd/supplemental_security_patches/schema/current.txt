@@ -1,5 +1,4 @@
-// Signature format: 6.0
-// - style=java
+// Signature format: 2.0
 package android.security.patches {
 
   public class SecurityPatches {

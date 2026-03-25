@@ -571,7 +571,6 @@ class AppErrors {
         // subreason (like EXCESSIVE_ENQUEUED_BROADCASTS_COUNT) that was set previously.
         if (subReason != SUBREASON_UNKNOWN) {
             proc.mErrorState.setPendingCrashSubReason(subReason);
-            proc.mErrorState.setPendingCrashDescription(message);
         }
         proc.scheduleCrashLocked(message, exceptionTypeId, extras, subReason);
         if (force) {
@@ -645,13 +644,12 @@ class AppErrors {
                     PackageWatchdog.FAILURE_REASON_APP_CRASH);
 
             synchronized (mService) {
-                final String pendingCrashDescription = r.mErrorState.getPendingCrashDescription();
                 mService.mProcessList.noteAppKill(r, (crashInfo != null
                           && "Native crash".equals(crashInfo.exceptionClassName))
                           ? ApplicationExitInfo.REASON_CRASH_NATIVE
                           : ApplicationExitInfo.REASON_CRASH,
                           r.mErrorState.getPendingCrashSubReason(),
-                          pendingCrashDescription != null ? pendingCrashDescription : "crash");
+                        "crash");
             }
         }
 
@@ -979,11 +977,10 @@ class AppErrors {
                 // Don't let services in this process be restarted and potentially
                 // annoy the user repeatedly.  Unless it is persistent, since those
                 // processes run critical code.
-                final String pendingCrashDescription = app.mErrorState.getPendingCrashDescription();
                 mService.mProcessList.removeProcessLocked(app, false, tryAgain,
                         ApplicationExitInfo.REASON_CRASH,
                         app.mErrorState.getPendingCrashSubReason(),
-                        pendingCrashDescription != null ? pendingCrashDescription : "crash");
+                        "crash");
                 mService.mAtmInternal.resumeTopActivities(false /* scheduleIdle */);
                 if (!showBackground) {
                     return false;

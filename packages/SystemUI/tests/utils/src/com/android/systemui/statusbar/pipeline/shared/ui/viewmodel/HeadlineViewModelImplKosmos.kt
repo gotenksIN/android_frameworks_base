@@ -16,18 +16,10 @@
 
 package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
 
-import android.content.testableContext
 import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.statusbar.notification.icon.ui.viewbinder.connectedDisplaysStatusBarNotificationIconViewStoreFactory
 
 val Kosmos.headlineViewModelImpl: HeadlineViewModelImpl by
-    Kosmos.Fixture {
-        HeadlineViewModelImpl(
-            testableContext.displayId,
-            headlineItemsAdapter,
-            connectedDisplaysStatusBarNotificationIconViewStoreFactory,
-        )
-    }
+    Kosmos.Fixture { HeadlineViewModelImpl(headlineItemsAdapter) }
 
 val Kosmos.headlineViewModelImplFactory: HeadlineViewModelImpl.Factory by
     Kosmos.Fixture {

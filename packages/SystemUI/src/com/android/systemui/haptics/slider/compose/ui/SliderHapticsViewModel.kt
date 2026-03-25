@@ -38,6 +38,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlin.math.abs
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 
 class SliderHapticsViewModel
@@ -85,21 +87,31 @@ constructor(
         )
     private var sliderTracker: SliderStateTracker? = null
 
-    val isRunning: Boolean
-        get() = isActive
+    private var trackerJob: Job? = null
 
-    override suspend fun onActivated() {
+    val isRunning: Boolean
+        get() = trackerJob?.isActive == true && sliderTracker?.isTracking == true
+
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
-            launch("SliderHapticsViewModel#SliderStateTracker") {
-                sliderTracker =
-                    SliderStateTracker(
-                        sliderHapticFeedbackProvider,
-                        sliderStateProducer,
-                        this,
-                        sliderTrackerConfig,
-                    )
-                sliderTracker?.startTracking()
-            }
+            trackerJob =
+                launch("SliderHapticsViewModel#SliderStateTracker") {
+                    try {
+                        sliderTracker =
+                            SliderStateTracker(
+                                sliderHapticFeedbackProvider,
+                                sliderStateProducer,
+                                this,
+                                sliderTrackerConfig,
+                            )
+                        sliderTracker?.startTracking()
+                        awaitCancellation()
+                    } finally {
+                        sliderTracker?.stopTracking()
+                        sliderTracker = null
+                        velocityTracker.resetTracking()
+                    }
+                }
 
             launch("SliderHapticsViewModel#InteractionSource") {
                 interactionSource.interactions.collect { interaction ->
@@ -109,13 +121,8 @@ constructor(
                     }
                 }
             }
+            awaitCancellation()
         }
-    }
-
-    override suspend fun onDeactivated() {
-        sliderTracker?.stopTracking()
-        sliderTracker = null
-        velocityTracker.resetTracking()
     }
 
     /**

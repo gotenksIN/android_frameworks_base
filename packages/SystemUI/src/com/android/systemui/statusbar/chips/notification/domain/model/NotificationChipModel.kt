@@ -43,6 +43,4 @@ data class NotificationChipModel(
     val lastAppVisibleTime: Long?,
     /** An optional per-notification ID used for logging. */
     val instanceId: InstanceId?,
-    /** Notification claims to represent the app's active screenshare */
-    val isScreenShareNotification: Boolean,
 )

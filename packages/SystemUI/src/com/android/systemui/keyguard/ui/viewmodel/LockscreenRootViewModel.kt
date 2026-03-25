@@ -16,14 +16,17 @@
 
 package com.android.systemui.keyguard.ui.viewmodel
 
+import androidx.compose.runtime.getValue
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryBypassInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 
 class LockscreenRootViewModel
@@ -35,21 +38,38 @@ constructor(
     deviceEntryUdfpsInteractor: DeviceEntryUdfpsInteractor,
     private val burnInMovementFactory: BurnInMovementState.Factory,
     private val wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+    private val hydrator = Hydrator("LockscreenRootViewModel.hydrator")
     val burnIn: BurnInMovementState = burnInMovementFactory.create()
 
     /** @see ShadeModeInteractor.isFullWidthShade */
-    val isFullWidthShade: Boolean by shadeModeInteractor.isFullWidthShade.hydratedStateOf()
+    val isFullWidthShade: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isFullWidthShade",
+            source = shadeModeInteractor.isFullWidthShade,
+        )
 
     /** @see DeviceEntryBypassInteractor.isBypassEnabled */
-    val isBypassEnabled: Boolean by deviceEntryBypassInteractor.isBypassEnabled.hydratedStateOf()
+    val isBypassEnabled: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isBypassEnabled",
+            source = deviceEntryBypassInteractor.isBypassEnabled,
+        )
 
     /** Whether udfps is supported. */
     val isUdfpsSupported: Boolean by
-        deviceEntryUdfpsInteractor.isUdfpsSupported.hydratedStateOf()
+        hydrator.hydratedStateOf(
+            traceName = "isUdfpsSupported",
+            source = deviceEntryUdfpsInteractor.isUdfpsSupported,
+            initialValue = deviceEntryUdfpsInteractor.isUdfpsSupported.value,
+        )
 
-    override suspend fun onActivated() {
-        coroutineScope { launch("BurnIn") { burnIn.activate() } }
+    override suspend fun onActivated(): Nothing {
+        coroutineScope {
+            launch { hydrator.activate() }
+            launch("BurnIn") { burnIn.activate() }
+            awaitCancellation()
+        }
     }
 
     fun setMediaPlayerBottom(bottom: Float) {

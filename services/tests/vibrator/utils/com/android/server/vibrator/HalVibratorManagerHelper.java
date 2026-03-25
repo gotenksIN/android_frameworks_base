@@ -794,8 +794,7 @@ public class HalVibratorManagerHelper {
         @Override
         public void clearSessions() throws RemoteException {
             mClearSessionsCount++;
-            if (!hasCapability(IVibratorManager.CAP_START_SESSIONS) && !hasCapability(
-                    IVibratorManager.CAP_HAPTIC_GENERATOR)) {
+            if (!hasCapability(IVibratorManager.CAP_START_SESSIONS)) {
                 throw new UnsupportedOperationException();
             }
             endLastSessionAbruptly();

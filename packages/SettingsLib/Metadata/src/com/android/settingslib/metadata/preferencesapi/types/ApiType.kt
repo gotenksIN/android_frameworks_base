@@ -19,12 +19,11 @@ package com.android.settingslib.metadata.preferencesapi.types
 import android.content.Context
 import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.ValidatedKeyParameters
-import com.android.settingslib.metadata.preferencesapi.types.EType
 
 /**
  * A type that can be used to define the type of a preference or parameter.
  */
-interface ApiType<InternalType, ExternalType : Any> {
+interface ApiType<InternalType, ExternalType> {
 
     /**
      * Returns the schema for the parameters of the type.
@@ -35,12 +34,10 @@ interface ApiType<InternalType, ExternalType : Any> {
     fun getParametersSchema(): KeyParametersSchema? = null
     fun getParameters(): ValidatedKeyParameters? = null
 
-    val externalType: EType<ExternalType>
-
     /**
      * Returns the type of the preference.
      */
-    fun getType(): Class<ExternalType> = externalType.clazz
+    fun getType(): Class<ExternalType>
 
     /**
      * Returns the description of the type.
@@ -57,11 +54,10 @@ interface ApiType<InternalType, ExternalType : Any> {
 
     fun convertInternalToExternal(internalValue: InternalType): ExternalType
     fun convertExternalToInternal(externalValue: ExternalType): InternalType
-    fun convertStringToInternal(value: String): InternalType = convertExternalToInternal(externalType.fromString(value))
 }
 
 /** ApiType for types which have the same internal and external type. */
-interface DirectApiType<ExternalType : Any> : ApiType<ExternalType, ExternalType> {
+interface DirectApiType<ExternalType> : ApiType<ExternalType, ExternalType> {
     override fun convertInternalToExternal(internalValue: ExternalType): ExternalType = internalValue
     override fun convertExternalToInternal(externalValue: ExternalType): ExternalType = externalValue
 }

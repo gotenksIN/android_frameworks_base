@@ -213,7 +213,7 @@ public final class DisplayManagerGlobal {
         }
 
         mDm = dm;
-        if (Process.myUid() == Process.SYSTEM_UID) {
+        if (Flags.displayInfoCopyOnWriteCacheEnabled() && Process.myUid() == Process.SYSTEM_UID) {
             mDmInternal = LocalServices.getService(DisplayManagerInternal.class);
         } else {
             mDmInternal = null;

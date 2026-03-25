@@ -16,7 +16,6 @@
 
 package com.android.systemui.screencapture.record.largescreen.ui.viewmodel
 
-import android.content.applicationContext
 import android.hardware.display.displayManager
 import com.android.internal.logging.uiEventLogger
 import com.android.systemui.kosmos.Kosmos
@@ -46,7 +45,6 @@ val Kosmos.preCaptureViewModelFactory by Fixture {
                 uiEventLogger = uiEventLogger,
                 toolbarViewModelFactory = preCaptureToolbarViewModelFactory,
                 appWindowInteractor = appWindowInteractor,
-                context = applicationContext,
             )
         }
     }

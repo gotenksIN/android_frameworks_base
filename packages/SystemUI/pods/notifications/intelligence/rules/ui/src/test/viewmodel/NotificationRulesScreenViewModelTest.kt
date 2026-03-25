@@ -29,7 +29,6 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.Action
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.DraftFilterModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.FilterModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.IncludedAppsModel
@@ -55,18 +54,16 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
             assertThat(underTest.currentScreen).isEqualTo(RulesScreenViewState.CurrentRules)
 
             val draftRule =
-                DraftRuleModel.PreExisting(
-                    id = 9,
+                DraftRuleModel(
+                    isNew = false,
                     action = ActionModel.Highlight,
-                    filter = DraftFilterModel(contacts = null, includedApps = null),
+                    contacts = null,
+                    includedApps = null,
                 )
 
             backStack.add(
                 RulesScreenViewState.EditRule(
-                    notificationRuleEditViewModelFactory.create(
-                        draftRule,
-                        onNavigateToCurrentRulesScreen = {},
-                    )
+                    notificationRuleEditViewModelFactory.create(draftRule)
                 )
             )
 

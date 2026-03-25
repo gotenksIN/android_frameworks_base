@@ -211,12 +211,8 @@ public final class ContactsPickerSessionContract {
      * session data.
      *
      * <p>Because a session URI projects data from {@link ContactsContract.Data}, clients can use
-     * the columns from {@link ContactsContract.Data} in their query projection and sort order,
-     * just as they would when querying {@link ContactsContract.Data} directly.
-     *
-     * <p>Clients are not expected to pass selection and selection arguments in this query, as the
-     * data is already selected by the human user. Throws {@link UnsupportedOperationException} when
-     * either selection or selection arguments are passed.
+     * the columns from {@link ContactsContract.Data} in their query projection, selection, and
+     * sort order, just as they would when querying {@link ContactsContract.Data} directly.
      */
     @FlaggedApi(Flags.FLAG_ENABLE_SYSTEM_CONTACTS_PICKER)
     public static final class Session implements BaseColumns {

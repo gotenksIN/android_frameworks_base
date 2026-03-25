@@ -218,7 +218,6 @@ fun ContentScope.ScrollingNotificationPanel(
     stackTopPadding: Dp,
     stackBottomPadding: () -> Dp,
     modifier: Modifier = Modifier,
-    aboveNotifications: @Composable (modifier: Modifier) -> Unit = {},
     shouldFillMaxHeight: Boolean = false,
     shouldIncludeHeadsUpSpace: Boolean = true,
     shouldDrawScrimBackground: Boolean = true,
@@ -278,7 +277,6 @@ fun ContentScope.ScrollingNotificationPanel(
         isTransparencyEnabled = isTransparencyEnabled,
         stackTopPadding = stackTopPadding,
         stackBottomPadding = stackBottomPadding,
-        aboveNotifications = aboveNotifications,
         shouldContentFillMaxSize = shouldFillMaxHeight,
         shouldScrimBackgroundFillMaxHeight = false,
         shouldDrawScrimBackground = shouldDrawScrimBackground,
@@ -309,7 +307,6 @@ fun ContentScope.NestedScrollingNotificationPanel(
     scrollingContentOverscrollEffect: OffsetOverscrollEffect,
     shortContentOverscrollEffect: OffsetOverscrollEffect,
     modifier: Modifier = Modifier,
-    aboveNotifications: @Composable (modifier: Modifier) -> Unit = {},
     shouldContentFillMaxSize: Boolean,
     shouldScrimBackgroundFillMaxHeight: Boolean,
     shouldIncludeHeadsUpSpace: Boolean = true,
@@ -370,7 +367,8 @@ fun ContentScope.NestedScrollingNotificationPanel(
         }
 
         // TalkBack sends a scroll event, when it wants to navigate to an item that is not displayed
-        // in the current viewport.
+        // in
+        // the current viewport.
         LaunchedEffect(viewModel) {
             viewModel.setAccessibilityScrollEventConsumer { event ->
                 // scroll up, or down by the height of the visible portion of the notification stack
@@ -418,8 +416,8 @@ fun ContentScope.NestedScrollingNotificationPanel(
     val expansionFraction by viewModel.expandFraction.collectAsStateWithLifecycle(0f)
     val screenHeight = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
 
-    /** Total vertical stack padding in pixels. */
-    val stackVerticalPaddingPx = {
+    /** Total horizontal stack padding in pixels. */
+    val stackHorizontalPaddingPx = {
         with(density) { (stackTopPadding + stackBottomPadding()).toPx() }.roundToInt()
     }
 
@@ -570,15 +568,13 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                 stackBoundsOnScreen.value = coordinates.boundsInWindow()
                             }
                 ) {
-                    // This is Media in disguise.
-                    aboveNotifications(Modifier.padding(bottom = 16.dp))
                     StackPlaceholder(
                         tag = "NestedScroll",
                         viewModel = viewModel,
                         modifier =
                             Modifier.notificationStackHeight(view = stackScrollView)
                                 .onSizeChanged { size ->
-                                    onStackHeightChanged(size.height + stackVerticalPaddingPx())
+                                    onStackHeightChanged(size.height + stackHorizontalPaddingPx())
                                 },
                     )
                     Spacer(

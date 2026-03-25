@@ -28,16 +28,12 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.SigningDetails;
 import android.content.pm.SignedPackage;
-import android.content.pm.UserInfo;
 import android.content.res.Resources.NotFoundException;
 import android.util.AtomicFile;
 import android.util.Log;
 import android.util.Slog;
-import android.os.Binder;
 import android.os.Environment;
 import android.os.Process;
-import android.os.UserHandle;
-import android.os.UserManager;
 import android.provider.DeviceConfig;
 
 import java.io.File;
@@ -82,8 +78,8 @@ public class MessagingReadRestrictionAllowlistMonitor
     private Allowlist mAllowlist = null;
 
     public MessagingReadRestrictionAllowlistMonitor(Context context) {
-        this(context, new File(context.getFilesDir(), READ_RESTRICTION_ALLOWLIST_FILE_NAME),
-            BackgroundThread.getExecutor());
+        this(context, new File(new File(Environment.getDataSystemDirectory(), TELEPHONY_DIR),
+             READ_RESTRICTION_ALLOWLIST_FILE_NAME), BackgroundThread.getExecutor());
     }
 
     @VisibleForTesting
@@ -229,9 +225,11 @@ public class MessagingReadRestrictionAllowlistMonitor
      * allowlist from DeviceConfig.
      */
     private static final class DeviceConfigAllowlist implements AllowlistProvider {
+        private final Context mContext;
         private final String mDeviceConfigKey;
 
         DeviceConfigAllowlist(@NonNull Context context, @NonNull String deviceConfigKey) {
+            mContext = context;
             mDeviceConfigKey = deviceConfigKey;
         }
 
@@ -268,16 +266,9 @@ public class MessagingReadRestrictionAllowlistMonitor
             Allowlist updatedAllowlist) {
         final PackageManager packageManager = context.getPackageManager();
         final AppOpsManager appOpsManager = context.getSystemService(AppOpsManager.class);
-        final UserManager userManager = context.getSystemService(UserManager.class);
-        final List<UserInfo> users = userManager.getUsers();
 
         List<AppOpChange> changes = storedAllowlist.getAppOpChanges(updatedAllowlist);
-
-        for (AppOpChange change : changes) {
-            for (UserInfo user : users) {
-                change.apply(packageManager, appOpsManager, user.id);
-            }
-        }
+        changes.forEach(change -> change.apply(packageManager, appOpsManager));
         return !changes.isEmpty();
     }
 
@@ -292,30 +283,42 @@ public class MessagingReadRestrictionAllowlistMonitor
     }
 
     @Nullable
-    private static ApplicationInfo getApplicationInfoAsUser(@Nullable String packageName,
-            @NonNull PackageManager packageManager, int userId) {
+    private static ApplicationInfo getApplicationInfo(@Nullable String packageName,
+            @NonNull PackageManager packageManager) {
+        if (packageName == null) {
+            return null;
+        }
         try {
-            return packageManager.getApplicationInfoAsUser(packageName,
-                    PackageManager.ApplicationInfoFlags.of(0), userId);
+            return packageManager.getApplicationInfo(packageName,
+                    PackageManager.ApplicationInfoFlags.of(0));
         } catch (PackageManager.NameNotFoundException e) {
-            Slog.e(TAG, "getApplicationInfoAsUser: Failed to fetch application info for "
+            Slog.e(TAG, "getApplicationInfo: Failed to fetch application info for "
                     + packageName);
             return null;
         }
     }
 
+    private static int getPackageUid(@NonNull String packageName,
+            @NonNull PackageManager packageManager) {
+        final ApplicationInfo applicationInfo = getApplicationInfo(packageName, packageManager);
+        if (applicationInfo == null) {
+            return Process.INVALID_UID;
+        }
+        return applicationInfo.uid;
+    }
+
     @Nullable
     private static SigningDetails getSigningDetails(@NonNull String packageName,
-            @NonNull PackageManager packageManager, int userId) {
+            @NonNull PackageManager packageManager) {
         try {
-            final PackageInfo packageInfo = packageManager.getPackageInfoAsUser(packageName,
-                    PackageManager.GET_SIGNING_CERTIFICATES, userId);
+            final PackageInfo packageInfo = packageManager.getPackageInfo(packageName,
+                    PackageManager.GET_SIGNING_CERTIFICATES);
             if (packageInfo == null || packageInfo.signingInfo == null) {
                 return null;
             }
             return packageInfo.signingInfo.getSigningDetails();
         } catch (PackageManager.NameNotFoundException e) {
-            Slog.e(TAG, "Failed to get package info for " + packageName);
+            Slog.e(TAG, "Failed to get package info for " + packageName, e);
         }
         return null;
     }
@@ -457,39 +460,33 @@ public class MessagingReadRestrictionAllowlistMonitor
     }
 
     record AppOpChange(@AppOpsManager.Mode int mode, AllowlistedPackage packageEntry) {
-        void apply(@NonNull PackageManager packageManager, @NonNull AppOpsManager appOpsManager,
-                int userId) {
-            final String packageName = packageEntry.packageName();
-
-            int uid;
-            try {
-                uid = packageManager.getPackageUidAsUser(packageName, userId);
-            } catch (PackageManager.NameNotFoundException e) {
-                Slog.v(TAG, "No package " + packageName + "found for userId " + userId);
-                return;
-            }
-
+        void apply(@NonNull PackageManager packageManager, @NonNull AppOpsManager appOpsManager) {
             if (mode == AppOpsManager.MODE_DEFAULT) {
-                Slog.v(TAG, "Setting AppOp mode to default for " + packageName + " userId: "
-                    + userId);
-                setAppOpMode(appOpsManager, packageName, uid, mode);
+                final int uid = getPackageUid(packageEntry.packageName(), packageManager);
+                if (uid < 0) {
+                    return;
+                }
+                Slog.v(TAG, "Setting AppOp mode to default for " + packageEntry.packageName());
+                setAppOpMode(appOpsManager, packageEntry.packageName(), uid, mode);
             } else if (mode == AppOpsManager.MODE_ALLOWED) {
-                // Fetch ApplicationInfo for this user to check system app status
-                ApplicationInfo appInfo = getApplicationInfoAsUser(packageName, packageManager,
-                        userId);
-                if (appInfo == null) {
+                final ApplicationInfo applicationInfo = getApplicationInfo(
+                        packageEntry.packageName(), packageManager);
+                if (applicationInfo == null || applicationInfo.uid < 0) {
                     return;
                 }
-                SigningDetails signingDetails = getSigningDetails(packageName, packageManager,
-                        userId);
+                final int uid = applicationInfo.uid;
+                SigningDetails signingDetails = getSigningDetails(packageEntry.packageName(),
+                        packageManager);
+
                 if (signingDetails == null) {
+                    Slog.v(TAG, "signingDetails are not available.");
                     return;
                 }
+
                 if (packageSignatureMatches(packageEntry, signingDetails,
-                        isPreInstalledApp(appInfo))) {
-                    Slog.v(TAG, "Setting AppOp mode to allowed for " + packageName + ", userId: "
-                        + userId);
-                    setAppOpMode(appOpsManager, packageName, uid, mode);
+                        isPreInstalledApp(applicationInfo))) {
+                    Slog.v(TAG, "Setting AppOp mode to allowed for " + packageEntry.packageName());
+                    setAppOpMode(appOpsManager, packageEntry.packageName(), uid, mode);
                 }
             }
         }

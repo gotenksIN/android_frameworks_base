@@ -131,11 +131,4 @@ enum class DeviceEntryRestrictionReason {
      * Restriction: Only strong biometric authentication is allowed.
      */
     SecureLockDeviceStrongBiometricOnlyAuth,
-
-    /**
-     * Reason: User not unlocked since sign-out.
-     *
-     * Restriction: Only bouncer based device entry is allowed.
-     */
-    UserNotUnlockedSinceSignOut,
 }

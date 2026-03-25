@@ -23,6 +23,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.annotation.IntDef;
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
@@ -34,7 +35,6 @@ import android.graphics.Color;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.os.Trace;
@@ -524,18 +524,7 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
                 userId = UserHandle.USER_SYSTEM;
             }
 
-            final Drawable iconDrawable = statusBarIcon.icon.loadDrawableAsUser(context, userId);
-
-            // New in Android 17: look through an AdaptiveIconDrawable for a monochrome
-            // version to use in the status bar.
-            if (iconDrawable instanceof AdaptiveIconDrawable) {
-                final AdaptiveIconDrawable adaptive = (AdaptiveIconDrawable) iconDrawable;
-                final Drawable monochrome = adaptive.getMonochrome();
-                if (monochrome != null) {
-                    return monochrome;
-                }
-            }
-            return iconDrawable;
+            return statusBarIcon.icon.loadDrawableAsUser(context, userId);
         }
     }
 

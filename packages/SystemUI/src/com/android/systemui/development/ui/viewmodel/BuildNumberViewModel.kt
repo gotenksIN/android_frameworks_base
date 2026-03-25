@@ -19,9 +19,11 @@ package com.android.systemui.development.ui.viewmodel
 import androidx.compose.runtime.getValue
 import com.android.systemui.development.domain.interactor.BuildNumberInteractor
 import com.android.systemui.development.shared.model.BuildNumber
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -30,21 +32,29 @@ import kotlinx.coroutines.launch
 /** View model for UI that (optionally) shows the build number and copies it on long press. */
 class BuildNumberViewModel
 @AssistedInject
-constructor(private val buildNumberInteractor: BuildNumberInteractor) : HydratedActivatable() {
+constructor(private val buildNumberInteractor: BuildNumberInteractor) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("BuildNumberViewModel")
 
     private val copyRequests = Channel<Unit>()
 
-    val buildNumber: BuildNumber? by buildNumberInteractor.buildNumber.hydratedStateOf()
+    val buildNumber: BuildNumber? by
+        hydrator.hydratedStateOf(
+            traceName = "buildNumber",
+            source = buildNumberInteractor.buildNumber,
+        )
 
     fun onBuildNumberLongPress() {
         copyRequests.trySend(Unit)
     }
 
-    override suspend fun onActivated() {
+    override suspend fun onActivated(): Nothing {
         coroutineScope {
+            launch { hydrator.activate() }
             launch {
                 copyRequests.receiveAsFlow().collect { buildNumberInteractor.copyBuildNumber() }
             }
+            awaitCancellation()
         }
     }
 

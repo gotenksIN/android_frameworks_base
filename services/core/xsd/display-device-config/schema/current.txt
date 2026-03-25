@@ -1,5 +1,4 @@
-// Signature format: 6.0
-// - style=java
+// Signature format: 2.0
 package com.android.server.display.config {
 
   public class AutoBrightness {
@@ -216,7 +215,7 @@ package com.android.server.display.config {
 
   public class DisplayQuirks {
     ctor public DisplayQuirks();
-    method public java.util.List<String> getQuirk();
+    method public java.util.List<java.lang.String> getQuirk();
   }
 
   public class EvenDimmerMode {

@@ -133,6 +133,7 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
             return;
         }
 
+        mMenuController.updateMenuLayout(newBounds);
         mPipBoundsState.setBounds(newBounds);
     };
 
@@ -258,7 +259,10 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
                 mPipBoundsState.setBounds(toBounds);
             } else {
                 mPipBoundsState.getMotionBoundsState().setBoundsInMotion(toBounds);
-                mPipTaskOrganizer.scheduleUserResizePip(getBounds(), toBounds, null);
+                mPipTaskOrganizer.scheduleUserResizePip(getBounds(), toBounds,
+                        (Rect newBounds) -> {
+                                mMenuController.updateMenuLayout(newBounds);
+                        });
             }
         } else {
             // If PIP is 'catching up' after being stuck in the dismiss target, update the animation

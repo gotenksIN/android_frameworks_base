@@ -76,7 +76,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.OperationCanceledException;
 import android.os.RemoteException;
-import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -2254,13 +2253,9 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             return false;
         }
 
-        // Create a copy of the placeholder intent so that we can add special extras to it
-        Intent placeholderActivityIntent = new Intent(placeholderRule.getPlaceholderIntent());
-        placeholderActivityIntent.putExtra(Intent.EXTRA_START_TIME, SystemClock.elapsedRealtime());
-
         // TODO(b/190433398): Handle failed request
         final Bundle options = getPlaceholderOptions(activity, isOnCreated);
-        startActivityToSide(wct, activity, placeholderActivityIntent, options,
+        startActivityToSide(wct, activity, placeholderRule.getPlaceholderIntent(), options,
                 placeholderRule, splitAttributes, null /* failureCallback */,
                 true /* isPlaceholder */);
         return true;

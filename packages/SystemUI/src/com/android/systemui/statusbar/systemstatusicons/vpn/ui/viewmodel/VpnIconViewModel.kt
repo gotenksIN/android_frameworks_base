@@ -20,7 +20,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.vpn.domain.interactor.VpnInteractor
 import com.android.systemui.statusbar.policy.vpn.shared.model.VpnState
@@ -32,12 +33,14 @@ import dagger.assisted.AssistedInject
 class VpnIconViewModel
 @AssistedInject
 constructor(@Assisted private val context: Context, interactor: VpnInteractor) :
-    SystemStatusIconViewModel.Default, HydratedActivatable() {
+    SystemStatusIconViewModel.Default, ExclusiveActivatable() {
+    val hydrator = Hydrator(traceName = "VpnIconViewModel.hydrator")
 
     private val vpnState by
-        interactor.vpnState.hydratedStateOf(
+        hydrator.hydratedStateOf(
             traceName = "SystemStatus.vpnState",
             initialValue = VpnState(),
+            source = interactor.vpnState,
         )
 
     override val slotName = context.getString(com.android.internal.R.string.status_bar_vpn)
@@ -71,6 +74,10 @@ constructor(@Assisted private val context: Context, interactor: VpnInteractor) :
             resId = res,
             contentDescription = ContentDescription.Resource(R.string.accessibility_vpn_on),
         )
+    }
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
     }
 
     @AssistedFactory

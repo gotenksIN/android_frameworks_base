@@ -77,7 +77,6 @@ import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.zIndex
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.common.ui.compose.gestures.dragSpy
-import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.qs.flags.QsEditModeFocusFixes
 import com.android.systemui.qs.flags.QsEditModeHoverFixes
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.InactiveTileCornerRadius
@@ -146,8 +145,8 @@ fun InteractiveTileContainer(
         content()
 
         /**
-         * We need to hide the decoration if there is none this prevents the decoration from
-         * blocking a hover/click of the tile
+         * We need to hide the decoration if there is none
+         * this prevents the decoration from blocking a hover/click of the tile
          */
         if (!QsEditModeHoverFixes.isEnabled || tileState.decoration() !is NoDecoration) {
             MinimumInteractiveSizeComponent(
@@ -157,7 +156,6 @@ fun InteractiveTileContainer(
                 isClickable = isClickable,
                 onClick = onClick,
                 rippleRadius = tileState.decoration().rippleRadius,
-                modifier = Modifier.sysuiResTag("EditTileDecoration"),
             ) {
                 Box(
                     Modifier.fillMaxSize()
@@ -258,7 +256,7 @@ fun StaticTileBadge(
         angle = { BADGE_ANGLE_RAD },
         offset = { offset },
         modifier =
-            modifier.sysuiResTag("EditTileDecoration").thenIf(QsEditModeFocusFixes.isEnabled) {
+            modifier.thenIf(QsEditModeFocusFixes.isEnabled) {
                 Modifier.focusProperties { canFocus = false }
             },
         isClickable = enabled,

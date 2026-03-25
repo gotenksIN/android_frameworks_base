@@ -61,8 +61,7 @@ public:
 
     void computeCurrentTransform(Matrix4* outMatrix) const;
 
-    SkRect computeClipAndTransform(const SkRect& bounds, Matrix4* outMatrix,
-                                   bool* disableClip) const;
+    SkRect computeClipAndTransform(const SkRect& bounds, Matrix4* outMatrix) const;
 
     void finish(SkRect* totalDirty);
 

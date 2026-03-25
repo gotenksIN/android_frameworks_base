@@ -19,7 +19,8 @@ package com.android.systemui.keyguard.ui.viewmodel
 import androidx.compose.runtime.getValue
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryBypassInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
-import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
 import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
 import com.android.systemui.media.remedia.ui.viewmodel.MediaCarouselVisibility
@@ -40,7 +41,9 @@ constructor(
     private val keyguardInteractor: KeyguardInteractor,
     shadeModeInteractor: ShadeModeInteractor,
     deviceEntryBypassInteractor: DeviceEntryBypassInteractor,
-) : HydratedActivatable() {
+) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("KeyguardMediaViewModel.hydrator")
 
     private val isMediaVisibleFlow: Flow<Boolean> =
         combine(
@@ -53,11 +56,18 @@ constructor(
             .distinctUntilChanged()
 
     /** Whether the media notification can be visible on keyguard. */
-    val isMediaVisible: Boolean by isMediaVisibleFlow.hydratedStateOf(initialValue = false)
+    val isMediaVisible: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isMediaVisible",
+            initialValue = false,
+            source = isMediaVisibleFlow,
+        )
 
-    val shadeMode: ShadeMode by shadeModeInteractor.shadeMode.hydratedStateOf()
+    val shadeMode: ShadeMode by
+        hydrator.hydratedStateOf(traceName = "shadeMode", source = shadeModeInteractor.shadeMode)
 
-    val isDozing: Boolean by keyguardInteractor.isDozing.hydratedStateOf()
+    val isDozing: Boolean by
+        hydrator.hydratedStateOf(traceName = "isDozing", source = keyguardInteractor.isDozing)
 
     fun onSwipeToDismiss() = mediaCarouselInteractor.onSwipeToDismiss()
 
@@ -67,6 +77,10 @@ constructor(
             isCarouselScrollingEnabled = true,
             carouselVisibility = MediaCarouselVisibility.WhenAnyCardIsActive,
         )
+
+    override suspend fun onActivated(): Nothing {
+        hydrator.activate()
+    }
 
     @AssistedFactory
     interface Factory {

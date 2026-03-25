@@ -20,7 +20,6 @@ import static android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_A
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
-import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.wm.shell.bubbles.util.BubbleUtils.getEnterBubbleTransaction;
 import static com.android.wm.shell.bubbles.util.BubbleUtils.getExitBubbleTransaction;
@@ -127,15 +126,11 @@ public class BubbleTaskViewListener implements TaskView.Listener {
             try {
                 final WindowContainerToken rootToken =
                         mExpandedViewManager.getBubbleHelper().getAppBubbleRootTaskToken();
-                if (rootToken == null || mBubble.isChat()) {
+                if (rootToken == null) {
                     options.setTaskAlwaysOnTop(true /* alwaysOnTop */);
                 }
                 options.setPendingIntentBackgroundActivityStartMode(
                         MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
-                // Force the bubble to launch on the main display.
-                if (Flags.launchBubbleOnMainDisplay()) {
-                    options.setLaunchDisplayId(DEFAULT_DISPLAY);
-                }
                 final boolean isShortcutBubble = (mBubble.hasMetadataShortcutId()
                         || (mBubble.isShortcut()
                         && BubbleFlagHelper.enableCreateAnyBubble()));

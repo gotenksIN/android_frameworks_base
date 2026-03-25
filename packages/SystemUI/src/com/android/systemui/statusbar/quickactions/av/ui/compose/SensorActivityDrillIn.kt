@@ -26,9 +26,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -39,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +65,7 @@ fun SensorActivityDrillIn(
 
     DrillIn(
         drillInTitle = stringResource(R.string.av_panel_title),
+        subtitle = stringResource(R.string.sensor_activity_header),
         returnToMainPage = { setCurrentPage(PageType.MAIN) },
         modifier = modifier,
     ) {
@@ -75,14 +74,6 @@ fun SensorActivityDrillIn(
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
             modifier = modifier,
         ) {
-            Text(
-                text = stringResource(R.string.sensor_activity_header),
-                modifier = Modifier.height(32.dp).width(256.dp),
-                style = typography.labelMedium,
-                textAlign = TextAlign.Center,
-                color = colorScheme.onSurfaceVariant,
-            )
-
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.Top),
@@ -114,7 +105,7 @@ fun SensorActivityDrillIn(
                         text = stringResource(R.string.sensor_activity_see_all_access_button),
                         textAlign = TextAlign.Center,
                         style =
-                            MaterialTheme.typography.labelMedium.copy(
+                            typography.labelMedium.copy(
                                 fontWeight = FontWeight.ExtraBold
                             ),
                         color = colorScheme.onSurface,
@@ -123,6 +114,8 @@ fun SensorActivityDrillIn(
                 },
                 modifier =
                     Modifier.clip(shape = RoundedCornerShape(size = 1000.dp)) // Make it a circle
+                        .width(348.dp)
+                        .height(36.dp)
                         .clickable(onClick = { viewModel.openPrivacyDashboard() }),
                 colors =
                     ListItemDefaults.colors()
@@ -171,8 +164,7 @@ private fun AppDetailItem(
         headlineContent = {
             Text(
                 text = appName,
-                style =
-                    MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                style = MaterialTheme.typography.titleSmallEmphasized,
                 color = colorScheme.onSurface,
             )
         },
@@ -216,32 +208,32 @@ private fun SupportingContent(
             val hasMicrophone = sensors.contains(Sensor.MICROPHONE)
             if (hasCamera) {
                 Icon(
-                    imageVector = Icons.Filled.Videocam,
+                    painter = painterResource(id = R.drawable.av_controls_chip_camera),
                     contentDescription = null,
                     tint = colorScheme.onSurface,
                 )
                 Text(
                     text = stringResource(R.string.sensor_activity_camera_label),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = typography.bodySmall,
                     color = colorScheme.onSurfaceVariant,
                 )
             }
             if (hasCamera && hasMicrophone) {
                 Text(
                     text = "•",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = typography.bodySmall,
                     color = colorScheme.onSurfaceVariant,
                 )
             }
             if (hasMicrophone) {
                 Icon(
-                    imageVector = Icons.Filled.Mic,
+                    painter = painterResource(id = R.drawable.av_controls_chip_mic),
                     contentDescription = null,
                     tint = colorScheme.onSurface,
                 )
                 Text(
                     text = stringResource(R.string.sensor_activity_microphone_label),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = typography.bodySmall,
                     color = colorScheme.onSurfaceVariant,
                 )
             }
@@ -252,13 +244,13 @@ private fun SupportingContent(
         ) {
             Text(
                 text = stringResource(R.string.sensor_activity_manage_access_button),
-                style = typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                style = typography.titleSmallEmphasized,
                 color = colorScheme.primary,
                 modifier = Modifier.clickable(onClick = { viewModel.manageApp(packageName) }),
             )
             Text(
                 text = stringResource(R.string.sensor_activity_close_app_button),
-                style = typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                style = typography.titleSmallEmphasized,
                 color = colorScheme.primary,
                 modifier = Modifier.clickable(onClick = { viewModel.closeApp(packageName) }),
             )

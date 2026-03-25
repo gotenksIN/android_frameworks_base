@@ -3474,7 +3474,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
             if (physicalDisplayChanged) {
                 mDisplayPolicy.physicalDisplayUpdated();
-                mDisplayUpdater.onDisplayContentDisplayPropertiesPostChanged();
+                if (Flags.syncedDisplayModeUpdates()) {
+                    if (mDisplayContent.isDefaultDisplay) {
+                        mWmService.mRoot.mDisplayUnblocker
+                                .onDefaultDisplayContentDisplayPropertiesPostChanged();
+                    }
+                } else {
+                    mDisplayUpdater.onDisplayContentDisplayPropertiesPostChanged();
+                }
             }
         }
     }
@@ -5508,9 +5515,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         // If we are turning on the screen after the boot is completed normally, don't do so until
         // we have the application and wallpaper.
-        if (mWmService.mSystemBooted
-                && ((!haveApp && !haveKeyguard) || (wallpaperEnabled && !haveWallpaper))) {
-            return true;
+        if (mWmService.mSystemBooted) {
+            if (!haveApp && !haveKeyguard) {
+                return true;
+            }
+
+            if (wallpaperEnabled && !haveWallpaper) {
+                return true;
+            }
+
+            if (!mWmService.mThemeReady) {
+                return true;
+            }
         }
 
         return false;

@@ -41,7 +41,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.android.internal.util.MemInfoReader;
 import com.android.server.am.MemoryLimiter.Configuration;
 import com.android.server.am.MemoryLimiter.Limits;
 
@@ -60,6 +59,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -96,6 +96,11 @@ public class MemoryLimiterTest {
     // The location of data files on the device.
     private static final String DATA_DIR = "/data/local/tmp/cts/memorylimiter/";
 
+    // Return the path to a data file.
+    private static String dataFile(String file) {
+        return DATA_DIR + file;
+    }
+
     // The UID of the test application.  This can change every time the package is installed but
     // should not change for the duration of the test.
     private int mUid;
@@ -111,8 +116,9 @@ public class MemoryLimiterTest {
         return null;
     }
 
-    // A convenience constant: 1MB.
-    static final int MEG = 1024 * 1024;
+    // Two convenience constants, 1MB and 1GB, and a function to express GB as MB.
+    static final long MB = 1024L * 1024;
+    static final long GB = 1024L * MB;
 
     // The mapping between process states and sizes is arbitrary.  Constants are declared to
     // make it more obvious in the test routine just what the memory limit will be.
@@ -124,22 +130,19 @@ public class MemoryLimiterTest {
     private static final int PROCESS_STATE_MAX = ActivityManager.PROCESS_STATE_TOP;
 
     // The memory assigned to a process in PROCESS_STATE_10M.
-    private static final Long sProcessMemory10M = (long) (10 * MEG);
+    private static final Long sProcessMemory10M = (long) (10 * MB);
 
     // The memory assigned to a process in PROCESS_STATE_100M.
-    private static final Long sProcessMemory100M = (long) (100 * MEG);
+    private static final Long sProcessMemory100M = (long) (100 * MB);
 
     // The memory assigned to a process in PROCESS_STATE_MAX.  Any negative value turns into
     // maximum memory in the native handlers, but the test uses -1 for consistency.
     private static final Long sProcessMemoryMax = (long) (-1);
 
-    // The available system memory nad the system swap.
-    private static final long sSystemMemory = getMemTotal();
-
-    private static long getMemTotal() {
-        MemInfoReader memInfo = new MemInfoReader();
-        memInfo.readMemInfo();
-        return memInfo.getTotalSize();
+    // Return true if MemoryLimiter is running in system_server.
+    private static boolean isMemoryLimiterRunning() {
+        String response = shellCommand("am memory-limiter status");
+        return response.contains("enabled");
     }
 
     // An Injector for testing.
@@ -147,17 +150,34 @@ public class MemoryLimiterTest {
 
         private final String mConfigFile;
 
+        private final boolean mLimitMode;
+
+        TestInjector(String config, boolean limitMode) {
+            mConfigFile = (config != null) ? dataFile(config) : super.configFile();
+            mLimitMode = limitMode;
+        }
+
         TestInjector(String config) {
-            mConfigFile = (config != null) ? DATA_DIR + config : super.configFile();
+            this(config, true);
         }
 
         TestInjector() {
-            this(null);
+            this("config-testing.xml");
         }
 
         @Override
         boolean isMonitoringEnabled() {
             return true;
+        }
+
+        @Override
+        boolean isSwapMonitoringEnabled() {
+            return true;
+        }
+
+        @Override
+        boolean limitMode() {
+            return mLimitMode;
         }
 
         @Override
@@ -187,17 +207,14 @@ public class MemoryLimiterTest {
         // The events received by this counter.
         final ArrayList<Event> mEvents = new ArrayList<>();
 
-        // The instance is created with the expected number of events.  Do not load any
-        // configuration file.
+        // The instance is created with the expected number of events.
         EventCounter(int expected) {
-            this(expected, null);
+            this(expected, true);
         }
 
-        // The instance is created with the expected number of events.  The supplied configuration
-        // file is parsed.  To simplify life, this method accepts the basename of the
-        // configuration file.  It quietly prepends the path component.
-        EventCounter(int expected, String config) {
-            super(new TestInjector(config));
+        // The instance is created with the expected number of events and the limit mode.
+        EventCounter(int expected, boolean limitMode) {
+            super(new TestInjector("config-testing.xml", limitMode));
             mLatch = new CountDownLatch(expected);
         }
 
@@ -224,21 +241,21 @@ public class MemoryLimiterTest {
             assertThat(event.pid).isEqualTo(helper.getPid());
             assertThat(event.uid).isEqualTo(helper.getUid());
             assertThat(event.limit).isEqualTo(limit);
+        }
 
-            // The computation of percent may have rounding errors, and this code is slightly
-            // different from the code in MemoryLimiter (by design).  The test therefore checks
-            // that the two values are within 1 of each other.
-            int ratio = Math.round((float) (((double) limit / (double) sSystemMemory) * 100));
-            assertThat(event.percent).isWithin(1).of(ratio);
+        // A tiny convenience function that creates a Limits object with three fields set to the
+        // same value.
+        private static Limits simpleLimits(long limit) {
+            return new Limits(limit, limit);
         }
 
         // Get the memory limit for the process state.  Use one of the process states above.
         @Override
         public Limits getStateLimit(@ProcessState int newState) {
             return switch (newState) {
-                case PROCESS_STATE_10M -> new Limits(sProcessMemory10M, sProcessMemory10M);
-                case PROCESS_STATE_100M -> new Limits(sProcessMemory100M, sProcessMemory100M);
-                case PROCESS_STATE_MAX -> new Limits(sProcessMemoryMax, sProcessMemoryMax);
+                case PROCESS_STATE_10M -> simpleLimits(sProcessMemory10M);
+                case PROCESS_STATE_100M -> simpleLimits(sProcessMemory100M);
+                case PROCESS_STATE_MAX -> simpleLimits(sProcessMemoryMax);
                 default -> {
                     fail("invalid state for testing: " + newState);
                     yield null;
@@ -380,14 +397,13 @@ public class MemoryLimiterTest {
         // UID.  The UID is specific to the helper package, so there is no impact to any other
         // functions on the system.  This must be done every time the helper app is started because
         // the cgroup path disappears if there are no processes with the UID.
-        long prepareCgroup() throws Exception {
+        void prepareCgroup() throws Exception {
             String path = String.format("/sys/fs/cgroup/apps/uid_%d", mUid);
             String r = shellCommand("chmod -R a+rw " + path);
             if (r != null && !r.trim().equals("")) {
                 Log.i(TAG, "unprotecting " + path + ": \"" + r + "\"");
                 fail("failed to prepare cgroup");
             }
-            return currentMemory();
         }
 
         // Return the path to the memcg file.  A null file returns the directory.
@@ -405,14 +421,22 @@ public class MemoryLimiterTest {
             return Files.exists(Paths.get(path));
         }
 
-        // Return the value from a cgroup file.  As a special case, this converts the string "max"
-        // to sProcessMemoryMax (aka, -1).
-        private long cgroupValue(String which) throws Exception {
+        // Return the contents of a cgroup file, as a string.
+        String cgroupData(String which) throws Exception {
+            // The system resets the protections of the memory.events file every time it
+            // changes.  Rerun the prepare operation to ensure the data can be read.
+            prepareCgroup();
             String path = cgroupFile(which);
             Path filePath = Paths.get(path);
 
             // Always specify the Charset, e.g., UTF_8.  This may throw: allow the test to fail.
-            String value = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+            return Files.readString(filePath, StandardCharsets.UTF_8).trim();
+        }
+
+        // Return the value from a cgroup file.  As a special case, this converts the string "max"
+        // to sProcessMemoryMax (aka, -1).
+        private long cgroupValue(String which) throws Exception {
+            String value = cgroupData(which);
 
             // The value can be the string "max"; if so, return -1.  Otherwise, the string must be
             // a valid integer.
@@ -440,14 +464,7 @@ public class MemoryLimiterTest {
 
         // Return the current value for high events.
         private long currentEvents() throws Exception {
-            String path = cgroupFile("memory.events");
-            Path filePath = Paths.get(path);
-
-            // The system resets the protections of the memory.events file every time it changes.
-            prepareCgroup();
-
-            // Always specify the Charset, e.g., UTF_8.  This may throw: allow the test to fail.
-            final String value = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+            final String value = cgroupData("memory.events");
 
             Matcher high = Pattern.compile("high (\\d+)").matcher(value);
             if (high.find()) {
@@ -519,6 +536,34 @@ public class MemoryLimiterTest {
                 // There should be exactly one event in the counter.
                 assertThat(counter.eventCount()).isEqualTo(1);
                 counter.expect(0, helper, sProcessMemory100M);
+
+                // Verify that limitMode is honored.
+                assertThat(helper.currentMemHigh()).isEqualTo(sProcessMemory100M);
+            }
+        }
+    }
+
+    @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
+    @Test
+    public void testLimiterSenseMode() throws Exception {
+        try (EventCounter counter = new EventCounter(1, false)) {
+            try (MemoryLimiter controller = new MemoryLimiter(counter)) {
+                MemoryLimiter.Limiter limiter = controller.newLimiter();
+
+                Helper helper = new Helper();
+                helper.attach(limiter);
+
+                // Set the limit, grow the app, and wait for the over-limit event.
+                limiter.onProcStateUpdated(PROCESS_STATE_100M);
+                helper.resize(100);
+                assertTrue(counter.await(10));
+
+                // There should be exactly one event in the counter.
+                assertThat(counter.eventCount()).isEqualTo(1);
+                counter.expect(0, helper, sProcessMemory100M);
+
+                // Verify that limitMode is honored.
+                assertThat(helper.currentMemHigh()).isEqualTo(sProcessMemoryMax);
             }
         }
     }
@@ -546,13 +591,13 @@ public class MemoryLimiterTest {
     }
 
     // Compare the two fields of a Configuration to the inputs.
-    private static void testConfig(Configuration cfg, int visible, int notVisible) {
-        assertThat(cfg.visible()).isEqualTo(visible);
-        assertThat(cfg.notVisible()).isEqualTo(notVisible);
+    private static void testConfig(Configuration cfg, long visible, long notVisible) {
+        assertThat(cfg.memVisible()).isEqualTo(visible);
+        assertThat(cfg.memNotVisible()).isEqualTo(notVisible);
     }
 
     private static void testConfig(Configuration cfg, Configuration ref) {
-        testConfig(cfg, ref.visible(), ref.notVisible());
+        testConfig(cfg, ref.memVisible(), ref.memNotVisible());
     }
 
     /**
@@ -579,7 +624,7 @@ public class MemoryLimiterTest {
                 assertThat(waitUntil(one, 4000)).isTrue();
                 assertThat(counter.stat("started")).isEqualTo(1);
                 assertThat(counter.stat("process-hwm")).isEqualTo(1);
-                assertThat(counter.stat("watched")).isEqualTo(1);
+                assertThat(counter.stat("watched")).isEqualTo(2);
 
                 helper.exit();
                 BooleanSupplier exit = () -> {
@@ -596,21 +641,9 @@ public class MemoryLimiterTest {
                 Log.i(TAG, counter.stats().toString());
                 assertThat(stats.get("started")).isEqualTo(1);
                 assertThat(stats.get("process-hwm")).isEqualTo(1);
-                assertThat(stats.get("watched")).isEqualTo(1);
+                assertThat(stats.get("watched")).isEqualTo(2);
                 assertThat(stats.get("processes")).isEqualTo(0);
             }
-        }
-    }
-
-    @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
-    @Test
-    public void testConfigDefaults() throws Exception {
-        // Fetch the default configuration and verify its fields.
-        Configuration cfg = MemoryLimiter.sDefaultConfig;
-        if (Flags.memoryLimiterDefaultAppLimits()) {
-            testConfig(cfg, 50, 25);
-        } else {
-            testConfig(cfg, 100, 100);
         }
     }
 
@@ -620,16 +653,20 @@ public class MemoryLimiterTest {
         Configuration cfg;
 
         // The default case.
-        cfg = MemoryLimiter.getConfiguration(null);
+        cfg = MemoryLimiter.getConfiguration(null, 0);
         testConfig(cfg, MemoryLimiter.sDefaultConfig);
 
         // A valid configuration file that specifies the defaults.
-        cfg = MemoryLimiter.getConfiguration(DATA_DIR + "config-default.xml");
-        testConfig(cfg, 40, 30);
+        cfg = MemoryLimiter.getConfiguration(dataFile("config-default.xml"), 10 * GB);
+        testConfig(cfg, 6 * GB, 3 * GB);
+        cfg = MemoryLimiter.getConfiguration(dataFile("config-default.xml"), 14 * GB);
+        testConfig(cfg, 8 * GB, 4 * GB);
+        cfg = MemoryLimiter.getConfiguration(dataFile("config-default.xml"), 8 * GB);
+        assertThat(cfg).isNull();
 
         // Parse an invalid XML file.  There must be an error.
         try {
-            cfg = MemoryLimiter.getConfiguration(DATA_DIR + "config-error.xml");
+            cfg = MemoryLimiter.getConfiguration(dataFile("config-error.xml"), 10 * GB);
             fail("failed to detect XML parse error");
         } catch (IllegalArgumentException e) {
             // Success.
@@ -646,6 +683,8 @@ public class MemoryLimiterTest {
             Flags.FLAG_MEMORY_LIMITER_DEFAULT_APP_LIMITS})
     @Test
     public void testOperation() throws Exception {
+        assumeTrue(isMemoryLimiterRunning());
+
         // Use the default "enabled" controller to fetch the limit.  There is no need for a full
         // MemoryLimiter.
         final Limits expectedLimit;
@@ -675,6 +714,25 @@ public class MemoryLimiterTest {
             Thread.sleep(200);
             assertThat(helper.currentSwapMax()).isEqualTo(sProcessMemoryMax);
         }
+
+        // Now test the manual shell command.  This goes through system_server so it cannot be done
+        // locally.  Set the limit to 975MB, which is unlikely to be confused with a valid from the
+        // currently running configuration file.
+        int limitInMB = 975;
+        shellCommand(String.format("am memory-limiter manual %d %d", helper.getPid(), limitInMB));
+        long expected = limitInMB * MB;
+        for (int i = 0; i < 100 && helper.currentMemHigh() != expected; i++) {
+            Thread.sleep(100); // Wait a bit before polling again.
+        }
+        assertThat(helper.currentMemHigh()).isEqualTo(expected);
+
+        if (Flags.memoryLimiterSwap()) {
+            // Poll until the limit is set by system_server.
+            for (int i = 0; i < 100 && helper.currentSwapMax() != expected; i++) {
+                Thread.sleep(100); // Wait a bit before polling again.
+            }
+            assertThat(helper.currentSwapMax()).isEqualTo(expected * MB);
+        }
     }
 
     /**
@@ -687,6 +745,8 @@ public class MemoryLimiterTest {
             Flags.FLAG_MEMORY_LIMITER_DEFAULT_APP_LIMITS})
     @Test
     public void testStatsdAtom() throws Exception {
+        assumeTrue(isMemoryLimiterRunning());
+
         // Start by enabling system_server control over the app.
         blockSystemLimiter(mUid, false);
 
@@ -796,6 +856,82 @@ public class MemoryLimiterTest {
                 assertThat(helper.currentMemHigh()).isEqualTo(sProcessMemoryMax);
             }
         }
+    }
+
+    /**
+     * A small helper function to cgroup data parsing for a helper.
+     */
+    private long[] testParsing(Helper helper, String which) throws Exception {
+        String data = helper.cgroupData(which);
+        long[] expected = MemoryLimiter.testParseCgroup(which, data);
+        return expected;
+    }
+
+    /**
+     * Verify the native cgroup file parsing routines.  The first set of tests verifies that
+     * fields are processed in order and return the expected values.
+     */
+    @Test
+    public void testCgroupParsing() throws Exception {
+        final String memEvents = """
+                                 low 1
+                                 high 3
+                                 max 5
+                                 oom 7
+                                 oom_kill 9
+                                 oom_group_kill 11
+                                 """;
+        {
+            long[] expected = {1, 3, 5, 7, 9, 11};
+            long[] parsed = MemoryLimiter.testParseCgroup("memory.events", memEvents);
+            assertThat(Arrays.equals(expected, parsed)).isTrue();
+        }
+
+        final String swapEvents = """
+                                  high 1
+                                  max 3
+                                  fail 5
+                                  """;
+        {
+            long[] expected = {1, 3, 5};
+            long[] parsed = MemoryLimiter.testParseCgroup("memory.swap.events", swapEvents);
+            assertThat(Arrays.equals(expected, parsed)).isTrue();
+        }
+
+        // Only the first two lines of memory.stat are parsed.  The source data includes three
+        // lines, just in case that affects the results.
+        final String memStats = """
+                                anon 113405952
+                                file 812163072
+                                kernel 5
+                                """;
+        {
+            long[] expected = {113405952, 812163072};
+            long[] parsed = MemoryLimiter.testParseCgroup("memory.stat", memStats);
+            assertThat(Arrays.equals(expected, parsed)).isTrue();
+        }
+
+        // Now, a negative test.  Verify that out-of-order fields are not parsed correctly.
+        // Look closely: "max" and "high" have changed position.
+        final String badEvents = """
+                                 low 1
+                                 max 5
+                                 high 3
+                                 oom 7
+                                 oom_kill 9
+                                 oom_group_kill 11
+                                 """;
+        {
+            long[] parsed = MemoryLimiter.testParseCgroup("memory.events", badEvents);
+            assertThat(parsed).isNull();
+        }
+
+        // Real-time tests: verify that the cgroup files returned from a running helper can be
+        // successfully parsed.
+        Helper helper = new Helper();
+        assertThat(testParsing(helper, "memory.events")).isNotNull();
+        assertThat(testParsing(helper, "memory.swap.events")).isNotNull();
+        assertThat(testParsing(helper, "memory.stat")).isNotNull();
     }
 
     static {

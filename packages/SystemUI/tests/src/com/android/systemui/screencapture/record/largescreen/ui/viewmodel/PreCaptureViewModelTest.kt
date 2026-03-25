@@ -43,6 +43,7 @@ import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.lifecycle.activateIn
+import com.android.systemui.res.R
 import com.android.systemui.screencapture.ScreenCaptureEvent
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters.Record.LargeScreenCaptureUiParameters
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiState
@@ -185,6 +186,59 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             assertThat(largeScreenCaptureParametersInteractor.getSelectedCaptureType())
                 .isEqualTo(ScreenCaptureType.RECORDING)
             assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.RECORDING)
+        }
+
+    @Test
+    fun disclaimer_shownWhenRecordingSelected() =
+        kosmos.runTest {
+            setupViewModel()
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.SCREENSHOT)
+            assertThat(viewModel.snackbarHostState.currentSnackbarData).isNull()
+
+            // Select APP_WINDOW recording (treated as single app message)
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+            viewModel.updateCaptureType(ScreenCaptureType.RECORDING)
+            runCurrent()
+
+            assertThat(viewModel.snackbarHostState.currentSnackbarData?.visuals?.message)
+                .isEqualTo(
+                    context.getString(R.string.screenrecord_permission_dialog_warning_single_app)
+                )
+        }
+
+    @Test
+    fun disclaimer_updatesWhenRecordingTargetChanges() =
+        kosmos.runTest {
+            setupViewModel()
+            viewModel.updateCaptureType(ScreenCaptureType.RECORDING)
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.FULLSCREEN)
+            runCurrent()
+
+            assertThat(viewModel.snackbarHostState.currentSnackbarData?.visuals?.message)
+                .isEqualTo(
+                    context.getString(R.string.screenrecord_permission_dialog_warning_entire_screen)
+                )
+
+            // Switch to APP_WINDOW while recording mode is still active
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+            runCurrent()
+
+            assertThat(viewModel.snackbarHostState.currentSnackbarData?.visuals?.message)
+                .isEqualTo(
+                    context.getString(R.string.screenrecord_permission_dialog_warning_single_app)
+                )
+        }
+
+    @Test
+    fun disclaimer_shownOnStartWhenRecordingDefault() =
+        kosmos.runTest {
+            setupViewModel(
+                LargeScreenCaptureUiParameters(defaultCaptureType = ScreenCaptureType.RECORDING)
+            )
+            runCurrent()
+
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.RECORDING)
+            assertThat(viewModel.snackbarHostState.currentSnackbarData).isNotNull()
         }
 
     @Test

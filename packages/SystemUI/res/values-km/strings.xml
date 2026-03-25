@@ -79,7 +79,6 @@
     <string name="wifi_debugging_allow" msgid="4573224609684957886">"អនុញ្ញាត"</string>
     <string name="wifi_debugging_secondary_user_title" msgid="2493201475880517725">"មិន​អនុញ្ញាត​ការជួសជុល​ដោយឥតខ្សែ​ទេ"</string>
     <string name="wifi_debugging_secondary_user_message" msgid="9085779370142222881">"អ្នក​ប្រើប្រាស់​ដែលបច្ចុប្បន្ន​បាន​ចូលគណនី​នៅលើ​ឧបករណ៍​នេះ​មិនអាច​បើក​ការជួសជុល​ដោយឥតខ្សែ​បានទេ។ ដើម្បី​ប្រើប្រាស់​មុខងារ​នេះ សូម​ប្ដូរ​ទៅ​អ្នកប្រើប្រាស់​ដែលជាអ្នកគ្រប់គ្រង។"</string>
-    <string name="change_connected_wifi_text" msgid="6346095920396568246">"អ្នកអាចផ្លាស់ប្ដូរការកំណត់នេះបាន នៅពេលចូលគណនី"</string>
     <string name="usb_contaminant_title" msgid="894052515034594113">"បានបិទរន្ធ USB"</string>
     <string name="usb_contaminant_message" msgid="7730476585174719805">"ដើម្បី​ការពារ​ឧបករណ៍​របស់អ្នកកុំឱ្យ​ចូលទឹក ឬ​កម្ទេចផ្សេងៗ រន្ធ USB ត្រូវបានបិទ ហើយ​នឹង​មិនស្គាល់​គ្រឿង​បរិក្ខារ​នោះទេ។\n\nអ្នកនឹង​ទទួលបាន​ការជូនដំណឺង នៅពេល​អ្នកអាច​ប្រើប្រាស់​រន្ធ USB ម្ដងទៀត។"</string>
     <string name="usb_port_enabled" msgid="531823867664717018">"បាន​បើក​រន្ធ USB ដើម្បី​សម្គាល់​ឆ្នាំងសាក និងគ្រឿងផ្សេងៗ"</string>
@@ -1836,6 +1835,7 @@
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"បន្ទាប់"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"រុក​រក​ទៅ​ទំព័រ​បន្ទាប់"</string>
     <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"ថយ​ក្រោយ"</string>
+    <string name="accessibility_close_overlay_box_description" msgid="8399871568780893724">"ថយក្រោយ"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"បំពេញស្វ័យប្រវត្តិ"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"ពង្រីក"</string>
     <string name="location_button_text_precise_location" msgid="4441259889842542799">"ទីតាំងជាក់លាក់"</string>
@@ -1861,25 +1861,18 @@
     <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"កែកុនរូបសម្រស់"</string>
     <string name="av_mic_label" msgid="5427348054144789879">"មីក្រូហ្វូន"</string>
     <string name="av_camera_label" msgid="7719772172590702343">"កាមេរ៉ា"</string>
-    <!-- no translation found for av_camera_blur_drill_in_title (3392789469292685354) -->
-    <skip />
+    <string name="av_camera_blur_drill_in_title" msgid="3392789469292685354">"ផ្ទៃ​ខាង​ក្រោយ​ព្រាល"</string>
     <string name="av_camera_blur_off" msgid="3170334995799202022">"បិទ"</string>
-    <!-- no translation found for av_camera_blur_light (5105255788203563538) -->
-    <skip />
-    <!-- no translation found for av_camera_blur_full (6493497965254048479) -->
-    <skip />
+    <string name="av_camera_blur_light" msgid="5105255788203563538">"ព្រាល​តិចៗ"</string>
+    <string name="av_camera_blur_full" msgid="6493497965254048479">"ព្រាល​ខ្លាំង"</string>
     <string name="av_camera_improve_lighting" msgid="1540549414296669133">"កែលម្អពន្លឺ"</string>
     <string name="av_camera_face_retouch" msgid="45890971969486224">"កែកុនរូបសម្រស់"</string>
-    <!-- no translation found for av_camera_framing (2948988841290208034) -->
-    <skip />
-    <!-- no translation found for av_studio_mic (1815195630183143501) -->
-    <skip />
-    <!-- no translation found for av_studio_look (631085505786989852) -->
-    <skip />
+    <string name="av_camera_framing" msgid="2948988841290208034">"ការរក្សាឱ្យនៅក្នុងកាមេរ៉ា"</string>
+    <string name="av_studio_mic" msgid="1815195630183143501">"សំឡេងស្ទូឌីយ៉ូ"</string>
+    <string name="av_studio_look" msgid="631085505786989852">"វីដេអូស្ទូឌីយ៉ូ"</string>
     <string name="av_studio_look_effects" msgid="4105109585851068415">"បែបផែន %d"</string>
     <string name="av_blur" msgid="405131343487260171">"ព្រាល"</string>
-    <!-- no translation found for av_live_captions (802763867449401889) -->
-    <skip />
+    <string name="av_live_captions" msgid="802763867449401889">"អក្សររត់ក្នុងពេលជាក់ស្ដែង"</string>
     <string name="av_drill_in_return_to_main" msgid="5273814393426741827">"ថយក្រោយ"</string>
     <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"ថ្ម %s"</string>
     <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"ថ្មខាងឆ្វេង %1$s    ថ្មខាងស្ដាំ %2$s"</string>
@@ -1893,4 +1886,11 @@
     <string name="dream_setup_title" msgid="7996530071414508238">"រៀបចំធាតុរក្សាអេក្រង់"</string>
     <string name="dream_setup_button_not_now" msgid="8028385323668620805">"កុំទាន់"</string>
     <string name="dream_setup_button_setup" msgid="4755361016017554826">"រៀបចំ"</string>
+    <string name="ace_attribution_dialog_settings_label" msgid="8898211593287114433">"ការកំណត់"</string>
+    <string name="ace_attribution_dialog_title" msgid="5236154464063969824">"ការ​ណែនាំពីតម្រុយវេទមន្ត"</string>
+    <string name="ace_attribution_dialog_description" msgid="1431906058759687758">"ចំណុចដែលបានពិចារណានៅក្នុងការណែនាំនេះ"</string>
+    <string name="ace_attribution_header_icon_accessibility_description" msgid="7385840112370423581">"រូបតំណាង Android Device Intelligence"</string>
+    <string name="ace_attribution_settings_button_accessibility_description" msgid="8426163772933746374">"ប៊ូតុងការកំណត់"</string>
+    <string name="ace_attribution_thumbs_up_button_accessibility_description" msgid="3561722934830934360">"ប៊ូតុងប្រតិកម្មដោយលើកមេដៃ"</string>
+    <string name="ace_attribution_thumbs_down_button_accessibility_description" msgid="5471283747650437662">"ប៊ូតុងប្រតិកម្មដោយឱ្យមេដៃ​ចុះ"</string>
 </resources>

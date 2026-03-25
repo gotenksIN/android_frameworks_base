@@ -732,7 +732,17 @@ flag {
 flag {
     name: "device_controller_role_api_enabled"
     is_exported: true
-    namespace: "device_controller_hsum"
+    namespace: "enterprise"
     description: "This flag enables the device controller role API"
     bug: "483629130"
+}
+
+flag {
+    name: "uri_grant_attribute_size_check_enabled"
+    namespace: "permissions"
+    description: "This flag enables the fix for URI grant persistence bypass."
+    bug: "262884935"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

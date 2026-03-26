@@ -29,9 +29,9 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.shade.domain.interactor.shadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 
-val Kosmos.statusBarVisibilityInteractor: StatusBarVisibilityInteractor by
+val Kosmos.homeStatusBarVisibilityInteractor: HomeStatusBarVisibilityInteractor by
     Kosmos.Fixture {
-        StatusBarVisibilityInteractor(
+        HomeStatusBarVisibilityInteractor(
             thisDisplayId = testableContext.displayId,
             homeStatusBarInteractor = homeStatusBarInteractor,
             bgDisplayScope = backgroundScope,

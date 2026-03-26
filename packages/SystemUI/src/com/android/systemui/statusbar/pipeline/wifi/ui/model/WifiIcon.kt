@@ -151,7 +151,9 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
             val isWifiStandardDisplaySupported = mIsWifiStandardDisplaySupported ?: false
 
 // QTI_END: 2024-06-20: WLAN: SystemUI: adding control to wifiStandard display feature
-            return if (this.showExclamation) {
+// QTI_BEGIN: 2026-03-30: WLAN: SystemUI: Fix showExclamation condition.
+            return if (!this.showExclamation) {
+// QTI_END: 2026-03-30: WLANL: SystemUI: Fix showExclamation condition.
 // QTI_BEGIN: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
                 val icon = when (wifiStandard) {
 // QTI_END: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.

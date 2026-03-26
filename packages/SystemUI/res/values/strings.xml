@@ -4792,6 +4792,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_generation_error_body" translatable="false">The rule could not be generated. Please try again.</string>
     <!-- Title for an error box explaining that a notification rule could not be saved. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_save_error" translatable="false">The rule could not be saved. Please try again.</string>
 
     <!-- Title for a button that will let users move to the next step of creating a new notification rule. [CHAR LIMIT=NONE]-->
@@ -4799,8 +4801,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_next" translatable="false">Next</string>
     <!-- Label for a button that will let users save a new notification rule. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_create_new_rule" translatable="false">Confirm and create</string>
     <!-- Label for a button that will let users save changes to an existing notification rule. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_confirm_changes" translatable="false">Confirm changes</string>
 
     <!-- Notifications with this action will be highlighted in the list and will alert the user via sound and/or vibration if enabled. [CHAR LIMIT=NONE]-->

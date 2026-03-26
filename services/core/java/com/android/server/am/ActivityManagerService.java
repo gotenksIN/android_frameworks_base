@@ -4157,7 +4157,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181201.001"
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
             EventLogTags.writeAmProcDied(app.userId, pid, app.processName, setAdj,
                     setProcState);

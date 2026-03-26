@@ -387,9 +387,10 @@
   <java-symbol type="bool" name="config_restartRadioAfterProvisioning" />
   <java-symbol type="bool" name="config_speed_up_audio_on_mt_calls" />
   <java-symbol type="bool" name="config_useFixedVolume" />
+  <java-symbol type="bool" name="config_supportProfilesOnNonMainUser"/>
   <java-symbol type="bool" name="config_isMainUserPermanentAdmin"/>
   <java-symbol type="bool" name="config_disallowRemovingLastAdminUser"/>
-  <java-symbol type="bool" name="config_supportProfilesOnNonMainUser"/>
+  <java-symbol type="bool" name="config_supportManagedProfileOnNonMainUser"/>
   <java-symbol type="bool" name="config_createInitialAdminUserOnHsum"/>
   <java-symbol type="bool" name="config_experimental_designateMainUser"/>
   <java-symbol type="bool" name="config_canSwitchToHeadlessSystemUser"/>
@@ -402,7 +403,7 @@
   <java-symbol type="bool" name="config_omnipresentCommunalUser"/>
   <java-symbol type="bool" name="config_enableNewAutoSelectNetworkUI"/>
   <java-symbol type="bool" name="config_disableUsbPermissionDialogs"/>
-  <java-symbol type="bool" name="config_allowContentRestrictionDevicePolicyBypassing"/>
+  <java-symbol type="bool" name="config_allowBypassingContentRestrictionSandboxing"/>
   <java-symbol type="dimen" name="config_highResTaskSnapshotScale" />
   <java-symbol type="dimen" name="config_lowResTaskSnapshotScale" />
   <java-symbol type="dimen" name="config_resActivitySnapshotScale" />
@@ -1400,6 +1401,7 @@
   <java-symbol type="drawable" name="default_lock_wallpaper" />
   <java-symbol type="drawable" name="indicator_input_error" />
   <java-symbol type="drawable" name="ic_file_copy" />
+  <java-symbol type="drawable" name="reboot_safe_mode_focus_indicator" />
   <java-symbol type="drawable" name="popup_bottom_dark" />
   <java-symbol type="drawable" name="popup_bottom_bright" />
   <java-symbol type="drawable" name="popup_bottom_medium" />
@@ -2279,6 +2281,7 @@
   <java-symbol type="integer" name="config_vibratorControlServiceDumpAggregationTimeMillisLimit" />
   <java-symbol type="integer" name="config_defaultVibrationAmplitude" />
   <java-symbol type="array" name="config_vibrationIntensityScaleFactors" />
+  <java-symbol type="array" name="config_keyboardVibrationIntensityScaleFactors" />
   <java-symbol type="array" name="config_externalVibrationIntensityScaleFactors" />
   <java-symbol type="dimen" name="config_hapticChannelMaxVibrationAmplitude" />
   <java-symbol type="dimen" name="config_keyboardHapticFeedbackFixedAmplitude" />
@@ -6326,10 +6329,6 @@
        root TaskDisplayArea is set to WINDOWING_MODE_FREEFORM. -->
   <java-symbol type="bool" name="config_enterDesktopByDefaultOnFreeformDisplay" />
 
-  <!-- Whether a desktop window should be maximized when it's dragged to the top edge of the
-       screen. -->
-  <java-symbol type="bool" name="config_dragToMaximizeInDesktopMode" />
-
   <!-- Whether the home screen should be shown behind freeform tasks in desktop mode. -->
   <java-symbol type="bool" name="config_showHomeBehindDesktop" />
 
@@ -6341,6 +6340,9 @@
 
   <!-- List of activities in the home package which should be allowed in desktop mode. -->
   <java-symbol type="array" name="config_desktopHomePackageFreeformActivities" />
+
+  <!-- List of packages which default to launch in fullscreen on desktop. -->
+  <java-symbol type="array" name="config_desktopLaunchInFullscreenPackages" />
 
   <!-- Frame rate compatibility value for Wallpaper -->
   <java-symbol type="integer" name="config_wallpaperFrameRateCompatibility" />
@@ -6616,6 +6618,8 @@
    <!-- The package name of the AllowlistProviderService -->
    <java-symbol type="string" name="config_allowlistProviderServicePackage"/>
 
+  <!-- Whether Personal Context is enabled -->
+  <java-symbol type="bool" name ="config_enablePersonalContextManagerService"/>
   <!-- Packages allowed to publish context hints -->
   <java-symbol type="array" name="config_allowlistPersonalContextHintPublishing" />
   <!-- Packages allowed to receive context hints -->
@@ -6624,6 +6628,10 @@
   <java-symbol type="array" name="config_allowlistPersonalContextInsightPublishing" />
   <!-- Packages allowed to receive context insights -->
   <java-symbol type="array" name="config_allowlistPersonalContextInsightReceiving" />
+  <!-- Packages allowed to register a visualizer -->
+  <java-symbol type="array" name="config_allowlistPersonalContextVisualizers" />
+  <!-- Packages allowed to filter for context insights -->
+  <java-symbol type="array" name="config_allowlistPersonalContextInsightFiltering" />
 
   <!-- PersonalContext TextClassifier configuration -->
   <java-symbol type="integer" name="config_textClassifierPersonalContextTimeoutMillis" />
@@ -6641,6 +6649,9 @@
 
   <!-- Whether the Wear-specific charging experience is enabled -->
   <java-symbol type="bool" name="config_wearChargingExperienceEnabled" />
+
+  <!-- Message for when screen brightness is overridden and cannot be adjusted -->
+  <java-symbol type="string" name="brightness_unable_adjust_msg" />
 
   <!-- ART Service configuration -->
   <java-symbol type="array" name="config_pr_dexopt_sync_forced_packages" />

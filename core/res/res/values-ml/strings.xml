@@ -2706,7 +2706,7 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"ടിവി ഓഫാക്കാൻ പവർ ബട്ടൺ ദീർഘനേരം അമർത്തുക"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"സിസ്റ്റം ഉറവിട മുന്നറിയിപ്പുകൾ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ഉറവിടത്തിന്റെ അമിതോപയോഗം"</string>
-    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"\'<xliff:g id="APP_NAME">%1$s</xliff:g> ആപ്പ് നിരവധി ഉറവിടങ്ങൾ ഉപയോഗിക്കുന്നു.\""</string>
+    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"അമിതമായ വിഭവ ഉപയോഗം കാരണം \'<xliff:g id="APP_NAME">%1$s</xliff:g> ആപ്പ് പ്രവർത്തനരഹിതമാക്കി. ക്രമീകരണത്തിലെ ആപ്പുകൾ മെനുവിൽ നിന്ന് നിങ്ങൾക്ക് ഇത് വീണ്ടും പ്രവർത്തനക്ഷമമാക്കാം.\""</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"രക്ഷിതാവിൽ നിന്നുള്ള അപ്‌ഡേറ്റ്"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ആപ്പ് ഇപ്പോൾ നീക്കം ചെയ്‌തിരിക്കുന്നു"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> ഇപ്പോൾ ലഭ്യമാണ്"</string>

@@ -21,9 +21,6 @@ import static android.os.Process.INVALID_UID;
 import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.text.TextUtils.formatSimple;
 
-import static com.android.internal.util.Preconditions.checkArgumentInRange;
-import static com.android.internal.util.Preconditions.checkArgumentNonNegative;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
@@ -34,8 +31,6 @@ import android.os.Message;
 import android.os.Process;
 import android.os.ProfilingServiceHelper;
 import android.os.ProfilingTrigger;
-import android.system.Os;
-import android.system.OsConstants;
 import android.util.IndentingPrintWriter;
 import android.util.Slog;
 
@@ -45,6 +40,7 @@ import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.MemInfoReader;
 import com.android.server.LocalServices;
+import com.android.server.am.memorylimiter.config.LimitSet;
 import com.android.server.am.memorylimiter.config.MemoryLimiterConfig;
 import com.android.server.am.memorylimiter.config.XmlParser;
 import com.android.tools.r8.keepanno.annotations.UsedByNative;
@@ -57,7 +53,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -87,22 +86,35 @@ class MemoryLimiter implements AutoCloseable {
     // The limits that this feature monitors.
     // LINT.IfChange(limitTypes)
     // A limit has been breached but which limit is unknown.
-    static final int UNKNOWN_LIMIT_TYPE = 0;
+    static final int LIMIT_TYPE_UNKNOWN = 0;
     // The memory.high limit has been breached.
-    static final int MEMORY_LIMIT_TYPE = 1;
+    static final int LIMIT_TYPE_MEMORY = 1;
+    // The memory.swap.max limit has been breached.
+    static final int LIMIT_TYPE_SWAP = 2;
     // LINT.ThenChange(/services/core/jni/com_android_server_am_MemoryLimiter.cpp:limitTypes)
+
+    // Well-known memory limits.
+    // LINT.IfChange(limitSpecials)
+    private static final Long LIMIT_IS_DISABLED = -1L;         // Disable the limit.
+    private static final Long LIMIT_IS_IGNORED = -2L;          // Ignore (do not apply).
+    // LINT.ThenChange(/services/core/jni/com_android_server_am_MemoryLimiter.cpp:limitSpecials)
 
     // A discriminated value to mean "all UIDs".  It does not overlay INVALID_UID or any legal
     // UID.
     static final int ALL_UIDS = -2;
+
+    // Two convenient constants.
+    private static final long MB = 1024L * 1024;
+    private static final long GB = 1024L * MB;
 
     /**
      * A convenience function that maps limit types to strings.
      */
     static String limitTypeToString(int type) {
         return switch (type) {
-            case UNKNOWN_LIMIT_TYPE -> "unknown";
-            case MEMORY_LIMIT_TYPE -> "memory.high";
+            case LIMIT_TYPE_UNKNOWN -> "unknown";
+            case LIMIT_TYPE_MEMORY -> "memory.high";
+            case LIMIT_TYPE_SWAP -> "memory.swap.max";
             default -> "unexpected";
         };
     }
@@ -112,59 +124,50 @@ class MemoryLimiter implements AutoCloseable {
      */
     static int limitTypeToAtom(int type) {
         return switch (type) {
-            case UNKNOWN_LIMIT_TYPE ->
+            case LIMIT_TYPE_UNKNOWN ->
                     FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT__TYPE__UNKNOWN;
-            case MEMORY_LIMIT_TYPE ->
+            case LIMIT_TYPE_MEMORY ->
                     FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT__TYPE__HIGH;
             default -> FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT__TYPE__UNKNOWN;
         };
     }
 
-    /**
-     * A configuration object.  The object contains the configuration parameters (memory assigned
-     * to the visible and notVisible proc states as well as a string that identifies the source of
-     * the parameters.
-     * Version zero is reserved for the "no limits" case, when default limits are disabled.
-     */
-    record Configuration(String source, int version, int visible, int notVisible) {
-        Configuration {
-            checkArgumentNonNegative(version, "version must be non-negative");
-            checkArgumentInRange(visible, 1, 100, "visible");
-            checkArgumentInRange(notVisible, 1, 100, "notVisible");
-        }
-
-        @Override
-        public String toString() {
-            return formatSimple("(%s, %d, %d, %d)", source, version, visible, notVisible);
-        }
-    }
+    /*
+     * A configuration object.  The object contains the limiter's configuration parameters:
+     * memory assigned to the visible and notVisible proc states and swap assigned to visible and
+     * notVisible proc states.  The values are in bytes.
+      */
+    @VisibleForTesting
+    record Configuration(long memVisible, long memNotVisible,
+            long swapVisible, long swapNotVisible) {}
 
     /**
-     * The default configuration limits visible processes to 50% and non-visible processes to 25%
-     * of available memory.
+     * A default configuration that can be used to test the MemoryLimiter behavior.  It can be
+     * used on systems with 8G or more of RAM but should not be used in production code without
+     * further review.  This sets memVisible=4G, memNotVisible=2G, swapVisible=2G, and
+     * swapNotVisible=2G.
      */
     @VisibleForTesting
     static final Configuration sDefaultConfig =
-            Flags.memoryLimiterDefaultAppLimits()
-            ? new Configuration("default", 1, 50, 25)
-            : new Configuration("disabled", 0, 100, 100);
+            new Configuration(GB * 4, GB * 2, GB * 2, GB * 2);
 
     /**
-     * The location of the option configuration file.
+     * The location of the required configuration file.
      */
     static final String CONFIG_PATH = "/vendor/etc/memory-limiter-config.xml";
 
-    // The system configuration information needed to construct limits.  The "valid" flag is false
-    // if any of the values could not be determined.  The iteration count is used to track how
-    // many times the limit initialization code has run.
-    private record LimitConfig(long memTotal, long swapTotal, long pageSize, boolean valid,
-                               int iteration) {}
-
-    // A single set of limits.  memHigh is applied to memory.high and swapMax is applied to
-    // memory.swap.max.  See {@link memLimit()} for details on how special limit values are
-    // interpreted.
+    // A single set of limits to be applied to the process immediately.  memHigh is applied to
+    // memory.high and swapMax is applied to memory.swap.max.  See {@link memLimit()} for details
+    // on how special limit values are interpreted.
     @VisibleForTesting
     public record Limits(long memHigh, long swapMax) {}
+
+    // Return the available memory in the system.  This is memTotal from /proc/meminfo.
+    private static long memTotal() {
+        MemInfoReader memInfo = new MemInfoReader();
+        memInfo.readMemInfo();
+        return memInfo.getTotalSize();
+    }
 
     /**
      * A controller specializes the behavior of an individual MemoryLimiter.
@@ -195,10 +198,9 @@ class MemoryLimiter implements AutoCloseable {
          *
          * @param pid The pid of the process to set the limit for.
          * @param uid The uid of the process to set the limit for.
-         * @param limitPercent The limit percentage (1-100) to set for the process. A negative value
-         *     sets the limit to the maximum value (i.e. unlimited).
+         * @param limit The limit, in bytes, for memHigh and swapMax.
          */
-        void setManualLimit(int pid, int uid, int limitPercent);
+        void setManualLimit(int pid, int uid, long limit);
 
         // The controller status, for debug and reports.
         void dump(PrintWriter pw);
@@ -231,7 +233,7 @@ class MemoryLimiter implements AutoCloseable {
         }
 
         @Override
-        public void setManualLimit(int pid, int uid, int limitPercent) {
+        public void setManualLimit(int pid, int uid, long limit) {
         }
 
         @Override
@@ -259,6 +261,30 @@ class MemoryLimiter implements AutoCloseable {
         // value of the feature flag.
         boolean isSwapMonitoringEnabled() {
             return Flags.memoryLimiterSwap();
+        }
+
+        // 12GB
+        private static final long MEM_12GB = 12L * 1024 * 1024 * 1024;
+
+        // Return true if the native layer should continue applying limits to a process after an
+        // overlimit event.  If this is false, then the native layer sets the limits to "max"
+        // after an over-limit event and will not make any further changes.  When limitMode is
+        // false, the system is said to be in "senseMode": it uses cgroups to detect over-limit
+        // events but does not enforce limits.
+        boolean limitMode() {
+            if (!Files.exists(Paths.get(configFile()))) {
+                // There is no configuration file, so only check limits.
+                return false;
+            }
+
+            MemInfoReader memInfo = new MemInfoReader();
+            memInfo.readMemInfo();
+            if (memInfo.getTotalSize() < MEM_12GB) {
+                // This instance has less than 12GB of ram available, so only check limits.
+                return false;
+            }
+
+            return true;
         }
 
         // True if running in test mode.  The default implementation assumes that test mode is
@@ -318,24 +344,6 @@ class MemoryLimiter implements AutoCloseable {
         // The opcode to close the controller.
         private static final int MESSAGE_CLOSE = 3;
 
-        // The opcode to refresh the known memory limits.
-        private static final int MESSAGE_INIT_LIMITS = 4;
-
-        // The polling cycle for initializing limits. MemInfo values seem to stabilize roughly 30s
-        // after system_server starts, so the poll is set to 10s.
-        private static final long INIT_POLL_MS = 10 * 1000;
-
-        // The maximum number of times the service will attempt to initialize the limits.  After
-        // this many retries, it just gives up.  A value of 30, in combination with the pol time
-        // above, means system_server will try for 5 minutes total.
-        private static final int MAX_LIMIT_INIT_ATTEMPTS = 30;
-
-        // Well-known memory limits.
-        private static final Long MAX_MEMORY = -1L;     // Maximum memory
-
-        // The extracted system configuration values.
-        private volatile LimitConfig mLimitConfig;
-
         // The well-known limits.  These are used only by dumpsys.
         private volatile Limits mLimitsNotVisible;
         private volatile Limits mLimitsVisible;
@@ -365,6 +373,7 @@ class MemoryLimiter implements AutoCloseable {
             mInjector = injector;
 
             mNative.set(initLimiter(ControllerEnabled.this, mInjector.isMonitoringEnabled(),
+                            mInjector.isSwapMonitoringEnabled(), mInjector.limitMode(),
                             mInjector.isTestMode()));
 
             mQueue = new Handler(BackgroundThread.getHandler().getLooper()) {
@@ -414,10 +423,6 @@ class MemoryLimiter implements AutoCloseable {
                                 mOpen = false;
                             }
 
-                            case MESSAGE_INIT_LIMITS -> {
-                                initializeMemoryLimits();
-                            }
-
                             default ->
                                     Slog.e(TAG, "invalid message: op=" + op);
                         }
@@ -425,69 +430,35 @@ class MemoryLimiter implements AutoCloseable {
                 };
 
             // Note that getConfiguration() accepts a null input.
-            mConfiguration = getConfiguration(mInjector.configFile());
-            // Initialize the memory limits.
-            initializeMemoryLimits();
+            try {
+                mConfiguration = getConfiguration(mInjector.configFile());
+                initializeMemoryLimits();
+            } catch (FileNotFoundException e) {
+                // Leading sanity checks mean this exception should never occur outside of test
+                // code.  Rethrow as an illegal argument because we were assured the file existed.
+                throw new IllegalArgumentException(e);
+            }
         }
 
         // Initialize the memory limits.  This exits immediately if memTotal or swapTotal is not
         // ready.
         private void initializeMemoryLimits() {
-            MemInfoReader memInfo = new MemInfoReader();
-            memInfo.readMemInfo();
-            long memTotal = memInfo.getTotalSize();
-            long swapTotal = memInfo.getSwapTotalSizeKb() * 1024;
-            long pageSize = Os.sysconf(OsConstants._SC_PAGE_SIZE);
+            Limits ignored = new Limits(LIMIT_IS_IGNORED, LIMIT_IS_IGNORED);
+            Limits cached = new Limits(LIMIT_IS_DISABLED, LIMIT_IS_IGNORED);
+            Limits notVisible = new Limits(mConfiguration.memNotVisible,
+                    mConfiguration.swapNotVisible);
+            Limits visible = new Limits(mConfiguration.memVisible,
+                    mConfiguration.swapVisible);
 
-            if (memTotal <= 0) {
-                Slog.e(TAG, formatSimple("invalid MemTotal: %d", memTotal));
-                // The effects of returning here are that no further initialization will occur.
-                // If mStateLimits has never been initialized then all limits will be null and no
-                // limiting will take place.
-                return;
-            }
-
-            if (pageSize <= 0) {
-                // Pagesize is used mostly for testing.  It's very likely that the page size will
-                // never become valid, so if it is invalid here, just assume 4096.  That's a
-                // pretty safe assumption until 16K pages are deployed.
-                Slog.e(TAG, formatSimple("invalid page size: %d - assuming 4096", pageSize));
-                pageSize = 4096;
-            }
-            // Remember if any of the following parameters are just estimates.
-            boolean finalized = true;
-
-            if (swapTotal <= 0) {
-                Slog.w(TAG, "swap not ready - assuming half of ram");
-                swapTotal = memTotal / 2;
-                finalized = false;
-            }
-
-            Slog.i(TAG, formatSimple("vmem=%d swap=%d page=%d", memTotal, swapTotal, pageSize));
-            mLimitConfig = new LimitConfig(memTotal, swapTotal, pageSize, finalized,
-                    mLimitConfig == null ? 0 : mLimitConfig.iteration + 1);
-
-            final int visiblePct = mConfiguration.visible;
-            final int notVisiblePct = mConfiguration.notVisible;
-            final boolean setSwap = mInjector.isSwapMonitoringEnabled();
-
-            Limits noop = new Limits(0, 0);
-            Limits cached = new Limits(MAX_MEMORY,
-                    setSwap ? MAX_MEMORY : 0);
-            Limits notVisible = new Limits(memLimit(memTotal, pageSize, notVisiblePct),
-                    setSwap ? memLimit(swapTotal, pageSize, notVisiblePct) : 0);
-            Limits visible = new Limits(memLimit(memTotal, pageSize, visiblePct),
-                    setSwap ? memLimit(swapTotal, pageSize, visiblePct) : 0);
-
-            // Initialize the procstate/bucket map.
             for (int state = ActivityManager.MIN_PROCESS_STATE;
                     state <= ActivityManager.MAX_PROCESS_STATE;
                     state++) {
                 if (state == ActivityManager.PROCESS_STATE_UNKNOWN
                         || state == ActivityManager.PROCESS_STATE_NONEXISTENT) {
-                    // Never try to configure a process that does not exist or is cached.
-                    mStateLimit.set(state, noop);
+                    // Do not try to configure a process that does not exist.
+                    mStateLimit.set(state, ignored);
                 } else if (ActivityManager.isProcStateCached(state)) {
+                    // Limits are lifted from cached processes.
                     mStateLimit.set(state, cached);
                 } else if (ActivityManager.isProcStateJankPerceptible(state)) {
                     mStateLimit.set(state, visible);
@@ -499,30 +470,6 @@ class MemoryLimiter implements AutoCloseable {
             // Save the configured limits for dumpsys.
             mLimitsNotVisible = notVisible;
             mLimitsVisible = visible;
-
-            // If the limits have not been finalized, cue up a retry.
-            if (!finalized && mLimitConfig.iteration < MAX_LIMIT_INIT_ATTEMPTS) {
-                mQueue.sendMessageDelayed(mQueue.obtainMessage(MESSAGE_INIT_LIMITS), INIT_POLL_MS);
-            }
-        }
-
-        // A helper function that returns the correct memory limit given a total memory size and a
-        // percentage.  If the percentage is 100, then MAX_MEMORY is returned.  A non-positive
-        // percentage should not be seen but if it is, the function returns zero.  Return values
-        // are truncated to the kernel page size.  If either system configuration parameter (total
-        // and pageSize) is invalid, MAX_MEMORY is returned.
-        private static long memLimit(long total, long pageSize, int percentage) {
-            if (percentage >= 100) {
-                return MAX_MEMORY;
-            } else if (total <= 0 || pageSize <= 0) {
-                return MAX_MEMORY;
-            } else if (percentage <= 0) {
-                return 0;
-            } else {
-                long limit = (percentage * total) / 100;
-                limit = (limit / pageSize) * pageSize;
-                return limit;
-            }
         }
 
         @Override
@@ -602,23 +549,9 @@ class MemoryLimiter implements AutoCloseable {
             Slog.i(TAG, formatSimple("onLimitExceeded: pid=%d uid=%d type=%s limit=%d pkg=%s",
                     pid, uid, limitTypeToString(type), limit, pkg));
 
-            MemInfoReader memInfo = new MemInfoReader();
-            memInfo.readMemInfo();
-            long memTotal = memInfo.getTotalSize();
-            long swapTotal = memInfo.getSwapTotalSizeKb() * 1024;
-
-            // If memTotal is zero, something is badly wrong with the system.  The code should
-            // never reach this point, because an invalid memTotal should disable limits, but just
-            // in case we do reach this point, log and exit immediately.
-            if (memTotal <= 0) {
-                Slog.e(TAG, formatSimple("onLimitExceeded: invalid memTotal=%d", memTotal));
-                return;
-            }
-
-            // Convert the limit into a percentage of available memory.  The next two lines
-            // safely generate the percentage between 0 and 100.
-            final double ratio = (100.0D * limit) / memTotal;
-            final int percent = (int) Math.round(Math.max(0.0, Math.min(100.0, ratio)));
+            // TODO (491137082) The limit is no longer a percentage of available memory and a new
+            // definition must be found.  For the moment, the percentage is set to zero.
+            final int percent = 0;
 
             // statsd logging is throttled to at most 28 events per day.
             if (shouldLogAtom()) {
@@ -658,12 +591,8 @@ class MemoryLimiter implements AutoCloseable {
         }
 
         @Override
-        public void setManualLimit(int pid, int uid, int limitPercent) {
-            final long memTotal = mLimitConfig.memTotal;
-            final long swapTotal = mLimitConfig.swapTotal;
-            final long pageSize = mLimitConfig.pageSize;
-            setLimit(pid, uid, new Limits(memLimit(memTotal, pageSize, limitPercent),
-                            memLimit(swapTotal, pageSize, limitPercent)));
+        public void setManualLimit(int pid, int uid, long limit) {
+            setLimit(pid, uid, new Limits(limit, limit));
         }
 
         @Override
@@ -737,45 +666,89 @@ class MemoryLimiter implements AutoCloseable {
     }
 
     /**
-     * Fetch the configuration.  If the file is null or the file does not exist, return the
-     * default.  Otherwise try to parse the file.  All errors are converted to an
-     * IllegalArgumentException.
+     * Find a Configuration constructed from the best matching configuration LimitSet.  The best
+     * match is the one with the largest "minimumRequiredMemTotal" value that is still below
+     * memTotal.  This returns null if there is no matching LimitSet.  This throws a
+     * NumberFormatException if any required attribute is not present or is invalid.
+     */
+    @Nullable
+    private static Configuration getConfiguration(List<LimitSet> sets, long memTotal) {
+        long minRequiredMem = 0;
+        Configuration result = null;
+        for (int i = 0; i < sets.size(); i++) {
+            LimitSet cfg = sets.get(i);
+            long minMemTotal = cfg.getMinimumRequiredMemTotal().longValue() * MB;
+            if (minMemTotal > memTotal || minMemTotal < minRequiredMem) {
+                continue;
+            }
+            minRequiredMem = minMemTotal;
+            result = new Configuration(
+                cfg.getMemVisible().longValue() * MB,
+                cfg.getMemNotVisible().longValue() * MB,
+                cfg.getSwapVisible().longValue() * MB,
+                cfg.getSwapNotVisible().longValue() * MB);
+        }
+        return result;
+    }
+
+    /**
+     * Fetch the configuration that is suitable, given the available memory parameter.  If the
+     * file is null, return the default.  Otherwise try to parse the file.  The function returns
+     * null if no LimitSet in the configuration file is suitable for the available memory.  All
+     * errors are converted to an IllegalArgumentException.
      */
     @VisibleForTesting
-    static Configuration getConfiguration(@Nullable String file) {
+    static Configuration getConfiguration(@Nullable String file, long memTotal)
+            throws FileNotFoundException {
         if (file == null) {
+            // A null file is a special case that is only used for testing.
             return sDefaultConfig;
         }
         try (InputStream str = new BufferedInputStream(new FileInputStream(file))) {
             MemoryLimiterConfig cfg = XmlParser.read(str);
-            // The following conditionals test that the required fields are present.  The parser
-            // only verifies that the xml is well-formed, not that it conforms to the xsd.
             if (cfg == null) {
                 throw new IllegalArgumentException("bad config: no MemoryLimiterConfig");
-            } else if (cfg.getVersion() == null) {
-                throw new IllegalArgumentException("bad config: no version attribute");
-            } else if (cfg.getVisible() == null) {
-                throw new IllegalArgumentException("bad config: no Visible attribute");
-            } else if (cfg.getNotVisible() == null) {
-                throw new IllegalArgumentException("bad config: no NotVisible attribute");
             }
-            // Most values are checked when the Configuration is constructed.  As a special case,
-            // though, the version must be positive if it comes from a configuration file.
-            if (cfg.getVersion().intValue() <= 0) {
+
+            // An invalid configuration file can throw an NPE or NumberFormatException during the
+            // following code.
+            if (cfg.getVersion().intValue() != 1) {
                 throw new IllegalArgumentException("bad config: invalid version");
             }
-            return new Configuration(file, cfg.getVersion().intValue(),
-                    cfg.getVisible().intValue(), cfg.getNotVisible().intValue());
+            List<LimitSet> clist = cfg.getConfigList().getLimitSet();
+            if (clist.size() < 1) {
+                throw new IllegalArgumentException("bad config: empty limit set");
+            }
+            // Return the best match configuration.  A null return means the XML was valid but
+            // there was no matching limit set.
+            return getConfiguration(clist, memTotal);
+
         } catch (FileNotFoundException e) {
-            // It is not an error if the file does not exist.  Silently return the default.
-            return sDefaultConfig;
+            // Override the configuration file limits and let the memory limiter run.  This is for
+            // development.
+            if (Flags.memoryLimiterForceOn()) {
+                return sDefaultConfig;
+            }
+            throw e;
         } catch (IOException e) {
-            Slog.e(TAG, "I/O error: " + e);
+            Slog.e(TAG, "config file: " + e);
             throw new IllegalArgumentException("bad config: " + file, e);
         } catch (XmlPullParserException | DatatypeConfigurationException e) {
             Slog.e(TAG, "XML error: " + e);
             throw new IllegalArgumentException("bad config: " + file, e);
+        } catch (NullPointerException e) {
+            Slog.e(TAG, "XML error: " + e);
+            throw new IllegalArgumentException("bad config: " + file, e);
         }
+    }
+
+    /**
+     * Return the configuration that is suitable for the memory in the current system.
+     */
+    @Nullable
+    private static Configuration getConfiguration(@Nullable String file)
+            throws FileNotFoundException {
+        return getConfiguration(file, memTotal());
     }
 
     /**
@@ -794,6 +767,34 @@ class MemoryLimiter implements AutoCloseable {
     }
 
     /**
+     * Return true if the system supports MemoryLimiting.  A system supports memory limiting if
+     * the default configuration exists and if the available memory is greater than or equal to
+     * the minimum available memory required by the configuration file.
+     */
+    @VisibleForTesting
+    static boolean isMemoryLimiterSupported(String configFile) {
+        if (!Files.exists(Paths.get(configFile))) return false;
+
+        try {
+            return getConfiguration(configFile) != null;
+        } catch (FileNotFoundException e) {
+            // This is surprising, because we just determined that the file existed.  Convert this
+            // to an IllegalStateException: something is wrong with the state of the system.
+            Slog.e(TAG, "unexpected file-not-found", e);
+            throw new IllegalStateException("config file removed at runtime", e);
+        }
+    }
+
+    /**
+     * Verify that the memory limiter can run with the default config file.  This is visible for
+     * testing so that tests can know if the memory limiter is currently running in the system.
+     */
+    @VisibleForTesting
+    static boolean isMemoryLimiterSupported() {
+        return isMemoryLimiterSupported(new Injector().configFile());
+    }
+
+    /**
      * Construct the default memory limiter.
      */
     private static Controller getDefaultController() {
@@ -805,8 +806,12 @@ class MemoryLimiter implements AutoCloseable {
             // feature must be enabled explicitly by the test method using the constructor that
             // takes a Controller.
             return new ControllerDisabled();
+        } else if (!isMemoryLimiterSupported()) {
+            // No configuration file or insufficient ram.  Also, the developer bypass flag is off.
+            return new ControllerDisabled();
         } else {
-            // The feature is enabled and this is system_server.
+            // The feature is enabled, this is system_server, a configuration file is
+            // present, and there is sufficient ram.
             return new ControllerEnabled(new Injector());
         }
     }
@@ -940,8 +945,8 @@ class MemoryLimiter implements AutoCloseable {
     /**
      * Manually set a limit for a process (for testing).
      */
-    void setManualLimit(int pid, int uid, int limitPercent) {
-        mController.setManualLimit(pid, uid, limitPercent);
+    void setManualLimit(int pid, int uid, int limitInMB) {
+        mController.setManualLimit(pid, uid, limitInMB * MB);
     }
 
     /**
@@ -964,11 +969,13 @@ class MemoryLimiter implements AutoCloseable {
      *
      * @param controller is the Controller that receives over-limit events.
      * @param monitor is true if limit monitoring is enabled.
+     * @param monitorSwap is true if the feature is monitoring swap as well as memory.
+     * @param limitMode is true if limits are still honored after an over-limit event.
      * @param testMode is true if running in test mode.
      * @return the native service.
      */
     private static native long initLimiter(Controller controller, boolean monitor,
-            boolean testMode);
+            boolean monitorSwap, boolean limitMode, boolean testMode);
 
     /**
      * Release the native handler.
@@ -995,4 +1002,20 @@ class MemoryLimiter implements AutoCloseable {
      * separated by whitespace.
      */
     private static native @Nullable String getStatistics(long service);
+
+    /**
+     * This is a test interface to the native code.  The function takes a string that is the name
+     * of a supported cgroup file and a string that is the content of that file.  The function
+     * parses the data into an array of longs; the order is the order of the fields in the cgroup
+     * file.  There are no side-effects and the function does not read any cgroup files.
+     *
+     * Supported files are "memory.events", "memory.swap.events", and "memory.stat".  Note that
+     * "memory.stat" is not fully parsed.
+     *
+     * @param file The name of the cgroup file.
+     * @param data The contents of the cgroup file.
+     * @return An array of longs representing the parsed data.
+     */
+    @VisibleForTesting
+    static native @Nullable long[] testParseCgroup(String file, String data);
 }

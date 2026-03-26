@@ -2151,6 +2151,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         if (parent == rootTask || task == rootTask) {
             // Nothing else to do since it is already restored in the right root task.
+            EventLogTags.writeWmTaskRestored(task.mTaskId, rootTask.mTaskId);
             return true;
         }
 
@@ -2163,6 +2164,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         rootTask.addChild(task, onTop, true /* showForAllUsers */);
         if (DEBUG_RECENTS) Slog.v(TAG_RECENTS,
                 "Added restored task=" + task + " to root task=" + rootTask);
+        EventLogTags.writeWmTaskRestored(task.mTaskId, rootTask.mTaskId);
         return true;
     }
 

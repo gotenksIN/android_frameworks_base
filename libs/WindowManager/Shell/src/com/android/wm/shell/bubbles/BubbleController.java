@@ -437,8 +437,12 @@ public class BubbleController implements ConfigurationChangeListener,
             public BubbleTaskView create() {
                 TaskViewTaskController taskViewTaskController = new TaskViewTaskController(
                         context, organizer, mTaskViewController, syncQueue);
+                // Enable background layer to show background color to prevent contents behind
+                // transparent bubble are shown.
+                boolean disableBackgroundLayer =
+                        !com.android.window.flags.Flags.addBgColorForTransparentBubbles();
                 TaskView taskView = new TaskView(context, mTaskViewController,
-                        taskViewTaskController, mainHandler);
+                        taskViewTaskController, mainHandler, disableBackgroundLayer);
                 return new BubbleTaskView(taskView, mainExecutor, BubbleController.this);
             }
         };
@@ -3045,7 +3049,7 @@ public class BubbleController implements ConfigurationChangeListener,
         if (mStackView == null && mLayerView == null) {
             return;
         }
-        BubbleLog.v("BubbleController.updateBubbleViews() mIsStatusBarShade=%s hasBubbles=%b",
+        BubbleLog.v("BubbleController.updateBubbleViews() mIsStatusBarShade=%b hasBubbles=%b",
                 mIsStatusBarShade, hasBubbles());
         if (!mIsStatusBarShade) {
             // Bubbles don't appear when the device is locked.

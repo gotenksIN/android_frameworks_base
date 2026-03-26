@@ -53,6 +53,7 @@ import static com.android.server.display.TestUtilsKt.createTestDisplayAddress;
 import static com.android.server.display.feature.flags.Flags.FLAG_CHANGE_DEFAULT_DISPLAY_LID_CLOSED;
 import static com.android.server.display.layout.Layout.Display.POSITION_REAR;
 import static com.android.server.display.layout.Layout.Display.POSITION_UNKNOWN;
+import static com.android.server.display.persistence.PersistentDataStoreTestUtilsKt.createInMemoryPersistentDataStore;
 import static com.android.server.utils.FoldSettingProvider.SETTING_VALUE_SELECTIVE_STAY_AWAKE;
 import static com.android.server.utils.FoldSettingProvider.SETTING_VALUE_SLEEP_ON_FOLD;
 import static com.android.server.utils.FoldSettingProvider.SETTING_VALUE_STAY_AWAKE_ON_FOLD;
@@ -123,8 +124,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -221,22 +220,8 @@ public class LogicalDisplayMapperTest {
         mDeviceStateToLayoutMapSpy =
                 spy(new DeviceStateToLayoutMap(mIdProducer, NON_EXISTING_FILE, true));
 
-        mDisplayDeviceRepo = new DisplayDeviceRepository(
-                new DisplayManagerService.SyncRoot(),
-                new PersistentDataStore(new PersistentDataStore.Injector() {
-                    @Override
-                    public InputStream openRead() {
-                        return null;
-                    }
-
-                    @Override
-                    public OutputStream startWrite() {
-                        return null;
-                    }
-
-                    @Override
-                    public void finishWrite(OutputStream os, boolean success) {}
-                }), /* stableEdidsFlag= */ true);
+        mDisplayDeviceRepo = new DisplayDeviceRepository(new DisplayManagerService.SyncRoot(),
+                createInMemoryPersistentDataStore(), /* stableEdidsFlag= */ true);
 
         // Disable binder caches in this process.
         PropertyInvalidatedCache.disableForTestMode();
@@ -307,23 +292,6 @@ public class LogicalDisplayMapperTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_DISPLAY_INFO_COPY_ON_WRITE_CACHE_ENABLED)
-    public void testDisplayDeviceAddAndRemove_NonInternalTypes() {
-        boolean infoCacheEnabled = false;
-        initLogicalDisplayMapper();
-        testDisplayDeviceAddAndRemove_NonInternal(TYPE_EXTERNAL, infoCacheEnabled);
-        testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_WIFI, infoCacheEnabled);
-        testDisplayDeviceAddAndRemove_NonInternal(TYPE_OVERLAY, infoCacheEnabled);
-        testDisplayDeviceAddAndRemove_NonInternal(TYPE_VIRTUAL, infoCacheEnabled);
-        testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_UNKNOWN, infoCacheEnabled);
-
-        // Call the internal test again, just to verify that adding non-internal displays
-        // doesn't affect the ability for an internal display to become the default display.
-        testDisplayDeviceAddAndRemove_Internal_Helper(infoCacheEnabled);
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_DISPLAY_INFO_COPY_ON_WRITE_CACHE_ENABLED)
     public void testDisplayDeviceAddAndRemove_NonInternalTypes_displayInfoCacheEnabled() {
         boolean infoCacheEnabled = true;
         initLogicalDisplayMapper();

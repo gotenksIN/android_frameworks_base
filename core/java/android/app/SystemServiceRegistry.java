@@ -92,9 +92,7 @@ import android.bluetooth.BluetoothFrameworkInitializer;
 import android.companion.CompanionDeviceManager;
 import android.companion.ICompanionDeviceManager;
 import android.companion.datatransfer.continuity.ITaskContinuityManager;
-import android.companion.datatransfer.continuity.IUniversalClipboardManager;
 import android.companion.datatransfer.continuity.TaskContinuityManager;
-import android.companion.datatransfer.continuity.UniversalClipboardManager;
 import android.companion.virtual.IVirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager;
 import android.compat.Compatibility;
@@ -279,6 +277,8 @@ import android.security.authenticationpolicy.IAuthenticationPolicyService;
 import android.security.intrusiondetection.IIntrusionDetectionService;
 import android.security.intrusiondetection.IntrusionDetectionManager;
 import android.security.keystore.KeyStoreManager;
+import android.security.trusttoken.ITrustTokenManager;
+import android.security.trusttoken.TrustTokenManager;
 import android.service.chooser.ChooserManager;
 import android.service.oemlock.IOemLockService;
 import android.service.oemlock.OemLockManager;
@@ -1617,21 +1617,6 @@ public final class SystemServiceRegistry {
                     });
         }
 
-        if (android.companion.Flags.universalClipboard()) {
-            registerService(Context.UNIVERSAL_CLIPBOARD_SERVICE, UniversalClipboardManager.class,
-                    new CachedServiceFetcher<UniversalClipboardManager>() {
-                        @Override
-                        public UniversalClipboardManager createService(ContextImpl ctx)
-                                throws ServiceNotFoundException {
-                            IBinder iBinder = ServiceManager.getServiceOrThrow(
-                                    Context.UNIVERSAL_CLIPBOARD_SERVICE);
-                            IUniversalClipboardManager service =
-                                    IUniversalClipboardManager.Stub.asInterface(iBinder);
-                            return new UniversalClipboardManager(ctx, service);
-                        }
-                    });
-        }
-
         registerService(Context.CROSS_PROFILE_APPS_SERVICE, CrossProfileApps.class,
                 new CachedServiceFetcher<CrossProfileApps>() {
                     @Override
@@ -1797,6 +1782,20 @@ public final class SystemServiceRegistry {
                         return new AttestationVerificationManager(ctx.getOuterContext(),
                                 IAttestationVerificationManagerService.Stub.asInterface(b));
                     }});
+        registerService(Context.TRUST_TOKEN_SERVICE, TrustTokenManager.class,
+                new CachedServiceFetcher<TrustTokenManager>() {
+                    @Override
+                    public TrustTokenManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        if (!android.security.Flags.enableTalismanService()) {
+                            throw new ServiceNotFoundException("TrustTokenManager is not enabled");
+                        }
+                        return new TrustTokenManager(
+                                ITrustTokenManager.Stub.asInterface(
+                                        ServiceManager.getServiceOrThrow(
+                                                Context.TRUST_TOKEN_SERVICE)));
+                    }
+                });
         registerService(Context.APP_HIBERNATION_SERVICE, AppHibernationManager.class,
                 new CachedServiceFetcher<AppHibernationManager>() {
                     @Override

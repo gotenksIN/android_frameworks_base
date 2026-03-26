@@ -1041,8 +1041,8 @@ public class AudioService extends IAudioService.Stub
         }
 
         @Override
-        public void permissionUpdateBarrier() {
-            AudioService.this.permissionUpdateBarrier();
+        public void permissionUpdateBarrier(boolean forRecord) {
+            AudioService.this.permissionUpdateBarrier(forRecord);
         }
 
         /**
@@ -12981,7 +12981,8 @@ public class AudioService extends IAudioService.Stub
             Binder.restoreCallingIdentity(token);
         }
 
-        boolean isForCall = AudioSystem.IN_VOICE_COMM_FOCUS_ID.compareTo(clientId) == 0;
+        boolean isForCall = AudioSystem.IN_VOICE_COMM_FOCUS_ID.equals(clientId)
+                || isCallerTelecom(Binder.getCallingUid(), callingPackageName);
 
         mmi.record();
         return getMediaFocusControlForEnvironment(focusEnvToken).requestAudioFocus(uid, aa,
@@ -13024,13 +13025,14 @@ public class AudioService extends IAudioService.Stub
         }
         mmi.record();
 
-        boolean isForCall = AudioSystem.IN_VOICE_COMM_FOCUS_ID.compareTo(clientId) == 0;
+        boolean isForCall = AudioSystem.IN_VOICE_COMM_FOCUS_ID.equals(clientId)
+                || isCallerTelecom(Binder.getCallingUid(), callingPackageName);
         //delay abandon focus requests from Telecom if an audio mode reset from Telecom
         // is still being processed
         final boolean abandonFromTelecom = (mContext.checkCallingOrSelfPermission(
                     MODIFY_PHONE_STATE) == PackageManager.PERMISSION_GRANTED)
                 && ((aa != null && aa.getUsage() == AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                        || AudioSystem.IN_VOICE_COMM_FOCUS_ID.equals(clientId));
+                        || isForCall);
         if (abandonFromTelecom) {
             synchronized (mAudioModeResetLock) {
                 final long start = java.lang.System.currentTimeMillis();
@@ -14875,6 +14877,7 @@ public class AudioService extends IAudioService.Stub
         ret.packageName = p.getPackageName();
         ret.targetSdk = p.getTargetSdkVersion();
         ret.isPlaybackCaptureAllowed = p.isAudioPlaybackCaptureAllowed();
+        ret.pccId = p.getPccId();
         return ret;
     }
 
@@ -17370,7 +17373,10 @@ public class AudioService extends IAudioService.Stub
 
     @Override
     /** @see AudioManager#permissionUpdateBarrier() */
-    public void permissionUpdateBarrier() {
+    public void permissionUpdateBarrier(boolean forRecord) {
+        if (!forRecord) {
+            return;
+        }
         mCacheWatcher.doCheck();
         List<Future> snapshot;
         synchronized (mScheduledPermissionTasks) {

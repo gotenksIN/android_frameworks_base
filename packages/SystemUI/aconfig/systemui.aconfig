@@ -438,10 +438,11 @@ flag {
 }
 
 flag {
-    name: "enable_inset_focus_rings_in_suw"
+    name: "enable_inset_focus_rings"
     namespace: "systemui"
-    description: "Decides whether to enable inset focus rings in the global actions dialog during the SuW."
+    description: "Decides whether to enable inset focus rings in the global actions dialog."
     bug: "484084632"
+    is_fixed_read_only: true
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -596,13 +597,6 @@ flag {
     namespace: "systemui"
     description: "Extends the on-screen display duration for HUNs when a mouse is detected."
     bug: "456554989"
-}
-
-flag {
-   name: "face_auth_low_light_animation"
-   namespace: "systemui"
-   description: "When a user is authenticating with face in low light scenarios, play an animation to illuminate the face."
-   bug: "487797673"
 }
 
 flag {
@@ -811,6 +805,13 @@ flag {
 }
 
 flag {
+    name: "issue_recording_use_screen_recording_service"
+    namespace: "systemui"
+    description: "Enables IssueRecordingService to use the new ScreenRecordingService binding."
+    bug: "476328961"
+}
+
+flag {
     name: "keyboard_docking_indicator"
     namespace: "systemui"
     description: "Glow bar indicator reveals upon keyboard docking."
@@ -822,6 +823,16 @@ flag {
     namespace: "systemui"
     description: "Allow showing education for physical keyboard and touchpad"
     bug: "317496783"
+}
+
+flag {
+    name: "keyguard_remove_ime_focus"
+    namespace: "systemui"
+    description: "Keep the window flag FLAG_ALT_FOCUSABLE_IM while on keyguard and only change it when transitioning to bouncer."
+    bug: "422846629"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1624,20 +1635,20 @@ flag {
 }
 
 flag {
+    name: "status_bar_chip_visibility_jank_fix"
+    namespace: "systemui"
+    description: "Fixes the notification icons hopping around when the chip shows/hides"
+    bug: "467677035"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "status_bar_chips_return_animations"
     namespace: "systemui"
     description: "Enables return animations for status bar chips"
     bug: "202516970"
-}
-
-flag {
-    name: "status_bar_chronometer_fixes"
-    namespace: "systemui"
-    description: "Fixes ticking behavior for the chronometer used in status bar chips"
-    bug: "450909625"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1667,6 +1678,13 @@ flag {
     namespace: "systemui"
     description: "Feature flag for the ime chip in desktop status bar"
     bug: "443854916"
+}
+
+flag {
+    name: "status_bar_is_connected_display_chip_controlled_by_config"
+    namespace: "systemui"
+    description: "Enable config to control the connected display chip"
+    bug: "400404040"
 }
 
 flag {
@@ -1855,6 +1873,16 @@ flag {
   namespace: "systemui"
   description: "Use compose's AndroidUiDispatcher as default"
   bug: "460414443"
+}
+
+flag {
+    name: "wakefulness_events_shared_flow"
+    namespace: "systemui"
+    description: "Add/use wakefulnessEvents SharedFlow in PowerInteractor"
+    bug: "489790572"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

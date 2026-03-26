@@ -83,7 +83,6 @@
     <string name="wifi_debugging_allow" msgid="4573224609684957886">"允许"</string>
     <string name="wifi_debugging_secondary_user_title" msgid="2493201475880517725">"不允许使用无线调试功能"</string>
     <string name="wifi_debugging_secondary_user_message" msgid="9085779370142222881">"当前已登录此设备的用户无法开启无线调试功能。要使用此功能，请切换为管理员用户。"</string>
-    <string name="change_connected_wifi_text" msgid="6346095920396568246">"登录后才能更改此设置"</string>
     <string name="usb_contaminant_title" msgid="894052515034594113">"USB 端口已停用"</string>
     <string name="usb_contaminant_message" msgid="7730476585174719805">"为避免液体或碎屑导致您的设备受损，系统已停用 USB 端口，因此目前无法检测任何配件。\n\n系统会在重新允许使用 USB 端口时通知您。"</string>
     <string name="usb_port_enabled" msgid="531823867664717018">"USB 端口已启用，可检测充电器和配件"</string>
@@ -178,8 +177,7 @@
     <string name="screen_record_accessibility_label_show_previous" msgid="5202414285722078012">"显示上一个"</string>
     <string name="screen_record_settings" msgid="2377267679200139285">"录屏设置"</string>
     <string name="screen_record_markup" msgid="5583986085046693669">"标记"</string>
-    <!-- no translation found for screen_record_color_picker (6732567862106107021) -->
-    <skip />
+    <string name="screen_record_color_picker" msgid="6732567862106107021">"颜色选择器"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"视频已保存"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"视频已删除"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"撤销"</string>
@@ -1466,8 +1464,7 @@
     <string name="controls_media_button_prev" msgid="8126822360056482970">"上一首"</string>
     <string name="controls_media_button_next" msgid="6662636627525947610">"下一首"</string>
     <string name="controls_media_button_connecting" msgid="3138354625847598095">"正在连接"</string>
-    <!-- no translation found for controls_media_output_chip (324952606619594635) -->
-    <skip />
+    <string name="controls_media_output_chip" msgid="324952606619594635">"打开输出设置"</string>
     <string name="media_transfer_undo" msgid="1895606387620728736">"撤销"</string>
     <string name="media_move_closer_to_start_cast" msgid="2673104707465013176">"若要在“<xliff:g id="DEVICENAME">%1$s</xliff:g>”上播放，请靠近这台设备"</string>
     <string name="media_move_closer_to_end_cast" msgid="7302555909119374738">"若要在此设备上播放，请再靠近<xliff:g id="DEVICENAME">%1$s</xliff:g>一点"</string>
@@ -1497,7 +1494,7 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"音频输出的可用设备。"</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"音量"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
-    <string name="media_output_dialog_missing_permissions_warning" msgid="4312830846174995199">"如需查看更多设备，您可能需要为“<xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>”授予相应权限"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="4312830846174995199">"如需查看更多设备，您可能需要向“<xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>”授予相应权限"</string>
     <string name="media_output_dialog_warning_button_fix" msgid="3650735180540135181">"打开“<xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>”"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"已连接的音箱"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"扬声器和显示屏"</string>
@@ -1844,13 +1841,14 @@
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"下一页"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"前往下一页"</string>
     <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"返回"</string>
+    <string name="accessibility_close_overlay_box_description" msgid="8399871568780893724">"返回"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"自动填充"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"展开"</string>
     <string name="location_button_text_precise_location" msgid="4441259889842542799">"精确位置"</string>
     <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"使用精确位置"</string>
     <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"共享精确位置"</string>
-    <string name="location_button_text_near_my_precise_location" msgid="7590342799002942963">"靠近我的精确位置"</string>
-    <string name="location_button_text_near_your_precise_location" msgid="3792598666253599055">"靠近您的精确位置"</string>
+    <string name="location_button_text_near_my_precise_location" msgid="7590342799002942963">"在我的精确位置附近"</string>
+    <string name="location_button_text_near_your_precise_location" msgid="3792598666253599055">"在您的精确位置附近"</string>
     <string name="privacy_chip_use_string" msgid="979159484631969073">"<xliff:g id="SENSOR">%1$s</xliff:g> 正在使用中"</string>
     <string name="privacy_chip_use_string_with_app" msgid="6807216002072346877">"<xliff:g id="APP">%2$s</xliff:g> 正在使用 <xliff:g id="SENSOR">%1$s</xliff:g>"</string>
     <string name="privacy_chip_camera_and_mic_text" msgid="6254449489859255607">"相机和麦克风"</string>
@@ -1869,25 +1867,18 @@
     <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"人像美化"</string>
     <string name="av_mic_label" msgid="5427348054144789879">"麦克风"</string>
     <string name="av_camera_label" msgid="7719772172590702343">"相机"</string>
-    <!-- no translation found for av_camera_blur_drill_in_title (3392789469292685354) -->
-    <skip />
+    <string name="av_camera_blur_drill_in_title" msgid="3392789469292685354">"背景模糊处理"</string>
     <string name="av_camera_blur_off" msgid="3170334995799202022">"关闭"</string>
-    <!-- no translation found for av_camera_blur_light (5105255788203563538) -->
-    <skip />
-    <!-- no translation found for av_camera_blur_full (6493497965254048479) -->
-    <skip />
+    <string name="av_camera_blur_light" msgid="5105255788203563538">"轻度虚化处理"</string>
+    <string name="av_camera_blur_full" msgid="6493497965254048479">"重度模糊处理"</string>
     <string name="av_camera_improve_lighting" msgid="1540549414296669133">"改善光线"</string>
     <string name="av_camera_face_retouch" msgid="45890971969486224">"人像美化"</string>
-    <!-- no translation found for av_camera_framing (2948988841290208034) -->
-    <skip />
-    <!-- no translation found for av_studio_mic (1815195630183143501) -->
-    <skip />
-    <!-- no translation found for av_studio_look (631085505786989852) -->
-    <skip />
+    <string name="av_camera_framing" msgid="2948988841290208034">"相机取景"</string>
+    <string name="av_studio_mic" msgid="1815195630183143501">"录音室麦克风"</string>
+    <string name="av_studio_look" msgid="631085505786989852">"摄影棚视效"</string>
     <string name="av_studio_look_effects" msgid="4105109585851068415">"%d 个特效"</string>
     <string name="av_blur" msgid="405131343487260171">"模糊处理"</string>
-    <!-- no translation found for av_live_captions (802763867449401889) -->
-    <skip />
+    <string name="av_live_captions" msgid="802763867449401889">"实时字幕"</string>
     <string name="av_drill_in_return_to_main" msgid="5273814393426741827">"返回"</string>
     <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"电量：%s"</string>
     <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"左侧电量：%1$s    右侧电量：%2$s"</string>
@@ -1901,4 +1892,11 @@
     <string name="dream_setup_title" msgid="7996530071414508238">"设置屏保"</string>
     <string name="dream_setup_button_not_now" msgid="8028385323668620805">"以后再说"</string>
     <string name="dream_setup_button_setup" msgid="4755361016017554826">"设置"</string>
+    <string name="ace_attribution_dialog_settings_label" msgid="8898211593287114433">"设置"</string>
+    <string name="ace_attribution_dialog_title" msgid="5236154464063969824">"魔力锦囊建议"</string>
+    <string name="ace_attribution_dialog_description" msgid="1431906058759687758">"此建议参考的项目"</string>
+    <string name="ace_attribution_header_icon_accessibility_description" msgid="7385840112370423581">"Android Device Intelligence 图标"</string>
+    <string name="ace_attribution_settings_button_accessibility_description" msgid="8426163772933746374">"“设置”按钮"</string>
+    <string name="ace_attribution_thumbs_up_button_accessibility_description" msgid="3561722934830934360">"“我喜欢”反馈按钮"</string>
+    <string name="ace_attribution_thumbs_down_button_accessibility_description" msgid="5471283747650437662">"“不喜欢”反馈按钮"</string>
 </resources>

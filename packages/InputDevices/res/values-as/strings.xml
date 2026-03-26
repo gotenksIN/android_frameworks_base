@@ -34,8 +34,7 @@
     <string name="keyboard_layout_brazilian" msgid="5117896443147781939">"ব্ৰাজিলিয়ান"</string>
     <string name="keyboard_layout_portuguese" msgid="2888198587329660305">"পৰ্টুগীজ"</string>
     <string name="keyboard_layout_slovak" msgid="2469379934672837296">"শ্ল\'ভাক"</string>
-    <!-- no translation found for keyboard_layout_slovak_qwerty (2786027565675359502) -->
-    <skip />
+    <string name="keyboard_layout_slovak_qwerty" msgid="2786027565675359502">"শ্ল’ভাক, QWERTY শৈলী"</string>
     <string name="keyboard_layout_slovenian" msgid="1735933028924982368">"শ্ল\'ভেনিয়া"</string>
     <string name="keyboard_layout_turkish" msgid="7736163250907964898">"তুৰ্কী"</string>
     <string name="keyboard_layout_turkish_f" msgid="9130320856010776018">"টুৰ্কিছ F"</string>
@@ -60,6 +59,14 @@
     <string name="keyboard_layout_montenegrin_cyrillic" msgid="2391253952894077421">"মণ্টেনেগ্ৰিণ (চিৰিলিক)"</string>
     <string name="keyboard_layout_romanian" msgid="8698989892731726903">"ৰোমানিয়ান"</string>
     <string name="keyboard_layout_english_india" msgid="7962353311188603367">"ইংৰাজী (ভাৰত)"</string>
+    <!-- no translation found for playstation_controller_circle_button (7568652559479549725) -->
+    <skip />
+    <!-- no translation found for playstation_controller_triangle_button (3965043076982375703) -->
+    <skip />
+    <!-- no translation found for playstation_controller_square_button (1023556625092062728) -->
+    <skip />
+    <!-- no translation found for playstation_controller_cross_button (8699108012800733863) -->
+    <skip />
     <string name="default_game_controller_down_button" msgid="230251187173899352">"তললৈ নিয়াৰ বুটাম"</string>
     <string name="default_game_controller_left_button" msgid="230625759940755272">"বাওঁফাললৈ নিয়াৰ বুটাম"</string>
     <string name="default_game_controller_right_button" msgid="6973117058284059868">"সোঁফাললৈ নিয়াৰ বুটাম"</string>

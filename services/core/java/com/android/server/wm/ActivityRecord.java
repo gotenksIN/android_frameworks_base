@@ -4522,9 +4522,7 @@ public final class ActivityRecord extends WindowToken {
         getDisplayContent().mUnknownAppVisibilityController.appRemovedOrHidden(this);
         mWmService.mSnapshotController.onAppRemoved(this);
         mAtmService.mStartingProcessActivities.remove(this);
-
-        mTaskSupervisor.getActivityMetricsLogger().notifyActivityRemoved(this);
-        mTaskSupervisor.mStoppingActivities.remove(this);
+        mTaskSupervisor.onActivityRemovedFromDisplay(this);
 
         mAppCompatController.getLetterboxPolicy().stop();
         mAppCompatController.getTransparentPolicy().stop();
@@ -7980,9 +7978,10 @@ public final class ActivityRecord extends WindowToken {
                 }
             }
         }
-        mAppCompatController.getSandboxingPolicy().resolveTmpOverrides(newParentConfiguration,
-                isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds(),
-                shouldApplyLegacyInsets, getAppCompatDisplayInsets());
+        final AppCompatSandboxingPolicy sandboxPolicy = mAppCompatController.getSandboxingPolicy();
+        sandboxPolicy.resolveTmpOverrides(newParentConfiguration, isFixedRotationTransforming(),
+                safeRegionPolicy.getLatestSafeRegionBounds(), shouldApplyLegacyInsets,
+                getAppCompatDisplayInsets());
 
         // Can't use resolvedConfig.windowConfiguration.getWindowingMode() because it can be
         // different from windowing mode of the task (PiP) during transition from fullscreen to PiP
@@ -8068,6 +8067,8 @@ public final class ActivityRecord extends WindowToken {
         mConfigurationSeq = Math.max(++mConfigurationSeq, 1);
         getResolvedOverrideConfiguration().seq = mConfigurationSeq;
 
+        sandboxPolicy.sandboxBoundsIfNeeded(resolvedConfig, newParentConfiguration);
+
         // TODO(b/392069771): Move to AppCompatSandboxingPolicy.
         // Sandbox max bounds by setting it to the activity bounds, if activity is letterboxed, or
         // has or will have mAppCompatDisplayInsets for size compat. Also forces an activity to be
@@ -8097,9 +8098,6 @@ public final class ActivityRecord extends WindowToken {
             resolvedConfig.windowConfiguration.setMaxBounds(mTmpBounds);
         }
 
-        mAppCompatController.getSandboxingPolicy().sandboxBoundsIfNeeded(resolvedConfig,
-                parentWindowingMode);
-
         applySizeOverrideIfNeeded(
                 mDisplayContent,
                 info.applicationInfo,
@@ -8109,7 +8107,7 @@ public final class ActivityRecord extends WindowToken {
                 hasFixedRotationTransform(),
                 getAppCompatDisplayInsets() != null,
                 task);
-        mAppCompatController.getSandboxingPolicy().resetTmpOverrides();
+        sandboxPolicy.resetTmpOverrides();
 
         logAppCompatState();
     }
@@ -8125,11 +8123,11 @@ public final class ActivityRecord extends WindowToken {
 
     void computeConfigByResolveHint(@NonNull Configuration resolvedConfig,
             @NonNull Configuration parentConfig) {
-        final ConfigOverrideHint resolveConfigHint =
-                mAppCompatController.getSandboxingPolicy().getResolveConfigHint();
+        final AppCompatSandboxingPolicy sandboxPolicy = mAppCompatController.getSandboxingPolicy();
+        final ConfigOverrideHint resolveConfigHint = sandboxPolicy.getResolveConfigHint();
         task.computeConfigResourceOverrides(resolvedConfig, parentConfig, resolveConfigHint);
         // Reset the temp info which should only take effect for the specified computation.
-        mAppCompatController.getSandboxingPolicy().resetDisplayInfoOverride();
+        sandboxPolicy.resetDisplayInfoOverride();
     }
 
     /**

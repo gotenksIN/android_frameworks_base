@@ -12599,6 +12599,7 @@ package android.content {
     field public static final String CATEGORY_UNIT_TEST = "android.intent.category.UNIT_TEST";
     field public static final String CATEGORY_VOICE = "android.intent.category.VOICE";
     field public static final String CATEGORY_VR_HOME = "android.intent.category.VR_HOME";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String CATEGORY_XR_PROJECTED_LAUNCHER = "android.intent.category.XR_PROJECTED_LAUNCHER";
     field public static final int CHOOSER_CONTENT_TYPE_ALBUM = 1; // 0x1
     field @NonNull public static final android.os.Parcelable.Creator<android.content.Intent> CREATOR;
     field public static final String EXTRA_ALARM_COUNT = "android.intent.extra.ALARM_COUNT";

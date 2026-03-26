@@ -183,9 +183,12 @@ public final class ComputerControlSessionProcessor {
                 "create session");
         final List<String> targetPackagesForConsentRequest = new ArrayList<>();
         if (opResult == AppOpsManager.MODE_IGNORED || opResult == AppOpsManager.MODE_ERRORED) {
-            Slog.w(TAG, "No permission to request computer control session: " + request.name());
-            dispatchSessionCreationFailed(request, ComputerControlSession.ERROR_PERMISSION_DENIED);
-            return;
+            if (!android.companion.virtualdevice.flags.Flags.computerControlPerAppConsent()) {
+                Slog.w(TAG, "No permission to request computer control session: " + request.name());
+                dispatchSessionCreationFailed(request,
+                        ComputerControlSession.ERROR_PERMISSION_DENIED);
+                return;
+            }
         }
         if (opResult == AppOpsManager.MODE_ALLOWED) {
             if (android.companion.virtualdevice.flags.Flags.computerControlPerAppConsent()) {

@@ -161,9 +161,12 @@ public class RequestComputerControlAccessFragment extends DialogFragment {
                 mAgentPackageName, null,
                 "Package " + mAgentPackageName + " is requesting computer control access");
         if (result == AppOpsManager.MODE_IGNORED || result == AppOpsManager.MODE_ERRORED) {
-            Log.w(TAG,
-                    mAgentPackageName + " does not have APP_OP permission to open consent dialog");
-            sendResult(Activity.RESULT_CANCELED);
+            if (!isPerAppConsentEnabled()) {
+                Log.w(TAG,
+                        mAgentPackageName
+                                + " does not have APP_OP permission to open consent dialog");
+                sendResult(Activity.RESULT_CANCELED);
+            }
         }
     }
 
@@ -182,6 +185,7 @@ public class RequestComputerControlAccessFragment extends DialogFragment {
 
     private void onAllow(View view) {
         resetDenialCount();
+        setComputerControlOp(AppOpsManager.MODE_ALLOWED);
         sendResult(Activity.RESULT_OK);
     }
 

@@ -15013,17 +15013,6 @@ public final class Settings {
                 "enable_non_resizable_multi_window";
 
         /**
-         * If true, shadows drawn around the window will be rendered by the system compositor. If
-         * false, shadows will be drawn by the client by setting an elevation on the root view and
-         * the contents will be inset by the surface insets.
-         * (0 = false, 1 = true)
-         * @hide
-         */
-        @Readable
-        public static final String DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR =
-                "render_shadows_in_compositor";
-
-        /**
          * Policy to be used for the display shade when connected to an external display.
          * @hide
          */

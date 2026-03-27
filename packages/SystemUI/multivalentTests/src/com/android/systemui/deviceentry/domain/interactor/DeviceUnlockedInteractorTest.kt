@@ -765,6 +765,25 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
             assertThat(isUnlocked).isTrue()
         }
 
+    @Test
+    fun unlockNow_rejectedIfUserSwitchInProgress() =
+        testScope.runTest {
+            setLockAfterScreenTimeout(5000)
+            val isUnlocked by collectLastValue(underTest.deviceUnlockStatus.map { it.isUnlocked })
+            unlockDevice()
+            assertThat(isUnlocked).isTrue()
+            underTest.lockNow("test")
+            runCurrent()
+            assertThat(isUnlocked).isFalse()
+
+            kosmos.fakeUserRepository.setMainUserIsUserSwitching()
+
+            underTest.unlockNowForPowerButtonGesture("test")
+
+            runCurrent()
+            assertThat(isUnlocked).isFalse()
+        }
+
     // Regression test for b/457867010
     @Test
     fun deviceUnlockStatus_doesLock_whenLockNowIsCalled_beforeAuthenticationMethodChanges() =

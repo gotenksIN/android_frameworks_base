@@ -28,12 +28,15 @@ import android.os.Handler
 import android.os.LocaleList
 import android.os.Looper
 import android.os.UserHandle
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.testing.TestableContext
 import androidx.test.filters.SmallTest
 import com.android.launcher3.icons.BaseIconFactory
 import com.android.launcher3.icons.BaseIconFactory.Companion.MODE_DEFAULT
 import com.android.launcher3.icons.IconProvider
+import com.android.window.flags.Flags
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.TestShellExecutor
@@ -139,7 +142,8 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
     }
 
     @Test
-    fun testGetNameAndHeaderIcon_notCached_loadsResourceAndCaches() = runTest {
+    @DisableFlags(Flags.FLAG_USE_BASE_INTENT_LABEL_FOR_APP_HEADER_TITLE)
+    fun testGetNameAndHeaderIcon_notCached_loadsResourceAndCaches_applicationLabel() = runTest {
         val task = createTaskInfo(context.userId)
         loader.onWindowDecorCreated(task)
 
@@ -148,7 +152,27 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
 
         verify(mockPackageManager).getApplicationLabel(task.topActivityInfo!!.applicationInfo)
         verify(mockHeaderIconFactory).createIconBitmap(any(), anyFloat(), anyInt(), anyBoolean())
-        assertThat(loader.taskToResourceCache[task.taskId]?.appName).isNotNull()
+        assertThat(loader.taskToResourceCache[task.taskId]?.appName).isEqualTo(APP_LABEL)
+        assertThat(loader.taskToResourceCache[task.taskId]?.appIcon).isNotNull()
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_USE_BASE_INTENT_LABEL_FOR_APP_HEADER_TITLE)
+    fun testGetNameAndHeaderIcon_notCached_loadsResourceAndCaches() = runTest {
+        val task = createTaskInfo(context.userId)
+        loader.onWindowDecorCreated(task)
+
+        loader.getNameAndHeaderIcon(task)
+        advanceUntilIdle()
+
+        verify(mockPackageManager)
+            .getText(
+                task.topActivityInfo!!.packageName,
+                task.topActivityInfo!!.labelRes,
+                task.topActivityInfo!!.applicationInfo,
+            )
+        verify(mockHeaderIconFactory).createIconBitmap(any(), anyFloat(), anyInt(), anyBoolean())
+        assertThat(loader.taskToResourceCache[task.taskId]?.appName).isEqualTo(ACTIVITY_LABEL)
         assertThat(loader.taskToResourceCache[task.taskId]?.appIcon).isNotNull()
     }
 
@@ -157,7 +181,7 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
         val task = createTaskInfo(context.userId)
         task.configuration.setLocales(LocaleList(Locale.US))
         loader.onWindowDecorCreated(task)
-        loader.taskToResourceCache[task.taskId] = AppResources("App Name", mock(), mock(), mock())
+        loader.taskToResourceCache[task.taskId] = AppResources(APP_LABEL, mock(), mock(), mock())
         loader.localeListOnCache[task.taskId] = LocaleList(Locale.US)
 
         loader.getNameAndHeaderIcon(task)
@@ -166,19 +190,42 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_USE_BASE_INTENT_LABEL_FOR_APP_HEADER_TITLE)
+    fun testGetNameAndHeaderIcon_cached_localesChanged_loadsResourceAndCaches_applicationLabel() =
+        runTest {
+            val task = createTaskInfo(context.userId)
+            loader.onWindowDecorCreated(task)
+            loader.taskToResourceCache[task.taskId] =
+                AppResources(APP_LABEL, mock(), mock(), mock())
+            loader.localeListOnCache[task.taskId] = LocaleList(Locale.US, Locale.FRANCE)
+            task.configuration.setLocales(LocaleList(Locale.FRANCE, Locale.US))
+            val frenchAppLabel = "Le nom de l'application"
+            doReturn(frenchAppLabel).whenever(mockPackageManager).getApplicationLabel(any())
+
+            val result = loader.getNameAndHeaderIcon(task)
+            advanceUntilIdle()
+
+            assertThat(result.first).isEqualTo(frenchAppLabel)
+            assertThat(loader.taskToResourceCache[task.taskId]?.appName).isEqualTo(frenchAppLabel)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_USE_BASE_INTENT_LABEL_FOR_APP_HEADER_TITLE)
     fun testGetNameAndHeaderIcon_cached_localesChanged_loadsResourceAndCaches() = runTest {
         val task = createTaskInfo(context.userId)
         loader.onWindowDecorCreated(task)
-        loader.taskToResourceCache[task.taskId] = AppResources("App Name", mock(), mock(), mock())
+        loader.taskToResourceCache[task.taskId] =
+            AppResources(ACTIVITY_LABEL, mock(), mock(), mock())
         loader.localeListOnCache[task.taskId] = LocaleList(Locale.US, Locale.FRANCE)
         task.configuration.setLocales(LocaleList(Locale.FRANCE, Locale.US))
-        doReturn("Le App Name").whenever(mockPackageManager).getApplicationLabel(any())
+        val frenchActivityLabel = "Le nom de l'activité"
+        doReturn(frenchActivityLabel).whenever(mockPackageManager).getText(any(), any(), any())
 
         val result = loader.getNameAndHeaderIcon(task)
         advanceUntilIdle()
 
-        assertThat(result.first).isEqualTo("Le App Name")
-        assertThat(loader.taskToResourceCache[task.taskId]?.appName).isEqualTo("Le App Name")
+        assertThat(result.first).isEqualTo(frenchActivityLabel)
+        assertThat(loader.taskToResourceCache[task.taskId]?.appName).isEqualTo(frenchActivityLabel)
     }
 
     @Test
@@ -196,7 +243,8 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
     fun testGetVeilIcon_cached_returnsFromCache() = runTest {
         val task = createTaskInfo(context.userId)
         loader.onWindowDecorCreated(task)
-        loader.taskToResourceCache[task.taskId] = AppResources("App Name", mock(), mock(), mock())
+        loader.taskToResourceCache[task.taskId] =
+            AppResources(ACTIVITY_LABEL, mock(), mock(), mock())
 
         loader.getVeilIcon(task)
 
@@ -251,12 +299,25 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
     private fun createTaskInfo(userId: Int): ActivityManager.RunningTaskInfo {
         val appIconDrawable = mock<Drawable>()
         val badgedAppIconDrawable = mock<Drawable>()
-        val activityInfo = ActivityInfo().apply { applicationInfo = ApplicationInfo() }
+        val activityInfo =
+            ActivityInfo().apply {
+                applicationInfo = ApplicationInfo()
+                labelRes = 1234
+                packageName = "com.foo"
+            }
         val componentName = ComponentName("com.foo", "BarActivity")
         whenever(mockPackageManager.getActivityInfo(eq(componentName), anyInt()))
             .thenReturn(activityInfo)
         whenever(mockPackageManager.getApplicationLabel(activityInfo.applicationInfo))
-            .thenReturn("Test App")
+            .thenReturn(APP_LABEL)
+        whenever(
+                mockPackageManager.getText(
+                    activityInfo.packageName,
+                    activityInfo.labelRes,
+                    activityInfo.applicationInfo,
+                )
+            )
+            .thenReturn(ACTIVITY_LABEL)
         whenever(mockPackageManager.getUserBadgedIcon(appIconDrawable, UserHandle.of(userId)))
             .thenReturn(badgedAppIconDrawable)
         whenever(mockIconProvider.getIcon(activityInfo)).thenReturn(appIconDrawable)
@@ -269,5 +330,10 @@ class WindowDecorTaskResourceLoaderTest : ShellTestCase() {
             .setBaseIntent(Intent().apply { component = componentName })
             .build()
             .apply { topActivityInfo = activityInfo }
+    }
+
+    companion object {
+        private const val APP_LABEL = "Test App"
+        private const val ACTIVITY_LABEL = "Test Activity"
     }
 }

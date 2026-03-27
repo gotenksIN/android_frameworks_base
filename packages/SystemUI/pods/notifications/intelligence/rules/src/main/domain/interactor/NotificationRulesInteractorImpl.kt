@@ -41,4 +41,8 @@ constructor(private val repository: NotificationRulesRepository) : NotificationR
     override suspend fun saveRule(rule: DraftRuleModel): Boolean {
         return repository.saveRule(rule)
     }
+
+    override suspend fun deleteRule(ruleId: Int): Boolean {
+        return repository.deleteRule(ruleId)
+    }
 }

@@ -20,6 +20,10 @@ import android.content.Context
 import android.content.res.Resources
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
@@ -30,6 +34,8 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.RuleMo
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class NotificationRulesScreenViewModelImpl
 @AssistedInject
@@ -37,6 +43,7 @@ constructor(
     @Assisted override val backStack: List<RulesScreenViewState>,
     private val interactor: NotificationRulesInteractor,
     private val contactsInteractor: ContactsInteractor,
+    @Application private val applicationScope: CoroutineScope,
     @NotificationRulesLog logBuffer: LogBuffer,
 ) : NotificationRulesScreenViewModel, HydratedActivatable() {
     private val logger = Logger(logBuffer, "ScreenViewModel")
@@ -46,6 +53,10 @@ constructor(
 
     override val currentScreen: RulesScreenViewState
         get() = backStack[backStack.size - 1]
+
+    // Note: This only stores a single rule ID, so only one rule can show a deletion error at a time
+    override var ruleWithDeletionError: Int? by mutableStateOf(null)
+        private set
 
     override fun buildRuleText(rule: RuleModel, resources: Resources): RuleDisplayModel {
         return buildReadOnlyRuleText(rule, resources, logger)
@@ -57,6 +68,19 @@ constructor(
         sizePx: Int,
     ): Bitmap? {
         return contactsInteractor.loadBitmapFromUri(uri, userContext, sizePx)
+    }
+
+    override fun deleteRule(ruleId: Int) {
+        // Use application scope so it's never cancelled
+        applicationScope.launch {
+            val wasDeletedSuccessfully = interactor.deleteRule(ruleId)
+            ruleWithDeletionError =
+                if (wasDeletedSuccessfully) {
+                    null
+                } else {
+                    ruleId
+                }
+        }
     }
 
     @AssistedFactory

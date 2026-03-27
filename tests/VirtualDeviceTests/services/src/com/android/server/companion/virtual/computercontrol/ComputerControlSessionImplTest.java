@@ -1781,6 +1781,50 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
+    public void updateInsets_subsequentUpdate_callsUpdateViewLayout() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        setupMockMirror();
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(
+                mA11yEmbeddedConnectionReceiver, new SurfaceControl());
+        Insets initialInsets = Insets.of(10, 20, 30, 40);
+
+        // First update should add the view
+        mirror.updateInsets(initialInsets);
+        verify(mWindowManager, timeout(UI_THREAD_TIMEOUT_MS)).addView(any(), any());
+
+        Insets newInsets = Insets.of(15, 25, 35, 45);
+
+        // Subsequent update should update the view layout instead of adding a new one
+        mirror.updateInsets(newInsets);
+        verify(mWindowManager, timeout(UI_THREAD_TIMEOUT_MS)).updateViewLayout(any(),
+                mLayoutParamsCaptor.capture());
+
+        WindowManager.LayoutParams lp = mLayoutParamsCaptor.getValue();
+        assertThat(lp.providedInsets).hasLength(4);
+        assertThat(lp.providedInsets[0].getInsetsSize()).isEqualTo(Insets.of(15, 0, 0, 0));
+        assertThat(lp.providedInsets[1].getInsetsSize()).isEqualTo(Insets.of(0, 25, 0, 0));
+        assertThat(lp.providedInsets[2].getInsetsSize()).isEqualTo(Insets.of(0, 0, 35, 0));
+        assertThat(lp.providedInsets[3].getInsetsSize()).isEqualTo(Insets.of(0, 0, 0, 45));
+    }
+
+    @Test
+    public void updateInsets_toNone_removesView() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        setupMockMirror();
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(
+                mA11yEmbeddedConnectionReceiver, new SurfaceControl());
+        Insets initialInsets = Insets.of(10, 20, 30, 40);
+
+        // First update should add the view
+        mirror.updateInsets(initialInsets);
+        verify(mWindowManager, timeout(UI_THREAD_TIMEOUT_MS)).addView(any(), any());
+
+        // Updating to Insets.NONE should remove the view
+        mirror.updateInsets(Insets.NONE);
+        verify(mWindowManager, timeout(UI_THREAD_TIMEOUT_MS)).removeView(any());
+    }
+
+    @Test
     public void closeInteractiveMirror_removesInsets() throws Exception {
         createComputerControlSession(mDefaultParams);
         setupMockMirror();

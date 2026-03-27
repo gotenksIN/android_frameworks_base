@@ -2643,7 +2643,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
             return;
         }
         mRemoteAccessibilityController.associateHierarchy(connection,
-                getViewRootImpl().mLeashToken, getAccessibilityViewId(),
+                getViewRootImpl().getAccessibilityLeashToken(), getAccessibilityViewId(),
                 getAccessibilityWindowId());
 
         updateEmbeddedAccessibilityMatrix(true);

@@ -240,13 +240,6 @@ flag {
 }
 
 flag {
-    name: "enable_caption_compat_inset_force_consumption_always"
-    namespace: "lse_desktop_experience"
-    description: "Enables force-consumption of caption bar insets for all apps in freeform"
-    bug: "352563889"
-}
-
-flag {
     name: "enable_close_lid_wm_shell_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enables Shell-side bugfixes for close lid feature."
@@ -638,6 +631,7 @@ flag {
     description: "Enables the ability for an activity to specify if it should be kept fullscreen /n"
                  "when launching in a new task."
     bug: "473009156"
+    is_exported: true
 }
 
 flag {
@@ -734,6 +728,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Fixes desktop to split screen on non default displays"
     bug: "390231697"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_open_by_default_dialog_focus_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables a bugfix to ensure the open by default dialog requests and releases input focus correctly."
+    bug: "489615986"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -937,17 +941,6 @@ flag {
     description: "Disable the veil animation and add a new animation for window maximization /n"
                  "and restoration for apps controlled by app compatibility framework."
     bug: "492012623"
-}
-
-flag {
-    name: "enable_window_context_resources_update_on_config_change"
-    namespace: "lse_desktop_experience"
-    description: "Updates window context resources before the view receives the config change callback."
-    bug: "394527409"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

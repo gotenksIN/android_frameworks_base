@@ -24,6 +24,7 @@ import android.annotation.Nullable;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.PendingIntent;
+import android.companion.virtual.computercontrol.ComputerControlSessionParams.NotificationParams;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -51,6 +52,7 @@ import android.view.inputmethod.InputConnection;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.os.IResultReceiver;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -265,6 +267,7 @@ public final class ComputerControlSession implements AutoCloseable {
     @NonNull
     private final Runnable mOnClosedRunnable;
 
+    private final InjectedA11yManager mA11yManager;
     private final ComputerControlAccessibilityProxy mAccessibilityProxy;
 
     private final IComputerControlLifecycleCallback mRemoteLifecycleCallback =
@@ -273,6 +276,7 @@ public final class ComputerControlSession implements AutoCloseable {
                 public void onActive() {
                     synchronized (mLifecycle) {
                         mLifecycle.onActive();
+                        mA11yManager.registerDisplayProxy(mAccessibilityProxy);
                     }
                 }
 
@@ -281,6 +285,7 @@ public final class ComputerControlSession implements AutoCloseable {
                         @Nullable String blockingPackage) {
                     synchronized (mLifecycle) {
                         mLifecycle.onBlocked(reason, blockingPackage);
+                        mA11yManager.unregisterDisplayProxy(mAccessibilityProxy);
                     }
                 }
 
@@ -289,6 +294,7 @@ public final class ComputerControlSession implements AutoCloseable {
                     releaseResources();
                     synchronized (mLifecycle) {
                         mLifecycle.onClosed(closeReason);
+                        mA11yManager.unregisterDisplayProxy(mAccessibilityProxy);
                     }
                     mOnClosedRunnable.run();
                     mHandlerThread.quitSafely();
@@ -298,9 +304,9 @@ public final class ComputerControlSession implements AutoCloseable {
     /** @hide */
     public ComputerControlSession(int displayId,
             @NonNull IComputerControlSession session,
-            @NonNull Consumer<AccessibilityDisplayProxy> registerA11yDisplayProxy,
+            @NonNull InjectedA11yManager a11yManager,
             @NonNull Runnable onClosedRunnable) {
-        this(displayId, session, registerA11yDisplayProxy, onClosedRunnable,
+        this(displayId, session, a11yManager, onClosedRunnable,
                 DisplayManagerGlobal.getInstance());
     }
 
@@ -308,7 +314,7 @@ public final class ComputerControlSession implements AutoCloseable {
     @VisibleForTesting
     public ComputerControlSession(int displayId,
             @NonNull IComputerControlSession session,
-            @NonNull Consumer<AccessibilityDisplayProxy> registerA11yDisplayProxy,
+            @NonNull InjectedA11yManager a11yManager,
             @NonNull Runnable onClosedRunnable,
             @NonNull DisplayManagerGlobal displayManagerGlobal) {
         mHandlerThread = new HandlerThread("ComputerControlSession");
@@ -316,6 +322,7 @@ public final class ComputerControlSession implements AutoCloseable {
         mHandler = new Handler(mHandlerThread.getLooper());
         mSession = Objects.requireNonNull(session);
         mOnClosedRunnable = onClosedRunnable;
+        mA11yManager = a11yManager;
 
         final Display display = displayManagerGlobal.getRealDisplay(displayId);
         Objects.requireNonNull(display);
@@ -335,7 +342,6 @@ public final class ComputerControlSession implements AutoCloseable {
         }
 
         mAccessibilityProxy = new ComputerControlAccessibilityProxy(displayId, mHandler);
-        registerA11yDisplayProxy.accept(mAccessibilityProxy);
     }
 
     /**
@@ -677,10 +683,12 @@ public final class ComputerControlSession implements AutoCloseable {
 
     /** Creates an interactive virtual display, mirroring the trusted one. */
     @Nullable
-    public InteractiveMirror createInteractiveMirror() {
+    public InteractiveMirror createInteractiveMirror(
+            IResultReceiver a11yEmbeddedConnectionReceiver) {
         try {
             SurfaceControl mirrorSurface = new SurfaceControl();
-            IInteractiveMirror mirror = mSession.createInteractiveMirror(mirrorSurface);
+            IInteractiveMirror mirror = mSession.createInteractiveMirror(
+                    a11yEmbeddedConnectionReceiver, mirrorSurface);
             if (mirror == null) {
                 return null;
             }
@@ -791,7 +799,12 @@ public final class ComputerControlSession implements AutoCloseable {
      * {@link android.app.NotificationManager#notify(String, int, Notification)}
      *
      * @throws IllegalStateException if a notification was already attached.
+     *
+     * @deprecated with ComputerControl v5, use
+     * {@link ComputerControlSessionParams.Builder#setNotificationParams(NotificationParams)}
+     * instead.
      */
+    @Deprecated
     public void attachNotificationInfo(int notificationId, @Nullable String notificationTag) {
         try {
             mSession.attachNotificationInfo(notificationId, notificationTag);
@@ -1111,7 +1124,17 @@ public final class ComputerControlSession implements AutoCloseable {
             final var a11yManager = Objects.requireNonNull(
                     mContext.getSystemService(AccessibilityManager.class));
             mSession = new ComputerControlSession(displayId, session,
-                    a11yManager::registerDisplayProxy, this::onSessionClosed);
+                    new InjectedA11yManager() {
+                        @Override
+                        public void registerDisplayProxy(AccessibilityDisplayProxy proxy) {
+                            a11yManager.registerDisplayProxy(proxy);
+                        }
+
+                        @Override
+                        public void unregisterDisplayProxy(AccessibilityDisplayProxy proxy) {
+                            a11yManager.unregisterDisplayProxy(proxy);
+                        }
+                    }, this::onSessionClosed);
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mCallback.onSessionCreated(mSession)));
         }
@@ -1126,5 +1149,15 @@ public final class ComputerControlSession implements AutoCloseable {
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(mCallback::onSessionClosed));
         }
+    }
+
+    /** @hide */
+    @VisibleForTesting
+    public interface InjectedA11yManager {
+        /** Register a proxy with the accessibility manager. */
+        void registerDisplayProxy(AccessibilityDisplayProxy proxy);
+
+        /** Unregister a proxy with the accessibility manager. */
+        void unregisterDisplayProxy(AccessibilityDisplayProxy proxy);
     }
 }

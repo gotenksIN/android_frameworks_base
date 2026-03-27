@@ -963,7 +963,8 @@
         android:permissionGroup="android.permission-group.UNDEFINED"
         android:label="@string/permlab_writeContacts"
         android:description="@string/permdesc_writeContacts"
-      android:protectionLevel="dangerous" />
+        android:protectionLevel="dangerous"
+        android:permissionFlags="allowedInPrivateComputeCore" />
 
     <!--Allows privileged applications to get details about contact picker sessions,
         including reading and writing sessions.
@@ -977,6 +978,20 @@
         android:name="android.permission.MANAGE_CONTACTS_PICKER_SESSION"
         android:protectionLevel="signature|privileged"
         android:featureFlag="android.content.flags.enable_system_contacts_picker" />
+
+    <!--Allows privileged applications to set the preference of individual activities to always
+        launch in fullscreen when in a new task via the activity property:
+        {@link android.window.PROPERTY_PREFER_FULLSCREEN_IN_NEW_TASK}.
+        <p>This permission is only granted to system apps.
+        <p>Protection level: signature|privileged
+        @SystemApi
+        @hide
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_FULLSCREEN_IN_NEW_TASK_PREFERENCE)
+     -->
+    <permission
+        android:name="android.permission.PREFER_FULLSCREEN_IN_NEW_TASK"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="com.android.window.flags.enable_fullscreen_in_new_task_preference" />
 
     <!-- Allows an app to update the verification status of E2EE contact keys owned by other apps.
         <p>This permission is only granted to system apps.
@@ -2311,7 +2326,8 @@
          @hide
     -->
     <permission android:name="android.permission.ACCESS_CONTEXT_HUB"
-        android:protectionLevel="signature|privileged" />
+        android:protectionLevel="signature|privileged"
+        android:permissionFlags="allowedInPrivateComputeCore" />
     <uses-permission android:name="android.permission.ACCESS_CONTEXT_HUB"/>
 
     <!-- @SystemApi Allows an application to create mock location providers for testing.
@@ -2670,7 +2686,8 @@
         android:permissionGroup="android.permission-group.UNDEFINED"
         android:description="@string/permdesc_bluetooth_connect"
         android:label="@string/permlab_bluetooth_connect"
-        android:protectionLevel="dangerous" />
+        android:protectionLevel="dangerous"
+        android:permissionFlags="allowedInPrivateComputeCore" />
 
     <!-- Required to be able to advertise to nearby Bluetooth devices.
          <p>Protection level: dangerous -->

@@ -79,8 +79,21 @@ public class VisualizerConnection {
                 mVisualizer = IInsightSurfaceVisualizer.Stub.asInterface(service);
 
                 // Perform all the deferred actions now that a visualizer exists.
-                mDeferredActions.forEach(Runnable::run);
-                mDeferredActions.clear();
+                if (mDeferredActions != null && !mDeferredActions.isEmpty()) {
+                    List<Runnable> actionsToRun = new ArrayList<>(mDeferredActions);
+                    mDeferredActions.clear();
+                    for (Runnable action : actionsToRun) {
+                        action.run();
+                    }
+                }
+                try {
+                    service.linkToDeath(() -> mInjector.executeAction(() -> {
+                        teardownVisualizer(name, "visualizer died");
+                        mInjector.onVisualizerDied(mConnectedClientIds);
+                    }), 0);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to link to death for " + name, e);
+                }
             });
         }
 
@@ -134,14 +147,24 @@ public class VisualizerConnection {
          * Execute the given {@link Runnable} action on a shared thread.
          */
         void executeAction(Runnable action);
+
+        /**
+         * Report that the visualizer has died.
+         *
+         * @param connectedClientIds the set of connected client ids
+         */
+        void onVisualizerDied(Set<UUID> connectedClientIds);
     }
 
     private static final class DefaultInjector implements Injector {
         private final Context mContext;
+        private final Consumer<Set<UUID>> mOnVisualizerDiedCallback;
         private final Executor mExecutor;
 
-        DefaultInjector(Context context, Executor executor) {
+        DefaultInjector(Context context, Consumer<Set<UUID>> onVisualizerDiedCallback,
+                Executor executor) {
             mContext = context;
+            mOnVisualizerDiedCallback = onVisualizerDiedCallback;
             mExecutor = executor;
         }
 
@@ -167,13 +190,21 @@ public class VisualizerConnection {
         public void executeAction(Runnable action) {
             mExecutor.execute(action);
         }
+
+        @Override
+        public void onVisualizerDied(Set<UUID> connectedClientIds) {
+            if (mOnVisualizerDiedCallback != null) {
+                mOnVisualizerDiedCallback.accept(connectedClientIds);
+            }
+        }
     }
 
     VisualizerConnection(
             ComponentName componentName,
             Context context,
+            Consumer<Set<UUID>> onVisualizerDiedCallback,
             Executor executor) {
-        this(componentName, new DefaultInjector(context, executor));
+        this(componentName, new DefaultInjector(context, onVisualizerDiedCallback, executor));
     }
 
     @VisibleForTesting

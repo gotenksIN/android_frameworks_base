@@ -28,6 +28,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ANR;
 import static com.android.server.am.ActivityManagerService.MY_PID;
 import static com.android.server.am.ProcessRecord.TAG;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.AnrController;
@@ -65,6 +66,7 @@ import com.android.internal.os.ProcessCpuTracker;
 import com.android.internal.os.ProcfsMemoryUtil.MemorySnapshot;
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.os.anr.AnrLatencyTracker;
+import com.android.internal.security.VerityUtils;
 import com.android.internal.util.FrameworkStatsLog;
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
 import com.android.server.am.trace.SmartTraceUtils;
@@ -546,8 +548,12 @@ class ProcessErrorStateRecord {
                 });
             }
         }
-        // Build memory headers for the ANRing process.
-        LinkedHashMap<String, String> memoryHeaders = buildMemoryHeadersFor(pid);
+        // Build memory and fs-verity headers for the ANRing process.
+        LinkedHashMap<String, String> extraHeaders = buildMemoryHeadersFor(pid);
+        if (extraHeaders == null) {
+            extraHeaders = new LinkedHashMap<>();
+        }
+        appendFsVerityHeaders(extraHeaders);
 
         // Get critical event log before logging the ANR so that it doesn't occur in the log.
         latencyTracker.criticalEventLogStarted();
@@ -661,7 +667,7 @@ class ProcessErrorStateRecord {
         File tracesFile = StackTracesDumpHelper.dumpStackTraces(firstPids,
                 isSilentAnr ? null : processCpuTracker, isSilentAnr ? null : lastPids,
                 nativePidsFuture, tracesFileException, firstPidEndOffset, annotation,
-                criticalEventLog, memoryHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
+                criticalEventLog, extraHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
                 latencyTracker, timeoutRecord);
 
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
@@ -994,6 +1000,25 @@ class ProcessErrorStateRecord {
             Settings.Secure.ANR_SHOW_BACKGROUND,
             0,
             resolver.getUserId()) != 0;
+    }
+
+    private void appendFsVerityHeaders(@NonNull LinkedHashMap<String, String> headers) {
+        if (mApp.info == null) {
+            return;
+        }
+        if (mApp.info.sourceDir != null) {
+            headers.put("BaseFsVerity",
+                    Boolean.toString(VerityUtils.hasFsverity(mApp.info.sourceDir)));
+        }
+        if (mApp.info.splitSourceDirs != null) {
+            for (int i = 0; i < mApp.info.splitSourceDirs.length; i++) {
+                String splitDir = mApp.info.splitSourceDirs[i];
+                if (splitDir != null) {
+                    headers.put("SplitFsVerity" + i,
+                            Boolean.toString(VerityUtils.hasFsverity(splitDir)));
+                }
+            }
+        }
     }
 
     private @Nullable LinkedHashMap<String, String> buildMemoryHeadersFor(int pid) {

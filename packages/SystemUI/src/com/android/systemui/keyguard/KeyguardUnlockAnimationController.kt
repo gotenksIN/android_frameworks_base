@@ -992,10 +992,8 @@ constructor(
                 // SyncRtSurfaceTransactionApplier cannot apply transaction when the target view is
                 // unable to draw
                 val leash: SurfaceControl = surface.leash
-                if (
-                    keyguardViewController.viewRootImpl.view?.visibility != View.VISIBLE &&
-                        leash.isValid
-                ) {
+                if (!leash.isValid) return@forEach
+                if (keyguardViewController.viewRootImpl.view?.visibility != View.VISIBLE) {
                     with(SurfaceControl.Transaction()) {
                         setMatrix(leash, surfaceBehindMatrix, tmpFloat)
                         setCornerRadius(leash, roundedCornerRadius)
@@ -1042,10 +1040,7 @@ constructor(
             // been released. If so, continue on to the next to avoid crashing.
             if (!leash.isValid) return@forEach
 
-            if (
-                keyguardViewController.viewRootImpl.view?.visibility != View.VISIBLE &&
-                    leash.isValid
-            ) {
+            if (keyguardViewController.viewRootImpl.view?.visibility != View.VISIBLE) {
                 with(SurfaceControl.Transaction()) {
                     setAlpha(leash, animationAlpha)
                     apply()

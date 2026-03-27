@@ -22,7 +22,7 @@ import com.airbnb.lottie.LottieAnimationView
 open class LowLightLottieView
 @JvmOverloads
 constructor(context: Context, attrs: AttributeSet? = null) : LottieAnimationView(context, attrs) {
-    open fun startAnimation(onTimeout: () -> Unit) {}
+    open fun startAnimation(onStart: () -> Unit, onTimeout: () -> Unit) {}
 
     open fun fadeOutAnimation(onAnimationStart: () -> Unit) {}
 }

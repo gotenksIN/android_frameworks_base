@@ -23,19 +23,18 @@ import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.style.ImageSpan
 import com.android.internal.R
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.collection.coordinator.shared.NotificationSummarizationAllowAnimation
 import javax.inject.Inject
 
-class SummarizationDecorator @Inject constructor(@ShadeDisplayAware private val context: Context) {
+@SysUISingleton
+open class SummarizationDecorator
+@Inject
+constructor(@ShadeDisplayAware private val context: Context) {
     fun decorateSummarization(entry: NotificationEntry, existingIcon: Drawable?): Drawable? {
-        val iconRes =
-            if (NotificationSummarizationAllowAnimation.isEnabled)
-                context.getDrawable(
-                    com.android.systemui.res.R.drawable.generic_noti_summarization_animated
-                )
-            else context.getDrawable(com.android.internal.R.drawable.ic_notification_summarization)
+        val iconRes = getIconRes()
         val icon = existingIcon ?: iconRes?.mutate()
         val imageSpan =
             icon?.let {
@@ -57,5 +56,16 @@ class SummarizationDecorator @Inject constructor(@ShadeDisplayAware private val 
             decoratedSummary,
         )
         return icon
+    }
+
+    open fun getIconRes(): Drawable? {
+        if (NotificationSummarizationAllowAnimation.isEnabled)
+            return context.getDrawable(
+                com.android.systemui.res.R.drawable.generic_noti_summarization_animated
+            )
+        else
+            return context.getDrawable(
+                com.android.internal.R.drawable.ic_notification_summarization
+            )
     }
 }

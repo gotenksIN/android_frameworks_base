@@ -6215,7 +6215,7 @@ public final class ActiveServices {
         final String procName = r.processName;
         final boolean isPcc = (r.serviceInfo.flags & ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX) != 0;
         final String hostingType;
-        if (r.isStartRequested()) {
+        if (r.isStartRequested() && (whileRestarting || !r.pendingStarts.isEmpty())) {
             hostingType = HostingRecord.HOSTING_TYPE_STARTED_SERVICE;
         } else {
             hostingType = HostingRecord.HOSTING_TYPE_BOUND_SERVICE;

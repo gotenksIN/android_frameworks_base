@@ -17,43 +17,73 @@
 package android.processor.devicepolicy.test
 
 import android.processor.devicepolicy.protos.PolicyMetadata
-import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata
-import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.StringPolicyMetadata
 import android.tools.policymetadata.Generator
 import org.junit.Test
 
 class StringGeneratorTest {
 
-    private fun stringTestPolicy(name: String): PolicyMetadata.Builder =
-        PolicyMetadata.newBuilder()
-            .setIdentifier(simpleNameToFieldName(name))
-            .setTypeSpecificMetadata(
-                TypeSpecificPolicyMetadata.newBuilder()
-                    .setStringMetadata(TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder())
-            )
+    private fun stringTestPolicy(name: String): PolicyMetadata.Builder {
+        return PolicyMetadata.newBuilder().apply {
+            identifier = simpleNameToFieldName(name)
+            typeSpecificMetadataBuilder.stringMetadataBuilder.resolutionMechanismBuilder //
+                .custom = true
+        }
+    }
 
     @Test
     fun test_outputMatches() {
         val javaFile =
             Generator.generate(
-                stringTestPolicy("test.package.PolicyContainer.MY_TEST_STRING_POLICY")
-                    .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
-                    .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                stringTestPolicy("test.package.PolicyContainer.MY_TEST_POLICY").apply {
+                    addAllowedScopes(PolicyMetadata.PolicyScope.POLICY_SCOPE_USER)
+                    affectedResource = PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
+                }
             )
 
         javaFile.assertContainsPolicy(
-            staticImports = listOf("test.package.PolicyContainer.MY_TEST_STRING_POLICY"),
+            staticImports = listOf("test.package.PolicyContainer.MY_TEST_POLICY"),
             code =
                 """
                   policies.add(new StringPolicyMetadata(
-                      /* id= */ MY_TEST_STRING_POLICY,
+                      /* id= */ MY_TEST_POLICY,
                       /* allowedScopes= */ Set.of(
-                          2
+                          1
                       ),
                       /* affectedResource= */ 1,
                       /* requiredPermission= */ null,
                       /* requiredCrossUserPermission= */ null,
                       /* allowedDpcTypes= */ Set.of(),
+                      /* resolutionMechanism= */ null,
+                      /* emptyStringAllowed= */ false,
+                      /* unprintableCharactersAllowed= */ false,
+                      /* maxLength= */ Integer.MAX_VALUE
+                  ));
+                """,
+        )
+    }
+
+    @Test
+    fun test_resolutionMechanismNotCoexistable_outputMatches() {
+        val javaFile =
+            Generator.generate(
+                stringTestPolicy("test.package.MY_TEST_POLICY").apply {
+                    typeSpecificMetadataBuilder.stringMetadataBuilder.resolutionMechanismBuilder
+                        .notCoexistable = true
+                }
+            )
+
+        javaFile.assertContainsPolicy(
+            staticImports = listOf("test.package.MY_TEST_POLICY"),
+            code =
+                """
+                  policies.add(new StringPolicyMetadata(
+                      /* id= */ MY_TEST_POLICY,
+                      /* allowedScopes= */ Set.of(),
+                      /* affectedResource= */ 0,
+                      /* requiredPermission= */ null,
+                      /* requiredCrossUserPermission= */ null,
+                      /* allowedDpcTypes= */ Set.of(),
+                      /* resolutionMechanism= */ new ResolutionMechanismMetadata.NotCoexistable(),
                       /* emptyStringAllowed= */ false,
                       /* unprintableCharactersAllowed= */ false,
                       /* maxLength= */ Integer.MAX_VALUE
@@ -66,16 +96,9 @@ class StringGeneratorTest {
     fun test_withMaxLength_outputMatches() {
         val javaFile =
             Generator.generate(
-                stringTestPolicy("test.package.PolicyContainer.MY_TEST_STRING_POLICY")
-                    .setTypeSpecificMetadata(
-                        TypeSpecificPolicyMetadata.newBuilder()
-                            .setStringMetadata(
-                                TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder()
-                                    .setMaxLength(10)
-                            )
-                    )
-                    .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
-                    .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                stringTestPolicy("test.package.PolicyContainer.MY_TEST_STRING_POLICY").apply {
+                    typeSpecificMetadataBuilder.stringMetadataBuilder.maxLength = 10
+                }
             )
 
         javaFile.assertContainsPolicy(
@@ -84,13 +107,12 @@ class StringGeneratorTest {
                 """
                     policies.add(new StringPolicyMetadata(
                         /* id= */ MY_TEST_STRING_POLICY,
-                        /* allowedScopes= */ Set.of(
-                            2
-                        ),
-                        /* affectedResource= */ 1,
+                        /* allowedScopes= */ Set.of(),
+                        /* affectedResource= */ 0,
                         /* requiredPermission= */ null,
                         /* requiredCrossUserPermission= */ null,
                         /* allowedDpcTypes= */ Set.of(),
+                        /* resolutionMechanism= */ null,
                         /* emptyStringAllowed= */ false,
                         /* unprintableCharactersAllowed= */ false,
                         /* maxLength= */ 10

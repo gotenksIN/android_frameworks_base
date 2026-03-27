@@ -35,6 +35,8 @@ import com.android.systemui.keyguard.shared.model.TransitionState.RUNNING
 import com.android.systemui.keyguard.shared.model.TransitionState.STARTED
 import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.kosmos.testScope
+import com.android.systemui.scene.domain.interactor.sceneInteractor
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.testKosmos
 import com.android.systemui.window.data.repository.fakeWindowRootViewBlurRepository
 import com.google.common.truth.Truth.assertThat
@@ -177,6 +179,45 @@ class DeviceEntryBackgroundViewModelTest : SysuiTestCase() {
             )
             runCurrent()
             assertThat(alpha).isEqualTo(0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsOneWhenOnCommunalScene() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.sceneInteractor.changeScene(toScene = Scenes.Communal, loggingReason = "test")
+            runCurrent()
+
+            val alpha by collectLastValue(underTest.alpha)
+            assertThat(alpha).isEqualTo(1.0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsOneWhenOnShadeScene() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.sceneInteractor.changeScene(toScene = Scenes.Shade, loggingReason = "test")
+            runCurrent()
+
+            val alpha by collectLastValue(underTest.alpha)
+            assertThat(alpha).isEqualTo(1.0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsOneWhenOnQuickSettingsScene() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.sceneInteractor.changeScene(
+                toScene = Scenes.QuickSettings,
+                loggingReason = "test",
+            )
+            runCurrent()
+
+            val alpha by collectLastValue(underTest.alpha)
+            assertThat(alpha).isEqualTo(1.0f)
         }
 
     private fun lockscreenToDozing(value: Float, state: TransitionState = RUNNING): TransitionStep {

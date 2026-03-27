@@ -129,7 +129,6 @@ java_library_static {
         "platform_service_defaults",
         "android.hardware.power-java_shared",
         "latest_android_hardware_broadcastradio_java_static",
-        "services_crashrecovery_stubs_conditionally",
         "ondeviceintelligence_conditionally",
     ],
     srcs: [
@@ -139,6 +138,7 @@ java_library_static {
         ":android.hardware.tv.mediaquality-V2-java-source",
         ":statslog-art-java-gen",
         ":statslog-contexthub-java-gen",
+        ":statslog-crashrecovery-java-gen",
         ":statslog-mediarouter-java-gen",
         ":statslog-privatecompute-java-gen",
         ":services.core-aidl-sources",
@@ -158,9 +158,6 @@ java_library_static {
         "java/com/android/server/am/EventLogTags.logtags",
         "java/com/android/server/wm/EventLogTags.logtags",
         "java/com/android/server/policy/EventLogTags.logtags",
-
-        // Java/AIDL sources to be moved out to CrashRecovery module
-        ":services-crashrecovery-sources",
     ],
 
     libs: [
@@ -177,6 +174,7 @@ java_library_static {
         "monet",
         "power_hint_flags_lib",
         "service-art.stubs.system_server",
+        "service-crashrecovery.stubs.system_server",
         "service-permission.stubs.system_server",
         "service-rkp.stubs.system_server",
         "service-sdksandbox.stubs.system_server",
@@ -385,4 +383,9 @@ cc_library {
         // The polyglot approach relies on multi-line // comments
         "-Wno-comment",
     ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
 }

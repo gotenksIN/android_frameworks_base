@@ -605,6 +605,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 && context.getResources().getBoolean(R.bool.config_enableUdcSysfsUsbStateUpdate)
                 && SELinux.getGenfsLabelsVersion() > MIN_SELINUX_GENFS_LABELS_VERSION;
 
+        Slog.d(TAG, "Enable UDC Sysfs USB State Update: " + mEnableUdcSysfsUsbStateUpdate);
         if (mEnableUdcSysfsUsbStateUpdate) {
             mUEventObserver.startObserving(UDC_SUBSYS_MATCH);
             new Thread("GetUsbControllerSysprop") {
@@ -679,8 +680,10 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     }
 
     private void startAccessoryMode() {
-        if (!mHasUsbAccessory) return;
-
+        if (!mHasUsbAccessory) {
+            Slog.d(TAG, "startAccessoryMode: FEATURE_USB_ACCESSORY not supported");
+            return;
+        }
         int operationId = sUsbOperationCount.incrementAndGet();
 
         if (mEnableAoaUserspaceImplementation) {
@@ -721,6 +724,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         }
 
         if (functions != UsbManager.FUNCTION_NONE) {
+            Slog.d(TAG, "startAccessoryMode: Setting FUNCTION_ACCESSORY");
             mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_ACCESSORY_MODE_ENTER_TIMEOUT),
                     ACCESSORY_REQUEST_TIMEOUT);
             mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_ACCESSORY_HANDSHAKE_TIMEOUT),
@@ -1119,7 +1123,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         protected void notifyAccessoryModeExit(int operationId) {
             // make sure accessory mode is off
             // and restore default functions
-            Slog.d(TAG, "exited USB accessory mode");
+            Slog.d(TAG, "exited USB accessory mode, operationId= " + operationId);
             setEnabledFunctions(UsbManager.FUNCTION_NONE, false, operationId);
 
             if (mCurrentAccessory != null) {
@@ -1643,9 +1647,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     break;
                 }
                 case MSG_ACCESSORY_HANDSHAKE_TIMEOUT: {
-                    if (DEBUG) {
-                        Slog.v(TAG, "Accessory handshake timeout");
-                    }
+                    Slog.i(TAG, "Accessory handshake timeout");
                     if (mBootCompleted) {
                         broadcastUsbAccessoryHandshake();
                     } else {

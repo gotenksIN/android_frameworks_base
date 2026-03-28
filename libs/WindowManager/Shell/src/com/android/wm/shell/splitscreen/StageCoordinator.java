@@ -1452,7 +1452,7 @@ public class StageCoordinator extends StageCoordinatorAbstract {
             return;
         }
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
-                "setExcludeImeInsets: root taskId=%s exclude=%s",
+                "setExcludeImeInsets: root taskId=%d exclude=%b",
                 mSplitRootTaskInfo.taskId, exclude);
         wct.setExcludeImeInsets(mSplitRootTaskInfo.token, exclude);
         mTaskOrganizer.applyTransaction(wct);

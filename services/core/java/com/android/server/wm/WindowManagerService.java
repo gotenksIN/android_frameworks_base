@@ -8956,6 +8956,8 @@ public class WindowManagerService extends IWindowManager.Stub
                     return;
                 }
                 mDisplayWindowSettings.setCanStealTopFocus(dc, canStealTopFocus);
+                mDisplayWindowSettings.applySettingsToDisplayLocked(dc,
+                        /* includeRotationSettings= */false);
             }
         }
 

@@ -153,6 +153,8 @@ import kotlinx.coroutines.flow.flowOf
 // QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
 // QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
+
 // QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
 
 /**
@@ -310,35 +312,46 @@ class MobileConnectionRepositoryImpl(
             .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initial)
     }
 
+
+    private val fiveGStateCache = ConcurrentHashMap<Int, StateFlow<TelephonyCallbackState>>()
 // QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
     private fun getFiveGStateFlow(slotIndex: Int): Flow<TelephonyCallbackState> {
-        return callbackFlow {
-            val listener =
-                object : IFiveGStateListener {
-                    override fun onStateChanged(serviceState: FiveGServiceState) {
+        return fiveGStateCache.getOrPut(slotIndex) {
+            callbackFlow {
+                val listener =
+                    object : IFiveGStateListener {
+                        override fun onStateChanged(serviceState: FiveGServiceState) {
 // QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-                        logger.logOnRadioIconTypeChanged(serviceState.radioIconType,
+                            logger.logOnRadioIconTypeChanged(
+                                serviceState.radioIconType,
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-                            serviceState.is6Rx, subId)
+                                serviceState.is6Rx, subId
+                            )
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-                        trySend(CallbackEvent.OnRadioIconTypeChanged(serviceState.radioIconType,
+                            trySend(
+                                CallbackEvent.OnRadioIconTypeChanged(
+                                    serviceState.radioIconType,
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-                            serviceState.is6Rx))
+                                    serviceState.is6Rx
+                                )
+                            )
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 // QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-                    }
+                        }
 
-                    override fun onCiwlanAvailableChanged(available: Boolean) {
-                        logger.logOnCiwlanAvailableChanged(available, subId)
-                        trySend(CallbackEvent.OnCiwlanAvailableChanged(available))
+                        override fun onCiwlanAvailableChanged(available: Boolean) {
+                            logger.logOnCiwlanAvailableChanged(available, subId)
+                            trySend(CallbackEvent.OnCiwlanAvailableChanged(available))
+                        }
                     }
+                fiveGServiceClient.registerListener(slotIndex, listener)
+                awaitClose {
+                    fiveGServiceClient.unregisterListener(slotIndex, listener)
                 }
-            fiveGServiceClient.registerListener(slotIndex, listener)
-            awaitClose {
-                fiveGServiceClient.unregisterListener(slotIndex, listener) }
+            }
+                .scan(TelephonyCallbackState()) { state, event -> state.applyEvent(event) }
+                .stateIn(scope, SharingStarted.WhileSubscribed(), TelephonyCallbackState())
         }
-            .scan(TelephonyCallbackState()) { state, event -> state.applyEvent(event) }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), TelephonyCallbackState())
     }
 
     private val fiveGState: Flow<TelephonyCallbackState> = run {

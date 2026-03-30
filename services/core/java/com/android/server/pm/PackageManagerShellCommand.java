@@ -5210,7 +5210,8 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("  list users");
         pw.println("    Lists the current users.");
         pw.println("");
-        pw.println("  create-user [--profileOf USER_ID] [--managed] [--restricted] [--guest]");
+        pw.println("  create-user [--profileOf USER_ID] [--managed] [--restricted] [--guest] "
+                + "[--demo]");
         pw.println("       [--user-type USER_TYPE] [--ephemeral] [--for-testing] [--pre-create-only]   USER_NAME");
         pw.println("    Create a new user with the given USER_NAME, printing the new user identifier");
         pw.println("    of the user.");
@@ -5220,6 +5221,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      --managed is shorthand for '--user-type android.os.usertype.profile.MANAGED'.");
         pw.println("      --restricted is shorthand for '--user-type android.os.usertype.full.RESTRICTED'.");
         pw.println("      --guest is shorthand for '--user-type android.os.usertype.full.GUEST'.");
+        pw.println("      --demo is shorthand for '--user-type android.os.usertype.full.DEMO'.");
         pw.println("");
         pw.println("  remove-user [--set-ephemeral-if-in-use | --wait] USER_ID");
         pw.println("    Remove the user with the given USER_IDENTIFIER, deleting all data");

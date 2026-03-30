@@ -37,7 +37,8 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
 
     private val frameworkExtractors = listOf(
         DirectProtoLogCallDataExtractor(),
-        IndirectProtoLogCallDataExtractor()
+        IndirectProtoLogCallDataExtractor(),
+        BubbleLogCallDataExtractor(),
     )
 
     override fun getApplicableUastTypes(): List<Class<out UElement>> =
@@ -155,7 +156,7 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
 
             // Only report issues for arguments that are actually passed in this call.
             // Internal arguments of a wrapper are checked at the wrapper definition.
-            if (!call.valueArguments.contains(arg)) {
+            if (!isArgumentPassedInCall(call, arg)) {
                 continue
             }
 
@@ -182,6 +183,15 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
                 }
             }
         }
+    }
+
+    private fun isArgumentPassedInCall(call: UCallExpression, arg: UExpression): Boolean {
+        if (call.valueArguments.contains(arg)) {
+            return true
+        }
+        val callPsi = call.sourcePsi ?: return true
+        val argPsi = arg.sourcePsi ?: return true
+        return com.intellij.psi.util.PsiTreeUtil.isAncestor(callPsi, argPsi, false)
     }
 
     private fun checkArgumentType(context: JavaContext, specifier: Specifier, arg: UExpression) {

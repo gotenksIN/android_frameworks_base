@@ -536,11 +536,9 @@ public class BubbleData {
         Bubble bubbleToReturn = findAndRemoveBubbleFromOverflow(bubbleKey);
         if (bubbleToReturn == null) {
             Icon icon = null;
-            if (Flags.useBubbleIconFromActivityInfo()) {
-                final PackageManager pm =
-                        BubbleController.getPackageManagerForUser(mContext, user.getIdentifier());
-                icon = mAppInfoProvider.getActivityInfoIcon(pm, intent);
-            }
+            final PackageManager pm =
+                    BubbleController.getPackageManagerForUser(mContext, user.getIdentifier());
+            icon = mAppInfoProvider.getActivityInfoIcon(pm, intent);
             bubbleToReturn = Bubble.createAppBubble(intent, user, icon);
         }
         return bubbleToReturn;
@@ -561,11 +559,9 @@ public class BubbleData {
         Bubble bubbleToReturn = findAndRemoveBubbleFromOverflow(bubbleKey);
         if (bubbleToReturn == null) {
             Icon icon = null;
-            if (Flags.useBubbleIconFromActivityInfo()) {
-                final PackageManager pm =
-                        BubbleController.getPackageManagerForUser(mContext, user.getIdentifier());
-                icon = mAppInfoProvider.getActivityInfoIcon(pm, taskInfo.baseIntent);
-            }
+            final PackageManager pm =
+                    BubbleController.getPackageManagerForUser(mContext, user.getIdentifier());
+            icon = mAppInfoProvider.getActivityInfoIcon(pm, taskInfo.baseIntent);
             bubbleToReturn = Bubble.createTaskBubble(taskInfo, user, icon);
         }
         return bubbleToReturn;

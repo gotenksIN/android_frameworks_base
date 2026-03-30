@@ -341,26 +341,22 @@
 
     <!-- Titles for Bluetooth AVRCP Versions -->
     <string-array name="bluetooth_avrcp_versions">
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-        <item>AVRCP 1.6 (Default)</item>
+        <item>AVRCP 1.5</item>
         <item>AVRCP 1.3</item>
         <item>AVRCP 1.4</item>
 <!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
 <!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-        <item>AVRCP 1.5</item>
+        <item>AVRCP 1.6 (Default)</item>
     </string-array>
 
     <!-- Values for Bluetooth AVRCP Versions -->
     <string-array name="bluetooth_avrcp_version_values">
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-        <item>avrcp16</item>
+        <item>avrcp15</item>
         <item>avrcp13</item>
         <item>avrcp14</item>
 <!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
 <!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-        <item>avrcp15</item>
+        <item>avrcp16</item>
     </string-array>
 
     <!-- Titles for Bluetooth MAP Versions -->

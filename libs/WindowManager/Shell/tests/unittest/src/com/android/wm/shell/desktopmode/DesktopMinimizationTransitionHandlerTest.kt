@@ -44,6 +44,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 @SmallTest
@@ -76,6 +78,7 @@ class DesktopMinimizationTransitionHandlerTest : ShellTestCase() {
 
     @Test
     fun startAnimation_openTransition_returnsFalse() {
+        val startTransaction = mock<SurfaceControl.Transaction>()
         val animates =
             handler.startAnimation(
                 transition = mock(),
@@ -84,16 +87,18 @@ class DesktopMinimizationTransitionHandlerTest : ShellTestCase() {
                         type = WindowManager.TRANSIT_OPEN,
                         task = createTask(WINDOWING_MODE_FREEFORM),
                     ),
-                startTransaction = mock(),
+                startTransaction = startTransaction,
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertFalse("Should not animate open transition", animates)
+        verify(startTransaction, never()).apply()
     }
 
     @Test
     fun startAnimation_toBackTransitionOpeningFreeformTask_returnsFalse() {
+        val startTransaction = mock<SurfaceControl.Transaction>()
         val animates =
             handler.startAnimation(
                 transition = mock(),
@@ -102,30 +107,34 @@ class DesktopMinimizationTransitionHandlerTest : ShellTestCase() {
                         changeMode = WindowManager.TRANSIT_OPEN,
                         task = createTask(WINDOWING_MODE_FREEFORM),
                     ),
-                startTransaction = mock(),
+                startTransaction = startTransaction,
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertFalse("Should not animate opening freeform task to back transition", animates)
+        verify(startTransaction, never()).apply()
     }
 
     @Test
     fun startAnimation_toBackTransitionToBackFreeformTask_returnsTrue() {
+        val startTransaction = mock<SurfaceControl.Transaction>()
         val animates =
             handler.startAnimation(
                 transition = mock(),
                 info = createTransitionInfo(task = createTask(WINDOWING_MODE_FREEFORM)),
-                startTransaction = mock(),
+                startTransaction = startTransaction,
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertTrue("Should animate going to back freeform task close transition", animates)
+        verify(startTransaction).apply()
     }
 
     @Test
     fun startAnimation_closeTransitionClosingFreeformTask_returnsTrue() {
+        val startTransaction = mock<SurfaceControl.Transaction>()
         val animates =
             handler.startAnimation(
                 transition = mock(),
@@ -135,16 +144,18 @@ class DesktopMinimizationTransitionHandlerTest : ShellTestCase() {
                         changeMode = TRANSIT_CLOSE,
                         task = createTask(WINDOWING_MODE_FREEFORM),
                     ),
-                startTransaction = mock(),
+                startTransaction = startTransaction,
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertTrue("Should animate going to back freeform task close transition", animates)
+        verify(startTransaction).apply()
     }
 
     @Test
     fun startAnimation_minimizeTransitionToBackFreeformTask_returnsTrue() {
+        val startTransaction = mock<SurfaceControl.Transaction>()
         val animates =
             handler.startAnimation(
                 transition = mock(),
@@ -153,12 +164,13 @@ class DesktopMinimizationTransitionHandlerTest : ShellTestCase() {
                         type = Transitions.TRANSIT_MINIMIZE,
                         task = createTask(WINDOWING_MODE_FREEFORM),
                     ),
-                startTransaction = mock(),
+                startTransaction = startTransaction,
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertTrue("Should animate going to back freeform task minimize transition", animates)
+        verify(startTransaction).apply()
     }
 
     private fun createTransitionInfo(

@@ -77,6 +77,7 @@ import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderView
 import com.android.systemui.screencapture.record.smallscreen.ui.PostRecordSnackbarDialogs
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.PostRecordingActionsViewModel
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.PostRecordingImmediateVideoViewModel
+import com.android.systemui.statusbar.phone.DialogDelegate
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import com.android.systemui.statusbar.phone.SystemUIDialog.DIALOG_WINDOW_TYPE
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
@@ -110,6 +111,10 @@ constructor(
             .create(
                 context = context.createWindowContext(display, DIALOG_WINDOW_TYPE, null),
                 theme = R.style.Theme_SystemUI_Dialog,
+                dialogDelegate =
+                    object : DialogDelegate<SystemUIDialog> {
+                        override fun shouldStashTaskbar(dialog: SystemUIDialog): Boolean = false
+                    },
             ) { dialogInstance ->
                 DialogContent(
                     uri = uri,

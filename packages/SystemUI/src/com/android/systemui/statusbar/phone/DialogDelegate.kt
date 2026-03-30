@@ -57,6 +57,15 @@ interface DialogDelegate<T : Dialog> {
 
     fun getHeight(dialog: T): Int = SystemUIDialog.getDefaultDialogHeight()
 
+    /**
+     * Returns whether this dialog should "stash" the taskbar.
+     *
+     * A stashing dialog typically hides other parts of the UI and prevents them from being
+     * interactable while the dialog is showing. If this method returns false, interface elements
+     * like a Taskbar may be visible and interactable while the dialog is showing.
+     */
+    fun shouldStashTaskbar(dialog: T): Boolean = true
+
     fun getBackAnimationSpec(displayMetricsProvider: () -> DisplayMetrics): BackAnimationSpec =
         BackAnimationSpec.floatingSystemSurfacesForSysUi(displayMetricsProvider)
 

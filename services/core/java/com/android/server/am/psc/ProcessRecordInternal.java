@@ -44,6 +44,7 @@ import android.os.Process;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.util.IndentingPrintWriter;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 
@@ -54,8 +55,6 @@ import com.android.server.am.ProcessOomProto;
 import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
-
-import java.io.PrintWriter;
 
 /** The state info of the process, including proc state, oom adj score, et al. */
 public abstract class ProcessRecordInternal {
@@ -1755,75 +1754,65 @@ public abstract class ProcessRecordInternal {
     /**
      * Dumps the current state of the ProcessRecordInternal to the given PrintWriter.
      *
-     * @param pw The PrintWriter to dump to.
-     * @param prefix The prefix string for each line.
+     * @param pw The IndentingPrintWriter to dump to.
      * @param nowUptime The current uptime in milliseconds.
      */
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void dump(PrintWriter pw, String prefix, long nowUptime) {
-        pw.print(prefix); pw.print("adjSeq="); pw.println(mAdjSeq);
-        pw.print(prefix); pw.print("oom adj: max="); pw.print(mMaxAdj);
-        pw.print(" curRaw="); pw.print(mCurRawAdj);
-        pw.print(" setRaw="); pw.print(mSetRawAdj);
-        pw.print(" cur="); pw.print(mCurAdj);
-        pw.print(" set="); pw.println(mSetAdj);
-        pw.print(prefix); pw.print("mCurSchedGroup="); pw.print(mCurSchedGroup);
-        pw.print(" setSchedGroup="); pw.print(mSetSchedGroup);
-        pw.print(" systemNoUi="); pw.println(mSystemNoUi);
-        pw.print(prefix); pw.print("curProcState="); pw.print(getCurProcState());
-        pw.print(" mRepProcState="); pw.print(mRepProcState);
-        pw.print(" setProcState="); pw.print(mSetProcState);
-        pw.print(" lastStateTime=");
+    public void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
+        pw.print("adjSeq", mAdjSeq).println();
+        pw.print("oom adj: max", mMaxAdj);
+        pw.print("curRaw", mCurRawAdj);
+        pw.print("setRaw", mSetRawAdj);
+        pw.print("cur", mCurAdj);
+        pw.print("set", mSetAdj).println();
+        pw.print("mCurSchedGroup", mCurSchedGroup);
+        pw.print("setSchedGroup", mSetSchedGroup);
+        pw.print("systemNoUi", mSystemNoUi).println();
+        pw.print("curProcState", getCurProcState());
+        pw.print("mRepProcState", mRepProcState);
+        pw.print("setProcState", mSetProcState);
+        pw.print("lastStateTime=");
         TimeUtils.formatDuration(getLastStateTime(), nowUptime, pw);
         pw.println();
-        pw.print(prefix); pw.print("curCapability=");
+        pw.print("curCapability=");
         ActivityManager.printCapabilitiesFull(pw, mCurCapability);
         pw.print(" setCapability=");
         ActivityManager.printCapabilitiesFull(pw, mSetCapability);
         pw.println();
-
-        pw.print(prefix);
-        pw.print("curCpuTimeReasons=0x"); pw.print(Integer.toHexString(mCurCpuTimeReasons));
-        pw.print(" setCpuTimeReasons=0x"); pw.print(Integer.toHexString(mSetCpuTimeReasons));
-        pw.print(" curImplicitCpuTimeReasons=0x");
-        pw.print(Integer.toHexString(mCurImplicitCpuTimeReasons));
-        pw.print(" setImplicitCpuTimeReasons=0x");
-        pw.print(Integer.toHexString(mSetImplicitCpuTimeReasons));
-        pw.println();
-
+        pw.printHexInt("curCpuTimeReasons", mCurCpuTimeReasons);
+        pw.printHexInt("setCpuTimeReasons", mSetCpuTimeReasons);
+        pw.printHexInt("curImplicitCpuTimeReasons", mCurImplicitCpuTimeReasons);
+        pw.printHexInt("setImplicitCpuTimeReasons", mSetImplicitCpuTimeReasons).println();
         if (mBackgroundRestricted) {
-            pw.print(" backgroundRestricted=");
-            pw.print(mBackgroundRestricted);
-            pw.print(" boundByNonBgRestrictedApp=");
-            pw.print(mSetBoundByNonBgRestrictedApp);
+            pw.print("backgroundRestricted", mBackgroundRestricted);
+            pw.print("boundByNonBgRestrictedApp", mSetBoundByNonBgRestrictedApp);
         }
         pw.println();
         if (mHasShownUi) {
-            pw.print(prefix); pw.print("hasShownUi="); pw.println(mHasShownUi);
+            pw.print("hasShownUi", mHasShownUi).println();
         }
-        pw.print(prefix); pw.print("cached="); pw.print(isCached());
-        pw.print(" empty="); pw.println(isEmpty());
+        pw.print("cached", isCached());
+        pw.print("empty", isEmpty()).println();
         if (mServiceB) {
-            pw.print(prefix); pw.print("serviceb="); pw.print(mServiceB);
-            pw.print(" serviceHighRam="); pw.println(mServiceHighRam);
+            pw.print("serviceb", mServiceB);
+            pw.print("serviceHighRam", mServiceHighRam).println();
         }
         if (getHasTopUi() || getHasOverlayUi() || mRunningRemoteAnimation) {
-            pw.print(prefix); pw.print("hasTopUi="); pw.print(getHasTopUi());
-            pw.print(" hasOverlayUi="); pw.print(getHasOverlayUi());
-            pw.print(" runningRemoteAnimation="); pw.println(mRunningRemoteAnimation);
+            pw.print("hasTopUi", getHasTopUi());
+            pw.print("hasOverlayUi", getHasOverlayUi());
+            pw.print("runningRemoteAnimation", mRunningRemoteAnimation).println();
         }
         if (mHasForegroundActivities || mRepForegroundActivities) {
-            pw.print(prefix);
-            pw.print("foregroundActivities="); pw.print(mHasForegroundActivities);
-            pw.print(" (rep="); pw.print(mRepForegroundActivities); pw.println(")");
+            pw.print("foregroundActivities", mHasForegroundActivities);
+            pw.print("(rep="); pw.print(mRepForegroundActivities); pw.println(")");
         }
         if (mLastTopTime > 0) {
-            pw.print(prefix); pw.print("lastTopTime=");
+            pw.print("lastTopTime=");
             TimeUtils.formatDuration(mLastTopTime, nowUptime, pw);
             pw.println();
         }
         if (mLastInvisibleTime > 0 && mLastInvisibleTime < Long.MAX_VALUE) {
-            pw.print(prefix); pw.print("lastInvisibleTime=");
+            pw.print("lastInvisibleTime=");
             final long elapsedRealtimeNow = SystemClock.elapsedRealtime();
             final long currentTimeNow = System.currentTimeMillis();
             final long lastInvisibleCurrentTime =
@@ -1832,7 +1821,7 @@ public abstract class ProcessRecordInternal {
             pw.println();
         }
         if (mHasStartedServices) {
-            pw.print(prefix); pw.print("hasStartedServices="); pw.println(mHasStartedServices);
+            pw.print("hasStartedServices", mHasStartedServices).println();
         }
     }
 

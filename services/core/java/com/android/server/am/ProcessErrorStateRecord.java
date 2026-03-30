@@ -49,6 +49,7 @@ import android.os.incremental.IncrementalManager;
 import android.os.incremental.IncrementalMetrics;
 import android.provider.Settings;
 import android.util.EventLog;
+import android.util.IndentingPrintWriter;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
 
@@ -68,7 +69,6 @@ import com.android.server.utils.AnrTimer;
 import com.android.server.wm.WindowProcessController;
 
 import java.io.File;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -954,21 +954,19 @@ class ProcessErrorStateRecord {
         setPendingCrashDescription(null);
     }
 
-    void dump(PrintWriter pw, String prefix, long nowUptime) {
+    void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
         synchronized (mProcLock) {
             if (mCrashing || mDialogController.hasCrashDialogs() || mNotResponding
                     || mDialogController.hasAnrDialogs() || mBad) {
-                pw.print(prefix);
-                pw.print(" mCrashing=" + mCrashing);
-                pw.print(" " + mDialogController.getCrashDialogs());
-                pw.print(" mNotResponding=" + mNotResponding);
-                pw.print(" " + mDialogController.getAnrDialogs());
-                pw.print(" bad=" + mBad);
+                pw.print("mCrashing", mCrashing);
+                pw.print(mDialogController.getCrashDialogs() + " ");
+                pw.print("mNotResponding", mNotResponding);
+                pw.print(mDialogController.getAnrDialogs() + " ");
+                pw.print("bad", mBad);
 
                 // mCrashing or mNotResponding is always set before errorReportReceiver
                 if (mErrorReportReceiver != null) {
-                    pw.print(" errorReportReceiver=");
-                    pw.print(mErrorReportReceiver.flattenToShortString());
+                    pw.print("errorReportReceiver", mErrorReportReceiver.flattenToShortString());
                 }
                 pw.println();
             }

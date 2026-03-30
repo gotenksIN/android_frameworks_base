@@ -16,6 +16,7 @@
 
 package com.android.server.notification;
 
+import static android.app.Flags.nmContextualDisplayLaunch;
 import static android.app.NotificationChannel.SOCIAL_MEDIA_ID;
 import static android.app.NotificationManager.IMPORTANCE_HIGH;
 import static android.app.NotificationManager.IMPORTANCE_LOW;
@@ -23,11 +24,16 @@ import static android.app.NotificationManager.IMPORTANCE_MAX;
 import static android.app.NotificationRule.Action.PRIMARY_ACTION_BUNDLE;
 import static android.app.NotificationRule.Action.PRIMARY_ACTION_HIGHLIGHT;
 import static android.app.NotificationRule.Action.PRIMARY_ACTION_LOW;
+import static android.app.NotificationRule.RESERVED_ID_STATIC_BUNDLES;
 import static android.media.AudioAttributes.USAGE_NOTIFICATION;
 import static android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI;
 import static android.provider.Settings.System.DEFAULT_NOTIFICATION_URI;
 import static android.provider.Settings.System.DEFAULT_RINGTONE_URI;
+import static android.service.notification.Adjustment.KEY_DYNAMIC_BUNDLE;
 import static android.service.notification.Adjustment.KEY_NOTIFICATION_RULES;
+import static android.service.notification.Adjustment.KEY_TYPE;
+import static android.service.notification.Adjustment.TYPE_NEWS;
+import static android.service.notification.Adjustment.TYPE_SOCIAL_MEDIA;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -61,6 +67,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.UserHandle;
 import android.permission.PermissionManager;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.service.notification.Adjustment;
@@ -454,16 +461,27 @@ public class NotificationAdjustmentExtractorTest extends UiServiceTestCase {
 
         NotificationRecord r = generateRecord();
         r.setAudiblyAlerted(true);
+        r.setBundleType(TYPE_NEWS);
 
         Bundle classificationAdj = new Bundle();
-        classificationAdj.putParcelable(Adjustment.KEY_TYPE, social);
+        if (nmContextualDisplayLaunch()) {
+            mRuleManager.setClassificationAdjustmentState(mUserId, true);
+            mRuleManager.setAssistantClassificationTypeState(mUserId, TYPE_NEWS, true);
+            mRuleManager.setClassificationSupportedForPackage(
+                    mUserId, r.getSbn().getPackageName(), true);
+            ArrayList<Integer> rules = new ArrayList<>();
+            rules.add(RESERVED_ID_STATIC_BUNDLES);
+            classificationAdj.putIntegerArrayList(KEY_NOTIFICATION_RULES, rules);
+        } else {
+            classificationAdj.putParcelable(Adjustment.KEY_TYPE, social);
+        }
         Adjustment adjustment = new Adjustment("pkg", r.getKey(), classificationAdj, "", 0);
         r.addAdjustment(adjustment);
 
         RankingReconsideration regroupingTask = underTest.process(r);
         assertThat(regroupingTask).isNotNull();
         regroupingTask.applyChangesLocked(r);
-        assertThat(r.getChannel()).isNotEqualTo(social);
+        assertThat(r.getChannel().isBundleChannel()).isFalse();
         verify(mGroupHelper, times(0)).onChannelUpdated(r);
     }
 
@@ -473,9 +491,20 @@ public class NotificationAdjustmentExtractorTest extends UiServiceTestCase {
                 SOCIAL_MEDIA_ID, "social", IMPORTANCE_LOW);
         NotificationRecord r = generateRecord();
         r.setAudiblyAlerted(true);
+        r.setBundleType(TYPE_NEWS);
 
         Bundle classificationAdj = new Bundle();
-        classificationAdj.putParcelable(Adjustment.KEY_TYPE, social);
+        if (nmContextualDisplayLaunch()) {
+            mRuleManager.setClassificationAdjustmentState(mUserId, true);
+            mRuleManager.setAssistantClassificationTypeState(mUserId, TYPE_NEWS, true);
+            mRuleManager.setClassificationSupportedForPackage(
+                    mUserId, r.getSbn().getPackageName(), true);
+            ArrayList<Integer> rules = new ArrayList<>();
+            rules.add(RESERVED_ID_STATIC_BUNDLES);
+            classificationAdj.putIntegerArrayList(KEY_NOTIFICATION_RULES, rules);
+        } else {
+            classificationAdj.putParcelable(Adjustment.KEY_TYPE, social);
+        }
         Adjustment adjustment = new Adjustment("pkg", r.getKey(), classificationAdj, "", 0);
         r.addAdjustment(adjustment);
 
@@ -486,30 +515,44 @@ public class NotificationAdjustmentExtractorTest extends UiServiceTestCase {
                 System.currentTimeMillis() + NotificationAdjustmentExtractor.HANG_TIME_MS);
 
         regroupingTask.applyChangesLocked(r);
-        assertThat(r.getChannel()).isEqualTo(social);
+        assertThat(r.getChannel().isBundleChannel()).isTrue();
         verify(mGroupHelper, times(1)).onChannelUpdated(r);
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH)
     public void testClassificationAdjustments_triggerRegrouping_whenSilent() {
         NotificationChannel social = new NotificationChannel(
                 SOCIAL_MEDIA_ID, "social", IMPORTANCE_LOW);
 
         NotificationRecord r = generateRecord();
+        r.setBundleType(TYPE_NEWS);
 
         Bundle classificationAdj = new Bundle();
-        classificationAdj.putParcelable(Adjustment.KEY_TYPE, social);
-        Adjustment adjustment = new Adjustment("pkg", r.getKey(), classificationAdj, "", 0);
+        if (nmContextualDisplayLaunch()) {
+            mRuleManager.setClassificationAdjustmentState(mUserId, true);
+            mRuleManager.setAssistantClassificationTypeState(mUserId, TYPE_NEWS, true);
+            mRuleManager.setClassificationSupportedForPackage(
+                    mUserId, r.getSbn().getPackageName(), true);
+            ArrayList<Integer> rules = new ArrayList<>();
+            rules.add(RESERVED_ID_STATIC_BUNDLES);
+            classificationAdj.putIntegerArrayList(KEY_NOTIFICATION_RULES, rules);
+        } else {
+            classificationAdj.putParcelable(Adjustment.KEY_TYPE, social);
+        }
+        Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(),
+                classificationAdj, "", r.getUser());
         r.addAdjustment(adjustment);
 
         RankingReconsideration regroupingTask = underTest.process(r);
         assertThat(regroupingTask).isNotNull();
         regroupingTask.applyChangesLocked(r);
-        assertThat(r.getChannel()).isEqualTo(social);
+        assertThat(r.getChannel().isBundleChannel()).isTrue();
         verify(mGroupHelper, times(1)).onChannelUpdated(r);
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH)
     public void testClassificationAdjustments_unclassifyTriggersUnbundling() {
         NotificationRecord r = generateRecord();
         r.setHadGroupSummaryWhenUnclassified(true);

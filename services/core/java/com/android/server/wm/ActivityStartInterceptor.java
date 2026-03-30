@@ -38,11 +38,10 @@ import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME;
 import static android.content.pm.ApplicationInfo.FLAG_SUSPENDED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.content.pm.PackageManager.RESTRICTION_CONFIRM_WITH_SPEEDBUMP;
 import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
-
-import static android.content.pm.PackageManager.RESTRICTION_CONFIRM_WITH_SPEEDBUMP;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -67,12 +66,11 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
+import android.util.ArraySet;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Display;
-
-import com.android.window.flags.Flags;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.BlockedAppActivity;
@@ -83,6 +81,7 @@ import com.android.internal.app.UnlaunchableAppActivity;
 import com.android.server.LocalServices;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.wm.ActivityInterceptorCallback.ActivityInterceptResult;
+import com.android.window.flags.Flags;
 
 /**
  * A class that contains activity intercepting logic for {@link ActivityStarter#execute()}
@@ -505,6 +504,10 @@ class ActivityStartInterceptor {
             return false;
         }
 
+        if (hasForegroundActivitiesPackage(packageName, pmi)) {
+            return false;
+        }
+
         // Safe to call getWellbeingPackageName() here. Both this interceptor and the
         // PackageManager implementation reside in system_server, so the Binder call is local
         // and doesn't incur IPC overhead.
@@ -548,6 +551,27 @@ class ActivityStartInterceptor {
         return true;
     }
 
+    @VisibleForTesting
+    boolean hasForegroundActivitiesPackage(String packageName, PackageManagerInternal pmi) {
+        final int packageUid = pmi.getPackageUid(packageName, 0, mUserId);
+        if (packageUid < 0) {
+            return false;
+        }
+        if (mService.mProcessMap == null) {
+            return false;
+        }
+        final ArraySet<WindowProcessController> processes =
+                mService.mProcessMap.getProcesses(packageUid);
+        if (processes != null) {
+            for (int i = processes.size() - 1; i >= 0; i--) {
+                final WindowProcessController wpc = processes.valueAt(i);
+                if (wpc.hasForegroundActivities()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     private boolean interceptLockedProfileIfNeeded() {
         final Intent interceptingIntent = interceptWithConfirmCredentialsIfNeeded(mAInfo, mUserId);

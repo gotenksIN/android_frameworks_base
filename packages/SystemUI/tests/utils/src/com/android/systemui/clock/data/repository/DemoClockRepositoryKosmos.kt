@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-package com.android.systemui.clock.domain.interactor
+package com.android.systemui.clock.data.repository
 
-import android.content.applicationContext
-import com.android.systemui.clock.data.repository.clockRepositorySwitcher
+import com.android.systemui.demoModeController
 import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.plugins.activityStarter
+import com.android.systemui.kosmos.backgroundScope
+import com.android.systemui.util.time.dateFormatUtil
+import com.android.systemui.util.time.fakeSystemClock
 
-var Kosmos.clockInteractor: ClockInteractor by
+var Kosmos.demoClockRepository: DemoClockRepository by
     Kosmos.Fixture {
-        ClockInteractor(
-            context = applicationContext,
-            clockRepository = clockRepositorySwitcher,
-            activityStarter = activityStarter,
+        DemoClockRepository(
+            backgroundScope = backgroundScope,
+            systemClock = fakeSystemClock,
+            dateFormatUtil = dateFormatUtil,
+            demoModeController = demoModeController,
         )
     }

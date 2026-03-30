@@ -17,10 +17,9 @@
 package com.android.wm.shell.desktopmode
 
 import android.app.ActivityManager.RunningTaskInfo
-import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
+import android.app.KeyguardManager
 import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
-import android.app.KeyguardManager
 import android.content.Context
 import android.hardware.input.InputManager
 import android.hardware.input.InputManager.KeyGestureEventHandler
@@ -31,7 +30,6 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
-import android.window.DesktopExperienceFlags
 import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
@@ -203,24 +201,7 @@ class DesktopModeKeyGestureHandler(
             }
             KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK -> {
                 logV("Key gesture KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK is handled")
-                val focusedTask =
-                    if (
-                        DesktopExperienceFlags.CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT
-                            .isTrue
-                    ) {
-                        getGloballyFocusedTaskToClose()
-                    } else {
-                        getGloballyFocusedDesktopTask().also { task ->
-                            if (task != null) {
-                                logV("Found focused desktop task %d to close", task.taskId)
-                            } else {
-                                logV(
-                                    "Globally focused desktop task is not found to close. focusedDisplay=%d",
-                                    focusTransitionObserver.globallyFocusedDisplayId,
-                                )
-                            }
-                        }
-                    } ?: return
+                val focusedTask = getGloballyFocusedTaskToClose() ?: return
                 mainExecutor.execute {
                     handleA11y(a11yAnnounceTextClosing)
                     // TODO(b/448484440): Call DesktopTasksController#closeTask instead.
@@ -271,7 +252,8 @@ class DesktopModeKeyGestureHandler(
     private fun getGloballyFocusedTaskToMoveToNextDisplay(): RunningTaskInfo? {
         getGloballyFocusedDesktopTask()?.let { desktopTask ->
             logV(
-                "getGloballyFocusedTaskToMoveToNextDisplay: Found globally focused desktop task to move: %d",
+                "getGloballyFocusedTaskToMoveToNextDisplay: Found globally " +
+                    "focused desktop task to move: %d",
                 desktopTask.taskId,
             )
             return@getGloballyFocusedTaskToMoveToNextDisplay desktopTask
@@ -279,7 +261,8 @@ class DesktopModeKeyGestureHandler(
 
         if (!desktopState.isProjectedMode()) {
             logV(
-                "getGloballyFocusedTaskToMoveToNextDisplay: Skip focusing fullscreen task because the device is not " +
+                "getGloballyFocusedTaskToMoveToNextDisplay: Skip focusing " +
+                    "fullscreen task because the device is not " +
                     "in the projected mode"
             )
             return null
@@ -287,7 +270,8 @@ class DesktopModeKeyGestureHandler(
 
         if (focusTransitionObserver.globallyFocusedDisplayId != DEFAULT_DISPLAY) {
             logV(
-                "getGloballyFocusedTaskToMoveToNextDisplay: Skip focusing fullscreen task because the focused " +
+                "getGloballyFocusedTaskToMoveToNextDisplay: Skip focusing " +
+                    "fullscreen task because the focused " +
                     "display is not default display"
             )
             return null
@@ -302,14 +286,16 @@ class DesktopModeKeyGestureHandler(
             .find { it.windowingMode == WINDOWING_MODE_FULLSCREEN }
             ?.let { fullscreenTask ->
                 logV(
-                    "getGloballyFocusedTaskToMoveToNextDisplay: Found globally focused fullscreen task to move: %d",
+                    "getGloballyFocusedTaskToMoveToNextDisplay: Found globally " +
+                        "focused fullscreen task to move: %d",
                     fullscreenTask.taskId,
                 )
                 return@getGloballyFocusedTaskToMoveToNextDisplay fullscreenTask
             }
 
         logW(
-            "No globally focused task to move: globallyFocusedTaskId=%d globallyFocusedDisplayId=%d",
+            "No globally focused task to move: globallyFocusedTaskId=%d " +
+                "globallyFocusedDisplayId=%d",
             focusTransitionObserver.globallyFocusedTaskId,
             focusTransitionObserver.globallyFocusedDisplayId,
         )

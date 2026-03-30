@@ -20,15 +20,14 @@ import android.view.Display
 import android.view.View
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.Dumpable
-import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.demomode.DemoModeController
 import com.android.systemui.dump.DumpManager
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.plugins.PluginDependencyProvider
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.power.domain.interactor.PowerInteractor
-import com.android.systemui.shade.NotificationShadeWindowViewController
 import com.android.systemui.shade.ShadeSurface
 import com.android.systemui.statusbar.AutoHideUiElement
 import com.android.systemui.statusbar.NotificationRemoteInputManager
@@ -43,7 +42,6 @@ import com.android.systemui.statusbar.window.StatusBarWindowController
 import com.android.systemui.statusbar.window.data.repository.StatusBarWindowStatePerDisplayRepository
 import com.android.systemui.statusbar.window.shared.model.StatusBarWindowState
 import com.android.wm.shell.bubbles.Bubbles
-import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -78,13 +76,11 @@ constructor(
     private val demoModeController: DemoModeController,
     private val pluginDependencyProvider: PluginDependencyProvider,
     private val remoteInputManager: NotificationRemoteInputManager,
-    private val notificationShadeWindowViewControllerLazy:
-        Lazy<NotificationShadeWindowViewController>,
     private val shadeSurface: ShadeSurface,
     private val bubblesOptional: Optional<Bubbles>,
     private val dumpManager: DumpManager,
     powerInteractor: PowerInteractor,
-    primaryBouncerInteractor: PrimaryBouncerInteractor,
+    keyguardInteractor: KeyguardInteractor,
 ) : Dumpable {
 
     private val dumpableName: String =
@@ -116,7 +112,7 @@ constructor(
     private val controllerAndBouncerShowing =
         combine(
             phoneStatusBarViewController.filterNotNull(),
-            primaryBouncerInteractor.isShowing,
+            keyguardInteractor.primaryBouncerShowing,
             ::Pair,
         )
 

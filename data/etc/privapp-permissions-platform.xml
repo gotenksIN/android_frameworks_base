@@ -570,10 +570,11 @@ applications that come with the platform
         <permission name="android.permission.MEDIA_RESOURCE_OVERRIDE_PID" />
         <!-- Permission required for CTS test - CtsAlarmManagerTestCases -->
         <permission name="android.permission.SCHEDULE_PRIORITIZED_ALARM" />
-        <!-- Permission required for CTS test - SystemMediaRouter2Test -->
+        <!-- Permission required for CTS test - CtsMediaRouterTestCases -->
         <permission name="android.permission.MEDIA_CONTENT_CONTROL"/>
         <permission name="android.permission.MODIFY_AUDIO_ROUTING"/>
         <permission name="android.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED"/>
+        <permission name="android.permission.REMOTE_DISPLAY_PROVIDER"/>
         <!-- Permission required for CTS test - MediaSessionTest -->
         <permission name="android.permission.OVERRIDE_MEDIA_SESSION_OWNER"/>
         <!-- Permission required for CTS test - CallAudioInterceptionTest -->

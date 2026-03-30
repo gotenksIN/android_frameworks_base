@@ -440,16 +440,18 @@ constructor(
                     it == PowerButtonLaunchEvent.LAUNCH_FROM_ENTERED ||
                         wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value
                 ) {
-                    deviceUnlockedInteractor.unlockNowForPowerButtonGesture(
-                        "double-tap power gesture arrived and we were asleep/waking from " +
-                            "entered"
-                    )
-                    switchToScene(
-                        targetSceneKey = Scenes.Gone,
-                        loggingReason = "double-tap power gesture",
-                        instantlySnapScenes = true,
-                        forDoubleTapPowerGesture = true,
-                    )
+                    if (
+                        deviceUnlockedInteractor.unlockNowForPowerButtonGesture(
+                            "double-tap power gesture while asleep/waking from entered"
+                        )
+                    ) {
+                        switchToScene(
+                            targetSceneKey = Scenes.Gone,
+                            loggingReason = "double-tap power gesture",
+                            instantlySnapScenes = true,
+                            forDoubleTapPowerGesture = true,
+                        )
+                    }
                 } else if (it == PowerButtonLaunchEvent.LAUNCH_FROM_NOT_ENTERED) {
                     switchToScene(
                         Scenes.Occluded,

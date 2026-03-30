@@ -601,8 +601,6 @@ public abstract class Connection extends Conferenceable {
      */
     public static final int PROPERTY_CROSS_SIM = 1 << 13;
 
-// QTI_BEGIN: 2020-12-09: Telephony: IMS: Add property PROPERTY_IS_PARTICIPANT_HOST
-// QTI_END: 2020-12-09: Telephony: IMS: Add property PROPERTY_IS_PARTICIPANT_HOST
 
     //**********************************************************************************************
     // Next PROPERTY value: 1<<14

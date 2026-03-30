@@ -400,15 +400,6 @@ flag {
     }
 }
 
-flag {
-    name: "fix_verify_bubble_task_id_on_removal"
-    namespace: "multitasking"
-    description: "Fixes a bug where we remove a bubble based on package name after the bubble task has changed"
-    bug: "482877474"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "fix_taskbar_scrim_view_on_home"

@@ -59,7 +59,6 @@ import com.android.internal.logging.InstanceIdSequence
 import com.android.internal.logging.testing.UiEventLoggerFake
 import com.android.internal.protolog.ProtoLog
 import com.android.internal.statusbar.IStatusBarService
-import com.android.wm.shell.Flags
 import com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
 import com.android.wm.shell.Flags.FLAG_UPDATE_BUBBLE_BOUNDS_DURING_ROTATION
@@ -876,7 +875,6 @@ class BubbleControllerTest {
         verify(windowManager, never()).removeView(any())
     }
 
-    @EnableFlags(Flags.FLAG_FIX_VERIFY_BUBBLE_TASK_ID_ON_REMOVAL)
     @Test
     fun removeBubble_withTaskId_taskIdsMatch_removeBubble() {
         val bubble = createBubble("key", taskId = 123)
@@ -901,7 +899,6 @@ class BubbleControllerTest {
         assertThat(bubbleData.hasBubbles()).isFalse()
     }
 
-    @EnableFlags(Flags.FLAG_FIX_VERIFY_BUBBLE_TASK_ID_ON_REMOVAL)
     @Test
     fun removeBubble_withTaskId_bubbleHasNoTaskId_removeBubble() {
         val bubble = createBubble("key", taskId = -1)
@@ -921,7 +918,6 @@ class BubbleControllerTest {
         assertThat(bubbleData.hasBubbles()).isFalse()
     }
 
-    @EnableFlags(Flags.FLAG_FIX_VERIFY_BUBBLE_TASK_ID_ON_REMOVAL)
     @Test
     fun removeBubble_withTaskId_differentTaskIds_doesNotRemoveBubble() {
         val bubble = createBubble("key", taskId = 123)

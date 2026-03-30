@@ -230,75 +230,93 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.java:8: Error: Unsupported format specifier '%z'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %z", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:9: Error: Unsupported format specifier '%X'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %X", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:10: Error: Unsupported format specifier '%a'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %abc", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:11: Error: Unsupported format specifier '%u'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %ul", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:12: Error: Unsupported format specifier '%l'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %lld", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:13: Error: Unsupported format specifier '%B'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %B", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:14: Error: Unsupported format specifier '%D'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %D", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:15: Error: Unsupported format specifier '%.'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %.2f", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:16: Error: Unsupported format specifier '%0'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %03d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:17: Error: Unsupported format specifier '%1'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %1${'$'}s", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:18: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:19: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,f", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:20: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,s", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:21: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,b", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:22: Error: Unsupported format specifier '%-'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %-d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:23: Error: Unsupported format specifier '%+'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %+d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:24: Error: Unsupported format specifier '%('. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %(d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:25: Error: Unsupported format specifier '% '. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: % d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 18 errors, 0 warnings
@@ -439,15 +457,18 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.kt:8: Error: Unsupported format specifier '%z'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %z", randomArg)
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.kt:9: Error: Unsupported format specifier '%0'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %03d", randomArg)
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.kt:10: Error: Unsupported format specifier '%.'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %.2f", randomArg)
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 3 errors, 0 warnings
@@ -523,15 +544,18 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.java:8: Error: Unsupported format specifier '%'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Dangling %");
                                                              ~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:9: Error: Unsupported format specifier '% '. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Dangling % in middle");
                                                              ~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:10: Error: Unsupported format specifier '% '. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Dangling % ");
                                                              ~~~~~~~~~~~~~
                 3 errors, 0 warnings
@@ -564,7 +588,8 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.java:9: Error: Unsupported format specifier '%0'. \
-                Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "number%03din", i);
                                                              ~~~~~~~~~~~~~~
                 1 errors, 0 warnings
@@ -678,7 +703,8 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Format with trailing percent %%", s);
                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:12: Error: Unsupported format specifier '%'. \
-                Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
+                    [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Format with trailing percent %", s);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 2 errors, 0 warnings
@@ -1596,7 +1622,8 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
                         }
 
                         fun check() {
-                            // These should ideally be ALLOWED, but currently might fail if we are too strict.
+                            // These should ideally be ALLOWED, but currently might fail if we are \
+                                too strict.
                             ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Int: %d", CONST_INT)
                             ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Q: %s", MyEnum.VALUE_ONE)
                             ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Str: %s", CONST_STR)
@@ -1613,10 +1640,12 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .run()
             .expect(
                 """
-                src/test/pkg/TestClass.kt:23: Error: ProtoLog format string argument should not be a constant. [ProtoLogConstantArgument]
+                src/test/pkg/TestClass.kt:23: Error: ProtoLog format string argument should not be \
+                    a constant. [ProtoLogConstantArgument]
                         ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Int: %d", 42)
                                                                         ~~
-                src/test/pkg/TestClass.kt:24: Error: ProtoLog format string argument should not be a constant. [ProtoLogConstantArgument]
+                src/test/pkg/TestClass.kt:24: Error: ProtoLog format string argument should not be \
+                    a constant. [ProtoLogConstantArgument]
                         ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Str: %s", "literal")
                                                                         ~~~~~~~~~
                 2 errors, 0 warnings

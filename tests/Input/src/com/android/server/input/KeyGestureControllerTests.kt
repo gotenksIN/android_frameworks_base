@@ -1433,7 +1433,6 @@ class KeyGestureControllerTests {
     }
 
     @Test
-    @EnableFlags(com.android.hardware.input.Flags.FLAG_FIX_SEARCH_MODIFIER_FALLBACKS)
     fun testInterceptKeyBeforeDispatchingWithFallthroughEvent() {
         val mockKcm = Mockito.mock(KeyCharacterMap::class.java)
         ExtendedMockito.`when`(KeyCharacterMap.load(anyInt())).thenReturn(mockKcm)

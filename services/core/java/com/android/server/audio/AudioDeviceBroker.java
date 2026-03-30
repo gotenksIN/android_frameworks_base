@@ -15,7 +15,6 @@
  */
 package com.android.server.audio;
 
-import static android.media.AudioDeviceAttributes.ROLE_OUTPUT;
 import static android.media.audio.Flags.scoManagedByAudio;
 import static android.media.audio.Flags.unifyAbsoluteVolumeManagement;
 import static android.media.AudioSystem.DEVICE_IN_ALL_SCO_SET;
@@ -79,8 +78,6 @@ import android.media.ICommunicationDeviceDispatcher;
 import android.media.IStrategyNonDefaultDevicesDispatcher;
 import android.media.IStrategyPreferredDevicesDispatcher;
 import android.media.MediaMetrics;
-import android.media.audio.DeviceIdentity;
-import android.media.audio.IAudioModeSession;
 import android.media.audiopolicy.AudioProductStrategy;
 import android.os.Binder;
 import android.os.Handler;
@@ -2864,6 +2861,17 @@ public class AudioDeviceBroker {
     @Nullable
     AdiDeviceState findBtDeviceStateForAddress(String address, int deviceType) {
         return mDeviceInventory.findBtDeviceStateForAddress(address, deviceType);
+    }
+
+    @Nullable
+    AudioDeviceAttributes getConnectedDeviceForAddress(
+            @NonNull String address, boolean isInput) {
+        return mDeviceInventory.getConnectedDeviceForAddress(address, isInput);
+    }
+
+    @Nullable
+    AudioDeviceAttributes getFirstConnectedDeviceAttributesOfTypes(Set<Integer> internalTypes) {
+        return mDeviceInventory.getFirstConnectedDeviceAttributesOfTypes(internalTypes);
     }
 
     boolean hasAlwaysRingDevice() {

@@ -1559,6 +1559,15 @@ public class AudioSystem
     }
 
     /** @hide */
+    public static final Set<Integer> DEVICE_ALL_BLE_HA_SET =
+            Set.of(DEVICE_OUT_BLE_HEARING_AID, DEVICE_IN_BLE_HEARING_AID);
+
+    /** @hide */
+    public static boolean isBluetoothLeHearingAidDevice(int deviceType) {
+        return DEVICE_ALL_BLE_HA_SET.contains(deviceType);
+    }
+
+    /** @hide */
     @android.ravenwood.annotation.RavenwoodKeep
     public static boolean isBluetoothLeOutCentralDevice(int deviceType) {
         return DEVICE_OUT_ALL_BLE_CENTRAL_SET.contains(deviceType);

@@ -83,6 +83,7 @@ import static com.android.internal.annotations.VisibleForTesting.Visibility.PACK
 import static com.android.media.audio.Flags.absVolumeStreamAlwaysMax;
 import static com.android.media.audio.Flags.alarmMinVolumeZero;
 import static com.android.media.audio.Flags.audioStreamBtScoCleanup;
+import static com.android.media.audio.Flags.bleHearingAidDeviceImpl;
 import static com.android.media.audio.Flags.cameraShutterSound;
 import static com.android.media.audio.Flags.deferWearPermissionUpdates;
 import static com.android.media.audio.Flags.disablePrescaleAbsoluteVolume;
@@ -104,7 +105,6 @@ import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_DISCOURAGED_AP
 import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_DISCOURAGED_API_USAGE_REPORTED__API_CATEGORY__AUDIO_API_BLUETOOTH_SCO;
 import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_DISCOURAGED_API_USAGE_REPORTED__API_CATEGORY__AUDIO_API_START_BLUETOOTH_SCO;
 import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_DISCOURAGED_API_USAGE_REPORTED__API_CATEGORY__AUDIO_API_MICROPHONE_MUTE;
-import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_DISCOURAGED_API_USAGE_REPORTED__API_CATEGORY__AUDIO_API_PARAMETERS;
 import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_DISCOURAGED_API_USAGE_REPORTED__API_CATEGORY__AUDIO_API_SURROUND_FORMAT;
 import static com.android.media.flags.Flags.enableAudioInputDeviceRoutingAndVolumeControl;
 import static com.android.server.audio.SoundDoseHelper.ACTION_CHECK_MUSIC_ACTIVE;
@@ -124,7 +124,6 @@ import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
-import android.app.AlarmManager;
 import android.app.AppGlobals;
 import android.app.AppOpsManager;
 import android.app.BroadcastOptions;
@@ -5896,6 +5895,8 @@ public class AudioService extends IAudioService.Stub
                 + bleHearingAidDevice());
         pw.println("\tandroid.media.audio.Flags.blePeripheralDevices:"
                 + blePeripheralDevices());
+        pw.println("\tcom.android.media.audio.Flags.bleHearingAidDeviceImpl:"
+                + bleHearingAidDeviceImpl());
     }
 
     private void dumpAudioMode(PrintWriter pw) {

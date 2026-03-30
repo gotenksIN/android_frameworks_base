@@ -24,7 +24,6 @@ import android.tools.traces.parsers.WindowManagerStateHelper
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import com.android.launcher3.tapl.LauncherInstrumentation
 import com.android.server.wm.flicker.helpers.DesktopModeAppHelper
 import org.junit.After
@@ -65,8 +64,12 @@ abstract class ManageOpenInstances(val rotation: Rotation = Rotation.ROTATION_0)
     open fun triggerFromTaskbar() {
         tapl.launchedAppState.taskbar.getAppIcon(browserAppHelper.appName).openMenu()
         clickFirstWindowFromManageWindows()
-        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
-        findObject(By.descContains(BrowserAppHelper.SHARE_BUTTON_DESC))
+        // Verify that we are back to the first window
+        wmHelper
+            .StateSyncBuilder()
+            .withAppTransitionIdle()
+            .withTopVisibleApp(browserAppHelper.componentMatcher)
+            .waitForAndVerify()
     }
 
     @Test
@@ -96,27 +99,32 @@ abstract class ManageOpenInstances(val rotation: Rotation = Rotation.ROTATION_0)
     }
 
     private fun clickFirstWindowFromManageWindows() {
-        findObject(By.descContains(MANAGE_WINDOWS_FROM_TASKBAR_DESC)).also { it.click() }
-        // Selects the initial opening window by its index, which prevents regressions by future
-        // alterations to the content description.
-        val openWindowObject = device.wait(Until.findObjects(By.clazz(OPEN_WINDOW_CLASS)), TIMEOUT)
-        openWindowObject.get(FIRST_OPEN_WINDOW_INDEX).also { it.click() }
+        findObject(By.text(MANAGE_WINDOWS_FROM_TASKBAR_TEXT)).also { it.click() }
+        // Selects the initial opening window by its row and column index.
+        val container = findObject(By.res(MANAGE_WINDOWS_MENU_CONTAINER_ID))
+        val row = FIRST_OPEN_WINDOW_INDEX / MENU_MAX_ICONS_PER_ROW
+        val column = FIRST_OPEN_WINDOW_INDEX % MENU_MAX_ICONS_PER_ROW
+        val targetRow = container.children[row]
+        val targetIcon = targetRow.children[column]
+        targetIcon.click()
     }
 
     private fun openNewWindowFromTaskbarMenu() {
         tapl.launchedAppState.taskbar.getAppIcon(browserAppHelper.appName).openMenu()
-        findObject(By.descContains(NEW_WINDOW_DESC)).also { it.click() }
+        findObject(By.text(NEW_WINDOW_TEXT)).also { it.click() }
     }
 
     private companion object {
         // The index of the first open window in the manage windows container
         const val FIRST_OPEN_WINDOW_INDEX = 2
         const val MANAGE_WINDOWS_FROM_HEADER_ID = "manage_windows_button"
-        const val MANAGE_WINDOWS_FROM_TASKBAR_DESC = "Manage Windows"
+        const val MANAGE_WINDOWS_FROM_TASKBAR_TEXT = "Manage Windows"
         const val MANAGE_WINDOWS_DIALOG_TEXT = "Manage windows"
-        const val NEW_WINDOW_DESC = "New Window"
+        const val MANAGE_WINDOWS_MENU_CONTAINER_ID =
+            "com.google.android.apps.nexuslauncher:id/manage_windows_menu_container"
+        const val MENU_MAX_ICONS_PER_ROW = 3
+        const val NEW_WINDOW_TEXT = "New Window"
         const val OPEN_INSTANCES_CONTAINER_CLASS = "android.widget.ScrollView"
-        const val OPEN_WINDOW_CLASS = "android.view.SurfaceView"
         const val SYSTEMUI_PACKAGE = "com.android.systemui"
         const val TIMEOUT: Long = 5000L
     }

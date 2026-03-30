@@ -147,7 +147,17 @@ flag {
 }
 
 flag {
-    name: "enable_split_dismiss_animation"
+  name: "report_missed_enter_anim_on_resume"
+  namespace: "windowing_frontend"
+  description: "Notify onEnterAnimationComplete if process attaches after transition"
+  bug: "493382989"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+    name: "enable_split_dismiss_animation_v2"
     namespace: "windowing_frontend"
     description: "Resize animation for expanding and collapsing surfaces when split screen is dismissed"
     bug: "481965406"
@@ -439,13 +449,10 @@ flag {
 }
 
 flag {
-    name: "use_transition_for_screenshot_window_additions"
-    namespace: "web_apps_on_chromeos_and_android"
-    description: "Use shell transitions to synchronize screenshot window additions."
-    bug: "476223353"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
+    name: "shared_surface_transition_animation"
+    namespace: "windowing_frontend"
+    description: "Allow the client to describe a transition animation and participate in the animation using a shared surface."
+    bug: "475737659"
 }
 
 flag {
@@ -490,4 +497,34 @@ flag {
     namespace: "windowing_frontend"
     description: "Sync storage before enabling screen during boot"
     bug: "467888558"
+}
+
+flag {
+    name: "keep_show_wallpaper_on_bottom"
+    namespace: "windowing_frontend"
+    description: "Keep changes with the SHOW_WALLPAPER flag at the bottom of the transition."
+    bug: "479707267"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "remove_starting_window_when_commit_invisible"
+    namespace: "windowing_frontend"
+    description: "Always clean up starting window when an activity commit invisible."
+    bug: "489653115"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "consolidate_remove_starting_window_from_task"
+    namespace: "windowing_frontend"
+    description: "Ensure a starting window being removed when condition met for all activities."
+    bug: "477134239"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

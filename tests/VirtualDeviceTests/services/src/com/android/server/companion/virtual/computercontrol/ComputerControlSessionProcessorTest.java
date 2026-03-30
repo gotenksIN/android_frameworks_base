@@ -27,7 +27,6 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -43,6 +42,8 @@ import android.app.IApplicationThread;
 import android.app.KeyguardManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
+import android.companion.DeviceId;
+import android.companion.virtual.CompanionDeviceId;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
 import android.companion.virtual.audio.AudioCapture;
 import android.companion.virtual.audio.AudioInjection;
@@ -70,19 +71,18 @@ import android.platform.test.annotations.Presubmit;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.security.authenticationpolicy.AuthenticationPolicyManager;
 import android.security.authenticationpolicy.IAuthenticationPolicyService;
-import android.util.ArraySet;
 import android.view.Display;
 import android.view.Surface;
+import android.view.WindowManager;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.android.server.LocalManagerRegistry;
 import com.android.server.LocalServices;
-import com.android.server.appop.AppOpsManagerLocal;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.pm.UserManagerInternal;
+import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
 import org.junit.After;
@@ -96,7 +96,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.List;
-import java.util.Set;
 
 @Presubmit
 @RunWith(AndroidJUnit4.class)
@@ -116,12 +115,18 @@ public class ComputerControlSessionProcessorTest {
     private static final AppInteractionAttribution APP_INTERACTION_ATTRIBUTION =
             new AppInteractionAttribution.Builder(
                     AppInteractionAttribution.INTERACTION_TYPE_USER_QUERY).build();
+    private static final DeviceId COMP_DEVICE_ID = new DeviceId.Builder()
+            .setCustomId("test")
+            .build();
+    private static final CompanionDeviceId COMPANION_DEVICE_ID =
+            new CompanionDeviceId(COMP_DEVICE_ID);
     private static final ComputerControlSessionParams PARAMS =
             new ComputerControlSessionParams.Builder()
                     .setName(ComputerControlSessionImplTest.class.getSimpleName())
                     .setTargetPackageNames(List.of(TARGET_PACKAGE))
                     .setTargetComputerControlVersion(MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17)
                     .setAppInteractionAttribution(APP_INTERACTION_ATTRIBUTION)
+                    .setCompanionDeviceId(COMPANION_DEVICE_ID)
                     .build();
 
     @Rule
@@ -136,7 +141,9 @@ public class ComputerControlSessionProcessorTest {
     @Mock
     private AppOpsManager mAppOpsManager;
     @Mock
-    private AppOpsManagerLocal mAppOpsManagerLocal;
+    private ActivityTaskManagerInternal mActivityTaskManagerInternal;
+    @Mock
+    private WindowManager mWindowManager;
     @Mock
     private WindowManagerInternal mWindowManagerInternal;
     @Mock
@@ -200,12 +207,17 @@ public class ComputerControlSessionProcessorTest {
         LocalServices.removeServiceForTest(InputManagerInternal.class);
         LocalServices.addService(InputManagerInternal.class, mInputManagerInternal);
 
-        LocalManagerRegistry.removeManagerForTesting(AppOpsManagerLocal.class);
-        LocalManagerRegistry.addManager(AppOpsManagerLocal.class, mAppOpsManagerLocal);
+        LocalServices.removeServiceForTest(ActivityTaskManagerInternal.class);
+        LocalServices.addService(ActivityTaskManagerInternal.class, mActivityTaskManagerInternal);
 
         Context context = spy(new ContextWrapper(
                 InstrumentationRegistry.getInstrumentation().getTargetContext()));
         doReturn(context).when(context).createContextAsUser(any(UserHandle.class), anyInt());
+
+        final Context displayContext = spy(new ContextWrapper(
+                InstrumentationRegistry.getInstrumentation().getTargetContext()));
+        doReturn(displayContext).when(context).createDisplayContext(any());
+        doReturn(mWindowManager).when(displayContext).getSystemService(WindowManager.class);
 
         when(context.getSystemService(Context.KEYGUARD_SERVICE)).thenReturn(mKeyguardManager);
         when(context.getSystemService(Context.AUTHENTICATION_POLICY_SERVICE))
@@ -225,7 +237,7 @@ public class ComputerControlSessionProcessorTest {
 
         when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
                 .thenReturn(AppOpsManager.MODE_ALLOWED);
-        when(mAppOpsManagerLocal.isUidInForeground(anyInt())).thenReturn(true);
+        when(mActivityTaskManagerInternal.isUidForeground(anyInt())).thenReturn(true);
 
         when(mVirtualDeviceFactory.createVirtualDevice(any(), any(), any()))
                 .thenReturn(mVirtualDevice);
@@ -242,12 +254,14 @@ public class ComputerControlSessionProcessorTest {
 
         when(mComputerControlSessionCallback.asBinder()).thenReturn(new Binder());
 
-        when(mAllowlistController.isPackageAllowedToCreateSession(anyString(), any()))
-                .thenReturn(true);
+        when(mAllowlistController.isPackageAllowedToCreateSession(anyString(), any(), any(),
+                anyInt())).thenReturn(true);
         when(mAllowlistController.isPackageAutomatable(
                 eq(TARGET_PACKAGE), eq(OWNER_PACKAGE_NAME), any())).thenReturn(true);
+        when(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(anyInt(), anyString(),
+                anyString())).thenReturn(true);
 
-        when(mAuthenticationPolicyService.isAgentAuthorized(any(), anyInt(), isNull()))
+        when(mAuthenticationPolicyService.isAgentAuthorized(any(), anyInt(), any()))
                 .thenReturn(true);
 
         mProcessor = new ComputerControlSessionProcessor(
@@ -271,7 +285,7 @@ public class ComputerControlSessionProcessorTest {
     @EnableFlags(android.companion.Flags.FLAG_SUPPORT_AI_AGENT)
     public void defaultDevice_keyguardLocked_sessionNotCreated() throws Exception {
         when(mAuthenticationPolicyService.isAgentAuthorized(
-                any(), eq(Context.DEVICE_ID_DEFAULT), isNull())).thenReturn(false);
+                any(), eq(Context.DEVICE_ID_DEFAULT), eq(COMP_DEVICE_ID))).thenReturn(false);
 
         mProcessor.processNewSessionRequest(
                 mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
@@ -296,10 +310,11 @@ public class ComputerControlSessionProcessorTest {
     @Test
     @EnableFlags(android.companion.Flags.FLAG_SUPPORT_AI_AGENT)
     public void nonDefaultDevice_uidNotSeenOnDevice_fallbackToDefaultDevice() throws Exception {
-        when(mVirtualDeviceManagerInternal.getDeviceIdsForUid(ATTRIBUTION_SOURCE.getUid()))
-                .thenReturn(new ArraySet<>(Set.of(Context.DEVICE_ID_DEFAULT)));
+        when(mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
+                ATTRIBUTION_SOURCE.getUid(), NON_DEFAULT_DEVICE_ID))
+                .thenReturn(false);
         when(mAuthenticationPolicyService.isAgentAuthorized(
-                any(), eq(Context.DEVICE_ID_DEFAULT), isNull())).thenReturn(false);
+                any(), eq(Context.DEVICE_ID_DEFAULT), eq(COMP_DEVICE_ID))).thenReturn(false);
 
         mProcessor.processNewSessionRequest(
                 mAppThread, ATTRIBUTION_SOURCE.withDeviceId(NON_DEFAULT_DEVICE_ID), PARAMS,
@@ -312,8 +327,9 @@ public class ComputerControlSessionProcessorTest {
     @Test
     @DisableFlags(android.companion.Flags.FLAG_SUPPORT_AI_AGENT)
     public void nonDefaultDevice_uidNotSeenOnDevice_fallbackToDefaultDevice_flagDisabled() throws Exception {
-        when(mVirtualDeviceManagerInternal.getDeviceIdsForUid(ATTRIBUTION_SOURCE.getUid()))
-                .thenReturn(new ArraySet<>(Set.of(Context.DEVICE_ID_DEFAULT)));
+        when(mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
+                ATTRIBUTION_SOURCE.getUid(), NON_DEFAULT_DEVICE_ID))
+                .thenReturn(false);
         when(mKeyguardManager.isDeviceLocked(CALLING_USER_ID, Context.DEVICE_ID_DEFAULT))
                 .thenReturn(true);
 
@@ -328,11 +344,11 @@ public class ComputerControlSessionProcessorTest {
     @Test
     @EnableFlags(android.companion.Flags.FLAG_SUPPORT_AI_AGENT)
     public void nonDefaultDevice_uidSeenOnDevice_sessionCreated() throws Exception {
-        when(mVirtualDeviceManagerInternal.getDeviceIdsForUid(ATTRIBUTION_SOURCE.getUid()))
-                .thenReturn(
-                        new ArraySet<>(Set.of(Context.DEVICE_ID_DEFAULT, NON_DEFAULT_DEVICE_ID)));
+        when(mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
+                ATTRIBUTION_SOURCE.getUid(), NON_DEFAULT_DEVICE_ID))
+                .thenReturn(true);
         when(mAuthenticationPolicyService.isAgentAuthorized(
-                any(), eq(NON_DEFAULT_DEVICE_ID), isNull())).thenReturn(true);
+                any(), eq(NON_DEFAULT_DEVICE_ID), eq(COMP_DEVICE_ID))).thenReturn(true);
 
         mProcessor.processNewSessionRequest(
                 mAppThread, ATTRIBUTION_SOURCE.withDeviceId(NON_DEFAULT_DEVICE_ID), PARAMS,
@@ -343,11 +359,26 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
+    @EnableFlags(android.companion.Flags.FLAG_SUPPORT_AI_AGENT)
+    public void sessionCreation_passesCompanionDeviceIdToPolicy() throws Exception {
+        when(mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
+                ATTRIBUTION_SOURCE.getUid(), NON_DEFAULT_DEVICE_ID))
+                .thenReturn(true);
+
+        mProcessor.processNewSessionRequest(
+                mAppThread, ATTRIBUTION_SOURCE.withDeviceId(NON_DEFAULT_DEVICE_ID), PARAMS,
+                mComputerControlSessionCallback);
+
+        verify(mAuthenticationPolicyService, timeout(CALLBACK_TIMEOUT_MS)).isAgentAuthorized(
+                any(), eq(NON_DEFAULT_DEVICE_ID), eq(COMP_DEVICE_ID));
+    }
+
+    @Test
     @DisableFlags(android.companion.Flags.FLAG_SUPPORT_AI_AGENT)
     public void nonDefaultDevice_uidSeenOnDevice_sessionCreated_flagDisabled() throws Exception {
-        when(mVirtualDeviceManagerInternal.getDeviceIdsForUid(ATTRIBUTION_SOURCE.getUid()))
-                .thenReturn(
-                        new ArraySet<>(Set.of(Context.DEVICE_ID_DEFAULT, NON_DEFAULT_DEVICE_ID)));
+        when(mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
+                ATTRIBUTION_SOURCE.getUid(), NON_DEFAULT_DEVICE_ID))
+                .thenReturn(true);
         when(mKeyguardManager.isDeviceLocked(CALLING_USER_ID, NON_DEFAULT_DEVICE_ID))
                 .thenReturn(false);
 
@@ -371,8 +402,9 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
-    public void callerNotInForeground_sessionNotCreated() throws Exception {
-        when(mAppOpsManagerLocal.isUidInForeground(ATTRIBUTION_SOURCE.getUid())).thenReturn(false);
+    public void callerWithoutVisibleWindow_sessionNotCreated() throws Exception {
+        when(mActivityTaskManagerInternal.isUidForeground(ATTRIBUTION_SOURCE.getUid()))
+                .thenReturn(false);
 
         mProcessor.processNewSessionRequest(
                 mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
@@ -383,8 +415,8 @@ public class ComputerControlSessionProcessorTest {
 
     @Test
     public void callerNotAllowListed_throwsException() throws Exception {
-        when(mAllowlistController.isPackageAllowedToCreateSession(anyString(), any()))
-                .thenReturn(false);
+        when(mAllowlistController.isPackageAllowedToCreateSession(anyString(), any(), any(),
+                anyInt())).thenReturn(false);
 
         assertThrows(SecurityException.class,
                 () -> mProcessor.processNewSessionRequest(
@@ -719,6 +751,59 @@ public class ComputerControlSessionProcessorTest {
 
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), any());
+    }
+
+    @Test
+    public void removeAppFromAutomatableAppListForAgent_closesSession() throws Exception {
+        mProcessor.processNewSessionRequest(
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any());
+
+        mProcessor.removeAppFromAutomatableAppListForAgent(
+                ATTRIBUTION_SOURCE.getUid(), OWNER_PACKAGE_NAME, TARGET_PACKAGE);
+
+        verify(mVirtualDevice, timeout(SESSION_CLOSE_TIMEOUT_MS)).close();
+    }
+
+    @Test
+    public void removeAppFromAutomatableAppListForAgent_differentPackage_doesNotCloseSession()
+            throws Exception {
+        mProcessor.processNewSessionRequest(
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any());
+
+        mProcessor.removeAppFromAutomatableAppListForAgent(
+                ATTRIBUTION_SOURCE.getUid(), OWNER_PACKAGE_NAME, ANOTHER_TARGET_PACKAGE);
+
+        verify(mVirtualDevice, never()).close();
+    }
+
+    @Test
+    public void clearAutomatableAppListForAgent_closesSession() throws Exception {
+        mProcessor.processNewSessionRequest(
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any());
+
+        mProcessor.clearAutomatableAppListForAgent(ATTRIBUTION_SOURCE.getUid(), OWNER_PACKAGE_NAME);
+
+        verify(mVirtualDevice, timeout(SESSION_CLOSE_TIMEOUT_MS)).close();
+    }
+
+    @Test
+    @EnableFlags(android.companion.virtualdevice.flags.Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
+    public void processNewSessionRequest_perAppConsentEnabled_notAutomatable_sendsPendingIntent()
+            throws Exception {
+        when(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(anyInt(), anyString(),
+                anyString())).thenReturn(false);
+
+        mProcessor.processNewSessionRequest(
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+
+        verify(mPendingIntentFactory).create(any(), anyInt(), mIntentArgumentCaptor.capture());
+        verify(mComputerControlSessionCallback).onSessionPending(any());
     }
 
     private ComputerControlSessionParams generateUniqueParams(int index) {

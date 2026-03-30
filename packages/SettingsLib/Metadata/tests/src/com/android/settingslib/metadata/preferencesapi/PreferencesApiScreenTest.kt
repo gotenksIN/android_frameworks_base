@@ -23,6 +23,7 @@ import android.os.UserManager
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.settingslib.metadata.SensitivityLevel
 import com.android.settingslib.metadata.ValidatedKeyParameters
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen.Companion.PARTIALLY_MIGRATED_PREFIX
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.ALLOWED
@@ -58,6 +59,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowBuild
+import com.android.settingslib.metadata.preferencesapi.safe
 
 @RunWith(AndroidJUnit4::class)
 class PreferencesApiScreenTest {
@@ -125,10 +127,10 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(2)
 
         // Check preference order is correct
-        val firstPreference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
+        val firstPreference = preferenceScreen.preferences[0] as ApiPreference<Boolean, Boolean>
         assertThat(firstPreference.key).isEqualTo(preferenceKey1)
 
-        val secondPreference = preferenceScreen.preferences[1] as ApiPreference<Int>
+        val secondPreference = preferenceScreen.preferences[1] as ApiPreference<Int, Int>
         assertThat(secondPreference.key).isEqualTo(preferenceKey2)
     }
 
@@ -177,7 +179,7 @@ class PreferencesApiScreenTest {
                         R.string.parameter_purpose1,
                         true,
                         GeneratedParameterType(R.string.parameter_type_description) {
-                            listOf(GeneratedValue("value", "type_description"))
+                            listOf(GeneratedValue("value".safe(), "type_description".safe()))
                         },
                     )
                 }
@@ -205,7 +207,7 @@ class PreferencesApiScreenTest {
                         R.string.parameter_purpose1,
                         true,
                         GeneratedParameterType(R.string.parameter_type_description) {
-                            listOf(GeneratedValue("value", "type_description"))
+                            listOf(GeneratedValue("value".safe(), "type_description".safe()))
                         },
                     )
                     prepareSpaRoute { params ->
@@ -263,7 +265,7 @@ class PreferencesApiScreenTest {
         val apiOperationContext =
             ApiOperationContext(context = context, parameters = ValidatedKeyParameters.EMPTY)
 
-        val preference = preferenceScreen.preferences[0] as ApiPreference<Int>
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Int, Int>
         assertThat(preference.key).isEqualTo("ApiPreference")
         runBlocking {
             assertThat(preference.preconditions?.check?.invoke(apiOperationContext) is EnterpriseRestriction).isTrue()
@@ -308,11 +310,11 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(2)
 
         // Check that getters return the correct value
-        val firstPreference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
+        val firstPreference = preferenceScreen.preferences[0] as ApiPreference<Boolean, Boolean>
         assertThat(firstPreference.storage(context).getValue(preferenceKey1, Boolean::class.java))
             .isEqualTo(preferenceValue1)
 
-        val secondPreference = preferenceScreen.preferences[1] as ApiPreference<Int>
+        val secondPreference = preferenceScreen.preferences[1] as ApiPreference<Int, Int>
         assertThat(secondPreference.key).isEqualTo("ApiPreference2")
         assertThat(secondPreference.storage(context).getValue(preferenceKey2, Int::class.java))
             .isEqualTo(preferenceValue2)
@@ -359,14 +361,14 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(2)
 
         // First preference doesn't have a setter, so the getter should return the same value
-        val firstPreference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
+        val firstPreference = preferenceScreen.preferences[0] as ApiPreference<Boolean, Boolean>
         assertThat(firstPreference.key).isEqualTo(preferenceKey1)
         firstPreference.storage(context).setValue(preferenceKey1, Boolean::class.java, true)
         assertThat(firstPreference.storage(context).getValue(preferenceKey1, Boolean::class.java))
             .isEqualTo(preferenceValue1)
 
         // Value of the second preference should be changed by setter
-        val secondPreference = preferenceScreen.preferences[1] as ApiPreference<Int>
+        val secondPreference = preferenceScreen.preferences[1] as ApiPreference<Int, Int>
         assertThat(secondPreference.key).isEqualTo(preferenceKey2)
         secondPreference
             .storage(context)
@@ -431,7 +433,7 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(1)
 
         // Check get preconditions description message
-        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean, Boolean>
         assertThat(preference.get.preconditions?.getDescription(context))
             .isEqualTo(context.getString(R.string.preconditions_description1))
 
@@ -563,7 +565,7 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(1)
 
         // Check get preconditions description message
-        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean, Boolean>
         assertThat(preference.get.preconditions?.getDescription(context))
             .isEqualTo(preconditionDescription)
 
@@ -673,7 +675,7 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(1)
 
         // Trying to set a wrong value throws exception and value stays the same
-        val preference = preferenceScreen.preferences[0] as ApiPreference<Int>
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Int, Int>
         assertThat(preference.key).isEqualTo(preferenceKey)
         val exception =
             assertThrows(IllegalStateException::class.java) {
@@ -755,7 +757,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -787,7 +789,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -865,7 +867,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -876,7 +878,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose2,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -933,7 +935,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                             parameter(
@@ -941,7 +943,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose2,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -970,7 +972,7 @@ class PreferencesApiScreenTest {
                             R.string.parameter_purpose1,
                             true,
                             GeneratedParameterType(R.string.parameter_type_description) {
-                                listOf(GeneratedValue("value", "type_description"))
+                                listOf(GeneratedValue("value".safe(), "type_description".safe()))
                             },
                         )
                     }
@@ -1476,8 +1478,9 @@ class PreferencesApiScreenTest {
         assertThat(preferenceScreen.preferences.size).isEqualTo(1)
 
         // Check preference's set operation has the correct warning message
-        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean>
-        assertThat(preference.set?.warning?.getWarning(context)).isEqualTo(context.getString(R.string.warning_message1))
+        val preference = preferenceScreen.preferences[0] as ApiPreference<Boolean, Boolean>
+        assertThat(preference.set?.warning?.getWarning(context))
+            .isEqualTo(context.getString(R.string.warning_message1))
     }
 
     @Test
@@ -1888,7 +1891,7 @@ class PreferencesApiScreenTest {
     }
 
     @Test
-    fun createPreferencesApiScreen_screenPreconditionsFail_launchIntentIsNull() {
+    fun createPreferencesApiScreen_screenPreconditionsFail_launchIntentIsNotNull() {
         val preferenceScreen =
             object :
                 PreferencesApiScreen(
@@ -1904,7 +1907,7 @@ class PreferencesApiScreenTest {
                 }
             }
 
-        assertThat(preferenceScreen.getLaunchIntent(context, null)).isNull()
+        assertThat(preferenceScreen.getLaunchIntent(context, null)).isNotNull()
     }
 
     @Test
@@ -2015,7 +2018,7 @@ class PreferencesApiScreenTest {
                             R.string.parameter_purpose1,
                             true,
                             GeneratedParameterType(R.string.parameter_type_description) {
-                                listOf(GeneratedValue("value", "type_description"))
+                                listOf(GeneratedValue("value".safe(), "type_description".safe()))
                             },
                         )
                         // Missing prepareSpaRoute
@@ -2074,6 +2077,39 @@ class PreferencesApiScreenTest {
             }
 
         assertThat(screen.tags(context)).asList().containsExactly("tag1", "tag2", PreferencesApiScreen.APP_FUNCTION_BATTERY, "api-first")
+    }
+
+    @Test
+    fun createPreferencesApiScreen_withoutSensitivity_hasDefaultNoSensitivity() {
+        val screen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+            }
+
+        assertThat(screen.sensitivityLevel).isEqualTo(SensitivityLevel.NO_SENSITIVITY)
+    }
+
+    @Test
+    fun createPreferencesApiScreen_withSpecifiedSensitivity_hasSpecifiedSensitivity() {
+        val screen =
+            object :
+                PreferencesApiScreen(
+                    key = SCREEN_KEY,
+                    topLevelSettingsCategory = Category.SYSTEM,
+                    fragment = PreferenceFragment::class,
+                    purpose = R.string.preference_screen_purpose,
+                ) {
+                init {
+                    sensitivityLevel(SensitivityLevel.DO_NOT_EXPOSE)
+                }
+            }
+
+        assertThat(screen.sensitivityLevel).isEqualTo(SensitivityLevel.DO_NOT_EXPOSE)
     }
 
     @Test

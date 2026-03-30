@@ -21,7 +21,7 @@ import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.R
 
 /** Any int in the given range, along the given step. */
-class IntInRange(val min: Int?, val max: Int?, val step: Int = 1, private val unitOfMeasurement: String? = null): ApiType<Int> {
+class IntInRange(val min: Int?, val max: Int?, val step: Int = 1, private val unitOfMeasurement: String? = null): DirectApiType<Int> {
 
     override fun getType(): Class<Int> = Int::class.java
 
@@ -49,3 +49,6 @@ class IntInRange(val min: Int?, val max: Int?, val step: Int = 1, private val un
 
     override fun getKey(): String = "IntInRange:${min}:${max}:${step}"
 }
+
+/** A percentage int in the range [0, 100], along with a unit description. */
+val PercentageInt = IntInRange(min = 0, max = 100, step = 1, unitOfMeasurement = "percentage")

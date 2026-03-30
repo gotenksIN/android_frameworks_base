@@ -22,11 +22,10 @@ import android.os.Build
 import android.view.MotionEvent
 import android.view.WindowInsetsController
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.scene.ContentKey
-import com.android.compose.animation.scene.DefaultEdgeDetector
+import com.android.compose.animation.scene.DynamicSizeEdgeDetector
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
@@ -34,6 +33,7 @@ import com.android.compose.animation.scene.SwipeSourceDetector
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.systemui.accessibility.domain.interactor.AccessibilityInteractor
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
@@ -61,6 +61,7 @@ import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.domain.interactor.RemoteInputInteractor
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationContainerInteractor
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
+import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import com.android.systemui.wallpapers.ui.viewmodel.WallpaperViewModel
 import dagger.Lazy
 import dagger.assisted.Assisted
@@ -78,6 +79,7 @@ class SceneContainerViewModel
 @AssistedInject
 constructor(
     @ShadeDisplayAware private val resources: Resources,
+    @ShadeDisplayAware private val systemBarUtilsState: SystemBarUtilsState,
     private val sceneInteractor: SceneInteractor,
     desktopInteractor: DesktopInteractor,
     private val deviceUnlockedInteractor: DeviceUnlockedInteractor,
@@ -100,6 +102,7 @@ constructor(
     sceneTransitionBlurViewModelFactory: SceneTransitionBlurViewModel.Factory,
     private val toastDisplayer: Lazy<SceneContainerToastDisplayer>,
     @Assisted private val motionEventHandlerReceiver: (MotionEventHandler?) -> Unit,
+    private val accessibilityInteractor: AccessibilityInteractor,
 ) : ExclusiveActivatable() {
 
     /** The scene that should be rendered. */
@@ -141,6 +144,15 @@ constructor(
     private val dualShadeGestureSplitRatio =
         resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
 
+    private val statusBarHeightPx: Int by
+        hydrator.hydratedStateOf(
+            traceName = "SceneContainerViewModel#statusBarHeight",
+            initialValue = 0,
+            source = systemBarUtilsState.statusBarHeight,
+        )
+
+    private val dynamicSizeEdgeDetector = DynamicSizeEdgeDetector { statusBarHeightPx }
+
     /**
      * The [SwipeSourceDetector] to use for defining which areas of the screen can be defined in the
      * [UserAction]s for this container.
@@ -148,16 +160,16 @@ constructor(
     val swipeSourceDetector: SwipeSourceDetector by
         hydrator.hydratedStateOf(
             traceName = "swipeSourceDetector",
-            initialValue = DefaultEdgeDetector,
+            initialValue = dynamicSizeEdgeDetector,
             source =
                 shadeModeInteractor.shadeMode.map {
                     if (it is ShadeMode.Dual) {
                         SceneContainerSwipeDetector(
-                            edgeSize = 40.dp,
+                            dynamicSizeEdgeDetector = dynamicSizeEdgeDetector,
                             invocationGestureSplitRatio = dualShadeGestureSplitRatio,
                         )
                     } else {
-                        DefaultEdgeDetector
+                        dynamicSizeEdgeDetector
                     }
                 },
         )
@@ -170,21 +182,33 @@ constructor(
             initialValue = 1f,
         )
 
+    private val accessibilityEnabled: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "accessibilityEnabled",
+            initialValue = false,
+            source = accessibilityInteractor.isEnabledFiltered,
+        )
+
     val accessibilityTitle: Int?
         @StringRes
         get() {
-            val overlays = sceneInteractor.transitionState.currentOverlays
-            val topmostOverlay = if (overlays.isNotEmpty()) overlays.last() else null
-            return when {
-                topmostOverlay == Overlays.NotificationsShade ->
-                    R.string.accessibility_desc_notification_shade
-                topmostOverlay == Overlays.QuickSettingsShade ->
-                    R.string.accessibility_desc_quick_settings
-                topmostOverlay == Overlays.Bouncer -> null
-                currentScene == Scenes.Shade -> R.string.accessibility_desc_notification_shade
-                currentScene == Scenes.QuickSettings -> R.string.accessibility_desc_quick_settings
-                currentScene == Scenes.Lockscreen -> R.string.accessibility_desc_lock_screen
-                else -> null
+            if (accessibilityEnabled) {
+                val overlays = sceneInteractor.transitionState.currentOverlays
+                val topmostOverlay = if (overlays.isNotEmpty()) overlays.last() else null
+                return when {
+                    topmostOverlay == Overlays.NotificationsShade ->
+                        R.string.accessibility_desc_notification_shade
+                    topmostOverlay == Overlays.QuickSettingsShade ->
+                        R.string.accessibility_desc_quick_settings
+                    topmostOverlay == Overlays.Bouncer -> null
+                    currentScene == Scenes.Shade -> R.string.accessibility_desc_notification_shade
+                    currentScene == Scenes.QuickSettings ->
+                        R.string.accessibility_desc_quick_settings
+                    currentScene == Scenes.Lockscreen -> R.string.accessibility_desc_lock_screen
+                    else -> null
+                }
+            } else {
+                return null
             }
         }
 
@@ -296,10 +320,10 @@ constructor(
             shadeModeInteractor.isDualShade &&
                 isDesktopStatusBarEnabled &&
                 event.action == MotionEvent.ACTION_OUTSIDE &&
-                sceneInteractor.currentOverlays.value.isNotEmpty() &&
+                sceneInteractor.transitionState.currentOverlays.isNotEmpty() &&
                 sceneInteractor.transitionState.isIdle()
         ) {
-            sceneInteractor.currentOverlays.value.forEach {
+            sceneInteractor.transitionState.currentOverlays.forEach {
                 sceneInteractor.hideOverlay(it, "Empty space touch")
             }
         }

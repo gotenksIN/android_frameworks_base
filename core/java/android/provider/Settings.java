@@ -5734,6 +5734,24 @@ public final class Settings {
                 "hardware_haptic_feedback_intensity";
 
         /**
+         * The intensity of keyboard vibrations, if configurable.
+         *
+         * Not all devices are capable of changing their feedback intensity; on these devices
+         * there will likely be no difference between the various vibration intensities except for
+         * intensity 0 (off) and the rest.
+         *
+         * <b>Values:</b><br/>
+         * 0 - Vibration is disabled<br/>
+         * 1 - Weak vibrations<br/>
+         * 2 - Medium vibrations<br/>
+         * 3 - Strong vibrations
+         * @hide
+         */
+        @Readable
+        public static final String KEYBOARD_VIBRATION_INTENSITY =
+                "keyboard_vibration_intensity";
+
+        /**
          * The intensity of gesture input vibrations if configurable. See {@link
          * android.os.VibrationAttributes#USAGE_GESTURE_INPUT} for details about gesture input
          * vibrations.
@@ -20727,12 +20745,22 @@ public final class Settings {
         public static final String MINMODE_ACTIVE = "minmode_active";
 
         /**
-          * Indicates if watch ranging is available for the device.
+         * Indicates if watch ranging is available for the device.
          *
          * @hide
          */
         public static final String WATCH_RANGING_AVAILABLE =
                 "watch_ranging_available";
+
+        /**
+         * Indicates if scene container flag is enabled. This is only a temporary addition that will
+         * be removed for Android 17.1 release.
+         *
+         * TODO (b/427071498): Remove this once SLD is integrated with Flexiglass
+         *
+         * @hide
+         */
+        public static final String SCENE_CONTAINER_ENABLED = "scene_container_enabled";
 
         /**
          * Settings migrated from Wear OS settings provider.

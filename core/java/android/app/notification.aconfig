@@ -14,9 +14,16 @@ flag {
 }
 
 flag {
-  name: "headline_prototypes"
+  name: "always_show_minimal_hun"
   namespace: "notifications"
-  description: "This flag adds static control for enabling prototypes for the headline project"
+  description: "[prototype] Always show Minimal HUN, even if the device is not in full screen."
+  bug: "449676256"
+}
+
+flag {
+  name: "notifs_all_use_pill_buttons"
+  namespace: "notifications"
+  description: "[prototype] Change all notifications to use pill-shaped action buttons."
   bug: "449676256"
 }
 
@@ -152,6 +159,13 @@ flag {
   metadata {
     purpose: PURPOSE_FEATURE
   }
+}
+
+flag {
+  name: "status_bar_headline"
+  namespace: "notifications"
+  description: "[prototype] Replaces ongoing activity chips with Headline."
+  bug: "486143387"
 }
 
 # Start: exported flags that cannot be removed

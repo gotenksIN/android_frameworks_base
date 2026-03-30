@@ -4780,7 +4780,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         // after this method returns.
         mHandler.post(() -> mDeletePackageHelper.deletePackageX(
                 packageName, PackageManager.VERSION_CODE_HIGHEST,
-                0, PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/));
+                0, PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/, Process.SYSTEM_UID));
     }
 
     void deletePreloadsFileCache() {
@@ -5708,9 +5708,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            // Public API implementation, pass in the calling uid
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId,
-                    Binder.getCallingUid());
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId);
         }
 
         @Override
@@ -7672,10 +7670,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            // Use Process.myUid here because this is the PackageManagerInternal implementation, it
-            // isn't called outside of system_server
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId,
-                    Process.myUid());
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
         }
 
         @Override
@@ -8759,7 +8754,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         boolean removedBySystem) {
         return mDeletePackageHelper.deletePackageX(packageName,
                 PackageManager.VERSION_CODE_HIGHEST, UserHandle.USER_SYSTEM,
-                PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/);
+                PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/, Process.SYSTEM_UID);
     }
 
     private static boolean isSystemOrPhone(int uid) {

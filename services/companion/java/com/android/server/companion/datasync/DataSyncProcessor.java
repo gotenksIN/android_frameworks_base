@@ -51,14 +51,16 @@ public class DataSyncProcessor {
 
     private static final String TAG = "CDM_DataSyncProcessor";
 
+    private final Object mRemoteMetadataLock = new Object();
+
+    @GuardedBy("mRemoteMetadataLock")
     private final AssociationStore mAssociationStore;
+
     private final LocalMetadataStore mLocalMetadataStore;
     private final CompanionTransportManager mTransportManager;
 
     @GuardedBy("mAssociationsWithTransport")
     private final Set<Integer> mAssociationsWithTransport = new HashSet<>();
-
-    private final Object mRemoteMetadataLock = new Object();
 
     public DataSyncProcessor(
             AssociationStore associationStore,
@@ -145,36 +147,67 @@ public class DataSyncProcessor {
     @VisibleForTesting
     public void setRemoteMetadata(int associationId,
             @NonNull PersistableBundle metadata) {
-        synchronized (mRemoteMetadataLock) {
-            Slog.i(TAG, "Setting remote metadata for association id=[" + associationId
-                    + "] value=[" + metadata + "]...");
+        Slog.i(TAG, "Setting remote metadata for association id=[" + associationId
+                + "] value=[" + metadata + "]...");
+        metadata.putLong(AssociationInfo.METADATA_TIMESTAMP, System.currentTimeMillis());
+        mAssociationStore.updateAssociation(associationId,
+                a -> (new AssociationInfo.Builder(a))
+                        .setMetadata(metadata)
+                        .build());
+    }
 
-            AssociationInfo association =
-                    mAssociationStore.getAssociationWithCallerChecks(associationId);
+    /**
+     * Enable system data sync.
+     */
+    public void enableSystemDataSync(int associationId, int flags) {
+        Slog.i(TAG, "Enabling system data sync flags for association id=[" + associationId
+                + "] flags=[" + flags + "]...");
 
-            metadata.putLong(AssociationInfo.METADATA_TIMESTAMP, System.currentTimeMillis());
-            AssociationInfo updated = (new AssociationInfo.Builder(association))
-                    .setMetadata(metadata)
-                    .build();
-            mAssociationStore.updateAssociation(updated);
-        }
+        mAssociationStore.updateAssociation(associationId,
+                a -> (new AssociationInfo.Builder(a))
+                        .setSystemDataSyncFlags(a.getSystemDataSyncFlags() | flags)
+                        .build());
+    }
+
+    /**
+     * Disable system data sync.
+     */
+    public void disableSystemDataSync(int associationId, int flags) {
+        Slog.i(TAG, "Disabling system data sync flags for association id=[" + associationId
+                + "] flags=[" + flags + "]...");
+
+        mAssociationStore.updateAssociation(associationId,
+                a -> (new AssociationInfo.Builder(a))
+                        .setSystemDataSyncFlags(a.getSystemDataSyncFlags() & (~flags))
+                        .build());
     }
 
 
     private void broadcastMetadata(List<AssociationInfo> associations) {
+        SparseArray<List<AssociationInfo>> newAssociations = new SparseArray<>();
         synchronized (mAssociationsWithTransport) {
             // Isolate newly attached associations and group by user.
-            associations.stream()
-                    .filter(association ->
-                            !mAssociationsWithTransport.contains(association.getId()))
-                    .collect(Collectors.groupingBy(AssociationInfo::getUserId))
-                    .forEach(this::sendMetadataUpdate);
+            for (AssociationInfo association : associations) {
+                if (!mAssociationsWithTransport.contains(association.getId())) {
+                    int userId = association.getUserId();
+                    List<AssociationInfo> userAssociations = newAssociations.get(userId);
+                    if (userAssociations == null) {
+                        userAssociations = new java.util.ArrayList<>();
+                        newAssociations.put(userId, userAssociations);
+                    }
+                    userAssociations.add(association);
+                }
+            }
 
             // Update the set of associations with transport.
             mAssociationsWithTransport.clear();
-            mAssociationsWithTransport.addAll(associations.stream()
-                    .map(AssociationInfo::getId)
-                    .collect(Collectors.toSet()));
+            for (AssociationInfo association : associations) {
+                mAssociationsWithTransport.add(association.getId());
+            }
+        }
+
+        for (int i = 0; i < newAssociations.size(); i++) {
+            sendMetadataUpdate(newAssociations.keyAt(i), newAssociations.valueAt(i));
         }
     }
 
@@ -216,14 +249,10 @@ public class DataSyncProcessor {
             // Update the metadata sent time after receiving ACK.
             for (int associationId : associationIds) {
                 results.get(associationId).thenRunAsync(() -> {
-                    synchronized (mRemoteMetadataLock) {
-                        AssociationInfo association =
-                                mAssociationStore.getAssociationWithCallerChecks(associationId);
-                        AssociationInfo updated = new AssociationInfo.Builder(association)
-                                .setTimeMetadataSent(System.currentTimeMillis())
-                                .build();
-                        mAssociationStore.updateAssociation(updated);
-                    }
+                    mAssociationStore.updateAssociation(associationId,
+                            a -> (new AssociationInfo.Builder(a))
+                                    .setTimeMetadataSent(System.currentTimeMillis())
+                                    .build());
                 });
             }
 

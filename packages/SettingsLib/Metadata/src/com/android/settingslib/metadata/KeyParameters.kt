@@ -22,6 +22,7 @@ import androidx.annotation.StringRes
 import com.android.settingslib.metadata.preferencesapi.types.ApiType
 import com.android.settingslib.metadata.preferencesapi.types.FiniteOptionsType
 import org.json.JSONObject
+import com.android.settingslib.metadata.preferencesapi.SafetyAnnotated
 
 /**
  * Holds an unvalidated set of key-value parameters. This class is a simple data container.
@@ -156,13 +157,13 @@ class KeyParametersSchema private constructor(
         val name: String,
         @StringRes val purpose: Int,
         val required: Boolean,
-        val type: ApiType<*>
+        val type: ApiType<*, *>
     ) {
         constructor(
             name: String,
             description: String,
             required: Boolean,
-            type: ApiType<*>
+            type: ApiType<*, *>,
         ) : this(name, description.hashCode(), required, type) {
             purposeHashMap[description.hashCode()] = description
         }
@@ -214,7 +215,7 @@ class KeyParametersSchema private constructor(
          * @param type The type of the parameter, used to generate its possible values.
          * @throws IllegalArgumentException if a parameter with the same name is already defined.
          */
-        fun parameter(name: String, @StringRes purpose: Int, required: Boolean = false, type: ApiType<*>): Builder {
+        fun parameter(name: String, @StringRes purpose: Int, required: Boolean = false, type: ApiType<*, *>): Builder {
             if (parameters.containsKey(name)) {
                 throw IllegalArgumentException("Parameter '$name' is already defined.")
             }
@@ -223,7 +224,7 @@ class KeyParametersSchema private constructor(
         }
 
         // TODO (b/468973102): remove this when all current parameterized screens migrated to string res purpose
-        fun parameter(name: String, purpose: String, required: Boolean = false, type: ApiType<*>): Builder {
+        fun parameter(name: String, purpose: String, required: Boolean = false, type: ApiType<*, *>): Builder {
             if (parameters.containsKey(name)) {
                 throw IllegalArgumentException("Parameter '$name' is already defined.")
             }
@@ -268,7 +269,29 @@ class KeyParametersSchema private constructor(
      *
      * @see prepare(providedValues: Map<String, String>)
      */
-    fun prepare(vararg values: Pair<String, String>): ValidatedKeyParameters = prepare(values.toMap())
+    fun prepare(vararg values: Pair<*, *>): ValidatedKeyParameters{
+        val valuesMap = mutableMapOf<String, String>()
+        for ((key, value) in values) {
+            val keyString = if (key is SafetyAnnotated<*>) {
+                key.value.toString()
+            } else if (key is String) {
+                key
+            } else {
+                error("Key is not a string or SafetyAnnotated<String>")
+            }
+            val valueString = if (value is SafetyAnnotated<*>) {
+                value.value.toString()
+            } else if (value is String) {
+                value
+            } else {
+                error("Value is not a string or SafetyAnnotated<String>")
+            }
+
+            valuesMap[keyString] = valueString
+        }
+
+        return prepare(valuesMap)
+    }
 
     /**
      * A convenience method to create a validated [ValidatedKeyParameters] instance from a [Bundle].
@@ -338,7 +361,11 @@ class KeyParametersSchema private constructor(
      * the parameterized screen is expected to gracefully accept and handle empty [ValidatedKeyParameters]
      * to ensure compatibility with older configurations or entry points.
      */
-    fun prepareEmpty() = prepare(emptyMap())
+    fun prepareEmpty(): ValidatedKeyParameters {
+        // This skips the required check as it is used when there are no
+        // parameters.
+        return ValidatedKeyParameters(this, mapOf())
+    }
 
     /**
      * Returns the map of parameter definitions.

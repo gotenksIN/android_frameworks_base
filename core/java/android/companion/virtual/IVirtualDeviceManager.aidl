@@ -25,6 +25,7 @@ import android.companion.virtual.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IAutomatedPackageListener;
+import android.companion.virtual.computercontrol.IComputerControlConsentManager;
 import android.companion.virtual.computercontrol.IComputerControlSessionCallback;
 import android.content.AttributionSource;
 import android.content.Intent;
@@ -64,6 +65,11 @@ interface IVirtualDeviceManager {
             in ComputerControlSessionParams params, in IComputerControlSessionCallback callback);
 
     /**
+     * Returns the consent manager for computer control.
+     */
+    IComputerControlConsentManager getComputerControlConsentManager();
+
+    /**
      * Returns the details of all available virtual devices.
      */
     List<VirtualDevice> getVirtualDevices();
@@ -101,7 +107,8 @@ interface IVirtualDeviceManager {
     /**
      * Returns whether the computer control functionality is available for the caller.
      */
-    boolean isComputerControlAvailable(in AttributionSource attributionSource);
+    boolean isComputerControlAvailable(in AttributionSource attributionSource,
+            int targetComputerControlVersion);
 
     /**
      * Returns the ID of the device which owns the display with the given ID.

@@ -48,6 +48,7 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
   allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining"
 }
 policy_metadata {
   identifier {
@@ -120,6 +121,7 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  flag: "android.app.admin.flags.policy_streamlining_auto_time"
 }
 policy_metadata {
   identifier {
@@ -172,6 +174,7 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
   allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.managed_esim_outgoing_transfer_policy"
 }
 policy_metadata {
   identifier {
@@ -244,6 +247,111 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  flag: "android.app.admin.flags.policy_streamlining_auto_time_zone"
+}
+policy_metadata {
+  identifier {
+    field_name: "APP_INSTALL"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether app installation is allowed or disallowed."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 1
+      int_def_name: "android.app.admin.PolicyIdentifier.AppInstallValue"
+      documentation: "Possible values {@link APP_INSTALL}\n\n@hide"
+      values {
+        field_name {
+          field_name: "APP_INSTALL_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "Installing Apps is allowed."
+      }
+      values {
+        field_name {
+          field_name: "APP_INSTALL_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "Installing Apps is disallowed. "
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_FINANCED_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
+  allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining_app_install"
+}
+policy_metadata {
+  identifier {
+    field_name: "APP_UNINSTALL"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether app uninstallation is allowed or disallowed."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 1
+      int_def_name: "android.app.admin.PolicyIdentifier.AppUninstallValue"
+      documentation: "Possible values {@link APP_UNINSTALL}\n\n@hide"
+      values {
+        field_name {
+          field_name: "APP_UNINSTALL_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "Uninstalling Apps is allowed."
+      }
+      values {
+        field_name {
+          field_name: "APP_UNINSTALL_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "Uninstalling Apps is disallowed. "
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_FINANCED_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
+  allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining_app_uninstall"
 }
 policy_metadata {
   identifier {
@@ -293,6 +401,55 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
   allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
   allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining_easter_eggs"
+}
+policy_metadata {
+  identifier {
+    field_name: "FACTORY_RESET"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls if the factory reset option is available in the\nsettings menu. Even if it is disabled factory reset might still be\npossible through other means."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 2
+      int_def_name: "android.app.admin.PolicyIdentifier.FactoryResetValue"
+      documentation: "Possible values {@link FACTORY_RESET}\n\n@hide"
+      values {
+        field_name {
+          field_name: "FACTORY_RESET_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "The settings menu of the user has factory reset disabled."
+      }
+      values {
+        field_name {
+          field_name: "FACTORY_RESET_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "The settings menu of the user has the factory reset option."
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_DEVICE
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_FACTORY_RESET"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  flag: "android.app.admin.flags.policy_streamlining_disallow_factory_reset"
 }
 policy_metadata {
   identifier {
@@ -315,6 +472,7 @@ policy_metadata {
   required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  flag: "android.app.admin.flags.policy_streamlining_lockscreen_message"
 }
 policy_metadata {
   identifier {
@@ -331,6 +489,9 @@ policy_metadata {
     list_metadata {
       string_metadata {
       }
+      resolution_mechanism {
+        custom: true
+      }
     }
   }
   allowed_scopes: POLICY_SCOPE_USER
@@ -339,4 +500,5 @@ policy_metadata {
   required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL"
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  flag: "android.app.admin.flags.policy_streamlining"
 }

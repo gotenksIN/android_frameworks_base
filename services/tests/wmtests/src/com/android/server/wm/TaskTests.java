@@ -197,7 +197,6 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     public void testRemoveOnlyChildNestedTask_removesFocusFromRoot() {
         // A created-by-organizer root task at the bottom.
         final Task bottomRootTask = createTask(mDisplayContent);
@@ -2694,7 +2693,11 @@ public class TaskTests extends WindowTestsBase {
         final ActivityManager.RunningTaskInfo info = new ActivityManager.RunningTaskInfo();
         task.fillTaskInfo(info);
 
-        assertTrue(info.isActivityStackTransparent);
+        if (Flags.partialTranslucentActivityEmbedding()) {
+            assertFalse(info.isActivityStackTransparent);
+        } else {
+            assertTrue(info.isActivityStackTransparent);
+        }
     }
 
     @EnableFlags(Flags.FLAG_VISIBILITY_MANAGEMENT_IN_BUBBLE_ROOT)

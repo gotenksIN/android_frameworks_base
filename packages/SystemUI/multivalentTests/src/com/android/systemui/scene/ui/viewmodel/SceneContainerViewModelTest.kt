@@ -25,10 +25,11 @@ import android.view.WindowInsetsController
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.compose.animation.scene.DefaultEdgeDetector
+import com.android.compose.animation.scene.DynamicSizeEdgeDetector
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.accessibility.data.repository.fakeAccessibilityRepository
 import com.android.systemui.classifier.fakeFalsingManager
 import com.android.systemui.desktop.domain.interactor.enableUsingDesktopStatusBar
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
@@ -477,24 +478,26 @@ class SceneContainerViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun edgeDetector_singleShade_usesDefaultEdgeDetector() =
+    fun edgeDetector_singleShade_usesDynamicEdgeDetector() =
         kosmos.runTest {
             val shadeMode by collectLastValue(shadeMode)
             enableSingleShade()
 
             assertThat(shadeMode).isEqualTo(ShadeMode.Single)
-            assertThat(underTest.swipeSourceDetector).isEqualTo(DefaultEdgeDetector)
+            assertThat(underTest.swipeSourceDetector)
+                .isInstanceOf(DynamicSizeEdgeDetector::class.java)
         }
 
     @Test
     @DisableFlags(FLAG_DUAL_SHADE)
-    fun edgeDetector_splitShade_usesDefaultEdgeDetector() =
+    fun edgeDetector_splitShade_usesDynamicEdgeDetector() =
         kosmos.runTest {
             val shadeMode by collectLastValue(shadeMode)
             enableSplitShade()
 
             assertThat(shadeMode).isEqualTo(ShadeMode.Split)
-            assertThat(underTest.swipeSourceDetector).isEqualTo(DefaultEdgeDetector)
+            assertThat(underTest.swipeSourceDetector)
+                .isInstanceOf(DynamicSizeEdgeDetector::class.java)
         }
 
     @Test
@@ -619,6 +622,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun accessibilityTitle_bouncerOverLockscreen() =
         kosmos.runTest {
+            kosmos.fakeAccessibilityRepository.isEnabledFiltered.value = true
             sceneInteractor.changeScene(Scenes.Lockscreen, "Switch to Lockscreen for test pre-req")
             fakeSceneDataSource.showOverlay(Overlays.Bouncer)
 
@@ -626,8 +630,18 @@ class SceneContainerViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    fun accessibilityTitle_lockscreen_accessibilityDisabled() =
+        kosmos.runTest {
+            kosmos.fakeAccessibilityRepository.isEnabledFiltered.value = false
+            sceneInteractor.changeScene(Scenes.Lockscreen, "Switch to Lockscreen for test pre-req")
+
+            assertThat(underTest.accessibilityTitle).isEqualTo(null)
+        }
+
+    @Test
     fun accessibilityTitle_lockscreen() =
         kosmos.runTest {
+            kosmos.fakeAccessibilityRepository.isEnabledFiltered.value = true
             sceneInteractor.changeScene(Scenes.Lockscreen, "Switch to Lockscreen for test pre-req")
 
             assertThat(underTest.accessibilityTitle)
@@ -637,6 +651,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun accessibilityTitle_singleShade() =
         kosmos.runTest {
+            kosmos.fakeAccessibilityRepository.isEnabledFiltered.value = true
             enableSingleShade()
 
             sceneInteractor.changeScene(Scenes.Shade, "Switch to NotificationShade for test")
@@ -652,6 +667,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @EnableFlags(FLAG_DUAL_SHADE)
     fun accessibilityTitle_dualShade() =
         kosmos.runTest {
+            kosmos.fakeAccessibilityRepository.isEnabledFiltered.value = true
             enableDualShade()
 
             fakeSceneDataSource.showOverlay(Overlays.NotificationsShade)

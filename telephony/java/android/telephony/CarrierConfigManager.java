@@ -10167,6 +10167,27 @@ public class CarrierConfigManager {
             "satellite_technology_type_int_array";
 
     /**
+     * An integer array containing the supported satellite frequencies, represented as EARFCN
+     * <p>
+     * EARFCN (E-UTRA Absolute Radio Frequency Channel Number) is a number that identifies a
+     * specific frequency channel in LTE/5G NR, used to define the carrier frequency.
+     * The range can be [0 ~ 65535] according to the 3GPP TS 36.101, or higher for 5G NR
+     * (NR-ARFCN) according to 3GPP TS 38.101-1. Each value in the array represents a
+     * channel number (unit: channel number), which maps to a specific carrier frequency.
+     * <p>
+     * <b>Note:</b> This key should never be used as a standalone carrier config.
+     * It is exclusively intended to be used as a key within the
+     * {@link #KEY_SATELLITE_CONFIGS_PER_PLMN_BUNDLE} PersistableBundle to configure
+     * supported frequencies per satellite provider.
+     * <p>
+     * This config is empty by default.
+     *
+     * @hide
+     */
+    public static final String KEY_SATELLITE_SUPPORTED_FREQUENCIES_INT_ARRAY =
+            "satellite_supported_frequencies_type_int_array";
+
+    /**
      * A PersistableBundle that contains a list of key-value pairs, where keys are satellite
      * provider PLMNs and values are bundles containing satellite configurations for that PLMN.
      * This allows for per-provider settings within a single carrier, which is necessary for
@@ -10183,6 +10204,7 @@ public class CarrierConfigManager {
      * <li>{@link #KEY_CARRIER_ROAMING_NTN_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_INT}</li>
      * <li>{@link #KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE_INT}</li>
      * <li>{@link #KEY_SATELLITE_TECHNOLOGY_INT_ARRAY}</li>
+     * <li>{@link #KEY_SATELLITE_SUPPORTED_FREQUENCIES_INT_ARRAY}</li>
      * </ul>
      * <p>
      * An example config for a hybrid carrier supporting two PLMNs (lets say "XXXXXX" is the PLMN of
@@ -10199,6 +10221,11 @@ public class CarrierConfigManager {
      *         <!-- SatelliteManager#NT_RADIO_TECHNOLOGY_NR_NTN -->
      *         <int-array name="satellite_technology_type_int_array" num="1">
      *             <item value="2" />
+     *         </int-array>
+     *         <!-- CarrierConfigManager#KEY_SATELLITE_SUPPORTED_FREQUENCIES_INT_ARRAY -->
+     *         <int-array name="satellite_supported_frequencies_int_array" num="2">
+     *             <item value="229015" />
+     *             <item value="229016" />
      *         </int-array>
      *     </pbundle_as_map>
      *     <!-- Skylo PLMN's satellite configurations -->
@@ -10726,7 +10753,7 @@ public class CarrierConfigManager {
      * The carrier roaming satellite upsell notification hysteresis time in seconds.
      *
      * <p>If the carrier supports purchasing satellite plan which is defined by {@link
-     * CarrierConfigManager#KEY_CARRIER_ROAMING_SATELLITE_UPSELL_MODE_SUPPORTED_BOOL} and the device
+     * CarrierConfigManager#KEY_CARRIER_ROAMING_SATELLITE_UPSELL_SUPPORTED_BOOL} and the device
      * is in {@link ServiceState#STATE_OUT_OF_SERVICE}, not connected to Wi-Fi, then hysteresis
      * timer defined by this key will start.
      *
@@ -11878,21 +11905,28 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
     public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
 
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * Specifies whether the "Radio Info" (and related) activities should be hidden on user builds.
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * <p>If {@code true}, the activities will be hidden on user builds.
      * If {@code false}, the activities will be visible (default behavior).
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * <p>Note: The hidden menu will always be displayed in non-user builds, regardless of this
      * configuration.
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
      * @hide
      */
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     public static final String KEY_HIDE_RADIO_INFO_ON_USER_BUILD_BOOL =
             "hide_radio_info_on_user_build_bool";
 
-// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
      * Controls whether the turbo DSDA icon is shown on the UI.
      *
@@ -11905,7 +11939,18 @@ public class CarrierConfigManager {
      */
     public static final String KEY_SHOW_TURBO_DSDA_ICON = "show_turbo_dsda_icon";
 
-// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
+
+    /**
+     * A list of network types that support a linger timer to delay the teardown of a data network.
+     *
+     * While the default value is null, configuring a linger timer is recommended for LTE
+     * and LTE CA.
+     *
+     * @see TelephonyManager NETWORK_TYPE_*
+     * @hide
+     */
+    public static final String KEY_DATA_LINGER_TIMER_ALLOWED_DATA_NETWORK_TYPES
+            = "data_linger_timer_allowed_data_network_types";
 
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;

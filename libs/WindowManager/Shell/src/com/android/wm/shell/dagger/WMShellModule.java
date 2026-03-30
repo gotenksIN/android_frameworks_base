@@ -99,8 +99,6 @@ import com.android.wm.shell.dagger.hierarchy.ContainerHierarchyDependency;
 import com.android.wm.shell.dagger.hierarchy.HandheldContainersModule;
 import com.android.wm.shell.dagger.pinnedlayer.PinnedLayerModule;
 import com.android.wm.shell.dagger.pip.PipModule;
-import com.android.wm.shell.desktopai.dagger.DesktopAIModule;
-import com.android.wm.shell.desktopai.dagger.DesktopAiInitializer;
 import com.android.wm.shell.desktopmode.CloseDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.DesktopActivityOrientationChangeHandler;
 import com.android.wm.shell.desktopmode.DesktopAnimationConfiguration;
@@ -117,6 +115,7 @@ import com.android.wm.shell.desktopmode.DesktopModeEventLogger;
 import com.android.wm.shell.desktopmode.DesktopModeKeyGestureHandler;
 import com.android.wm.shell.desktopmode.DesktopModeLoggerTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopModeMoveToDisplayTransitionHandler;
+import com.android.wm.shell.desktopmode.DesktopModeShellCommandHandler;
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger;
 import com.android.wm.shell.desktopmode.DesktopRemoteListener;
 import com.android.wm.shell.desktopmode.DesktopTaskChangeListener;
@@ -133,6 +132,8 @@ import com.android.wm.shell.desktopmode.FreeformFallbackTransitionObserver;
 import com.android.wm.shell.desktopmode.NormalAppLayerController;
 import com.android.wm.shell.desktopmode.NormalAppLayerHandler;
 import com.android.wm.shell.desktopmode.OverviewToDesktopTransitionObserver;
+import com.android.wm.shell.desktopmode.PipDisplayDisconnectHandler;
+import com.android.wm.shell.desktopmode.PipDisplayReconnectHandler;
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator;
 import com.android.wm.shell.desktopmode.ShellDesktopState;
 import com.android.wm.shell.desktopmode.ShellDesktopStateImpl;
@@ -143,8 +144,8 @@ import com.android.wm.shell.desktopmode.VisualIndicatorUpdateScheduler;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.desktopmode.WindowDragTransitionHandler;
 import com.android.wm.shell.desktopmode.api.DesktopMode;
+import com.android.wm.shell.desktopmode.api.impl.DesktopModeAidlProvider;
 import com.android.wm.shell.desktopmode.api.impl.DesktopModeImpl;
-import com.android.wm.shell.desktopmode.api.impl.IDesktopModeProvider;
 import com.android.wm.shell.desktopmode.clientfullscreenrequest.DesktopFullscreenRequestHandler;
 import com.android.wm.shell.desktopmode.compatui.SystemModalsTransitionHandler;
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer;
@@ -160,7 +161,6 @@ import com.android.wm.shell.desktopmode.education.AppToWebEducationController;
 import com.android.wm.shell.desktopmode.education.AppToWebEducationFilter;
 import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.education.data.AppToWebEducationDatastoreRepository;
-import com.android.wm.shell.desktopmode.homescreenpeeking.DesktopHomeScreenPeekController;
 import com.android.wm.shell.desktopmode.multidesks.DeskSwitchTransitionHandler;
 import com.android.wm.shell.desktopmode.multidesks.DesksController;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
@@ -186,8 +186,6 @@ import com.android.wm.shell.pinnedlayer.phone.PinnedLayerFlags;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUiState;
 import com.android.wm.shell.pip.PipTransitionController;
-import com.android.wm.shell.pip2.phone.PipDisplayDisconnectHandler;
-import com.android.wm.shell.pip2.phone.PipDisplayReconnectHandler;
 import com.android.wm.shell.pip2.phone.PipDisplayTransferHandler;
 import com.android.wm.shell.pip2.phone.PipScheduler;
 import com.android.wm.shell.pip2.phone.PipTransitionState;
@@ -232,6 +230,7 @@ import com.android.wm.shell.windowdecor.VeiledTaskResizer;
 import com.android.wm.shell.windowdecor.WindowDecorViewModel;
 import com.android.wm.shell.windowdecor.additionalviewcontainer.AdditionalSystemViewContainer;
 import com.android.wm.shell.windowdecor.common.CaptionVisibilityHelper;
+import com.android.wm.shell.windowdecor.common.DecorThemeUtil;
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader;
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoaderImpl;
 import com.android.wm.shell.windowdecor.common.viewhost.DefaultWindowDecorViewHostSupplier;
@@ -274,7 +273,6 @@ import java.util.Optional;
                 LetterboxModule.class,
                 PinnedLayerModule.class,
                 DesktopModule.class,
-                DesktopAIModule.class,
                 HandheldContainersModule.class,
                 BubbleModule.class,
         })
@@ -1293,13 +1291,14 @@ public abstract class WMShellModule {
             @ShellMainThread ShellExecutor mainExecutor,
             DisplayController displayController,
             DesktopState desktopState,
-            AccessibilityManager accessibilityManager) {
+            AccessibilityManager accessibilityManager,
+            ShellController shellController) {
         if (desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopModeKeyGestureHandler(context,
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories, inputManager, shellTaskOrganizer,
                     focusTransitionObserver, mainExecutor, displayController, desktopState,
-                    accessibilityManager));
+                    accessibilityManager, shellController));
         }
         return Optional.empty();
     }
@@ -1374,7 +1373,8 @@ public abstract class WMShellModule {
             FluidTaskResizer fluidTaskResizer,
             VeiledTaskResizer veiledTaskResizer,
             MultiDisplayTaskMover multiDisplayTaskMover,
-            SnapController snapController
+            SnapController snapController,
+            DecorThemeUtil.Factory decorThemeUtilFactory
     ) {
         if (!shelldesktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.empty();
@@ -1397,7 +1397,7 @@ public abstract class WMShellModule {
                 desksOrganizer, shelldesktopState, desktopConfig, userProfileContexts,
                 lockTaskChangeListener, pinnedLayerController.orElse(null),
                 pinnedLayerUiState.orElse(null), fluidTaskResizer, veiledTaskResizer,
-                multiDisplayTaskMover, snapController));
+                multiDisplayTaskMover, snapController, decorThemeUtilFactory));
     }
 
     @WMSingleton
@@ -2288,26 +2288,11 @@ public abstract class WMShellModule {
             ShellCrashHandler shellCrashHandler,
             AppToWebEducationController appToWebEducationController,
             QuitFocusedAppKeyGestureHandler quitFocusedAppKeyGestureHandler,
-            Optional<DesktopAiInitializer> desktopAiInitializer,
             BubbleRootTask bubbleRootTask,
-            IDesktopModeProvider desktopModeProvider,
+            DesktopModeAidlProvider desktopModeAidlProvider,
             DesktopTasksTransitionHandler desktopTasksTransitionHandler,
-            DesktopHomeScreenPeekController desktopHomeScreenPeekController) {
+            DesktopModeShellCommandHandler desktopModeShellCommandHandler) {
         return new Object();
-    }
-
-    @WMSingleton
-    @Provides
-    static IDesktopModeProvider provideIDesktopModeProvider(
-            ShellInit shellInit,
-            ShellController shellController,
-            Optional<DesktopTasksController> desktopTasksController,
-            DesktopState desktopState) {
-        return new IDesktopModeProvider(
-                shellInit,
-                shellController,
-                desktopTasksController,
-                desktopState);
     }
 
     @WMSingleton

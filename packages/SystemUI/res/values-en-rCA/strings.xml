@@ -174,6 +174,7 @@
     <string name="screen_record_accessibility_label_show_previous" msgid="5202414285722078012">"Show previous"</string>
     <string name="screen_record_settings" msgid="2377267679200139285">"Screen recording settings"</string>
     <string name="screen_record_markup" msgid="5583986085046693669">"Markup"</string>
+    <string name="screen_record_color_picker" msgid="6732567862106107021">"Color picker"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Video saved"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"Video deleted"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"Undo"</string>
@@ -987,12 +988,7 @@
     <string name="inline_done_button" msgid="6043094985588909584">"Done"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Apply"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Turn off"</string>
-    <string name="bridged_device_type_unknown" msgid="8435318668271946936">"device"</string>
-    <string name="bridged_device_type_phone" msgid="7971199513068521770">"phone"</string>
-    <string name="bridged_device_type_tablet" msgid="7403330807933649592">"tablet"</string>
-    <string name="bridged_device_type_laptop" msgid="8027976360936787349">"laptop"</string>
-    <string name="bridged_device_type_watch" msgid="2634106046119813073">"watch"</string>
-    <string name="bridged_device_type_tv" msgid="5471822369478942796">"TV"</string>
+    <string name="bridged_source_device" msgid="2233591993331607836">"source device"</string>
     <string name="inline_bridged_open_associated_device_settings" msgid="6885442224230065508">"Open <xliff:g id="DEVICE_TYPE">%1$s</xliff:g> settings"</string>
     <string name="notification_silence_title" msgid="8608090968400832335">"Silent"</string>
     <string name="notification_alert_title" msgid="3656229781017543655">"Default"</string>
@@ -1229,10 +1225,8 @@
     <string name="accessibility_quick_settings_open_settings" msgid="536838345505030893">"Open <xliff:g id="ID_1">%s</xliff:g> settings."</string>
     <string name="accessibility_quick_settings_edit" msgid="6544873823850165">"Edit order of Quick Settings."</string>
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Power menu"</string>
-    <!-- no translation found for accessibility_quick_settings_power_menu_expanded (4665161431290201722) -->
-    <skip />
-    <!-- no translation found for accessibility_quick_settings_power_menu_collapsed (5800930916550853776) -->
-    <skip />
+    <string name="accessibility_quick_settings_power_menu_expanded" msgid="4665161431290201722">"Expanded"</string>
+    <string name="accessibility_quick_settings_power_menu_collapsed" msgid="5800930916550853776">"Collapsed"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Page <xliff:g id="ID_1">%1$d</xliff:g> of <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Turn on <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="2409946187069273612">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> is the keyboard shortcut to use <xliff:g id="ID_4">^4</xliff:g>. <xliff:g id="ID_5">^5</xliff:g>"</string>
@@ -1466,6 +1460,7 @@
     <string name="controls_media_button_prev" msgid="8126822360056482970">"Previous track"</string>
     <string name="controls_media_button_next" msgid="6662636627525947610">"Next track"</string>
     <string name="controls_media_button_connecting" msgid="3138354625847598095">"Connecting"</string>
+    <string name="controls_media_output_chip" msgid="324952606619594635">"Open output settings"</string>
     <string name="media_transfer_undo" msgid="1895606387620728736">"Undo"</string>
     <string name="media_move_closer_to_start_cast" msgid="2673104707465013176">"Move closer to play on <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
     <string name="media_move_closer_to_end_cast" msgid="7302555909119374738">"To play here, move closer to <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
@@ -1495,8 +1490,8 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"Available devices for audio output."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"Volume"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
-    <string name="media_output_dialog_missing_permissions_warning" msgid="1279351363821022727">"Some devices are not visible. Update your app permissions"</string>
-    <string name="media_output_dialog_warning_button_fix" msgid="3324600211761037516">"Fix"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="4312830846174995199">"To see more devices, you may need to allow permissions for <xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>"</string>
+    <string name="media_output_dialog_warning_button_fix" msgid="3650735180540135181">"Open <xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"Connected speakers"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Speakers &amp; Displays"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"Suggested"</string>
@@ -1606,8 +1601,7 @@
     <string name="clipboard_image_preview" msgid="2156475174343538128">"Image preview"</string>
     <string name="clipboard_edit" msgid="4500155216174011640">"edit"</string>
     <string name="add" msgid="81036585205287996">"Add"</string>
-    <!-- no translation found for remove (7031760447233505700) -->
-    <skip />
+    <string name="remove" msgid="7031760447233505700">"Remove"</string>
     <string name="manage_users" msgid="1823875311934643849">"Manage users"</string>
     <string name="drag_split_not_supported" msgid="7173481676120546121">"This notification does not support dragging to split screen"</string>
     <string name="dream_overlay_location_active" msgid="6484763493158166618">"Location active"</string>
@@ -1867,18 +1861,18 @@
     <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"Portrait touch-up"</string>
     <string name="av_mic_label" msgid="5427348054144789879">"Microphone"</string>
     <string name="av_camera_label" msgid="7719772172590702343">"Camera"</string>
-    <string name="av_camera_blur_drill_in_title" msgid="2250600375798981511">"Background Blur"</string>
+    <string name="av_camera_blur_drill_in_title" msgid="3392789469292685354">"Background blur"</string>
     <string name="av_camera_blur_off" msgid="3170334995799202022">"Off"</string>
-    <string name="av_camera_blur_light" msgid="5666055368940059418">"Light"</string>
-    <string name="av_camera_blur_full" msgid="3276351992811619332">"Full"</string>
+    <string name="av_camera_blur_light" msgid="5105255788203563538">"Light blur"</string>
+    <string name="av_camera_blur_full" msgid="6493497965254048479">"Heavy blur"</string>
     <string name="av_camera_improve_lighting" msgid="1540549414296669133">"Improve lighting"</string>
     <string name="av_camera_face_retouch" msgid="45890971969486224">"Portrait touch-up"</string>
-    <string name="av_camera_framing" msgid="5108462267843042492">"Camera Framing"</string>
-    <string name="av_studio_mic" msgid="2614843492629357766">"Studio Mic"</string>
-    <string name="av_studio_look" msgid="621893522645557619">"Studio Look"</string>
+    <string name="av_camera_framing" msgid="2948988841290208034">"Camera framing"</string>
+    <string name="av_studio_mic" msgid="1815195630183143501">"Studio mic"</string>
+    <string name="av_studio_look" msgid="631085505786989852">"Studio look"</string>
     <string name="av_studio_look_effects" msgid="4105109585851068415">"%d effects"</string>
     <string name="av_blur" msgid="405131343487260171">"Blur"</string>
-    <string name="av_live_captions" msgid="7819416886586903077">"Live Captions"</string>
+    <string name="av_live_captions" msgid="802763867449401889">"Live captions"</string>
     <string name="av_drill_in_return_to_main" msgid="5273814393426741827">"Back"</string>
     <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"Battery %s"</string>
     <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"L battery %1$s    R battery %2$s"</string>

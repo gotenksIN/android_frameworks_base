@@ -68,6 +68,7 @@ import android.util.IndentingPrintWriter;
 import android.util.Log;
 import android.util.MathUtils;
 import android.view.DisplayCutout;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -4033,7 +4034,6 @@ public class NotificationStackScrollLayout
 
         ShadeScrimShape shape = mScrollViewFields.clippingShape;
         if (shape == null) {
-            Log.d(TAG, "outsideScrimBounds:false, reason:`\"clippingShape null\"");
             return false;
         }
         ShadeScrimBounds bounds = shape.getBounds();
@@ -4086,6 +4086,9 @@ public class NotificationStackScrollLayout
                     // This is the ONLY place mSendingTouchesToSceneFramework can become true.
                     mSendingTouchesToSceneFramework = handled;
                     mGestureReachedScroller = false;
+
+                    // Side Effect: set initial guts state when a gesture starts
+                    updateIsCurrentGestureInGuts(ev);
                 }
                 case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     // Gesture ended: route the final event accordingly.
@@ -4096,6 +4099,12 @@ public class NotificationStackScrollLayout
                         // Claim this gesture from the SceneFramework with a final ACTION_CANCEL.
                         claimTouchFromSceneFramework(ev);
                     }
+
+                    // Side Effect (The Workaround): Re-evaluate isTouchInGuts on the UP/CANCEL
+                    // event and leave the state exactly as it was requested by downstream.
+                    // Prevent SceneContainer from closing the guts, it the touch finished inside.
+                    updateIsCurrentGestureInGuts(ev);
+
                     mSendingTouchesToSceneFramework = false;
                     mGestureReachedScroller = false;
                     setIsBeingDragged(false);
@@ -4201,6 +4210,15 @@ public class NotificationStackScrollLayout
         syntheticCancel.setLocation(ev.getRawX(), ev.getRawY());
         mController.sendTouchToSceneFramework(syntheticCancel);
         syntheticCancel.recycle();
+    }
+
+    /**
+     * Sets {@link ScrollViewFields#sendCurrentGestureInGuts} with {@code true} when the given
+     * {@link MotionEvent} is inside the notification guts, and {@code false} otherwise.
+     */
+    private void updateIsCurrentGestureInGuts(MotionEvent event) {
+        final boolean isTouchInGuts = mController.isTouchInGutsView(event);
+        mScrollViewFields.sendCurrentGestureInGuts(isTouchInGuts);
     }
 
     void dispatchDownEventToScroller(MotionEvent ev) {
@@ -6626,12 +6644,6 @@ public class NotificationStackScrollLayout
     public void setClippingShape(@Nullable ShadeScrimShape shape) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
         if (Objects.equals(mScrollViewFields.clippingShape, shape)) return;
-        // Check if the clipping shape is flipping from non-null to null or vice versa.
-        boolean wasPresent = mScrollViewFields.clippingShape != null;
-        boolean isPresent = shape != null;
-        if (wasPresent != isPresent) {
-            Log.d(TAG, "clipping shape flipped to " + (isPresent ? "value" : "null"));
-        }
         mScrollViewFields.clippingShape = shape;
         mShouldUseRoundedRectClipping = shape != null;
         mRoundedClipPath.reset();
@@ -6660,12 +6672,6 @@ public class NotificationStackScrollLayout
     public void setNegativeClippingShape(@Nullable ShadeScrimShape shape) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
         if (Objects.equals(mScrollViewFields.negativeClippingShape, shape)) return;
-        // Check if the negative clipping shape is flipping from non-null to null or vice versa.
-        boolean wasPresent = mScrollViewFields.negativeClippingShape != null;
-        boolean isPresent = shape != null;
-        if (wasPresent != isPresent) {
-            Log.d(TAG, "negative clipping shape flipped to " + (isPresent ? "value" : "null"));
-        }
         mScrollViewFields.negativeClippingShape = shape;
         mShouldUseNegativeRoundedRectClipping = shape != null;
         mNegativeRoundedClipPath.reset();
@@ -7493,6 +7499,12 @@ public class NotificationStackScrollLayout
 
     private final ExpandHelper.Callback mExpandHelperCallback = new ExpandHelper.Callback() {
         @Override
+        public void playExpandStartHaptic() {
+            // provide haptic feedback when the Notification starts to expand
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        }
+
+        @Override
         public ExpandableView getChildAtPosition(float touchX, float touchY) {
             return NotificationStackScrollLayout.this.getChildAtPosition(touchX, touchY);
         }
@@ -7566,6 +7578,7 @@ public class NotificationStackScrollLayout
         }
     };
 
+    @NonNull
     @Override
     public ExpandHelper.Callback getExpandHelperCallback() {
         return mExpandHelperCallback;

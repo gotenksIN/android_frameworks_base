@@ -1358,9 +1358,8 @@ public interface WindowManager extends ViewManager {
      *     android:value="true|false"/&gt;
      * &lt;/application&gt;
      * </pre>
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_VIRTUAL_GAMEPAD_DEVELOPER_OPT_OUT)
     String PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE =
             "android.window.PROPERTY_COMPAT_ALLOW_VIRTUAL_GAMEPAD_OVERRIDE";
 
@@ -1486,6 +1485,41 @@ public interface WindowManager extends ViewManager {
      */
     String PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY =
             "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY";
+
+    /**
+     * Application or Activity level
+     * {@link android.content.pm.PackageManager.Property PackageManager.Property} that specifies
+     * whether this package or activity wants to allow synchronized insets animation.
+     *
+     * <p>When the synchronized insets animation is enabled, the insets will be dispatched to the
+     * view hierarchy for each frame of the animation, ensuring that the views are laid out in sync
+     * with the animation progress.
+     *
+     * <p>Setting this property to {@code false} informs the system that the activity must be
+     * opted-out from the synchronized insets animation even if the device manufacturer has opted
+     * the app into the treatment.
+     *
+     * <p>Not setting this property at all, or setting this property to {@code true} has no effect.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_COMPAT_ALLOW_SYNCHRONIZED_INSETS_ANIMATION"
+     *     android:value="false"/&gt;
+     * &lt;/application&gt;
+     * </pre>or
+     * <pre>
+     * &lt;activity&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_COMPAT_ALLOW_SYNCHRONIZED_INSETS_ANIMATION"
+     *     android:value="false"/&gt;
+     * &lt;/activity&gt;
+     * </pre>
+     * @hide
+     */
+    String PROPERTY_COMPAT_ALLOW_SYNCHRONIZED_INSETS_ANIMATION =
+            "android.window.PROPERTY_COMPAT_ALLOW_SYNCHRONIZED_INSETS_ANIMATION";
 
     /**
      * Application or Activity level

@@ -120,6 +120,9 @@
                 <xs:element type="sensorDetails" name="tempSensor">
                     <xs:annotation name="final"/>
                 </xs:element>
+                <xs:element type="sensorDetails" name="colorSensor" minOccurs="0" maxOccurs="1">
+                    <xs:annotation name="final"/>
+                </xs:element>
 
                 <!-- Length of the ambient light horizon used to calculate the long & short term
                 estimates of ambient light in milliseconds.-->
@@ -756,6 +759,43 @@
              enable the logic of changing the brightness with ambient light changes -->
             <xs:element name="idleStylusTimeoutMillis" type="xs:nonNegativeInteger"
                 minOccurs="0" maxOccurs="1">
+                <xs:annotation name="final"/>
+            </xs:element>
+            <!-- Values used to compute the brightness ramp animation. -->
+            <xs:element name="brighteningRampGamma" type="nonNegativeDecimal" minOccurs="0" maxOccurs="1">
+                <xs:annotation name="final"/>
+            </xs:element>
+            <xs:element name="darkeningRampGamma" type="nonNegativeDecimal" minOccurs="0" maxOccurs="1">
+                <xs:annotation name="final"/>
+            </xs:element>
+            <!-- Map from lux delta values to the desired ramp animation duration limits. -->
+            <xs:element name="luxDeltaToRampLimits" type="luxDeltaToRampLimits" minOccurs="0">
+                <xs:annotation name="final"/>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="luxDeltaToRampLimits">
+        <xs:sequence>
+            <xs:element name="point" type="luxDeltaRampLimitPoint" maxOccurs="unbounded">
+                <xs:annotation name="nonnull"/>
+                <xs:annotation name="final"/>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="luxDeltaRampLimitPoint">
+        <xs:sequence>
+            <xs:element name="luxDelta" type="xs:nonNegativeInteger">
+                <xs:annotation name="nonnull"/>
+                <xs:annotation name="final"/>
+            </xs:element>
+            <xs:element name="rampIncreaseMaxMillis" type="xs:nonNegativeInteger">
+                <xs:annotation name="nonnull"/>
+                <xs:annotation name="final"/>
+            </xs:element>
+            <xs:element name="rampDecreaseMaxMillis" type="xs:nonNegativeInteger">
+                <xs:annotation name="nonnull"/>
                 <xs:annotation name="final"/>
             </xs:element>
         </xs:sequence>

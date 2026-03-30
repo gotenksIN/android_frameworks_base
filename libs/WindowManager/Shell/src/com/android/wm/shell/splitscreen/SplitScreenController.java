@@ -411,12 +411,12 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
 
     /** Check task is under split or not by taskId. */
     public boolean isTaskInSplitScreen(int taskId) {
-        return mStageCoordinator.getStageOfTask(taskId) != STAGE_TYPE_UNDEFINED;
+        return mStageCoordinator.getCurrentStageTypeOfTask(taskId) != STAGE_TYPE_UNDEFINED;
     }
 
     /** Get the split stage of task is under it. */
     public @StageType int getStageOfTask(int taskId) {
-        return mStageCoordinator.getStageOfTask(taskId);
+        return mStageCoordinator.getCurrentStageTypeOfTask(taskId);
     }
 
     /**
@@ -1349,8 +1349,12 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
                             Rect taskBounds, boolean startRecents,
                             @Nullable WindowContainerTransaction withRecentsWct) {
                         AtomicBoolean result = new AtomicBoolean(false);
-                        mSelectListener.call(l -> result.set(l.onRequestSplitSelect(taskInfo,
-                                splitPosition, taskBounds, startRecents, withRecentsWct)));
+                        mSelectListener.call(l -> {
+                            l.onRequestSplitSelect(taskInfo, splitPosition, taskBounds,
+                                    startRecents, withRecentsWct);
+                            // Set to true only if the request got executed
+                            result.set(true);
+                        });
                         return result.get();
                     }
                 };

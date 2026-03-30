@@ -19,6 +19,7 @@ package com.android.extensions.computercontrol;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,7 +27,10 @@ import static org.testng.Assert.assertThrows;
 
 import android.companion.virtual.IVirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager;
+import android.companion.virtualdevice.flags.Flags;
 import android.content.pm.PackageManager;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.testing.TestableContext;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -49,6 +53,9 @@ public class ComputerControlExtensionsTest {
     private static final List<String> TARGET_PACKAGE_NAMES = List.of("com.android.foo");
 
     @Rule
+    public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+
+    @Rule
     public final TestableContext mContext = spy(
             new TestableContext(InstrumentationRegistry.getInstrumentation().getTargetContext()));
 
@@ -69,7 +76,7 @@ public class ComputerControlExtensionsTest {
         mContext.setMockPackageManager(mPackageManager);
         mContext.addMockSystemService(VirtualDeviceManager.class,
                 new VirtualDeviceManager(mIVirtualDeviceManager, mContext));
-        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(true);
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any(), anyInt())).thenReturn(true);
 
         mParams = new ComputerControlSession.Params.Builder(mContext)
                 .setName(SESSION_NAME)
@@ -105,7 +112,7 @@ public class ComputerControlExtensionsTest {
 
     @Test
     public void getInstance_noAccess_returnsNonNull() throws Exception {
-        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(false);
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any(), anyInt())).thenReturn(false);
         assertThat(ComputerControlExtensions.getInstance(mContext)).isNotNull();
     }
 
@@ -114,15 +121,18 @@ public class ComputerControlExtensionsTest {
         assertThat(ComputerControlExtensions.getInstance(mContext)).isNotNull();
     }
 
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACCESS)
     @Test
     public void isSessionCreationAvailable_noAccess_returnsFalse() throws Exception {
-        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(false);
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any(), anyInt())).thenReturn(false);
         assertThat(ComputerControlExtensions.isSessionCreationAvailable(mContext)).isFalse();
     }
 
+
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACCESS)
     @Test
     public void isSessionCreationAvailable_withAccess_returnsTrue() throws Exception {
-        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(true);
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any(), anyInt())).thenReturn(true);
         assertThat(ComputerControlExtensions.isSessionCreationAvailable(mContext)).isTrue();
     }
 

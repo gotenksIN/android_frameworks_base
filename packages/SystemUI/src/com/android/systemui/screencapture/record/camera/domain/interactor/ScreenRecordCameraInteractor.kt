@@ -44,7 +44,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -73,7 +72,7 @@ constructor(
     val isConnected: Flow<Boolean> = repository.isConnected
     val cameraSubjectBounds: StateFlow<Region?> = repository.cameraSubjectBounds
 
-    private val _cameraBackground = MutableStateFlow(cameraBackgroundColors.first())
+    private val _cameraBackground = MutableStateFlow(Color.TRANSPARENT)
     val cameraBackground: StateFlow<Int> = _cameraBackground
 
     private val surfaceParameters = MutableStateFlow<CameraSurfaceParameters?>(null)
@@ -108,7 +107,7 @@ constructor(
                 SharingStarted.Eagerly,
                 false,
             )
-    val streamConfiguration: StateFlow<StreamConfiguration?> =
+    private val statelessStreamConfiguration: Flow<StreamConfiguration?> =
         combine(repository.isConnected.filter { it }, displayParameters.filterNotNull()) {
                 _,
                 displayParameters ->
@@ -125,12 +124,14 @@ constructor(
                 // null is a valid value here indicating that something went wrong
                 it == null || it.isValid()
             }
-            .stateInTraced(
-                "ScreenRecordCameraInteractor#optimalCameraStreamSize",
-                coroutineScope,
-                SharingStarted.Eagerly,
-                null,
-            )
+
+    val streamConfiguration: StateFlow<StreamConfiguration?> =
+        statelessStreamConfiguration.stateInTraced(
+            "ScreenRecordCameraInteractor#optimalCameraStreamSize",
+            coroutineScope,
+            SharingStarted.Eagerly,
+            null,
+        )
 
     override suspend fun start() {
         // Keep the service connected throughout the recording for faster camera on/off
@@ -145,9 +146,11 @@ constructor(
             .onEach { if (it) repository.setBackgroundColor(cameraBackground.value) }
             .launchIn(coroutineScope)
 
-        combine(surfaceParameters.filterNotNull(), streamConfiguration.filterNotNull()) {
-                params,
-                optimalCameraStreamSize ->
+        combine(
+                surfaceParameters.filterNotNull(),
+                // Observe stateless configuration here to startStream after any prepareStream call
+                statelessStreamConfiguration.filterNotNull(),
+            ) { params, optimalCameraStreamSize ->
                 if (
                     params.surface == null ||
                         params.size != optimalCameraStreamSize.cameraStreamSize
@@ -187,7 +190,9 @@ constructor(
     }
 
     fun setBackgroundColor(@ColorInt color: Int) {
-        require(color in cameraBackgroundColors) { "color should be one of cameraBackgroundColors" }
+        require(color in cameraBackgroundColors || color == Color.TRANSPARENT) {
+            "color should be one of cameraBackgroundColors or transparent"
+        }
         _cameraBackground.value = color
     }
 

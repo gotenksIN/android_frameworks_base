@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -71,6 +72,7 @@ fun CredentialScreen(
     onCancel: () -> Unit = {}, // TODO: These three callbacks are Spaghetti related
     onCredentialMatched: (ByteArray, Boolean) -> Unit,
     onFallbackSelected: (Int) -> Unit = {},
+    onContentViewMoreOptionsButtonPressed: () -> Unit = {},
 ) {
     val viewModel = rememberViewModel("CredentialScreen") { viewModelFactory.create() }
     val credentialKind by
@@ -178,6 +180,7 @@ fun CredentialScreen(
                                 onSuccess = { credential -> handleSuccess(credential) },
                                 isVisible = currentView == BiometricPromptView.CREDENTIAL,
                                 error = errorMessage,
+                                userId = header.user.userIdForPasswordEntry,
                             )
                         }
                         PromptKind.Pattern -> {
@@ -212,6 +215,7 @@ fun CredentialScreen(
                     footer = footer,
                     onCancel = onCancel,
                     isReversed = isSeascape,
+                    onContentViewMoreOptionsButtonPressed = onContentViewMoreOptionsButtonPressed,
                 )
             } else {
                 PortraitCredentialLayout(
@@ -219,6 +223,7 @@ fun CredentialScreen(
                     content = credentialInput,
                     footer = footer,
                     onCancel = onCancel,
+                    onContentViewMoreOptionsButtonPressed = onContentViewMoreOptionsButtonPressed,
                 )
             }
         }
@@ -231,10 +236,12 @@ private fun PortraitCredentialLayout(
     content: @Composable () -> Unit,
     footer: @Composable () -> Unit,
     onCancel: () -> Unit,
+    onContentViewMoreOptionsButtonPressed: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
+            modifier =
+                Modifier.fillMaxWidth().imePadding().padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -245,7 +252,10 @@ private fun PortraitCredentialLayout(
                         .verticalScroll(rememberScrollState()),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                PromptHeader(header = header)
+                PromptHeader(
+                    header = header,
+                    onContentViewMoreOptionsButtonPressed = onContentViewMoreOptionsButtonPressed,
+                )
             }
             content()
             footer()
@@ -275,6 +285,7 @@ private fun LandscapeCredentialLayout(
     footer: @Composable () -> Unit,
     onCancel: () -> Unit,
     isReversed: Boolean,
+    onContentViewMoreOptionsButtonPressed: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(24.dp).widthIn(max = 800.dp),
@@ -296,7 +307,11 @@ private fun LandscapeCredentialLayout(
                         Column(
                             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
                         ) {
-                            PromptHeaderLandscape(header = header)
+                            PromptHeaderLandscape(
+                                header = header,
+                                onContentViewMoreOptionsButtonPressed =
+                                    onContentViewMoreOptionsButtonPressed,
+                            )
                         }
                         footer()
                     }
@@ -323,7 +338,7 @@ private fun LandscapeCredentialLayout(
         val inputPane =
             @Composable {
                 Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    modifier = Modifier.weight(1f).fillMaxHeight().imePadding(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

@@ -65,6 +65,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.service.adb.AdbDebuggingManagerProto;
+import android.service.adb.AdbWifiProto;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Slog;
@@ -162,16 +163,21 @@ public class AdbDebuggingManager {
     private AdbConnectionPortPoller mConnectionPortPoller;
 
     /**
-     * The port used for the ADB over Wi-Fi TLS connection.
+     * Contains the network information for the ADB over Wi-Fi connection.
      *
-     * <p>This value is updated when the TLS server starts and is reset to 0 when wireless debugging
-     * is disabled. A value of 0 indicates that the port is not active or known.
+     * @param port The port used for the ADB over Wi-Fi TLS connection.
+     * @param hostname The hostname used for the ADB over Wi-Fi TLS connection.
+     */
+    private record AdbWirelessInfo(int port, @NonNull Optional<String> hostname) {}
+
+    /**
+     * The network information for the ADB over Wi-Fi connection.
      *
      * <p>This field is marked as volatile to ensure that writes from the {@link
      * AdbDebuggingHandler} thread are immediately visible to other threads that may call {@link
-     * #getAdbWirelessPort()}.
+     * #getAdbWirelessPort()} or {@link #getAdbWirelessHostName()}.
      */
-    private volatile int mAdbWifiTlsPort = 0;
+    private volatile AdbWirelessInfo mAdbWirelessInfo = new AdbWirelessInfo(0, Optional.empty());
 
     private final Ticker mTicker;
 
@@ -659,6 +665,9 @@ public class AdbDebuggingManager {
         // Event sent when AdbWifiNetworkMonitor attempts to stop adb wifi.
         static final int MSG_STOP_TLS_SERVICE = 33;
 
+        // Event sent when the mDNS hostname is known.
+        static final int MSG_ON_LOCALHOSTNAME_KNOWN = 34;
+
         // === Messages we can send to adbd ===========
         static final String MSG_DISCONNECT_DEVICE = "DD";
         static final String MSG_START_ADB_WIFI = "W1";
@@ -702,7 +711,7 @@ public class AdbDebuggingManager {
             // TODO(b/373819573): Consider how to handle Ethernet for wireless debugging,
             // as AdbdServicesManager currently depends on Wi-Fi features.
             if (mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI)) {
-                mAdbdServicesManager = new AdbdServicesManager(mContext, "comm");
+                mAdbdServicesManager = new AdbdServicesManager(mContext, "comm", this);
             } else {
                 mAdbdServicesManager = new AdbdServicesManagerNoop();
             }
@@ -969,7 +978,7 @@ public class AdbDebuggingManager {
                         break;
                     }
                     mAdbWifiEnabled = false;
-                    mAdbWifiTlsPort = 0;
+                    mAdbWirelessInfo = new AdbWirelessInfo(0, Optional.empty());
                     mAdbConnectionInfo.clear();
                     mAdbNetworkMonitor.unregister();
                     stopAdbdWifi();
@@ -1001,7 +1010,7 @@ public class AdbDebuggingManager {
                         break;
                     }
 
-                    mAdbWifiTlsPort = 0;
+                    mAdbWirelessInfo = new AdbWirelessInfo(0, Optional.empty());
                     mAdbConnectionInfo.clear();
                     stopAdbdWifi();
                     onAdbdWifiServerDisconnected(-1);
@@ -1124,7 +1133,7 @@ public class AdbDebuggingManager {
                 case MSG_SERVER_CONNECTED -> {
                     int port = (int) msg.obj;
                     onAdbdWifiServerConnected(port);
-                    mAdbWifiTlsPort = port;
+                    mAdbWirelessInfo = new AdbWirelessInfo(port, mAdbWirelessInfo.hostname());
                 }
                 case MSG_SERVER_DISCONNECTED -> {
                     if (!mAdbWifiEnabled) {
@@ -1183,6 +1192,16 @@ public class AdbDebuggingManager {
                         return;
                     }
                     mAdbdServicesManager.onAttributeChanged();
+                }
+                case MSG_ON_LOCALHOSTNAME_KNOWN -> {
+                    String hostname = (String) msg.obj;
+                    mAdbWirelessInfo =
+                            new AdbWirelessInfo(mAdbWirelessInfo.port(), Optional.of(hostname));
+                    Intent intent = new Intent(AdbManager.WIRELESS_DEBUG_STATE_CHANGED_ACTION);
+                    intent.putExtra(
+                            AdbManager.WIRELESS_STATUS_EXTRA, AdbManager.WIRELESS_STATUS_CONNECTED);
+                    AdbDebuggingManager.sendBroadcastWithDebugPermission(
+                            mContext, intent, UserHandle.ALL);
                 }
             }
         }
@@ -1637,8 +1656,14 @@ public class AdbDebuggingManager {
 
     /** Returns the port adbwifi is currently opened on. */
     public int getAdbWirelessPort() {
-        return mAdbWifiTlsPort;
+        return mAdbWirelessInfo.port();
     }
+
+    /** Returns the hostname adbwifi is currently opened on. */
+    public Optional<String> getAdbWirelessHostName() {
+        return mAdbWirelessInfo.hostname();
+    }
+
 
     /** Returns the list of paired devices. */
     public Map<String, PairDevice> getPairedDevices() {
@@ -1717,12 +1742,11 @@ public class AdbDebuggingManager {
                 mFingerprints);
 
         try {
-            File userKeys = new File("/data/misc/adb/adb_keys");
-            if (userKeys.exists()) {
+            if (mUserKeyFile != null && mUserKeyFile.exists()) {
                 dump.write(
                         "user_keys",
                         AdbDebuggingManagerProto.USER_KEYS,
-                        FileUtils.readTextFile(userKeys, 0, null));
+                        FileUtils.readTextFile(mUserKeyFile, 0, null));
             } else {
                 Slog.i(TAG, "No user keys on this device");
             }
@@ -1731,22 +1755,43 @@ public class AdbDebuggingManager {
         }
 
         try {
-            dump.write(
-                    "system_keys",
-                    AdbDebuggingManagerProto.SYSTEM_KEYS,
-                    FileUtils.readTextFile(new File("/adb_keys"), 0, null));
+            File systemKeys = new File("/adb_keys");
+            if (systemKeys.exists()) {
+                dump.write(
+                        "system_keys",
+                        AdbDebuggingManagerProto.SYSTEM_KEYS,
+                        FileUtils.readTextFile(systemKeys, 0, null));
+            } else {
+                Slog.i(TAG, "No system keys on this device");
+            }
         } catch (IOException e) {
             Slog.i(TAG, "Cannot read system keys", e);
         }
 
         try {
-            dump.write(
-                    "keystore",
-                    AdbDebuggingManagerProto.KEYSTORE,
-                    FileUtils.readTextFile(mTempKeysFile, 0, null));
+            if (mTempKeysFile != null && mTempKeysFile.exists()) {
+                dump.write(
+                        "keystore",
+                        AdbDebuggingManagerProto.KEYSTORE,
+                        FileUtils.readTextFile(mTempKeysFile, 0, null));
+            } else {
+                Slog.i(TAG, "No keystore on this device");
+            }
         } catch (IOException e) {
             Slog.i(TAG, "Cannot read keystore: ", e);
         }
+
+        long adbWifiToken = dump.start("adb_wifi", AdbDebuggingManagerProto.ADB_WIFI);
+        dump.write("enabled", AdbWifiProto.ENABLED, mAdbWifiEnabled);
+        dump.write("network_bssid", AdbWifiProto.NETWORK_BSSID, mAdbConnectionInfo.getBSSID());
+        dump.write("network_ssid", AdbWifiProto.NETWORK_SSID, mAdbConnectionInfo.getSSID());
+        dump.write(
+                "is_trusted_network",
+                AdbWifiProto.IS_TRUSTED_NETWORK,
+                mHandler.mAdbKeyStore.isTrustedNetwork(
+                        mAdbConnectionInfo.getBSSID(), mAdbConnectionInfo.getSSID()));
+        dump.write("tls_port", AdbWifiProto.TLS_PORT, mAdbWirelessInfo.port());
+        dump.end(adbWifiToken);
 
         dump.end(token);
     }

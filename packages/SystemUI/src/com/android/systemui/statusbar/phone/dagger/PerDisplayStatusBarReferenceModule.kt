@@ -31,13 +31,10 @@ import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarVie
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinderImpl
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel.HomeStatusBarViewModelFactory
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModelImpl.HomeStatusBarViewModelFactoryImpl
-import com.android.systemui.statusbar.window.data.repository.StatusBarWindowStatePerDisplayRepository
-import com.android.systemui.statusbar.window.data.repository.StatusBarWindowStatePerDisplayRepositoryImpl
 import dagger.Binds
 import dagger.Lazy
 import dagger.Module
 import dagger.Provides
-import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoSet
 
 @Module(subcomponents = [HomeStatusBarComponent::class])
@@ -67,24 +64,13 @@ interface PerDisplayStatusBarReferenceModule {
     ): SystemUIDisplaySubcomponent.LifecycleListener
 
     @Binds
+    @IntoSet
     @DisplayAware
-    fun statusBarWindowStateRepository(
-        impl: StatusBarWindowStatePerDisplayRepositoryImpl
-    ): StatusBarWindowStatePerDisplayRepository
+    fun systemStatusSchedulerAsLifecycleListener(
+        @DisplayAware scheduler: SystemStatusAnimationScheduler
+    ): SystemUIDisplaySubcomponent.LifecycleListener
 
     companion object {
-        @Provides
-        @ElementsIntoSet
-        @DisplayAware
-        fun systemStatusSchedulerAsLifecycleListener(
-            @DisplayAware scheduler: SystemStatusAnimationScheduler
-        ): Set<SystemUIDisplaySubcomponent.LifecycleListener> {
-            return if (Flags.systemStatusAnimationPerDisplay()) {
-                setOf(scheduler)
-            } else {
-                emptySet()
-            }
-        }
 
         @Provides
         @DisplayAware

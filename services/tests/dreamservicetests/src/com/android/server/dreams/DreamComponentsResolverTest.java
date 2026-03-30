@@ -16,21 +16,22 @@
 
 package com.android.server.dreams;
 
+import static android.service.dreams.Flags.dreamsSwitcher;
+
 import static com.google.common.truth.Truth.assertThat;
+
 import static org.mockito.Mockito.when;
 
 import android.content.ComponentName;
 import android.hardware.display.AmbientDisplayConfiguration;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
-import android.provider.Settings;
 import android.service.dreams.DreamItem;
 import android.service.dreams.DreamPlaylist;
 import android.service.dreams.Flags;
-import android.testing.TestableContext;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
-import androidx.test.runner.AndroidJUnit4;
 
 import com.android.server.pm.UserManagerInternal;
 
@@ -42,21 +43,18 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
+import java.util.Optional;
+
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class DreamComponentsResolverTest {
     @Rule public final MockitoRule mMockitoRule = MockitoJUnit.rule();
     @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
-    @Rule
-    public final TestableContext mContext =
-            new TestableContext(
-                    androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
-                            .getContext());
-
     @Mock private DreamRepository mDreamRepository;
     @Mock private AmbientDisplayConfiguration mDozeConfig;
     @Mock private UserManagerInternal mUserManagerInternal;
+    @Mock private DreamValidator mDreamValidator;
 
     private DreamComponentsResolver mResolver;
 
@@ -73,18 +71,22 @@ public class DreamComponentsResolverTest {
         when(mUserManagerInternal.getMainUserId()).thenReturn(USER_ID);
         mResolver =
                 new DreamComponentsResolver(
-                        mContext,
                         USER_ID,
                         mDozeConfig,
                         mUserManagerInternal,
                         /* dreamsOnlyEnabledForDockUser= */ false,
-                        mDreamRepository);
+                        mDreamRepository,
+                        mDreamValidator);
     }
 
     @Test
     public void resolve_doze_forceEnabled() {
         when(mDozeConfig.ambientDisplayComponent()).thenReturn(DOZE_COMPONENT.flattenToString());
-        mockDreamItem(DOZE_COMPONENT);
+        if (dreamsSwitcher()) {
+            mockDreamItem(DOZE_COMPONENT);
+        } else {
+            mockValid(DOZE_COMPONENT);
+        }
 
         final ComponentName resolvedComponent =
                 mResolver.resolve(/* doze= */ true, /* forceAmbientDisplayEnabled= */ true, null);
@@ -95,7 +97,11 @@ public class DreamComponentsResolverTest {
     public void resolve_doze_configEnabled() {
         when(mDozeConfig.enabled(USER_ID)).thenReturn(true);
         when(mDozeConfig.ambientDisplayComponent()).thenReturn(DOZE_COMPONENT.flattenToString());
-        mockDreamItem(DOZE_COMPONENT);
+        if (dreamsSwitcher()) {
+            mockDreamItem(DOZE_COMPONENT);
+        } else {
+            mockValid(DOZE_COMPONENT);
+        }
 
         final ComponentName resolvedComponent =
                 mResolver.resolve(/* doze= */ true, /* forceAmbientDisplayEnabled= */ false, null);
@@ -113,7 +119,11 @@ public class DreamComponentsResolverTest {
 
     @Test
     public void resolve_systemDream() {
-        mockDreamItem(DREAM_COMPONENT);
+        if (dreamsSwitcher()) {
+            mockDreamItem(DREAM_COMPONENT);
+        } else {
+            mockValid(DREAM_COMPONENT);
+        }
         final ComponentName resolvedComponent =
                 mResolver.resolve(/* doze= */ false, false, DREAM_COMPONENT);
         assertThat(resolvedComponent).isEqualTo(DREAM_COMPONENT);
@@ -123,7 +133,12 @@ public class DreamComponentsResolverTest {
     public void resolve_userDream() {
         when(mDreamRepository.getDreamComponentsForUser(USER_ID))
                 .thenReturn(new ComponentName[] {DREAM_COMPONENT});
-        mockDreamItem(DREAM_COMPONENT);
+
+        if (dreamsSwitcher()) {
+            mockDreamItem(DREAM_COMPONENT);
+        } else {
+            mockValid(DREAM_COMPONENT);
+        }
 
         final ComponentName resolvedComponent = mResolver.resolve(/* doze= */ false, false, null);
         assertThat(resolvedComponent).isEqualTo(DREAM_COMPONENT);
@@ -136,7 +151,11 @@ public class DreamComponentsResolverTest {
         when(mDreamRepository.getDefaultDreamComponentForUser(USER_ID))
                 .thenReturn(DEFAULT_DREAM_COMPONENT);
 
-        mockDreamItem(DEFAULT_DREAM_COMPONENT);
+        if (dreamsSwitcher()) {
+            mockDreamItem(DEFAULT_DREAM_COMPONENT);
+        } else {
+            mockValid(DEFAULT_DREAM_COMPONENT);
+        }
 
         final ComponentName resolvedComponent = mResolver.resolve(/* doze= */ false, false, null);
         assertThat(resolvedComponent).isEqualTo(DEFAULT_DREAM_COMPONENT);
@@ -148,12 +167,12 @@ public class DreamComponentsResolverTest {
         int otherUser = 10;
         mResolver =
                 new DreamComponentsResolver(
-                        mContext,
                         otherUser,
                         mDozeConfig,
                         mUserManagerInternal,
                         /* dreamsOnlyEnabledForDockUser= */ true,
-                        mDreamRepository);
+                        mDreamRepository,
+                        mDreamValidator);
 
         final ComponentName resolvedComponent = mResolver.resolve(/* doze= */ false, false, null);
         assertThat(resolvedComponent).isNull();
@@ -195,12 +214,12 @@ public class DreamComponentsResolverTest {
         int otherUser = 10;
         mResolver =
                 new DreamComponentsResolver(
-                        mContext,
                         otherUser,
                         mDozeConfig,
                         mUserManagerInternal,
                         /* dreamsOnlyEnabledForDockUser= */ true,
-                        mDreamRepository);
+                        mDreamRepository,
+                        mDreamValidator);
 
         DreamPlaylist playlist = mResolver.getDreamPlaylist(null);
         assertThat(playlist).isNotNull();
@@ -250,12 +269,102 @@ public class DreamComponentsResolverTest {
         assertThat(mResolver.isValid(null)).isFalse();
     }
 
+    @Test
+    public void getDreamPlaylist_usesCache() {
+        mockDreamItem(DREAM_COMPONENT);
+        when(mDreamRepository.getDreamComponentsForUser(USER_ID))
+                .thenReturn(new ComponentName[] {DREAM_COMPONENT});
+
+        final DreamPlaylist playlist1 = mResolver.getDreamPlaylist(null);
+        final DreamPlaylist playlist2 = mResolver.getDreamPlaylist(null);
+
+        // Verify reference equality (same object from cache)
+        assertThat(playlist1).isSameInstanceAs(playlist2);
+    }
+
+    @Test
+    public void invalidate_clearsCache() {
+        mockDreamItem(DREAM_COMPONENT);
+        when(mDreamRepository.getDreamComponentsForUser(USER_ID))
+                .thenReturn(new ComponentName[] {DREAM_COMPONENT});
+
+        final DreamPlaylist playlist1 = mResolver.getDreamPlaylist(null);
+        mResolver.invalidate();
+        final DreamPlaylist playlist2 = mResolver.getDreamPlaylist(null);
+
+        // Verify cache was cleared (different objects)
+        assertThat(playlist1).isNotSameInstanceAs(playlist2);
+        assertThat(playlist1).isEqualTo(playlist2);
+    }
+
+    @Test
+    public void onPackageChanged_relevantPackage_invalidatesCache() {
+        mockDreamItem(DREAM_COMPONENT);
+        when(mDreamRepository.getDreamComponentsForUser(USER_ID))
+                .thenReturn(new ComponentName[] {DREAM_COMPONENT});
+
+        final DreamPlaylist playlist1 = mResolver.getDreamPlaylist(null);
+        mResolver.onPackageChanged(DREAM_COMPONENT.getPackageName());
+        final DreamPlaylist playlist2 = mResolver.getDreamPlaylist(null);
+
+        // Verify cache was cleared
+        assertThat(playlist1).isNotSameInstanceAs(playlist2);
+    }
+
+    @Test
+    public void onPackageChanged_irrelevantPackage_doesNotInvalidate() {
+        mockDreamItem(DREAM_COMPONENT);
+        when(mDreamRepository.getDreamComponentsForUser(USER_ID))
+                .thenReturn(new ComponentName[] {DREAM_COMPONENT});
+
+        final DreamPlaylist playlist1 = mResolver.getDreamPlaylist(null);
+        mResolver.onPackageChanged("com.irrelevant.package");
+        final DreamPlaylist playlist2 = mResolver.getDreamPlaylist(null);
+
+        // Verify cache was NOT cleared
+        assertThat(playlist1).isSameInstanceAs(playlist2);
+    }
+
+    @Test
+    public void onPackageChanged_defaultDream_invalidatesCache() {
+        when(mDreamRepository.getDreamComponentsForUser(USER_ID)).thenReturn(new ComponentName[0]);
+        when(mDreamRepository.getDefaultDreamComponentForUser(USER_ID))
+                .thenReturn(DEFAULT_DREAM_COMPONENT);
+        mockDreamItem(DEFAULT_DREAM_COMPONENT);
+
+        final DreamPlaylist playlist1 = mResolver.getDreamPlaylist(null);
+        mResolver.onPackageChanged(DEFAULT_DREAM_COMPONENT.getPackageName());
+        final DreamPlaylist playlist2 = mResolver.getDreamPlaylist(null);
+
+        // Verify cache was cleared
+        assertThat(playlist1).isNotSameInstanceAs(playlist2);
+    }
+
+    @Test
+    public void onPackageChanged_configuredButInvalid_invalidatesCache() {
+        final ComponentName invalidDream = new ComponentName("com.invalid", ".Dream");
+        when(mDreamRepository.getDreamComponentsForUser(USER_ID))
+                .thenReturn(new ComponentName[] {invalidDream});
+        when(mDreamRepository.getDreamItem(invalidDream)).thenReturn(Optional.empty());
+
+        final DreamPlaylist playlist1 = mResolver.getDreamPlaylist(null);
+        mResolver.onPackageChanged(invalidDream.getPackageName());
+        final DreamPlaylist playlist2 = mResolver.getDreamPlaylist(null);
+
+        // Verify cache was cleared
+        assertThat(playlist1).isNotSameInstanceAs(playlist2);
+    }
+
     private DreamItem createDreamItem(ComponentName component) {
         return new DreamItem.Builder(component).build();
     }
 
     private void mockDreamItem(ComponentName component) {
         when(mDreamRepository.getDreamItem(component))
-                .thenReturn(java.util.Optional.of(new DreamItem.Builder(component).build()));
+                .thenReturn(Optional.of(new DreamItem.Builder(component).build()));
+    }
+
+    private void mockValid(ComponentName component) {
+        when(mDreamValidator.validate(component, USER_ID)).thenReturn(true);
     }
 }

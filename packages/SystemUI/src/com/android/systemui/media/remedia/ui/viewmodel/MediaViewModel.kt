@@ -74,7 +74,7 @@ constructor(
         get() = interactor.isGutsVisible
 
     /** The index of the currently-selected card. */
-    private var selectedCardIndex: Int by mutableIntStateOf(0)
+    private var selectedCardIndex: Int by mutableIntStateOf(interactor.currentCarouselIndex)
         private set
 
     /** The index of the currently visible card across different locations of media carousel */
@@ -310,6 +310,8 @@ constructor(
                                             it.onClick(expandable)
                                         }
                                     },
+                                    defaultDescription =
+                                        context.getString(R.string.controls_media_output_chip),
                                 )
                             }
                         }
@@ -334,6 +336,8 @@ constructor(
                                         session.outputDevice.onClick(expandable)
                                     }
                                 },
+                                defaultDescription =
+                                    context.getString(R.string.controls_media_output_chip),
                             )
                         }
 
@@ -436,6 +440,7 @@ constructor(
             mediaUiEventLogger.logMediaCarouselPage(selectedCardIndex)
         }
         interactor.storeCurrentCarouselIndex(selectedCardIndex)
+        interactor.setIsGutsVisible(false)
     }
 
     /** Notifies that the card at [cardIndex] is visible on screen. */

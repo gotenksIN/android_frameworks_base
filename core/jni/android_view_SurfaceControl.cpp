@@ -2518,7 +2518,8 @@ public:
                                    jankData[i].frameVsyncId, javaJankTypeLegacy,
                                    javaJankTypeExperimental, jankData[i].frameIntervalNs,
                                    jankData[i].scheduledAppFrameTimeNs,
-                                   jankData[i].actualAppFrameTimeNs, jankData[i].presentDelayNs);
+                                   jankData[i].actualAppFrameTimeNs, jankData[i].presentDelayNs,
+                                   jankData[i].jankScore);
             env->SetObjectArrayElement(jJankDataArray, i, jJankData);
             env->DeleteLocalRef(jJankData);
         }
@@ -2762,9 +2763,9 @@ static void nativeSetPostProcess(JNIEnv* env, jclass clazz, jlong transactionObj
     transaction->setPostProcess(ctrl, shaderBinder, uniforms, sampleTarget);
 }
 
-static jobject nativeRegisterShader(JNIEnv* env, jclass clazz, jstring debugName,
+static jobject nativeRegisterShader(JNIEnv* env, jclass clazz, jstring uniqueShaderName,
                                     jstring shaderString) {
-    ScopedUtfChars name(env, debugName);
+    ScopedUtfChars name(env, uniqueShaderName);
     if (!name.c_str()) {
         return nullptr;
     }
@@ -3307,7 +3308,7 @@ int register_android_view_SurfaceControl(JNIEnv* env)
                 FindClassOrDie(env, "android/view/SurfaceControl$JankData");
     gJankDataClassInfo.clazz = MakeGlobalRefOrDie(env, jankDataClazz);
     gJankDataClassInfo.ctor =
-            GetMethodIDOrDie(env, gJankDataClassInfo.clazz, "<init>", "(JIIJJJJ)V");
+            GetMethodIDOrDie(env, gJankDataClassInfo.clazz, "<init>", "(JIIJJJJD)V");
     jclass onJankDataListenerClazz =
             FindClassOrDie(env, "android/view/SurfaceControl$OnJankDataListener");
     gJankDataListenerClassInfo.clazz = MakeGlobalRefOrDie(env, onJankDataListenerClazz);

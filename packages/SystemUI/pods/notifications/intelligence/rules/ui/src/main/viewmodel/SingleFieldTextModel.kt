@@ -20,10 +20,11 @@ import android.content.res.Resources
 import android.text.Annotation
 import android.text.Spanned
 import android.text.TextUtils
+import com.android.systemui.log.core.Logger
 import com.android.systemui.res.R
 
 /** Represents a single field as text. */
-internal data class SingleFieldTextModel(
+internal data class SingleFieldTextModel<T>(
     val text: String,
     /** True if this text is ambiguous and requires clarification. See [RuleValue.Ambiguous]. */
     val isAmbiguous: Boolean,
@@ -34,6 +35,9 @@ internal data class SingleFieldTextModel(
      * [onClick] will be associated with this range.
      */
     val valueFieldRange: IntRange?,
+    /** If this field is fully specified, this is the first item in the list. */
+    val firstItem: T?,
+    val firstItemIconId: String?,
     /** Optional clickable behavior. */
     val onClick: (() -> Unit)?,
 )
@@ -41,44 +45,65 @@ internal data class SingleFieldTextModel(
 /** Creates text that shows 1 or more selected items. */
 internal fun <T> createMultiItemText(
     items: List<T>,
+    id: (T) -> String,
     label: (T) -> String,
     onClick: (() -> Unit)?,
     resources: Resources,
-): SingleFieldTextModel {
+    logger: Logger,
+): SingleFieldTextModel<T> {
     check(items.isNotEmpty()) { "Items must be non-empty" }
+    val first = items[0]
 
-    val first = label(items[0])
+    val firstLabel = label(first)
     val spanned =
         if (items.size > 1) {
             val template = resources.getText(R.string.notification_rules_from_multi_items)
-            TextUtils.expandTemplate(template, first, (items.size - 1).toString()) as Spanned
+            TextUtils.expandTemplate(template, firstLabel, (items.size - 1).toString()) as Spanned
         } else {
             val template = resources.getText(R.string.notification_rules_from_single_item)
-            TextUtils.expandTemplate(template, first) as Spanned
+            TextUtils.expandTemplate(template, firstLabel) as Spanned
         }
 
-    return createFieldText(spanned, onClick, isAmbiguous = false)
+    return createFieldText(
+        spanned,
+        firstItem = first,
+        firstItemIconId = id(first),
+        onClick = onClick,
+        isAmbiguous = false,
+        logger = logger,
+    )
 }
 
 /**
  * Creates text for a rule value that's underspecified. Clicking on the text will let users clarify
  * what items should be selected.
  */
-internal fun createAmbiguousText(
+internal fun <T> createAmbiguousText(
     placeholderText: String,
     onClick: () -> Unit,
     resources: Resources,
-): SingleFieldTextModel {
+    logger: Logger,
+): SingleFieldTextModel<T> {
     val template = resources.getText(R.string.notification_rules_from_single_item)
     val spanned = TextUtils.expandTemplate(template, placeholderText) as Spanned
-    return createFieldText(spanned, onClick, isAmbiguous = true)
+    return createFieldText(
+        spanned,
+        firstItem = null,
+        firstItemIconId = null,
+        onClick = onClick,
+        isAmbiguous = true,
+        logger = logger,
+    )
 }
 
-private fun createFieldText(
+private fun <T> createFieldText(
     spanned: Spanned,
+    firstItem: T?,
+    firstItemIconId: String?,
     onClick: (() -> Unit)?,
     isAmbiguous: Boolean,
-): SingleFieldTextModel {
+    logger: Logger,
+): SingleFieldTextModel<T> {
     val annotations: Array<Annotation> = spanned.getSpans(0, spanned.length, Annotation::class.java)
 
     val valueFieldRange =
@@ -87,12 +112,16 @@ private fun createFieldText(
                 annotation.key == "valueField" && annotation.value.toBoolean()
             }
             ?.let { spanned.getSpanStart(it) until spanned.getSpanEnd(it) }
-    // TODO: b/478225883 - Log if value field range wasn't found in string.
+    if (valueFieldRange == null) {
+        logger.w({ "No valueField annotation for $str1" }) { str1 = spanned.toString() }
+    }
 
     return SingleFieldTextModel(
         text = spanned.toString(),
         valueFieldRange = valueFieldRange,
         onClick = onClick,
+        firstItem = firstItem,
+        firstItemIconId = firstItemIconId,
         isAmbiguous = isAmbiguous,
     )
 }

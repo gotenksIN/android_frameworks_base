@@ -32,8 +32,6 @@ import static android.app.ActivityOptions.ANIM_OPEN_CROSS_PROFILE_APPS;
 import static android.app.ActivityOptions.ANIM_REMOTE_ANIMATION;
 import static android.app.ActivityOptions.ANIM_SCALE_UP;
 import static android.app.ActivityOptions.ANIM_SCENE_TRANSITION;
-import static android.app.ActivityOptions.ANIM_THUMBNAIL_ASPECT_SCALE_DOWN;
-import static android.app.ActivityOptions.ANIM_THUMBNAIL_ASPECT_SCALE_UP;
 import static android.app.ActivityOptions.ANIM_THUMBNAIL_SCALE_DOWN;
 import static android.app.ActivityOptions.ANIM_THUMBNAIL_SCALE_UP;
 import static android.app.ActivityOptions.ANIM_UNDEFINED;
@@ -1250,6 +1248,8 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mAppCompatController.dump(pw, prefix);
+
+        AppCompatCameraPolicy.dump(this, pw, prefix);
     }
 
     static boolean dumpActivity(FileDescriptor fd, PrintWriter pw, int index, ActivityRecord r,
@@ -2793,6 +2793,20 @@ public final class ActivityRecord extends WindowToken {
     }
 
     void removeStartingWindow() {
+        if (com.android.window.flags.Flags.consolidateRemoveStartingWindowFromTask()) {
+            // Remove starting window directly if is in a pure task. Otherwise if it is associated
+            // with a task (e.g. nested task fragment), then remove only if all visible windows in
+            // the task are drawn.
+            final Task associatedTask = task.mSharedStartingData != null ? task : null;
+            if (associatedTask != null) {
+                final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
+                if (r != null && r != this) {
+                    r.removeStartingWindow();
+                    return;
+                }
+            }
+        }
+
         final AppCompatLetterboxPolicy letterboxPolicy = mAppCompatController.getLetterboxPolicy();
         boolean prevEligibleForLetterboxEducation =
                 letterboxPolicy.isEligibleForLetterboxEducation();
@@ -3547,6 +3561,11 @@ public final class ActivityRecord extends WindowToken {
     boolean finishIfSameAffinity(ActivityRecord r) {
         // End search once we get to the activity that doesn't have the same affinity.
         if (!Objects.equals(r.taskAffinity, taskAffinity)) return true;
+
+        // Do not allow task to finish if last task in lockTask mode.
+        if (mAtmService.getLockTaskController().activityBlockedFromFinish(r)) {
+            return false;
+        }
 
         r.finishIfPossible("request-affinity", true /* oomAdj */);
         return false;
@@ -5248,10 +5267,6 @@ public final class ActivityRecord extends WindowToken {
                             pendingOptions.getStartY() + buffer.getHeight()));
                 }
                 break;
-            case ANIM_THUMBNAIL_ASPECT_SCALE_UP:
-            case ANIM_THUMBNAIL_ASPECT_SCALE_DOWN:
-                // TODO(b/397847511): remove the related types from ActivityOptions.
-                break;
             case ANIM_OPEN_CROSS_PROFILE_APPS:
                 options = AnimationOptions.makeCrossProfileAnimOptions();
                 break;
@@ -5456,9 +5471,13 @@ public final class ActivityRecord extends WindowToken {
                     && mDisplayContent.getImeWindow().isVisible();
             finishOrAbortReplacingWindow();
             if (!firstWindowDrawn && task != null && task.mSharedStartingData != null) {
-                final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
-                if (r != null) {
-                    r.removeStartingWindow();
+                if (com.android.window.flags.Flags.consolidateRemoveStartingWindowFromTask()) {
+                    removeStartingWindow();
+                } else {
+                    final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
+                    if (r != null) {
+                        r.removeStartingWindow();
+                    }
                 }
             }
         }
@@ -5649,6 +5668,10 @@ public final class ActivityRecord extends WindowToken {
                 mStartingWindow.clearPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
                 mStartingWindow.mLegacyPolicyVisibilityAfterAnim = false;
             }
+        } else if (com.android.window.flags.Flags.removeStartingWindowWhenCommitInvisible()
+                && mStartingData != null) {
+            // Clean up invisible starting window if any.
+            removeStartingWindowAnimation(false /* prepareAnimation */);
         }
         // dispatchTaskInfoChangedIfNeeded() right after ActivityRecord#setVisibility() can report
         // the stale visible state, because the state will be updated after the app transition.
@@ -6386,6 +6409,29 @@ public final class ActivityRecord extends WindowToken {
 
         r.mDisplayContent.handleActivitySizeCompatModeIfNeeded(r);
         r.mDisplayContent.mUnknownAppVisibilityController.notifyAppResumedFinished(r);
+        if (com.android.window.flags.Flags.reportMissedEnterAnimOnResume()) {
+            r.scheduleEnterAnimationCompleteIfNeeded();
+        }
+    }
+
+    void scheduleEnterAnimationCompleteIfNeeded() {
+        if (!mEnteringAnimation) {
+            // Note that mEnteringAnimation is only set to true when an app transition finishes
+            // or when the activity becomes visible without a transition. This ensures that
+            // calling this from activityResumedLocked won't notify completion prematurely while
+            // the transition for this activity is still active.
+            return;
+        }
+        final IApplicationThread client = app == null ? null : app.getThread();
+        if (client == null) {
+            return;
+        }
+        mEnteringAnimation = false;
+        try {
+            client.scheduleEnterAnimationComplete(token);
+        } catch (RemoteException e) {
+            Slog.i(TAG, "scheduleEnterAnimationComplete failed for " + this + " e=" + e);
+        }
     }
 
     static void activityRefreshedLocked(IBinder token) {
@@ -6699,15 +6745,20 @@ public final class ActivityRecord extends WindowToken {
         // Remove starting window directly if is in a pure task. Otherwise if it is associated with
         // a task (e.g. nested task fragment), then remove only if all visible windows in the task
         // are drawn.
-        final Task associatedTask = task.mSharedStartingData != null ? task : null;
-        if (associatedTask == null) {
+        if (com.android.window.flags.Flags.consolidateRemoveStartingWindowFromTask()) {
             removeStartingWindow();
         } else {
-            final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
-            if (r != null) {
-                r.removeStartingWindow();
+            final Task associatedTask = task.mSharedStartingData != null ? task : null;
+            if (associatedTask == null) {
+                removeStartingWindow();
+            } else {
+                final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
+                if (r != null) {
+                    r.removeStartingWindow();
+                }
             }
         }
+
         updateReportedVisibilityLocked();
     }
 
@@ -7415,7 +7466,10 @@ public final class ActivityRecord extends WindowToken {
         if (mStartingData != null) {
             // Remove orphaned starting window.
             if (DEBUG_VISIBILITY) Slog.w(TAG_VISIBILITY, "Found orphaned starting window " + this);
-            removeStartingWindowAnimation(false /* prepareAnimation */);
+            if (!com.android.window.flags.Flags.removeStartingWindowWhenCommitInvisible()
+                    || !isVisible()) {
+                removeStartingWindowAnimation(false /* prepareAnimation */);
+            }
         }
         if (!mDisplayContent.mUnknownAppVisibilityController.allResolved()) {
             // Remove the unknown visibility record because an invisible activity shouldn't block

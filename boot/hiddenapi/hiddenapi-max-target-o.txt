@@ -61964,8 +61964,6 @@ Landroid/view/DisplayEventReceiver;->nativeDispose(J)V
 Landroid/view/DisplayEventReceiver;->nativeInit(Ljava/lang/ref/WeakReference;Landroid/os/MessageQueue;I)J
 Landroid/view/DisplayEventReceiver;->nativeScheduleVsync(J)V
 Landroid/view/DisplayEventReceiver;->TAG:Ljava/lang/String;
-Landroid/view/DisplayEventReceiver;->VSYNC_SOURCE_APP:I
-Landroid/view/DisplayEventReceiver;->VSYNC_SOURCE_SURFACE_FLINGER:I
 Landroid/view/DisplayInfo;-><init>(Landroid/os/Parcel;)V
 Landroid/view/DisplayInfo;-><init>(Landroid/view/DisplayInfo;)V
 Landroid/view/DisplayInfo;->address:Ljava/lang/String;
@@ -77414,7 +77412,6 @@ Lcom/android/internal/R$anim;->linear_interpolator:I
 Lcom/android/internal/R$anim;->lock_screen_behind_enter:I
 Lcom/android/internal/R$anim;->lock_screen_behind_enter_fade_in:I
 Lcom/android/internal/R$anim;->lock_screen_behind_enter_wallpaper:I
-Lcom/android/internal/R$anim;->lock_screen_wallpaper_exit:I
 Lcom/android/internal/R$anim;->overshoot_interpolator:I
 Lcom/android/internal/R$anim;->push_down_in:I
 Lcom/android/internal/R$anim;->push_down_out:I

@@ -164,6 +164,15 @@ flag {
     is_exported: true
 }
 
+
+flag {
+    name: "public_device_profile"
+    namespace: "virtual_devices"
+    description: "API for getting the profile of a virtual device"
+    bug: "493126008"
+    is_exported: true
+}
+
 flag {
     name: "audio_focus_environments"
     namespace: "virtual_devices"
@@ -213,6 +222,16 @@ flag {
 }
 
 flag {
+    name: "computer_control_per_app_consent"
+    namespace: "virtual_devices"
+    description: "Change consent flow for computer control to a per app model"
+    bug: "483624078"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "multi_user_view_configuration"
     namespace: "virtual_devices"
     description: "Apply custom ViewConfiguration for virtual devices across users."
@@ -238,4 +257,14 @@ flag {
     description: "API for VirtualCamera owner to close the current camera session"
     bug: "487943236"
     is_exported: true
+}
+
+flag {
+    name: "computer_control_role_assistant_requirement"
+    namespace: "virtual_devices"
+    description: "Require the ASSISTANT role for computer control session creation"
+    bug: "487979979"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

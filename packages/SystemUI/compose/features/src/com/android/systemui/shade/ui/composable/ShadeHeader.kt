@@ -44,10 +44,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
@@ -177,7 +177,7 @@ object ShadeHeader {
     }
 }
 
-/** The status bar that appears above the Shade scene on small screens. */
+/** The status bar that appears above the Shade scene */
 @Composable
 fun ContentScope.CollapsedShadeHeader(
     viewModel: ShadeHeaderViewModel,
@@ -212,7 +212,10 @@ fun ContentScope.CollapsedShadeHeader(
                 Clock(
                     onClick = viewModel::onClockClicked,
                     textColor = textColor,
-                    modifier = Modifier.minimumInteractiveComponentSize(),
+                    modifier =
+                        Modifier.sysuiResTag("expanded_header_clock")
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .wrapContentSize(Alignment.CenterStart),
                 )
                 VariableDayDate(
                     longerDateText = viewModel.longerDateText,
@@ -317,7 +320,8 @@ fun ContentScope.ExpandedShadeHeader(
                     textColor = textColor,
                     modifier =
                         Modifier.sysuiResTag("expanded_header_clock")
-                            .minimumInteractiveComponentSize(),
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .wrapContentSize(Alignment.CenterStart),
                 )
                 Box(
                     modifier =
@@ -804,6 +808,7 @@ private fun ContentScope.StatusIcons(
     if (SystemStatusIconsInCompose.isEnabled) {
         SystemStatusIcons(
             viewModelFactory = viewModel.systemStatusIconsViewModelFactory,
+            systemStatusIconBlocklistInteractor = viewModel.systemStatusIconsBlockListInteractor,
             tint = Color(foregroundColor),
         )
     } else {

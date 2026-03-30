@@ -29,13 +29,11 @@ import com.android.compose.animation.scene.TransitionKey
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
-import com.android.systemui.Flags
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
 import com.android.systemui.deviceentry.domain.interactor.RestrictedModeInteractor
-import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.scenetransition.LockscreenSceneTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
@@ -54,7 +52,6 @@ import com.android.systemui.util.kotlin.pairwise
 import com.android.systemui.util.println
 import dagger.Lazy
 import java.io.PrintWriter
-import java.io.StringWriter
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -94,7 +91,6 @@ constructor(
     private val shadeModeInteractor: ShadeModeInteractor,
     private val authenticationInteractor: Lazy<AuthenticationInteractor>,
     private val lockscreenSceneTransitionInteractor: Lazy<LockscreenSceneTransitionInteractor>,
-    private val dumpManager: DumpManager,
 ) {
 
     /**
@@ -125,6 +121,10 @@ constructor(
      * Note that during a transition between overlays, a different set of overlays may be rendered -
      * but only the ones in this set are considered the current overlays.
      */
+    @Deprecated(
+        "Prefer the more performant non-Flow version.",
+        ReplaceWith("transitionState.currentOverlays"),
+    )
     val currentOverlays: StateFlow<Set<OverlayKey>> = repository.currentOverlays
 
     @Deprecated("Prefer the more performant non-Flow version.", ReplaceWith("transitionState"))
@@ -313,8 +313,8 @@ constructor(
      * scene, any current transition will be canceled and an animation to the target scene will be
      * started.
      *
-     * If [hideAllOverlays] is `true`, any visible overlays will be hidden (with transition), even
-     * if the scene change is rejected.
+     * If [hideOverlays] is not [HideOverlayCommand.HideNone], any visible overlays (all or some)
+     * will be hidden (with transition), even if the scene change is rejected.
      */
     @JvmOverloads
     fun changeScene(
@@ -323,7 +323,7 @@ constructor(
         transitionKey: TransitionKey? = null,
         keyguardState: KeyguardState? = null,
         forceSettleToTargetScene: Boolean = false,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
     ) {
         if (keyguardState != null) {
             lockscreenSceneTransitionInteractor.get().setNextLockscreenTargetState(keyguardState)
@@ -337,10 +337,18 @@ constructor(
             repository.freezeAndAnimateToCurrentState()
         }
 
-        if (hideAllOverlays) {
-            currentOverlays.value.forEach {
-                hideOverlay(it, "Hiding overlay ${it.debugName} due to scene change request")
+        when (hideOverlays) {
+            HideOverlayCommand.HideAll -> {
+                transitionState.currentOverlays.forEach {
+                    hideOverlay(it, "Hiding overlay ${it.debugName} due to scene change request")
+                }
             }
+            is HideOverlayCommand.HideSome -> {
+                hideOverlays.overlays.forEach {
+                    hideOverlay(it, "Hiding overlay ${it.debugName} due to scene change request")
+                }
+            }
+            HideOverlayCommand.HideNone -> {}
         }
 
         if (
@@ -375,13 +383,13 @@ constructor(
      */
     fun snapToGoneForUnlockedPowerLaunchGesture(
         loggingReason: String,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         keyguardState: KeyguardState? = null,
     ) {
         snapToScene(
             Scenes.Gone,
             loggingReason,
-            hideAllOverlays,
+            hideOverlays,
             keyguardState,
             // Only allowed for unlocked power gesture! Do not emulate this!
             skipValidateSceneChange = true,
@@ -397,19 +405,18 @@ constructor(
      * If [keyguardState] is provided, we'll notify KeyguardTransitionRepository to transition to
      * that state as part of this scene change.
      *
-     * If [hideAllOverlays] is `true`, any visible overlays will be instantly hidden, even if the
-     * scene change is rejected.
+     * Override the [hideOverlays] to avoid hiding any overlays or to specify which ones should be hidden.
      */
     fun snapToScene(
         toScene: SceneKey,
         loggingReason: String,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         keyguardState: KeyguardState? = null,
     ) {
         snapToScene(
             toScene,
             loggingReason,
-            hideAllOverlays,
+            hideOverlays,
             keyguardState,
             skipValidateSceneChange = false,
         )
@@ -418,7 +425,7 @@ constructor(
     private fun snapToScene(
         toScene: SceneKey,
         loggingReason: String,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         keyguardState: KeyguardState? = null,
         // Whether to skip validating the scene change. This should *always* be false unless we're
         // doing the unlocked power launch gesture, which is the only case where System UI can
@@ -439,8 +446,15 @@ constructor(
                     loggingReason = loggingReason,
                 )
         ) {
-            if (hideAllOverlays) {
-                repository.instantlyTransitionTo(overlays = emptySet())
+            when (hideOverlays) {
+                HideOverlayCommand.HideAll ->
+                    repository.instantlyTransitionTo(overlays = emptySet())
+                HideOverlayCommand.HideNone -> Unit
+                is HideOverlayCommand.HideSome -> {
+                    repository.instantlyTransitionTo(
+                        overlays = transitionState.currentOverlays - hideOverlays.overlays.toSet()
+                    )
+                }
             }
             return
         }
@@ -459,10 +473,14 @@ constructor(
             isInstant = true,
         )
 
-        repository.instantlyTransitionTo(
-            scene = resolvedScene,
-            overlays = emptySet<OverlayKey>().takeIf { hideAllOverlays },
-        )
+        val overlaysToSet =
+            when (hideOverlays) {
+                HideOverlayCommand.HideAll -> emptySet()
+                HideOverlayCommand.HideNone -> null
+                is HideOverlayCommand.HideSome ->
+                    transitionState.currentOverlays - hideOverlays.overlays.toSet()
+            }
+        repository.instantlyTransitionTo(scene = resolvedScene, overlays = overlaysToSet)
     }
 
     /**
@@ -530,7 +548,7 @@ constructor(
 
         logger.logOverlayChangeRequested(to = overlay, reason = loggingReason)
 
-        repository.instantlyTransitionTo(overlays = currentOverlays.value + overlay)
+        repository.instantlyTransitionTo(overlays = transitionState.currentOverlays + overlay)
     }
 
     /**
@@ -546,7 +564,7 @@ constructor(
 
         logger.logOverlayChangeRequested(from = overlay, reason = loggingReason)
 
-        repository.instantlyTransitionTo(overlays = currentOverlays.value - overlay)
+        repository.instantlyTransitionTo(overlays = transitionState.currentOverlays - overlay)
     }
 
     /**
@@ -620,25 +638,6 @@ constructor(
             }
 
             Event.UserInputEnd -> {
-                // TODO(b/467878509) Delete this temporary code and the flag
-                if (Flags.logStateOnShadeGestureFailure()) {
-                    // indicates that b/467878509 has probably just triggered
-                    if (!repository.isSceneContainerUserInputOngoing) {
-                        dumpManager.getDumpables().forEach { entry ->
-                            val stringWriter = StringWriter()
-                            val printWriter = PrintWriter(stringWriter)
-                            if (
-                                entry.name.contains("AmbientState") ||
-                                    entry.name.contains("Notification") ||
-                                    entry.name.contains("Keyguard") ||
-                                    entry.name.contains("Shade")
-                            ) {
-                                entry.dumpable.dump(printWriter, emptyArray())
-                            }
-                            logger.logDumpable(entry.name, stringWriter.toString())
-                        }
-                    }
-                }
                 repository.isRemoteUserInputOngoing = false
                 repository.isSceneContainerUserInputOngoing = false
             }
@@ -893,7 +892,7 @@ constructor(
     ): Boolean {
         check(from != null || to != null) {
             "No overlay key provided for requested change." +
-                " Current transition state is ${transitionStateFlow.value}." +
+                " Current transition state is $transitionState." +
                 " Logging reason for overlay change was: $loggingReason"
         }
 
@@ -935,7 +934,7 @@ constructor(
                 false
             }
 
-            from != null && from !in currentOverlays.value -> {
+            from != null && from !in transitionState.currentOverlays -> {
                 logger.logContentChangeRejection(
                     from = from,
                     to = to,
@@ -945,7 +944,7 @@ constructor(
                 false
             }
 
-            to != null && to in currentOverlays.value -> {
+            to != null && to in transitionState.currentOverlays -> {
                 logger.logContentChangeRejection(
                     from = from,
                     to = to,
@@ -1031,7 +1030,7 @@ constructor(
             }
 
             launch {
-                currentOverlays
+                snapshotFlow { transitionState.currentOverlays }
                     .map { overlayKeys -> DiffableOverlayKeys(keys = overlayKeys) }
                     .pairwise()
                     .collect { (prev, current) ->
@@ -1110,6 +1109,16 @@ constructor(
     }
 
     private data class IsVisibleWithLoggingReason(val value: Boolean, val loggingReason: String)
+
+    sealed interface HideOverlayCommand {
+        data object HideAll : HideOverlayCommand
+
+        data object HideNone : HideOverlayCommand
+
+        class HideSome(val overlays: List<OverlayKey>) : HideOverlayCommand {
+            constructor(overlay: OverlayKey) : this(listOf(overlay))
+        }
+    }
 
     /**
      * Defines interface for classes that represents events that are of interest to the scene

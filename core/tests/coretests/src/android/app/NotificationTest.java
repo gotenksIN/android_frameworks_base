@@ -77,6 +77,8 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import android.annotation.Nullable;
+import android.app.Notification.Metric.FixedInt;
+import android.app.Notification.Metric.TimeDifference;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.Context;
 import android.content.Intent;
@@ -114,9 +116,9 @@ import com.android.internal.R;
 import com.android.internal.util.ContrastColorUtil;
 import com.android.internal.widget.NotificationProgressModel;
 
-import junit.framework.Assert;
-
 import libcore.junit.util.compat.CoreCompatChangeRule;
+
+import junit.framework.Assert;
 
 import org.junit.Before;
 import org.junit.Ignore;
@@ -125,6 +127,8 @@ import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
@@ -143,6 +147,8 @@ public class NotificationTest {
     public TestRule compatChangeRule = new PlatformCompatChangeRule();
     @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
+    PendingIntent mPendingIntent;
+
     @Before
     public void setUp() {
         mContext = InstrumentationRegistry.getContext();
@@ -153,6 +159,10 @@ public class NotificationTest {
         boolean nightMode = (mContext.getResources().getConfiguration().uiMode
                 & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         mDefaultColors.resolvePalette(mContext, Notification.COLOR_DEFAULT, false, nightMode);
+
+        mPendingIntent = PendingIntent.getActivity(mContext, 0,
+                new Intent().setPackage(mContext.getPackageName()),
+                PendingIntent.FLAG_MUTABLE);
     }
 
     @Test
@@ -289,7 +299,7 @@ public class NotificationTest {
         Notification n = new Notification.Builder(mContext, "test")
                 .setStyle(new Notification.MetricStyle()
                         .addMetric(new Notification.Metric(
-                                new Notification.Metric.FixedInt(1), "Int")))
+                                new FixedInt(1), "Int")))
                 .build();
         assertThat(n.hasTitle()).isTrue();
     }
@@ -405,7 +415,7 @@ public class NotificationTest {
         Notification n = new Notification.Builder(mContext, "test")
                 .setStyle(new Notification.MetricStyle()
                         .addMetric(new Notification.Metric(
-                                new Notification.Metric.FixedInt(1), "Int")))
+                                new FixedInt(1), "Int")))
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
                 .build();
         assertThat(n.extras.getString(Notification.EXTRA_TEMPLATE))
@@ -705,7 +715,7 @@ public class NotificationTest {
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
                 .setStyle(new Notification.MetricStyle()
                         .addMetric(new Notification.Metric(
-                                new Notification.Metric.FixedInt(1), "Int")))
+                                new FixedInt(1), "Int")))
                 .setOngoing(true)
                 .setRequestPromotedOngoing(true)
                 .build();
@@ -1279,6 +1289,75 @@ public class NotificationTest {
     }
 
     @Test
+    public void testBuild_ensureCallIconIsNotTooBig_resizesIcon() {
+        Icon hugeIcon = Icon.createWithBitmap(
+                Bitmap.createBitmap(3000, 3000, Bitmap.Config.ARGB_8888));
+        PendingIntent hangUpIntent = createPendingIntent("hangUp");
+        Notification.CallStyle style = Notification.CallStyle.forOngoingCall(
+                new Person.Builder().setName("A Caller").setIcon(hugeIcon).build(),
+                hangUpIntent
+        );
+
+        int expectedSize = mContext.getResources().getDimensionPixelSize(
+                R.dimen.notification_person_icon_max_size);
+
+        Notification notification = new Notification.Builder(mContext, "Channel")
+                .setStyle(style).build();
+
+        Bitmap bitmap = notification.extras.getParcelable(
+                EXTRA_CALL_PERSON, Person.class).getIcon().getBitmap();
+        assertThat((float) bitmap.getWidth()).isWithin(3f).of(expectedSize);
+        assertThat((float) bitmap.getHeight()).isWithin(3f).of(expectedSize);
+    }
+
+    @Test
+    public void testBuild_ensureBubbleIconIsNotTooBig_resizesIcon() {
+        Icon hugeIcon = Icon.createWithBitmap(
+                Bitmap.createBitmap(3000, 3000, Bitmap.Config.ARGB_8888));
+        PendingIntent bubbleIntent = PendingIntent.getActivity(mContext, 0,
+                new Intent().setPackage(mContext.getPackageName()),
+                PendingIntent.FLAG_MUTABLE);
+        PendingIntent deleteIntent = PendingIntent.getActivity(mContext, 0, new Intent(),
+                PendingIntent.FLAG_IMMUTABLE);
+        Notification.BubbleMetadata.Builder metadataBuilder =
+                new Notification.BubbleMetadata.Builder(bubbleIntent, hugeIcon)
+                        .setDesiredHeight(300)
+                        .setSuppressableBubble(false)
+                        .setDeleteIntent(deleteIntent);
+
+        Notification.BubbleMetadata data = metadataBuilder.build();
+
+        Notification notification = new Notification.Builder(mContext, "Channel")
+                .setBubbleMetadata(data).build();
+
+        Bitmap bitmap = notification.getBubbleMetadata().getIcon().getBitmap();
+        assertThat((float) bitmap.getWidth()).isWithin(3f).of(
+                mContext.getResources().getDimensionPixelSize(
+                        R.dimen.notification_bubble_size));
+        assertThat((float) bitmap.getHeight()).isWithin(3f).of(
+                mContext.getResources().getDimensionPixelSize(
+                        R.dimen.notification_bubble_size));
+    }
+
+    @Test
+    public void testBuild_ensureActionIconIsNotTooBig_resizesIcon() {
+        Icon hugeIcon = Icon.createWithBitmap(
+                Bitmap.createBitmap(3000, 3000, Bitmap.Config.ARGB_8888));
+        Notification notification = new Notification.Builder(mContext, "Channel")
+                .addAction(new Notification.Action.Builder(
+                        hugeIcon, "title", mPendingIntent).build())
+                .build();
+
+        Bitmap bitmap = notification.actions[0].getIcon().getBitmap();
+        assertThat((float) bitmap.getWidth()).isWithin(3f).of(
+                mContext.getResources().getDimensionPixelSize(
+                        R.dimen.notification_small_icon_size));
+        assertThat((float) bitmap.getHeight()).isWithin(3f).of(
+                mContext.getResources().getDimensionPixelSize(
+                        R.dimen.notification_small_icon_size));
+    }
+
+    @Test
     public void testBuild_ensureSmallIconIsNotTooBig_resizesIcon() {
         Icon hugeIcon = Icon.createWithBitmap(
                 Bitmap.createBitmap(3000, 3000, Bitmap.Config.ARGB_8888));
@@ -1314,9 +1393,7 @@ public class NotificationTest {
                 style).build();
 
         float targetSize = mContext.getResources().getDimensionPixelSize(
-                ActivityManager.isLowRamDeviceStatic()
-                        ? R.dimen.notification_person_icon_max_size_low_ram
-                        : R.dimen.notification_person_icon_max_size);
+                R.dimen.notification_person_icon_max_size);
 
         Bitmap personIcon = style.getUser().getIcon().getBitmap();
         assertThat((float) personIcon.getWidth()).isWithin(3f).of(targetSize);
@@ -1339,16 +1416,16 @@ public class NotificationTest {
         Notification.MessagingStyle style = new Notification.MessagingStyle(
                 new Person.Builder().setName("A User").build()).setShortcutIcon(hugeIcon);
 
-        Notification notification = new Notification.Builder(mContext, "Channel").setStyle(
-                style).build();
+        new Notification.Builder(mContext, "Channel").setStyle(style).build();
+
         Bitmap shortcutIcon = style.getShortcutIcon().getBitmap();
 
         assertThat((float) shortcutIcon.getWidth()).isWithin(3f).of(
                 mContext.getResources().getDimensionPixelSize(
-                        R.dimen.notification_small_icon_size));
+                        R.dimen.notification_person_icon_max_size));
         assertThat((float) shortcutIcon.getHeight()).isWithin(3f).of(
                 mContext.getResources().getDimensionPixelSize(
-                        R.dimen.notification_small_icon_size));
+                        R.dimen.notification_person_icon_max_size));
     }
 
     @Test
@@ -1395,6 +1472,161 @@ public class NotificationTest {
     @Test
     public void testColors_ensureColors_colorized_producesValidPalette_black() {
         validateColorizedPaletteForColor(Color.BLACK);
+    }
+
+    @Test
+    public void testGetHistoryTitle_noStyle() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentTitle("setContentTitle")
+                .build();
+        assertThat(n.getHistoryTitle(mContext)).isEqualTo("setContentTitle");
+    }
+
+    @Test
+    public void testGetHistoryTitle_bigTextStyle() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setStyle(new Notification.BigTextStyle().setBigContentTitle("setBigContentTitle"))
+                .build();
+        assertThat(n.getHistoryTitle(mContext)).isEqualTo("setBigContentTitle");
+    }
+
+    @Test
+    public void testGetHistoryTitle_noTitle() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .build();
+        assertThat(n.getHistoryTitle(mContext))
+                .isEqualTo(mContext.getString(R.string.notification_history_title_placeholder));
+    }
+
+    @Test
+    public void testGetHistoryText_noStyle() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("setContentText");
+    }
+
+    @Test
+    public void testGetHistoryText_bigTextStyle() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.BigTextStyle().bigText("bigText"))
+                .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("bigText");
+    }
+
+    @Test
+    public void testGetHistoryText_messagingStyle() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MessagingStyle("user")
+                        .addMessage("message1", 0, "sender")
+                        .addMessage("message2", 0, "sender"))
+                .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("message2");
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_METRIC_STYLE)
+    public void testGetHistoryText_metricStyle_fixedInt() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MetricStyle()
+                        .addMetric(new Notification.Metric(
+                                new FixedInt(1, "count"), "Int")))
+                .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("Int (count): 1");
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_METRIC_STYLE)
+    public void testGetHistoryText_metricStyle_timeDifference_runningStopwatch() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MetricStyle()
+                        .addMetric(new Notification.Metric(
+                                TimeDifference.forStopwatch(
+                                        Instant.now(),
+                                        TimeDifference.FORMAT_CHRONOMETER),
+                                "Time")))
+                .build();
+        assertThat(n.getHistoryText(mContext))
+                .isEqualTo("Time: "
+                        + mContext.getString(R.string.notification_metric_running_stopwatch));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_METRIC_STYLE)
+    public void testGetHistoryText_metricStyle_timeDifference_runningTimer() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MetricStyle()
+                        .addMetric(new Notification.Metric(
+                                TimeDifference.forTimer(
+                                        Instant.ofEpochSecond(30),
+                                        TimeDifference.FORMAT_CHRONOMETER),
+                                "Time")))
+                .build();
+        assertThat(n.getHistoryText(mContext))
+                .isEqualTo("Time: "
+                        + mContext.getString(R.string.notification_metric_running_timer));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_METRIC_STYLE)
+    public void testGetHistoryText_metricStyle_timeDifference_pausedStopwatch() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MetricStyle()
+                        .addMetric(
+                                new Notification.Metric(
+                                TimeDifference.forPausedStopwatch(Duration.ofSeconds(30),
+                                        TimeDifference.FORMAT_CHRONOMETER), "Time")))
+                .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("Time: 00:30");
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_METRIC_STYLE)
+    public void testGetHistoryText_metricStyle_timeDifference_pausedTimer() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MetricStyle()
+                        .addMetric(
+                                new Notification.Metric(
+                                        TimeDifference.forPausedTimer(Duration.ofSeconds(30),
+                                                TimeDifference.FORMAT_CHRONOMETER), "Time")))
+                        .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("Time: 00:30");
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_METRIC_STYLE)
+    public void testGetHistoryText_metricStyle_multipleMetrics() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.MetricStyle()
+                        .addMetric(
+                                new Notification.Metric(
+                                        TimeDifference.forPausedTimer(Duration.ofSeconds(30),
+                                                TimeDifference.FORMAT_CHRONOMETER), "Time"))
+                        .addMetric(new Notification.Metric(
+                                new FixedInt(1, "count"), "Int")))
+                        .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("Time: 00:30 "
+                + mContext.getString(R.string.notification_header_divider_symbol)
+                + " Int (count): 1");
+    }
+    @Test
+    public void testGetHistoryText_inboxStyle() {
+        // InboxStyle doesn't override getHistoryText, so it should fall back to EXTRA_TEXT
+        Notification n = new Notification.Builder(mContext, "test")
+                .setContentText("setContentText")
+                .setStyle(new Notification.InboxStyle()
+                        .addLine("line1")
+                        .addLine("line2"))
+                .build();
+        assertThat(n.getHistoryText(mContext)).isEqualTo("setContentText");
     }
 
     @Test
@@ -3102,8 +3334,12 @@ public class NotificationTest {
 
     private static class NotAPlatformStyle extends Notification.Style {
         @Override
+        protected void reduceImageSizes(Context context) {}
+
+        @Override
         public boolean areNotificationsVisiblyDifferent(Notification.Style other) {
             return false;
         }
+
     }
 }

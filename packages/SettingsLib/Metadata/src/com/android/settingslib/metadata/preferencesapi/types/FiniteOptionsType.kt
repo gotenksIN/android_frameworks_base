@@ -17,15 +17,22 @@
 package com.android.settingslib.metadata.preferencesapi.types
 
 import android.content.Context
+import com.android.settingslib.metadata.preferencesapi.SafetyAnnotated
 
 /**
  * Specialized type that describes the subset of `ApiType`s which have a finite set of values.
  */
-interface FiniteOptionsType<V> : ApiType<V> {
+interface FiniteOptionsType<InternalType, ExternalType> : ApiType<InternalType, ExternalType> {
 
     /**
      * Returns all the values a preference with this type could have, together with their
      * description.
      */
-    suspend fun getOptions(context: Context): List<Pair<V, String>>
+    suspend fun getOptions(context: Context): List<Pair<SafetyAnnotated<ExternalType>, SafetyAnnotated<String>>>
+}
+
+/** FiniteOptionsType for types which have the same internal and external type. */
+interface DirectFiniteOptionsType<ExternalType> : FiniteOptionsType<ExternalType, ExternalType> {
+    override fun convertInternalToExternal(internalValue: ExternalType): ExternalType = internalValue
+    override fun convertExternalToInternal(externalValue: ExternalType): ExternalType = externalValue
 }

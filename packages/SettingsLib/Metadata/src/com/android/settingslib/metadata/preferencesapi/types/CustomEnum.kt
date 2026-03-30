@@ -20,6 +20,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import com.android.settingslib.metadata.preferencesapi.resolveString
 import kotlin.reflect.KClass
+import com.android.settingslib.metadata.preferencesapi.safe
 
 inline fun <reified T, E> CustomEnum(
     enumClass: KClass<E>,
@@ -36,13 +37,13 @@ inline fun <reified T, E> CustomEnum(
  *
  * DO NOT CONSTRUCT DIRECTLY. Use the helper methods instead.
 */
-class CustomEnum<T, E> constructor (
-    val enumClass: KClass<E>,
-    private val valueType: Class<T>,
+class CustomEnum<EnumType, ExternalType> constructor (
+    val enumClass: KClass<EnumType>,
+    private val valueType: Class<ExternalType>,
     @field:StringRes val descriptionRes: Int?,
     val description: String?,
-) : FiniteOptionsType<T> where E : Enum<E>, E : EnumApi<T> {
-    override fun getType(): Class<T> = valueType
+) : FiniteOptionsType<EnumType, ExternalType> where EnumType : Enum<EnumType>, EnumType : EnumApi<ExternalType> { // todo: support internal type
+    override fun getType(): Class<ExternalType> = valueType
 
     init {
         val isStringApi = EnumApiWithString::class.java.isAssignableFrom(enumClass.java)
@@ -54,15 +55,15 @@ class CustomEnum<T, E> constructor (
     }
 
     @Suppress("UNCHECKED_CAST")
-    private val entries: Array<E> = enumClass.java.enumConstants ?: (emptyArray<Any>() as Array<E>)
+    private val entries: Array<EnumType> = enumClass.java.enumConstants ?: (emptyArray<Any>() as Array<EnumType>)
 
-    private val valueMap: Map<T, E> = entries.associateBy { it.asApiValue }
+    private val valueMap: Map<ExternalType, EnumType> = entries.associateBy { it.asApiValue }
 
     /** Finds the Enum constant associated with the given API value. */
-    fun fromApiValue(value: T): E? = valueMap[value]
+    fun fromApiValue(value: ExternalType): EnumType? = valueMap[value]
 
     /** Returns all entries. */
-    fun getEntries(): List<E> = entries.toList()
+    fun getEntries(): List<EnumType> = entries.toList()
 
     override suspend fun getOptions(context: Context) = entries.map { entry ->
         val purposeString = when (entry) {
@@ -72,12 +73,15 @@ class CustomEnum<T, E> constructor (
             // This case is unreachable because of the init block check
             else -> error("Enum entry does not implement EnumApiWithString or EnumApiWithRes.")
         }
-        entry.asApiValue to purposeString
+        entry.asApiValue.safe() to purposeString.safe()
     }.toList()
 
     override fun getDescription(context: Context): String = resolveString(context, descriptionRes, description)
 
-    override fun getKey(): String = "CustomEnum:${enumClass.qualifiedName}:${descriptionRes}:${description}"
+    override fun getKey(): String = "CustomEnum:${enumClass.qualifiedName}"
+
+    override fun convertInternalToExternal(internalValue: EnumType): ExternalType = internalValue.asApiValue
+    override fun convertExternalToInternal(externalValue: ExternalType): EnumType = fromApiValue(externalValue)!!
 }
 
 /**

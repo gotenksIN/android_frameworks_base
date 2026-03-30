@@ -20,31 +20,90 @@ import com.android.wm.shell.dagger.WMShellConcurrencyModule
 import com.android.wm.shell.dagger.WMShellCoroutinesModule
 import com.android.wm.shell.dagger.WMSingleton
 import com.android.wm.shell.hierarchy.ContainerHierarchy
+import com.android.wm.shell.hierarchy.experimental.AlwaysOnTopMode
+import com.android.wm.shell.hierarchy.experimental.HandheldRootMode
+import com.android.wm.shell.hierarchy.experimental.MultiContainerMode
+import com.android.wm.shell.hierarchy.experimental.testsplit.PipMode
+import com.android.wm.shell.hierarchy.experimental.testsplit.SplitMode
 import com.android.wm.shell.hierarchy.modes.FormFactorModes
+import com.android.wm.shell.hierarchy.modes.handheld.HandheldModeRequester
 import com.android.wm.shell.hierarchy.modes.handheld.HandheldModes
-import com.android.wm.shell.hierarchy.modes.handheld.HandheldRootMode
 import com.android.wm.shell.sysui.ShellInit
+import dagger.Lazy
 import dagger.Module
 import dagger.Provides
 
-/**
- * Provides basic dependencies from {@link com.android.wm.shell.hierarchy} for handheld devices.
- */
+/** Provides basic dependencies from {@link com.android.wm.shell.hierarchy} for handheld devices. */
 @Module(
-    includes = [
-        WMShellConcurrencyModule::class,
-        WMShellCoroutinesModule::class,
-        ContainerHierarchyModule::class,
-    ]
+    includes =
+        [
+            WMShellConcurrencyModule::class,
+            WMShellCoroutinesModule::class,
+            ContainerHierarchyModule::class,
+        ]
 )
 class HandheldContainersModule {
+
     @WMSingleton
     @Provides
-    fun provideRootMode(
+    fun provideHandheldRootMode(): HandheldRootMode {
+        return HandheldRootMode()
+    }
+
+    @WMSingleton
+    @Provides
+    fun provideAlwaysOnTopMode(
         context: Context,
         hierarchy: ContainerHierarchy,
-    ): HandheldRootMode {
-        return HandheldRootMode(context, hierarchy)
+        modeRequester: HandheldModeRequester
+    ): AlwaysOnTopMode {
+        return AlwaysOnTopMode(context, hierarchy, modeRequester)
+    }
+
+    @WMSingleton
+    @Provides
+    fun provideMultiContainerMode(
+        context: Context,
+        hierarchy: ContainerHierarchy,
+        modeRequester: HandheldModeRequester
+    ): MultiContainerMode {
+        return MultiContainerMode(context, hierarchy, modeRequester)
+    }
+
+    @WMSingleton
+    @Provides
+    fun providePipMode(
+        context: Context,
+        hierarchy: ContainerHierarchy,
+        modeRequester: HandheldModeRequester
+    ): PipMode {
+        return PipMode(context, hierarchy, modeRequester)
+    }
+
+    @WMSingleton
+    @Provides
+    fun provideSplitMode(
+        context: Context,
+        hierarchy: ContainerHierarchy,
+        modeRequester: HandheldModeRequester
+    ): SplitMode {
+        return SplitMode(context, hierarchy, modeRequester)
+    }
+
+    @WMSingleton
+    @Provides
+    fun provideHandheldModeRequester(
+        alwaysOnTopModeLazy: Lazy<AlwaysOnTopMode>,
+        multiContainerModeLazy: Lazy<MultiContainerMode>,
+        splitModeLazy: Lazy<SplitMode>,
+        pipModeLazy: Lazy<PipMode>
+    ): HandheldModeRequester {
+        return HandheldModeRequester(
+            alwaysOnTopModeLazy,
+            multiContainerModeLazy,
+            splitModeLazy,
+            pipModeLazy
+        )
     }
 
     // This provides the override FormFactorModes in ContainerHierarchyModule
@@ -53,11 +112,19 @@ class HandheldContainersModule {
     fun provideOverrideFormFactorModes(
         hierarchy: ContainerHierarchy,
         rootMode: HandheldRootMode,
+        alwaysOnTopMode: AlwaysOnTopMode,
+        multiContainerMode: MultiContainerMode,
+        splitMode: SplitMode,
+        pipMode: PipMode,
         shellInit: ShellInit,
     ): FormFactorModes {
         return HandheldModes(
             hierarchy,
             rootMode,
+            alwaysOnTopMode,
+            multiContainerMode,
+            splitMode,
+            pipMode,
             shellInit,
         )
     }

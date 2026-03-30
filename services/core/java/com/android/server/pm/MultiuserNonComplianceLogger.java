@@ -27,12 +27,14 @@ import android.os.Handler;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
-import android.util.ArrayMap;
-import android.util.ArraySet;
 import android.util.IndentingPrintWriter;
 import android.util.SparseIntArray;
 
+import com.android.internal.annotations.VisibleForTesting;
+
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Class used to report events that indicate the potential existence of non-multiuser-compliant
@@ -42,6 +44,24 @@ import java.util.Map;
 final class MultiuserNonComplianceLogger {
 
     private static final String PROP_ENABLE_IT = "fw.user.log_non_compliance";
+
+    /**
+     * When this property is set to {@code true}, the title of the notifications shown in the HSU
+     * (Headless System User) will be logged.
+     *
+     * <p>This is fine because it's unlikely that the title will contain PII:
+     *   <ul>
+     *     <li>If the target user is USER_SYSTEM, it wouldn't have PII because the HSU is not
+     *         associated with a “human” user (for example, it cannot have accounts or apps manually
+     *         installed from the app store).
+     *     <li>If it's USER_ALL, the same title would be shown to all users – hence, if a
+     *         system app / service is adding PII about a particular user in the title of a
+     *         notification sent to USER_ALL, it’s leaking that PII to the other users.
+     *   </ul>
+     */
+    @VisibleForTesting
+    static final String PROP_SHOW_HSU_NOTIFICATION_TITLE = "fw.user.log_hsu_notification_title";
+
     private static final int PROP_ENABLED = 1;
     private static final int PROP_DEFAULT = -1;
 
@@ -61,36 +81,104 @@ final class MultiuserNonComplianceLogger {
     @Nullable
     private final SparseIntArray mIsMainUserCalls;
 
-    /** Activities launched while the current user is the headless system user. */
+    /**
+     * Activities launched while the current user is the headless system user.
+     *
+     * <p>Key is activity name, value is number of times it was launched.
+     */
     @Nullable
-    private final ArraySet<ComponentName> mLaunchedHsuActivities;
+    private final Map<ComponentName, Integer> mLaunchedHsuActivities;
 
-    /** Activities blocked while the current user is the headless system user. */
+    /**
+     * Activities blocked while the current user is the headless system user.
+     *
+     * <p>Key is activity name, value is number of times it was blocked.
+     */
     @Nullable
-    private final ArraySet<ComponentName> mBlockedHsuActivities;
+    private final Map<ComponentName, Integer> mBlockedHsuActivities;
 
-    /** Notifications shown while the current user is the headless system user. */
+    /**
+     * Notifications posted while the current user is the headless system user.
+     *
+     * <p>Key is notification, value is number of times it was blocked.
+     */
     @Nullable
-    private final Map<HsuNotification, Integer> mShownHsuNotifications;
+    private final Map<HsuNotification, Integer> mPostedHsuNotifications;
 
-    private record HsuNotification(
+    /**
+     * Notifications blocked while the current user is the headless system user.
+     *
+     * <p>Key is notification, value is number of times it was blocked.
+     */
+    @Nullable
+    private final Map<HsuNotification, Integer> mBlockedHsuNotifications;
+
+    @VisibleForTesting
+    record HsuNotification(
             String pkg,
             @Nullable String tag,
             int id,
             @CanBeALL @UserIdInt int targetUserId,
             int visibility,
+            @Nullable String title,
+            boolean redacted,
             @Nullable String category,
             @Nullable String channel) {
+
+        HsuNotification {
+            if (title == null) {
+                redacted = false;
+            } else {
+                // TODO(b/414326600): current notifications are only logged for the HSU, but if /
+                // once the mechanism becomes more generic, it should check that the actual user is
+                // the HSU (notice that's different than the target user, which could be USER_ALL).
+                redacted = !SystemProperties.getBoolean(PROP_SHOW_HSU_NOTIFICATION_TITLE, false);
+                if (redacted) {
+                    title = title.length() + "_chars";
+                }
+            }
+        }
 
         void dump(IndentingPrintWriter pw) {
             pw.print("[pkg="); pw.print(pkg);
             pw.print(", tag="); pw.print(tag);
             pw.print(", id="); pw.print(id);
-            pw.print(", user="); pw.print(targetUserId);
+            pw.print(", targetUserId="); pw.print(targetUserId);
+            pw.print(", title=");
+            if (title == null) {
+                pw.print("null");
+            } else if (redacted) {
+                // Don't need to wrap with "" (i.e. "title") as it will be X_chars
+                pw.printf("%s (redacted)", title);
+            } else {
+                pw.printf("\"%s\"", title);
+            }
             pw.print(", vis="); pw.print(Notification.visibilityToString(visibility));
             pw.print(", category="); pw.print(category);
             pw.print(", channel="); pw.print(channel);
             pw.print("]");
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(category, channel, id, pkg, redacted, tag, targetUserId, title,
+                    visibility);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof HsuNotification)) {
+                return false;
+            }
+            HsuNotification other = (HsuNotification) obj;
+            return Objects.equals(category, other.category)
+                    && Objects.equals(channel, other.channel) && id == other.id
+                    && Objects.equals(pkg, other.pkg) && redacted == other.redacted
+                    && Objects.equals(tag, other.tag) && targetUserId == other.targetUserId
+                    && Objects.equals(title, other.title) && visibility == other.visibility;
         }
     }
 
@@ -101,15 +189,17 @@ final class MultiuserNonComplianceLogger {
                 || SystemProperties.getInt(PROP_ENABLE_IT, PROP_DEFAULT) == PROP_ENABLED) {
             mGetMainUserCalls = new SparseIntArray();
             mIsMainUserCalls = new SparseIntArray();
-            mLaunchedHsuActivities = new ArraySet<>();
-            mBlockedHsuActivities = new ArraySet<>();
-            mShownHsuNotifications = new ArrayMap<>();
+            mLaunchedHsuActivities = new LinkedHashMap<>();
+            mBlockedHsuActivities = new LinkedHashMap<>();
+            mPostedHsuNotifications = new LinkedHashMap<>();
+            mBlockedHsuNotifications = new LinkedHashMap<>();
         } else {
             mGetMainUserCalls = null;
             mIsMainUserCalls = null;
             mLaunchedHsuActivities = null;
             mBlockedHsuActivities = null;
-            mShownHsuNotifications = null;
+            mPostedHsuNotifications = null;
+            mBlockedHsuNotifications = null;
         }
     }
 
@@ -134,35 +224,51 @@ final class MultiuserNonComplianceLogger {
     }
 
     void logLaunchedHsuActivity(ComponentName activity) {
-        logHsuActivity(mLaunchedHsuActivities, activity);
+        incrementCount(mLaunchedHsuActivities, activity);
     }
 
     void logBlockedHsuActivity(ComponentName activity) {
-        logHsuActivity(mBlockedHsuActivities, activity);
+        incrementCount(mBlockedHsuActivities, activity);
     }
 
-    private void logHsuActivity(@Nullable ArraySet<ComponentName> activities,
-            ComponentName activity) {
-        if (activities == null) {
-            return;
-        }
-        mHandler.post(() -> activities.add(activity));
+    void logBlockedHsuNotification(StatusBarNotification sbn) {
+        logHsuNotification(mBlockedHsuNotifications, sbn);
     }
 
-    void logShownHsuNotification(StatusBarNotification sbn) {
-        if (mShownHsuNotifications == null) {
+    void logPostedHsuNotification(StatusBarNotification sbn) {
+        logHsuNotification(mPostedHsuNotifications, sbn);
+    }
+
+    void logHsuNotification(@Nullable Map<HsuNotification, Integer> notifications,
+            StatusBarNotification sbn) {
+        if (notifications == null) {
             return;
         }
         Notification notification = sbn.getNotification();
+        CharSequence tmpTitle = notification.extras.getCharSequence(Notification.EXTRA_TITLE);
+        String title = tmpTitle == null ? null : tmpTitle.toString();
+        // NOTE: title could have PII, so it must be redacted, but that's done in the
+        // HsuNotification constructor.
+        // TODO(b/483110541, 414326600): the channel on the notification object is not
+        // guaranteed to be the channel the notification is actually posted to, so we might
+        // need to add it as an argument (on this method and related places)
         HsuNotification notif = new HsuNotification(
                 sbn.getPackageName(), sbn.getTag(), sbn.getId(), sbn.getUser().getIdentifier(),
-                notification.visibility, notification.category, notification.getChannelId());
+                notification.visibility, title, /* redacted= */ true, notification.category,
+                notification.getChannelId());
+        incrementCount(notifications, notif);
+    }
+
+    private <T> void incrementCount(Map<T, Integer> map, T element) {
+        if (map == null) {
+            return;
+        }
         mHandler.post(() -> {
-            Integer currentCount = mShownHsuNotifications.get(notif);
+            Integer currentCount = map.get(element);
             if (currentCount == null) {
-                mShownHsuNotifications.put(notif, 1);
+                map.put(element, 1);
             } else {
-                mShownHsuNotifications.put(notif, currentCount + 1);
+                map.put(element, currentCount + 1);
             }
         });
     }
@@ -176,7 +282,9 @@ final class MultiuserNonComplianceLogger {
         pw.println();
         dumpHsuActivities(pw, mLaunchedHsuActivities, "launched");
         pw.println();
-        dumpShownHsuNotifications(pw);
+        dumpHsuNotifications(pw, mBlockedHsuNotifications, "blocked");
+        pw.println();
+        dumpHsuNotifications(pw, mPostedHsuNotifications, "posted");
     }
 
     private void dumpDeprecatedCalls(
@@ -206,7 +314,10 @@ final class MultiuserNonComplianceLogger {
         pw.decreaseIndent();
     }
 
-    private void dumpHsuActivities(IndentingPrintWriter pw, ArraySet<ComponentName> activities,
+    // NOTE: we could squash / refactor the 2 dump() methods below into one, but it would require
+    // another String arg for the element ("activities", "notifications") and a lambda to dump the
+    // keys, so it's not worth it.
+    private void dumpHsuActivities(IndentingPrintWriter pw, Map<ComponentName, Integer> activities,
             String what) {
         if (activities == null) {
             pw.printf("Not logging %s HSU activities\n", what);
@@ -218,22 +329,25 @@ final class MultiuserNonComplianceLogger {
 
         pw.printf("%d activities %s on HSU\n", size, what);
         pw.increaseIndent();
-        for (int i = 0; i < size; i++) {
-            pw.println(activities.valueAt(i).flattenToShortString());
+        for (Map.Entry<ComponentName, Integer> entry : activities.entrySet()) {
+            String activity = entry.getKey().flattenToShortString();
+            int count = entry.getValue();
+            pw.printf("%s: %d times\n", activity, count);
         }
         pw.decreaseIndent();
     }
 
-    private void dumpShownHsuNotifications(IndentingPrintWriter pw) {
-        if (mShownHsuNotifications == null) {
-            pw.println("Not logging shown HSU notifications");
+    private void dumpHsuNotifications(IndentingPrintWriter pw,
+            Map<HsuNotification, Integer> notifications, String what) {
+        if (notifications == null) {
+            pw.printf("Not logging %s HSU notifications\n", what);
             return;
         }
 
-        int size = mShownHsuNotifications.size();
-        pw.printf("%d notifications shown on HSU\n", size);
+        int size = notifications.size();
+        pw.printf("%d notifications %s on HSU\n", size, what);
         pw.increaseIndent();
-        for (Map.Entry<HsuNotification, Integer> entry : mShownHsuNotifications.entrySet()) {
+        for (Map.Entry<HsuNotification, Integer> entry : notifications.entrySet()) {
             entry.getKey().dump(pw);
             pw.printf(": %d times\n", entry.getValue());
         }
@@ -244,20 +358,23 @@ final class MultiuserNonComplianceLogger {
         // TODO(b/414326600): should reset in the mHandler thread (as its state is written in that
         // thread), but it would require blocking the caller until it's done
 
-        if (mGetMainUserCalls != null) {
-            mGetMainUserCalls.clear();
+        clear(mGetMainUserCalls);
+        clear(mIsMainUserCalls);
+        clear(mBlockedHsuActivities);
+        clear(mLaunchedHsuActivities);
+        clear(mBlockedHsuNotifications);
+        clear(mPostedHsuNotifications);
+    }
+
+    private static void clear(@Nullable SparseIntArray array) {
+        if (array != null) {
+            array.clear();
         }
-        if (mIsMainUserCalls != null) {
-            mIsMainUserCalls.clear();
-        }
-        if (mLaunchedHsuActivities != null) {
-            mLaunchedHsuActivities.clear();
-        }
-        if (mBlockedHsuActivities != null) {
-            mBlockedHsuActivities.clear();
-        }
-        if (mShownHsuNotifications != null) {
-            mShownHsuNotifications.clear();
+    }
+
+    private static void clear(@Nullable Map<?, ?> map) {
+        if (map != null) {
+            map.clear();
         }
     }
 

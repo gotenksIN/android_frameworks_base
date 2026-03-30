@@ -19,12 +19,18 @@ package com.android.server.companion.virtual.computercontrol;
 import static android.Manifest.permission.ACCESS_COMPUTER_CONTROL;
 import static android.Manifest.permission.POST_NOTIFICATIONS;
 
+import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionProcessor.MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.app.KeyguardManager;
+import android.app.role.RoleManager;
 import android.companion.virtual.VirtualDeviceManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -34,11 +40,15 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Process;
+import android.os.UserHandle;
 import android.provider.DeviceConfig;
 import android.text.TextUtils;
+import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.Pair;
 import android.util.Slog;
+import android.util.SparseArray;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -54,6 +64,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -87,9 +98,15 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
     private final DeviceConfigRemoteList mAutomatableAppDenylist;
     private final boolean mBuildIsDebuggable;
     private final PermissionManagerServiceInterface mPermissionManager;
+    private final ComputerControlDataStore mDataStore;
     // In debuggable builds, we can have a list of "super agents" (defined by a config resource)
     // which are allowed to automate any app.
     private final SignedPackageList mSuperAgentPackages = new SignedPackageList();
+    // List of automatable apps per agent package uid, package name.
+    // Maps: Agent UID -> (Agent Package Name -> Set of Target Package Names)
+    @GuardedBy("mPerAgentAutomatableAppList")
+    private final SparseArray<Map<String, Set<String>>> mPerAgentAutomatableAppList =
+            new SparseArray<>();
 
     ComputerControlAllowlistController(@NonNull Context context) {
         this(context, BackgroundThread.getExecutor(),
@@ -100,7 +117,7 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
                 new File(new File(Environment.getDataSystemDirectory(), COMPUTER_CONTROL_DIR),
                         AUTOMATABLE_APP_DENYLIST_FILE_NAME),
                 LocalServices.getService(PermissionManagerServiceInterface.class),
-                Build.isDebuggable());
+                new ComputerControlDataStore(), Build.isDebuggable());
     }
 
     @VisibleForTesting
@@ -108,6 +125,7 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
             @NonNull File agentAllowlistFile, @NonNull File automatableAppsAllowlistFile,
             @NonNull File automatableAppsDenylistFile,
             @NonNull PermissionManagerServiceInterface permissionManager,
+            @NonNull ComputerControlDataStore dataStore,
             boolean buildIsDebuggable) {
         mContext = context;
         mBackgroundExecutor = executor;
@@ -119,6 +137,7 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
                 COMPUTER_CONTROL_AUTOMATABLE_APP_DENYLIST_KEY);
         mPermissionManager = permissionManager;
         mBuildIsDebuggable = buildIsDebuggable;
+        mDataStore = dataStore;
         final Resources resources = context.getResources();
         try {
             final String[] superAgentConfigItems =
@@ -163,13 +182,37 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
             mSessionOwnerAllowlist.update();
             mAutomatableAppAllowlist.update();
             mAutomatableAppDenylist.update();
+            if (android.companion.virtualdevice.flags.Flags.computerControlPerAppConsent()) {
+                SparseArray<Map<String, Set<String>>> automatableApps =
+                        mDataStore.readAutomatableAppList();
+                synchronized (mPerAgentAutomatableAppList) {
+                    for (int i = 0; i < automatableApps.size(); i++) {
+                        mPerAgentAutomatableAppList.put(automatableApps.keyAt(i),
+                                automatableApps.valueAt(i));
+                    }
+                }
+            }
         });
         DeviceConfig.addOnPropertiesChangedListener(
                 COMPUTER_CONTROL_NAMESPACE, mBackgroundExecutor, this);
+
+        if (android.companion.virtualdevice.flags.Flags.computerControlPerAppConsent()) {
+            // Register broadcast receiver for package removal events.
+            final IntentFilter intentFilter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+            intentFilter.addDataScheme("package");
+            mContext.registerReceiver(new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    onPackageChanged(intent);
+                }
+            }, intentFilter);
+        }
     }
 
     boolean isPackageAllowedToCreateSession(@Nullable String packageName,
-            @NonNull PackageManager packageManager) {
+            @NonNull PackageManager packageManager,
+            @NonNull UserHandle ownerUser,
+            int targetComputerControlVersion) {
         if (packageName == null) {
             return false;
         }
@@ -210,6 +253,24 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
             }
         }
 
+        if (android.companion.virtualdevice.flags.Flags.computerControlRoleAssistantRequirement()) {
+            if (targetComputerControlVersion >= MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17) {
+                final long token = Binder.clearCallingIdentity();
+                try {
+                    RoleManager roleManager = mContext.getSystemService(RoleManager.class);
+                    if (roleManager == null || !roleManager.getRoleHoldersAsUser(
+                            RoleManager.ROLE_ASSISTANT, ownerUser).contains(packageName)) {
+                        Slog.i(TAG, "isPackageAllowedToCreateSession: Calling application "
+                                + packageName
+                                + " is not the ASSISTANT role holder");
+                        return false;
+                    }
+                } finally {
+                    Binder.restoreCallingIdentity(token);
+                }
+            }
+        }
+
         if (signingDetails == null) {
             Slog.e(TAG, "isPackageAllowedToCreateSession: Failed to fetch signing details for "
                     + packageName);
@@ -247,6 +308,13 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
                 session.getPackageManager());
     }
 
+    /**
+     * Returns whether the given {@code targetPackage} is automatable. This returns if
+     * {@param targetPackage} is automatable by an agent if user gives consent for it.
+     * Apps that are denylisted or not in the global allowlist are not automatable by any agent even
+     * if user consents to it.
+     * @return
+     */
     boolean isPackageAutomatable(@Nullable String targetPackage,
             @Nullable String sessionOwnerPackage, @NonNull PackageManager packageManager) {
         if (targetPackage == null || sessionOwnerPackage == null) {
@@ -290,19 +358,187 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
             return false;
         }
 
+        if (mSessionOwnerAllowlist.anyMatch(targetPackage, targetPackageSigningDetails)) {
+            Slog.i(
+                    TAG,
+                    "isPackageAutomatable: Cannot automate an approved agent application: "
+                            + targetPackage);
+            return false;
+        }
+
         // Check if the app is denylisted first.
         if (mAutomatableAppDenylist.anyMatch(targetPackage, targetPackageSigningDetails)) {
             Slog.i(TAG, "isPackageAutomatable: Found denylist entry for " + targetPackage);
             return false;
         }
-
-        // Check if the app is allowlisted.
         final ApplicationInfo appInfo = getApplicationInfo(targetPackage, packageManager);
         final boolean isInAllowlist = mAutomatableAppAllowlist.anyMatch(targetPackage,
                 targetPackageSigningDetails, isPreInstalledApp(appInfo));
         Slog.i(TAG, "isPackageAutomatable: Is there any allowlist entry for " + targetPackage
                 + " : " + isInAllowlist);
         return isInAllowlist;
+    }
+
+    /**
+     * Returns whether the given {@param agentUid} and {@param agentPackageName} have consent to
+     * automated {@param targetPackage}
+     */
+    boolean doesAgentHaveConsentToAutomateTargetApp(int agentUid, @Nullable String agentPackageName,
+            @Nullable String targetPackage) {
+        if (!android.companion.virtualdevice.flags.Flags.computerControlPerAppConsent()) {
+            return true;
+        }
+        if (targetPackage == null || agentPackageName == null) {
+            return false;
+        }
+        synchronized (mPerAgentAutomatableAppList) {
+            final Map<String, Set<String>> agentMap = mPerAgentAutomatableAppList.get(agentUid);
+            if (agentMap == null) {
+                return false;
+            }
+            final Set<String> allowList = agentMap.get(agentPackageName);
+            return allowList != null && allowList.contains(targetPackage);
+        }
+    }
+
+    String[] getAutomatableAppListForAgent(int agentUid, @NonNull String agentPackageName) {
+        synchronized (mPerAgentAutomatableAppList) {
+            final Map<String, Set<String>> agentMap = mPerAgentAutomatableAppList.get(agentUid);
+            if (agentMap == null) {
+                return new String[0];
+            }
+            final Set<String> allowlist = agentMap.get(agentPackageName);
+            if (allowlist == null) {
+                return new String[0];
+            }
+            return allowlist.toArray(new String[0]);
+        }
+    }
+
+    void addAppToAutomatableAppListForAgent(int agentUid, @NonNull String agentPackageName,
+            @NonNull String packageName) {
+        synchronized (mPerAgentAutomatableAppList) {
+            Map<String, Set<String>> agentMap = mPerAgentAutomatableAppList.get(agentUid);
+            if (agentMap == null) {
+                agentMap = new ArrayMap<>();
+                mPerAgentAutomatableAppList.put(agentUid, agentMap);
+            }
+            Set<String> allowlist = agentMap.get(agentPackageName);
+            if (allowlist == null) {
+                allowlist = new ArraySet<>();
+                agentMap.put(agentPackageName, allowlist);
+            }
+            allowlist.add(packageName);
+            scheduleWritePerAgentConsentData();
+        }
+    }
+
+    void removeAppFromAutomatableAppListForAgent(int agentUid, @NonNull String agentPackageName,
+            @NonNull String packageName) {
+        synchronized (mPerAgentAutomatableAppList) {
+            final Map<String, Set<String>> agentMap = mPerAgentAutomatableAppList.get(agentUid);
+            if (agentMap == null) {
+                return;
+            }
+            final Set<String> allowlist = agentMap.get(agentPackageName);
+            if (allowlist == null) {
+                return;
+            }
+            boolean changed = allowlist.remove(packageName);
+            if (!changed) {
+                return;
+            }
+            if (allowlist.isEmpty()) {
+                agentMap.remove(agentPackageName);
+                if (agentMap.isEmpty()) {
+                    mPerAgentAutomatableAppList.remove(agentUid);
+                }
+            }
+            scheduleWritePerAgentConsentData();
+        }
+    }
+
+    void clearAutomatableAppListForAgent(int agentUid, @NonNull String agentPackageName) {
+        synchronized (mPerAgentAutomatableAppList) {
+            final Map<String, Set<String>> agentMap = mPerAgentAutomatableAppList.get(agentUid);
+            if (agentMap == null) {
+                return;
+            }
+            if (!agentMap.containsKey(agentPackageName)) {
+                return;
+            }
+            agentMap.remove(agentPackageName);
+            if (agentMap.isEmpty()) {
+                mPerAgentAutomatableAppList.remove(agentUid);
+            }
+            scheduleWritePerAgentConsentData();
+        }
+    }
+
+    private void onPackageChanged(@NonNull Intent intent) {
+        final String action = intent.getAction();
+        if (!Intent.ACTION_PACKAGE_REMOVED.equals(action)) {
+            return;
+        }
+        final boolean replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false);
+        if (replacing) {
+            return;
+        }
+        final String packageName = intent.getData().getSchemeSpecificPart();
+        final int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
+        if (packageName == null || uid == -1) {
+            return;
+        }
+        Slog.i(TAG, "Package removed: " + packageName);
+        final int userId = UserHandle.getUserId(uid);
+        synchronized (mPerAgentAutomatableAppList) {
+            boolean changed = false;
+            // If the removed package was an agent, remove it from the agent map
+            Map<String, Set<String>> agentMap = mPerAgentAutomatableAppList.get(uid);
+            if (agentMap != null) {
+                agentMap.remove(packageName);
+                if (agentMap.isEmpty()) {
+                    mPerAgentAutomatableAppList.remove(uid);
+                }
+                changed = true;
+            }
+
+            // If the removed package was a target app, remove it from all agents' lists
+            // that belong to the same user.
+            for (int i = 0; i < mPerAgentAutomatableAppList.size(); i++) {
+                final int agentUid = mPerAgentAutomatableAppList.keyAt(i);
+                if (UserHandle.getUserId(agentUid) == userId) {
+                    Map<String, Set<String>> map = mPerAgentAutomatableAppList.valueAt(i);
+                    for (Set<String> targets : map.values()) {
+                        if (targets.remove(packageName)) {
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            if (changed) {
+                scheduleWritePerAgentConsentData();
+            }
+        }
+    }
+
+    private void scheduleWritePerAgentConsentData() {
+        // Create a copy of the data to write, to avoid holding the lock during I/O.
+        final SparseArray<Map<String, Set<String>>> automatableAppsCopy = new SparseArray<>();
+        synchronized (mPerAgentAutomatableAppList) {
+            for (int i = 0; i < mPerAgentAutomatableAppList.size(); i++) {
+                int key = mPerAgentAutomatableAppList.keyAt(i);
+                Map<String, Set<String>> value = mPerAgentAutomatableAppList.valueAt(i);
+                Map<String, Set<String>> valueCopy = new ArrayMap<>();
+                for (Map.Entry<String, Set<String>> entry : value.entrySet()) {
+                    valueCopy.put(entry.getKey(), new ArraySet<>(entry.getValue()));
+                }
+                automatableAppsCopy.put(key, valueCopy);
+            }
+        }
+        mBackgroundExecutor.execute(() -> {
+            mDataStore.writeAutomatableAppList(automatableAppsCopy);
+        });
     }
 
     private static int getPackageUid(@NonNull String packageName,

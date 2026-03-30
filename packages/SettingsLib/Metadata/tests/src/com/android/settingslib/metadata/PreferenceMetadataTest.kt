@@ -199,7 +199,7 @@ class PreferenceMetadataTest {
 
         val result = preference.setWarningAsString(context)
 
-        assertThat(result).isEqualTo("Warning before writing: Set warning (must be shown).")
+        assertThat(result).isEqualTo("[Must show to user]: Set warning.")
     }
 
     @Test
@@ -215,7 +215,7 @@ class PreferenceMetadataTest {
 
         val result = preference.setWarningAsString(context)
 
-        assertThat(result).isEqualTo("Warning before writing: Set warning (must be shown if preconditions are met: Set preconditions).")
+        assertThat(result).isEqualTo("[Must show to user]: Set warning (if preconditions are met: Set preconditions).")
     }
 
     @Test
@@ -231,7 +231,7 @@ class PreferenceMetadataTest {
 
         val result = preference.setWarningAsString(context)
 
-        assertThat(result).isEqualTo("Warning before writing: Set warning (must be shown if preconditions are met: Set value preconditions).")
+        assertThat(result).isEqualTo("[Must show to user]: Set warning (if preconditions are met: Set value preconditions).")
     }
 
     @Test
@@ -244,7 +244,7 @@ class PreferenceMetadataTest {
     }
 
     @Test
-    fun setWarningAsString_nonApiPreference() {
+    fun setWarningAsString_nonApiPreference_notImplementingPreferenceSetWarningProvider() {
         val preference = object : PreferenceMetadata {
             override val key = "key"
             override val purpose = 0
@@ -253,6 +253,22 @@ class PreferenceMetadataTest {
         val result = preference.setWarningAsString(context)
 
         assertThat(result).isNull()
+    }
+
+    @Test
+    fun setWarningAsString_nonApiPreference_implementingPreferenceSetWarningProvider() {
+        val preference = object : PreferenceMetadata, PreferenceSetWarningProvider {
+            override val key = "key"
+            override val purpose = 0
+            override val setWarning = WarningInfo(
+                preconditionsDescription = "Set preconditions",
+                warningMessage = "Set warning"
+            )
+        }
+
+        val result = preference.setWarningAsString(context)
+
+        assertThat(result).isEqualTo("[Must show to user]: Set warning (if preconditions are met: Set preconditions).")
     }
 
     open class TestApiPreference(
@@ -264,12 +280,13 @@ class PreferenceMetadataTest {
         override val set: SetConfig<String>? = null,
         override val getParameters: () -> ValidatedKeyParameters? = { null },
         override val getParametersSchema: () -> KeyParametersSchema? = { null },
-    ) : ApiPreference<String>(null, PreferenceTarget.DEVICE) {
+    ) : ApiPreference<String, String>(null, PreferenceTarget.DEVICE) {
         override val type = AnyString
         override val valueType = String::class.java
         override val permissions: Permissions? = null
         override val screenPermissions: Permissions? = null
         override val getScreenParameters: () -> ValidatedKeyParameters? = { null }
+        override val supportsWrite = set != null
     }
 
     open class TestPreferencesApiScreen(

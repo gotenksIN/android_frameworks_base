@@ -36,6 +36,9 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.window.TransitionInfo;
 
+import com.android.internal.protolog.ProtoLog;
+import com.android.wm.shell.Flags;
+import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.FocusTransitionListener;
 import com.android.wm.shell.shared.IFocusTransitionListener;
 import com.android.wm.shell.shared.TransitionUtil.LeafTaskFilter;
@@ -90,6 +93,11 @@ public class FocusTransitionObserver {
      * Update display/window focus state from the given transition info and notifies changes if any.
      */
     public void updateFocusState(@NonNull TransitionInfo info) {
+        ProtoLog.v(
+                ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                "%s: Updating focus state for transition #%d",
+                TAG,
+                info.getDebugId());
         final SparseArray<RunningTaskInfo> lastTransitionFocusedTasks =
                 mFocusedTaskOnDisplay.clone();
 
@@ -140,7 +148,6 @@ public class FocusTransitionObserver {
                 }
             }
 
-
             if (change.hasFlags(FLAG_IS_DISPLAY) && change.hasFlags(FLAG_MOVED_TO_TOP)) {
                 if (mFocusedDisplayId != change.getEndDisplayId()) {
                     updateFocusedDisplay(change.getEndDisplayId());
@@ -151,6 +158,23 @@ public class FocusTransitionObserver {
         mTmpTasksToBeNotified.clear();
     }
 
+    /**
+     * Called when a display is being disconnected (removed or switched to mirroring).
+     * Resets the focused display if the disconnected display was the one with focus.
+     */
+    public void onDisplayDisconnected(int displayId, int nextDisplayId) {
+        if (!Flags.enableFocusResetOnDisplayRemoval()) {
+            return;
+        }
+
+        mFocusedTaskOnDisplay.remove(displayId);
+        if (mFocusedDisplayId == displayId) {
+            Slog.d(TAG, "The focused display " + displayId
+                    + " is disconnected. Reset focus to " + nextDisplayId);
+            updateFocusedDisplay(nextDisplayId);
+        }
+    }
+
     private void updateFocusedTaskPerDisplay(RunningTaskInfo task, int displayId) {
         final RunningTaskInfo lastFocusedTaskOnDisplay =
                 mFocusedTaskOnDisplay.get(displayId);
@@ -159,13 +183,21 @@ public class FocusTransitionObserver {
         final int lastFocusedId = lastFocusedTaskOnDisplay != null
                 ? lastFocusedTaskOnDisplay.taskId : INVALID_TASK_ID;
         if (lastFocusedId == task.taskId) {
-            Slog.d(
+            ProtoLog.d(
+                    ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                    "%s: Task id=%d is already focused on displayId=%d. Skip notifying.",
                     TAG,
-                    String.format(
-                            "Task id=%d is already focused on displayId=%d. Skip notifying.",
-                            task.taskId, displayId));
+                    task.taskId,
+                    displayId);
             return;
         }
+
+        ProtoLog.d(
+                ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                "%s: Focus updated on displayId=%d to taskId=%d",
+                TAG,
+                displayId,
+                task.taskId);
 
         if (lastFocusedTaskOnDisplay != null) {
             mTmpTasksToBeNotified.add(lastFocusedTaskOnDisplay);
@@ -180,6 +212,11 @@ public class FocusTransitionObserver {
             mTmpTasksToBeNotified.add(lastGloballyFocusedTask);
         }
         mFocusedDisplayId = endDisplayId;
+        ProtoLog.d(
+                ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                "%s: Globally focused display changed to displayId=%d",
+                TAG,
+                endDisplayId);
         notifyFocusedDisplayChanged();
         final RunningTaskInfo currentGloballyFocusedTask =
                 mFocusedTaskOnDisplay.get(mFocusedDisplayId);
@@ -224,6 +261,15 @@ public class FocusTransitionObserver {
     private void notifyTaskFocusChanged(RunningTaskInfo task) {
         final boolean isFocusedOnDisplay = isFocusedOnDisplay(task);
         final boolean isFocusedGlobally = hasGlobalFocus(task);
+        notifyFocusedTaskChangedToRemote(task, isFocusedOnDisplay, isFocusedGlobally);
+        ProtoLog.v(
+                ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                "%s: Notifying local listeners of task focus change: taskId=%d,"
+                    + " isFocusedOnDisplay=%b, isFocusedGlobally=%b",
+                TAG,
+                task.taskId,
+                isFocusedOnDisplay,
+                isFocusedGlobally);
         mLocalListeners.forEach((listener, executor) ->
                 executor.execute(() -> listener.onFocusedTaskChanged(task, isFocusedOnDisplay,
                         isFocusedGlobally)));
@@ -231,6 +277,11 @@ public class FocusTransitionObserver {
 
     private void notifyFocusedDisplayChanged() {
         notifyFocusedDisplayChangedToRemote();
+        ProtoLog.v(
+                ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                "%s: Notifying local listeners of display focus change: displayId=%d",
+                TAG,
+                mFocusedDisplayId);
         mLocalListeners.forEach((listener, executor) ->
                 executor.execute(() -> {
                     listener.onFocusedDisplayChanged(mFocusedDisplayId);
@@ -243,6 +294,17 @@ public class FocusTransitionObserver {
                 mRemoteListener.onFocusedDisplayChanged(mFocusedDisplayId);
             } catch (RemoteException e) {
                 Slog.w(TAG, "Failed call notifyFocusedDisplayChangedToRemote", e);
+            }
+        }
+    }
+
+    private void notifyFocusedTaskChangedToRemote(RunningTaskInfo task, boolean isFocusedOnDisplay,
+            boolean isFocusedGlobally) {
+        if (mRemoteListener != null) {
+            try {
+                mRemoteListener.onFocusedTaskChanged(task, isFocusedOnDisplay, isFocusedGlobally);
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Failed call notifyFocusedTaskChangedToRemote", e);
             }
         }
     }

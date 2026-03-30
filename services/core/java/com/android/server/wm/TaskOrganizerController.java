@@ -986,6 +986,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                 .setLaunchCookie(params.getLaunchCookie())
                 .setParent(parent)
                 .setRemoveWithTaskOrganizer(true)
+                .setOnTop(params.isOnTop())
                 .setReparentOnDisplayRemoval(properties.isReparentOnDisplayRemoval());
         if (Flags.visibilityManagementInBubbleRoot() && params.isVisibilityBarrier()) {
             builder.setIsVisibilityBarrier(true);
@@ -1000,6 +1001,30 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
 
         if (Flags.visibilityManagementInBubbleRoot() && properties.isForceLeafTasksNonOccluding()) {
             task.setForceLeafTasksNonOccluding(true);
+        }
+        if (properties.isReparentLeafTaskIfRelaunchFromHome()) {
+            task.setReparentLeafTaskIfRelaunchFromHome(true);
+        }
+        if (properties.isDisallowOverrideWindowingModeForChildren()) {
+            task.setDisallowOverrideWindowingModeForChildren(true);
+        }
+        if (properties.isPreserveLeafTaskIfRelaunch()) {
+            task.setPreserveLeafTaskIfRelaunch(true);
+        }
+        if (properties.isInterceptBackPressedOnTaskRoot()) {
+            setInterceptBackPressedOnTaskRoot(task.mTaskId, true);
+        }
+        if (properties.isTaskForceExcludedFromRecents()) {
+            task.setForceExcludedFromRecents(true);
+        }
+        if (properties.isDisablePip()) {
+            task.setDisablePip(true);
+        }
+        if (properties.isDisableLaunchAdjacent()) {
+            task.setLaunchAdjacentDisabled(true);
+        }
+        if (properties.isForceTranslucent()) {
+            task.setForceTranslucent(true);
         }
 
         // We want to defer the task appear signal until the task is fully created and attached to
@@ -1061,6 +1086,13 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         // Group the given tasks per state
         for (int i = 0; i < tasks.size(); i++) {
             final Task task = tasks.valueAt(i);
+
+            if (task.mTaskOrganizer == null) {
+                Slog.w(TAG, "Cannot handle onPackageUpdateRequest because task organizer is "
+                        + "not present for taskId: " + task.mTaskId);
+                continue;
+            }
+
             final TaskOrganizerState state = mTaskOrganizerStates.get(
                     task.mTaskOrganizer.asBinder());
 
@@ -1088,6 +1120,16 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         // Group the given tasks per state
         for (int i = 0; i < tasks.size(); i++) {
             final Task task = tasks.get(i);
+
+            if (task.mTaskOrganizer == null) {
+                Slog.w(TAG, "Cannot handle onPackageUpdateFinished because task organizer is "
+                        + "not present for taskId: " + task.mTaskId);
+                // Handler of this task won't get the call do clean up for this task, so go ahead
+                // and mark the task as handled instead of hitting the timeout.
+                task.continuePackageUpdate();
+                continue;
+            }
+
             final TaskOrganizerState state = mTaskOrganizerStates.get(
                     task.mTaskOrganizer.asBinder());
 

@@ -39,6 +39,8 @@ import com.android.settingslib.graph.PreferenceGetterFlags
 import com.android.settingslib.metadata.CatalystFlagProvider
 import com.android.settingslib.metadata.CatalystFlagProviderFactory
 import com.android.settingslib.metadata.KeyParametersSchema
+import com.android.settingslib.metadata.PreferenceSetWarningProvider
+import com.android.settingslib.metadata.WarningInfo
 import com.android.settingslib.metadata.preferencesapi.ApiPreference
 import com.android.settingslib.metadata.preferencesapi.GetConfig
 import com.android.settingslib.metadata.preferencesapi.PreconditionsConfig
@@ -67,7 +69,7 @@ class PreferenceGraphBuilderTest {
     private open class TestPreference(
         override val sensitivityLevel: Int,
         private val writePermissions: Permissions? = null
-    ) : PersistentPreference<Int> {
+    ) : PersistentPreference<Int>, PreferenceSetWarningProvider {
         override val bindingKey: String = "test_key"
         override val valueType: Class<Int> = Int::class.javaObjectType
         override val key: String = "test_key"
@@ -79,6 +81,13 @@ class PreferenceGraphBuilderTest {
             ReadWritePermit.ALLOW
 
         override fun getWritePermissions(context: Context): Permissions? = writePermissions
+
+        override val setWarning = WarningInfo(
+            preconditionsDescription = "set_warning_preconditions_description",
+            warningMessage = "set_warning_message"
+        )
+
+        override val supportsWrite = true
     }
 
     @After
@@ -102,7 +111,7 @@ class PreferenceGraphBuilderTest {
         override val set: SetConfig<Int>? = null,
         val parametersSchema: KeyParametersSchema? = null,
         val parameters: ValidatedKeyParameters? = null
-    ) : ApiPreference<Int>(null, PreferenceTarget.DEVICE) {
+    ) : ApiPreference<Int, Int>(null, PreferenceTarget.DEVICE) {
         override val type = AnyInt
         override val valueType = Int::class.javaObjectType
         override val permissions: Permissions? = null
@@ -110,6 +119,7 @@ class PreferenceGraphBuilderTest {
         override val getScreenParameters: () -> ValidatedKeyParameters? = { null }
         override val getParametersSchema: () -> KeyParametersSchema? = { parametersSchema }
         override val getParameters: () -> ValidatedKeyParameters? = { parameters }
+        override val supportsWrite = set != null
     }
 
     @Test
@@ -156,6 +166,21 @@ class PreferenceGraphBuilderTest {
 
         val result = preference.evalWritePermit(context, 0, 0)
 
+        assertThat(result).isEqualTo(ReadWritePermit.DISALLOW)
+    }
+
+    @Test
+    fun evalWritePermit_requiresConfirmationSensitivity_returnsDisallow() {
+        // Arrange: Create a preference with REQUIRES_CONFIRMATION sensitivity level.
+        // The build type and global setting should not affect this outcome.
+        ShadowBuild.setType("userdebug")
+        Settings.Global.putInt(context.contentResolver, SETTING_KEY, 1)
+        val preference = TestPreference(SensitivityLevel.REQUIRES_CONFIRMATION)
+
+        // Act: Evaluate the write permit.
+        val result = preference.evalWritePermit(context, 0, 0)
+
+        // Assert: The result should be DISALLOW, as this sensitivity level is strictly disallowed.
         assertThat(result).isEqualTo(ReadWritePermit.DISALLOW)
     }
 
@@ -387,14 +412,6 @@ class PreferenceGraphBuilderTest {
     }
 
     @Test
-    fun toProto_legacyPreference_isNotWritable() {
-        val preference = TestPreference(SensitivityLevel.NO_SENSITIVITY)
-        val proto = preference.toProto(context, 0, 0, screenMetadata, false, PreferenceGetterFlags.METADATA)
-
-        assertThat(proto.writable).isFalse()
-    }
-
-    @Test
     fun toProto_apiPreference_includesKeyParametersAndSchema() {
         setCatalystUseKeyParameters(true)
         val schema = KeyParametersSchema {
@@ -593,6 +610,150 @@ class PreferenceGraphBuilderTest {
 
         assertThat(proto.setWarning.preconditionsList).containsExactly("set_warning_value_preconditions_desc")
         assertThat(proto.setWarning.warning).isEqualTo("set_warning_with_value_preconditions_message")
+    }
+
+    @Test
+    fun toProto_standardPreference_inheritsKeyParametersAndSchemaFromScreen() {
+        setCatalystUseKeyParameters(true)
+        val schema = KeyParametersSchema {
+            parameter("test_param", "test_purpose", required = true, type = AnyString)
+        }
+        val params = schema.prepare("test_param" to "value")
+
+        val screenMetadataWithParams = object : PreferenceScreenMetadata {
+            override val bindingKey: String = "screen_key"
+            override val key: String = "screen_key"
+            override val purpose: Int = 0
+            override fun fragmentClass(): Class<out Fragment>? = null
+            override val keyParametersSchema: KeyParametersSchema = schema
+            override val keyParameters: ValidatedKeyParameters = params
+
+            override fun getPreferenceHierarchy(
+                context: Context,
+                coroutineScope: CoroutineScope
+            ): PreferenceHierarchy = preferenceHierarchy(context) {}
+        }
+
+        val preference = TestPreference(SensitivityLevel.NO_SENSITIVITY)
+        val proto = preference.toProto(context, 0, 0, screenMetadataWithParams, false, PreferenceGetterFlags.METADATA)
+
+        assertThat(proto.hasParametersSchema()).isTrue()
+        assertThat(proto.hasKeyParameters()).isTrue()
+        assertThat(proto.keyParameters.valuesMap).containsEntry("test_param", "value")
+    }
+
+    @Test
+    fun toProto_legacyPreferenceWithPreferenceSetWarningProvider_includesSetWarningInfo() {
+        val preference = TestPreference(SensitivityLevel.NO_SENSITIVITY)
+        val proto = preference.toProto(context, 0, 0, screenMetadata, false, 0)
+
+        assertThat(proto.setWarning.preconditionsList).containsExactly("set_warning_preconditions_description")
+        assertThat(proto.setWarning.warning).isEqualTo("set_warning_message")
+    }
+
+    private class TestDiscreteIntPreference(
+        override val sensitivityLevel: Int = SensitivityLevel.NO_SENSITIVITY,
+    ) : PersistentPreference<Int>, com.android.settingslib.metadata.DiscreteIntValue {
+        override val bindingKey: String = "discrete_int_key"
+        override val valueType: Class<Int> = Int::class.javaObjectType
+        override val key: String = "discrete_int_key"
+        override val purpose: Int = 2737
+        override val values: Int = android.R.array.emailAddressTypes
+        override val valuesDescription: Int = android.R.array.emailAddressTypes
+
+        override fun isPersistent(context: Context): Boolean = true
+        override val supportsWrite: Boolean = true
+
+        override fun getWritePermit(context: Context, callingPid: Int, callingUid: Int): Int? =
+            ReadWritePermit.ALLOW
+
+        override fun getWritePermissions(context: Context): Permissions? = null
+    }
+
+    @Test
+    fun toProto_discreteIntValue_includesValueDescriptor() {
+        val preference = TestDiscreteIntPreference()
+        val proto = preference.toProto(
+            context,
+            0,
+            0,
+            screenMetadata,
+            false,
+            PreferenceGetterFlags.METADATA or PreferenceGetterFlags.VALUE_DESCRIPTOR
+        )
+
+        assertThat(proto.hasValueDescriptor()).isTrue()
+        assertThat(proto.valueDescriptor.possibleValuesList).isNotEmpty()
+    }
+
+    private class TestDiscreteTextPreference(
+        override val sensitivityLevel: Int = SensitivityLevel.NO_SENSITIVITY,
+    ) : PersistentPreference<CharSequence>, com.android.settingslib.metadata.DiscreteTextValue {
+        override val bindingKey: String = "discrete_text_key"
+        override val valueType: Class<CharSequence> = CharSequence::class.javaObjectType
+        override val key: String = "discrete_text_key"
+        override val purpose: Int = 2737
+        override val values: Int = android.R.array.imProtocols
+        override val valuesDescription: Int = android.R.array.imProtocols
+
+        override fun isPersistent(context: Context): Boolean = true
+        override val supportsWrite: Boolean = true
+
+        override fun getWritePermit(context: Context, callingPid: Int, callingUid: Int): Int? =
+            ReadWritePermit.ALLOW
+
+        override fun getWritePermissions(context: Context): Permissions? = null
+    }
+
+    @Test
+    fun toProto_discreteTextValue_includesValueDescriptor() {
+        val preference = TestDiscreteTextPreference()
+        val proto = preference.toProto(
+            context,
+            0,
+            0,
+            screenMetadata,
+            false,
+            PreferenceGetterFlags.METADATA or PreferenceGetterFlags.VALUE_DESCRIPTOR
+        )
+
+        assertThat(proto.hasValueDescriptor()).isTrue()
+        assertThat(proto.valueDescriptor.possibleValuesList).isNotEmpty()
+    }
+
+    private class TestDiscreteStringPreference(
+        override val sensitivityLevel: Int = SensitivityLevel.NO_SENSITIVITY,
+    ) : PersistentPreference<String>, com.android.settingslib.metadata.DiscreteStringValue {
+        override val bindingKey: String = "discrete_string_key"
+        override val valueType: Class<String> = String::class.javaObjectType
+        override val key: String = "discrete_string_key"
+        override val purpose: Int = 2737
+        override val values: Int = android.R.array.imProtocols
+        override val valuesDescription: Int = android.R.array.imProtocols
+
+        override fun isPersistent(context: Context): Boolean = true
+        override val supportsWrite: Boolean = true
+
+        override fun getWritePermit(context: Context, callingPid: Int, callingUid: Int): Int? =
+            ReadWritePermit.ALLOW
+
+        override fun getWritePermissions(context: Context): Permissions? = null
+    }
+
+    @Test
+    fun toProto_discreteStringValue_includesValueDescriptor() {
+        val preference = TestDiscreteStringPreference()
+        val proto = preference.toProto(
+            context,
+            0,
+            0,
+            screenMetadata,
+            false,
+            PreferenceGetterFlags.METADATA or PreferenceGetterFlags.VALUE_DESCRIPTOR
+        )
+
+        assertThat(proto.hasValueDescriptor()).isTrue()
+        assertThat(proto.valueDescriptor.possibleValuesList).isNotEmpty()
     }
 
     companion object {

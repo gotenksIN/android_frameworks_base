@@ -2471,16 +2471,10 @@ public final class ActivityThread extends ClientTransactionHandler
         public void getExecutableMethodFileOffsets(
                 @NonNull MethodDescriptor methodDescriptor,
                 @NonNull IOffsetCallback resultCallback) {
-            Executable executable;
-            if (android.security.Flags.dynamicInstrumentationAppClassloader()) {
-                Application app = currentApplication();
-                ClassLoader cl = (app != null) ? app.getClassLoader() : getClass().getClassLoader();
-                executable = MethodDescriptorParser.parseMethodDescriptor(cl, methodDescriptor);
-            } else {
-                executable =
-                        MethodDescriptorParser.parseMethodDescriptor(
-                                getClass().getClassLoader(), methodDescriptor);
-            }
+            Application app = currentApplication();
+            ClassLoader cl = (app != null) ? app.getClassLoader() : getClass().getClassLoader();
+            Executable executable =
+                    MethodDescriptorParser.parseMethodDescriptor(cl, methodDescriptor);
 
             VMDebug.ExecutableMethodFileOffsets location;
             if (com.android.art.flags.Flags.executableMethodFileOffsetsV2()) {
@@ -8349,6 +8343,19 @@ public final class ActivityThread extends ClientTransactionHandler
                             ApplicationInfo.METADATA_PRELOADED_FONTS, 0);
                     if (preloadedFontsResource != 0) {
                         data.info.getResources().preloadFonts(preloadedFontsResource);
+                    }
+
+                    if (com.android.text.flags.Flags.perAppFontationSettings()) {
+                        // Uses AndroidManifest meta-data to switch the Text Renderer backend on a
+                        // per-application basis. This is primarily used to fix the renderer backend
+                        // during screenshot tests not to break by feature flag rollout.
+                        // This functionality is temporary and will be removed once Fontation
+                        // becomes the default backend.
+                        final int useFontation = info.metaData.getInt(
+                                "android.graphics.text_renderer", -1);
+                        if (useFontation != -1) {
+                            Typeface.setFontRenderingBackend(useFontation);
+                        }
                     }
                 }
             } catch (RemoteException e) {

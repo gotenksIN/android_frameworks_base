@@ -18,7 +18,9 @@ package android.app.admin;
 
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_FACTORY_RESET;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_FUN;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_LOCKSCREEN_MESSAGE;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS;
@@ -30,9 +32,13 @@ import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER;
 import static android.app.admin.DevicePolicyManager.RESOURCE_DEVICE_WIDE;
 import static android.app.admin.DevicePolicyManager.RESOURCE_PER_USER;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_APP_INSTALL;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_APP_UNINSTALL;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_DISALLOW_FACTORY_RESET;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_EASTER_EGGS;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_LOCKSCREEN_MESSAGE;
 import static android.processor.devicepolicy.AllowedDpcTypes.ALLOWED;
 import static android.processor.devicepolicy.AllowedDpcTypes.DISALLOWED;
 
@@ -40,12 +46,12 @@ import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.app.admin.flags.Flags;
-import android.content.Intent;
-import android.os.UserManager;
+import android.app.admin.DevicePolicyManager;
 import android.processor.devicepolicy.AllowedDpcTypes;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.EnumResolutionMechanism;
 import android.processor.devicepolicy.ListOfStringPolicyDefinition;
+import android.processor.devicepolicy.ListResolutionMechanism;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
 
@@ -78,8 +84,8 @@ public final class PolicyIdentifier<T> {
      * Create an instance of PolicyIdentifier. Should only be used to create the static definitions
      * below.
      *
-     * <b>This API is only public for testing purposes. Real applications should only use the static
-     * instances defined below.
+     * <p><b>This API is only public for testing purposes. Real applications should only use the
+     * static instances defined below.</b>
      */
     public PolicyIdentifier(@NonNull String id) {
         this.mId = id;
@@ -176,21 +182,22 @@ public final class PolicyIdentifier<T> {
 
     /** The user can choose whether the time is automatically obtained from the network or not. */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME)
-    public static final int AUTO_TIME_USER_CHOICE = 0;
+    public static final int AUTO_TIME_USER_CHOICE =
+            DevicePolicyManager.AUTO_TIME_NOT_CONTROLLED_BY_POLICY;
 
     /**
      * The admin has disabled the time to be automatically obtained from the network. This is not
      * enforced and the user can still enable it.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME)
-    public static final int AUTO_TIME_DISABLED_UNENFORCED = 1;
+    public static final int AUTO_TIME_DISABLED_UNENFORCED = DevicePolicyManager.AUTO_TIME_DISABLED;
 
     /**
      * The admin has enabled the time to be automatically obtained from the network. This is not
      * enforced and the user can still disable it.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME)
-    public static final int AUTO_TIME_ENABLED_UNENFORCED = 2;
+    public static final int AUTO_TIME_ENABLED_UNENFORCED = DevicePolicyManager.AUTO_TIME_ENABLED;
 
     /**
      * The admin has disabled the time to be automatically obtained from the network. This is
@@ -245,23 +252,21 @@ public final class PolicyIdentifier<T> {
             resolutionMechanism = @EnumResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> AUTO_TIME = new PolicyIdentifier<>("AUTO_TIME");
 
-    /**
-     * Specifies that the user is allowed to transfer managed eSIMs from the device.
-     */
+    /** Specifies that the user is allowed to transfer managed eSIMs from the device. */
     @FlaggedApi(Flags.FLAG_MANAGED_ESIM_OUTGOING_TRANSFER_POLICY)
     public static final int MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED = 1;
 
-    /**
-     * Specifies that the user is not allowed to transfer managed eSIMs from the device.
-     */
+    /** Specifies that the user is not allowed to transfer managed eSIMs from the device. */
     @FlaggedApi(Flags.FLAG_MANAGED_ESIM_OUTGOING_TRANSFER_POLICY)
     public static final int MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED = 2;
 
     /** @hide */
-    @IntDef(prefix = { "MANAGED_ESIM_OUTGOING_TRANSFER_" }, value = {
-            MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED,
-            MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED
-    })
+    @IntDef(
+            prefix = {"MANAGED_ESIM_OUTGOING_TRANSFER_"},
+            value = {
+                MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED,
+                MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED
+            })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ManagedEsimOutgoingTransferPolicy {}
 
@@ -272,24 +277,25 @@ public final class PolicyIdentifier<T> {
     @NonNull
     @EnumPolicyDefinition(
             base =
-            @PolicyDefinition(
-                    allowedScopes = {POLICY_SCOPE_DEVICE},
-                    affectedResource = RESOURCE_DEVICE_WIDE,
-                    requiredPermission = MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS,
-                    allowedDpcTypes =
-                    @AllowedDpcTypes(
-                            deviceOwner = ALLOWED,
-                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
-                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
-                            unaffiliatedFullUserProfileOwner = ALLOWED,
-                            profileOwnerOnUser0 = ALLOWED)),
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_DEVICE},
+                            affectedResource = RESOURCE_DEVICE_WIDE,
+                            requiredPermission = MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
+                                            unaffiliatedFullUserProfileOwner = ALLOWED,
+                                            profileOwnerOnUser0 = ALLOWED)),
             intDef = ManagedEsimOutgoingTransferPolicy.class,
             defaultValue = MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED,
-            resolutionMechanism = @EnumResolutionMechanism(mostRestrictive = {
-                    MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED,
-                    MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED
-            })
-    )
+            resolutionMechanism =
+                    @EnumResolutionMechanism(
+                            mostRestrictive = {
+                                MANAGED_ESIM_OUTGOING_TRANSFER_DISALLOWED,
+                                MANAGED_ESIM_OUTGOING_TRANSFER_ALLOWED
+                            }))
     public static final PolicyIdentifier<Integer> MANAGED_ESIM_OUTGOING_TRANSFER_POLICY =
             new PolicyIdentifier<>("MANAGED_ESIM_OUTGOING_TRANSFER_POLICY");
 
@@ -310,7 +316,7 @@ public final class PolicyIdentifier<T> {
      * DeviceAdminReceiver} to listen to the {@link Intent#ACTION_LOCALE_CHANGED} broadcast and set
      * a new version of this string accordingly.
      */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_LOCKSCREEN_MESSAGE)
     @NonNull
     @StringPolicyDefinition(
             base =
@@ -350,27 +356,30 @@ public final class PolicyIdentifier<T> {
                                             requiredCrossUserPermission =
                                                     MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL,
                                             allowedDpcTypes =
-                                                    @AllowedDpcTypes(
-                                                            deviceOwner = ALLOWED,
-                                                            managedProfileOwnerOfOrganizationOwnedDevice =
-                                                                    ALLOWED,
-                                                            managedProfileOwnerOfPersonalOwnedDevice =
-                                                                    DISALLOWED,
-                                                            unaffiliatedFullUserProfileOwner =
-                                                                    DISALLOWED))))
+                                            @AllowedDpcTypes(
+                                                    deviceOwner = ALLOWED,
+                                                    managedProfileOwnerOfOrganizationOwnedDevice =
+                                                            ALLOWED,
+                                                    managedProfileOwnerOfPersonalOwnedDevice =
+                                                            DISALLOWED,
+                                                    unaffiliatedFullUserProfileOwner =
+                                                            DISALLOWED))),
+            resolutionMechanism = @ListResolutionMechanism(custom = true))
     public static final PolicyIdentifier<List<String>> CONTENT_RESTRICTION_APPS =
             new PolicyIdentifier<>("CONTENT_RESTRICTION_APPS");
 
     /** The user can choose whether the device's time zone is set automatically or not. */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
-    public static final int AUTO_TIME_ZONE_USER_CHOICE = 0;
+    public static final int AUTO_TIME_ZONE_USER_CHOICE =
+            DevicePolicyManager.AUTO_TIME_ZONE_NOT_CONTROLLED_BY_POLICY;
 
     /**
      * The admin has disabled automatic time zone detection. This is not enforced and the user can
      * still enable it. Use {@link UserManager#DISALLOW_CONFIG_DATE_TIME} to enforce the policy.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
-    public static final int AUTO_TIME_ZONE_DISABLED_UNENFORCED = 1;
+    public static final int AUTO_TIME_ZONE_DISABLED_UNENFORCED =
+            DevicePolicyManager.AUTO_TIME_ZONE_DISABLED;
 
     /**
      * The admin has enabled the time zone to be automatically obtained from the network. This is
@@ -378,7 +387,8 @@ public final class PolicyIdentifier<T> {
      * UserManager#DISALLOW_CONFIG_DATE_TIME} to enforce the policy.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE)
-    public static final int AUTO_TIME_ZONE_ENABLED_UNENFORCED = 2;
+    public static final int AUTO_TIME_ZONE_ENABLED_UNENFORCED =
+            DevicePolicyManager.AUTO_TIME_ZONE_ENABLED;
 
     /**
      * The admin has disabled automatic time zone detection. This is enforced and the user cannot
@@ -437,6 +447,98 @@ public final class PolicyIdentifier<T> {
     public static final PolicyIdentifier<Integer> AUTO_TIME_ZONE =
             new PolicyIdentifier<>("AUTO_TIME_ZONE");
 
+    /** Installing Apps is allowed. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_APP_INSTALL)
+    public static final int APP_INSTALL_ALLOWED = 1;
+
+    /** Installing Apps is disallowed. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_APP_INSTALL)
+    public static final int APP_INSTALL_DISALLOWED = 2;
+
+    /**
+     * Possible values {@link APP_INSTALL}
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            prefix = {"APP_INSTALL_"},
+            value = {
+                APP_INSTALL_ALLOWED,
+                APP_INSTALL_DISALLOWED,
+            })
+    public @interface AppInstallValue {}
+
+    /** Policy that controls whether app installation is allowed or disallowed. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_APP_INSTALL)
+    @NonNull
+    @EnumPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_USER},
+                            affectedResource = RESOURCE_PER_USER,
+                            requiredPermission = MANAGE_DEVICE_POLICY_APPS_CONTROL,
+                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
+                                            unaffiliatedFullUserProfileOwner = ALLOWED,
+                                            financedDeviceOwner = ALLOWED,
+                                            profileOwnerOnUser0 = ALLOWED)),
+            intDef = AppInstallValue.class,
+            defaultValue = APP_INSTALL_ALLOWED,
+            resolutionMechanism = @EnumResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<Integer> APP_INSTALL =
+            new PolicyIdentifier<>("APP_INSTALL");
+
+    /** Uninstalling Apps is allowed. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_APP_UNINSTALL)
+    public static final int APP_UNINSTALL_ALLOWED = 1;
+
+    /** Uninstalling Apps is disallowed. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_APP_UNINSTALL)
+    public static final int APP_UNINSTALL_DISALLOWED = 2;
+
+    /**
+     * Possible values {@link APP_UNINSTALL}
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            prefix = {"APP_UNINSTALL_"},
+            value = {
+                APP_UNINSTALL_ALLOWED,
+                APP_UNINSTALL_DISALLOWED,
+            })
+    public @interface AppUninstallValue {}
+
+    /** Policy that controls whether app uninstallation is allowed or disallowed. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_APP_UNINSTALL)
+    @NonNull
+    @EnumPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_USER},
+                            affectedResource = RESOURCE_PER_USER,
+                            requiredPermission = MANAGE_DEVICE_POLICY_APPS_CONTROL,
+                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
+                                            unaffiliatedFullUserProfileOwner = ALLOWED,
+                                            financedDeviceOwner = ALLOWED,
+                                            profileOwnerOnUser0 = ALLOWED)),
+            intDef = AppUninstallValue.class,
+            defaultValue = APP_UNINSTALL_ALLOWED,
+            resolutionMechanism = @EnumResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<Integer> APP_UNINSTALL =
+            new PolicyIdentifier<>("APP_UNINSTALL");
+
     /** Easter eggs are disallowed. */
     @FlaggedApi(FLAG_POLICY_STREAMLINING_EASTER_EGGS)
     public static final int EASTER_EGGS_DISALLOWED = 1;
@@ -485,6 +587,62 @@ public final class PolicyIdentifier<T> {
             resolutionMechanism = @EnumResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> EASTER_EGGS =
             new PolicyIdentifier<>("EASTER_EGGS");
+
+    /**
+     * Possible values {@link FACTORY_RESET}
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            prefix = {"FACTORY_RESET_"},
+            value = {
+                FACTORY_RESET_DISALLOWED,
+                FACTORY_RESET_ALLOWED,
+            })
+    public @interface FactoryResetValue {}
+
+    /** The settings menu of the user has factory reset disabled. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_DISALLOW_FACTORY_RESET)
+    public static final int FACTORY_RESET_DISALLOWED = 1;
+
+    /** The settings menu of the user has the factory reset option. */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_DISALLOW_FACTORY_RESET)
+    public static final int FACTORY_RESET_ALLOWED = 2;
+
+    /**
+     * Policy that controls if the factory reset option is available in the settings menu. Even if
+     * it is disabled factory reset might still be possible through other means.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_DISALLOW_FACTORY_RESET)
+    @NonNull
+    @EnumPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_DEVICE, POLICY_SCOPE_USER},
+                            affectedResource = RESOURCE_PER_USER,
+                            requiredPermission = MANAGE_DEVICE_POLICY_FACTORY_RESET,
+                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            profileOwnerOnUser0 = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            intDef = FactoryResetValue.class,
+            defaultValue = FACTORY_RESET_ALLOWED,
+            resolutionMechanism = @EnumResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<Integer> FACTORY_RESET =
+            new PolicyIdentifier<>("FACTORY_RESET");
+
+    // Make sure to update the policy metadata file when updating the definitions above by running
+    // the following commands:
+    // m framework-minus-apex
+    // cp out/soong/.intermediates/frameworks/base/framework-minus-apex/android_common/javac
+    // /*/anno/android/processor/devicepolicy/policies.textproto
+    // frameworks/base/tools/policymetadata/policies.textproto
 
     // LINT.ThenChange(/tools/policymetadata/policies.textproto)
 }

@@ -55,8 +55,7 @@ class InstallViewModel(application: Application, val repository: InstallReposito
             repository.installResult.distinctUntilChanged()
         ) { installStage: InstallStage? ->
             if (installStage != null) {
-                    updateInstallStage(installStage)
-                _currentInstallStage.value = installStage
+                updateInstallStage(installStage)
             }
         }
 

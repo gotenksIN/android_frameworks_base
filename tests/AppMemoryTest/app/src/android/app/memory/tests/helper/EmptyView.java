@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 The Android Open Source Project
+ * Copyright (C) 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,11 @@
 
 package android.app.memory.testhelper;
 
-import android.os.Bundle;
+import android.content.Context;
+import android.view.View;
 
-import androidx.fragment.app.FragmentActivity;
-
-public class EmptyActivity extends FragmentActivity {
-    public EmptyActivity() {
-        super(R.layout.empty_activity);
-    }
-    @Override
-    protected void onCreate(Bundle icicle) {
-        super.onCreate(icicle);
-        if (icicle == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .setReorderingAllowed(true)
-                    .add(R.id.empty_activity, EmptyFragment.class, null)
-                    .commit();
-        }
+public class EmptyView extends View {
+    public EmptyView(Context context) {
+        super(context);
     }
 }

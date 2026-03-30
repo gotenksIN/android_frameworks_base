@@ -72,6 +72,42 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
                 .indented(),
         )
 
+    private val bubbleLogApi: Array<TestFile> =
+        arrayOf(
+            kotlin(
+                """
+                package com.android.wm.shell.shared.bubbles.logging
+
+                object BubbleLog {
+                    @JvmOverloads
+                    @JvmStatic
+                    fun d(message: String, vararg parameters: Any? = emptyArray(), \
+                        eventData: String? = null) {}
+
+                    @JvmOverloads
+                    @JvmStatic
+                    fun v(message: String, vararg parameters: Any? = emptyArray(), \
+                        eventData: String? = null) {}
+
+                    @JvmOverloads
+                    @JvmStatic
+                    fun i(message: String, vararg parameters: Any? = emptyArray(), \
+                        eventData: String? = null) {}
+
+                    @JvmOverloads
+                    @JvmStatic
+                    fun w(message: String, vararg parameters: Any? = emptyArray(), \
+                        eventData: String? = null) {}
+
+                    @JvmOverloads
+                    @JvmStatic
+                    fun e(message: String, vararg parameters: Any? = emptyArray(), \
+                        eventData: String? = null) {}
+                }
+                """.addLineContinuation()
+            ).indented()
+        )
+
     @Test
     fun testValidCases() {
         lint()
@@ -1653,6 +1689,151 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             )
     }
 
+    @Test
+    fun testBubbleLogValidCases() {
+        lint()
+            .files(
+                kotlin(
+                    """
+                    package test.pkg
+
+                    import com.android.wm.shell.shared.bubbles.logging.BubbleLog
+
+                    class TestClass {
+                        fun good(s: String, i: Int) {
+                            BubbleLog.d("User %s, id %d", s, i)
+                            BubbleLog.v("Simple message")
+                            BubbleLog.d("Event user %s", s, eventData = "login")
+                        }
+                    }
+                    """.addLineContinuation()
+                ).indented(),
+                *bubbleLogApi
+            )
+            .run()
+            .expectClean()
+    }
+
+    @Test
+    fun testBubbleLogInvalidCases() {
+        lint()
+            .files(
+                kotlin(
+                    """
+                    package test.pkg
+
+                    import com.android.wm.shell.shared.bubbles.logging.BubbleLog
+
+                    class TestClass {
+                        fun bad(s: String, i: Int) {
+                            BubbleLog.d("User %d", s)
+                            BubbleLog.v("Message %s", s, i)
+                            BubbleLog.d("Missing args %s %d", s)
+                            BubbleLog.v("Too many args %s", s, i)
+                            BubbleLog.d("Event %d", i, s, eventData = "event")
+                            BubbleLog.d("Named args %s", eventData = s, parameters = arrayOf(i))
+                        }
+                    }
+                    """.addLineContinuation()
+                ).indented(),
+                *bubbleLogApi
+            )
+            .run()
+            .expect(
+                """
+                src/test/pkg/TestClass.kt:8: Error: Incorrect argument count: format string \
+                expects 1 arguments but 2 were provided. [ProtoLogArgCount]
+                        BubbleLog.v("Message %s", s, i)
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.kt:9: Error: Incorrect argument count: format string \
+                expects 2 arguments but 1 were provided. [ProtoLogArgCount]
+                        BubbleLog.d("Missing args %s %d", s)
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.kt:10: Error: Incorrect argument count: format string \
+                expects 1 arguments but 2 were provided. [ProtoLogArgCount]
+                        BubbleLog.v("Too many args %s", s, i)
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.kt:11: Error: Incorrect argument count: format string \
+                expects 1 arguments but 2 were provided. [ProtoLogArgCount]
+                        BubbleLog.d("Event %d", i, s, eventData = "event")
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.kt:7: Error: Incorrect argument type for format specifier \
+                '%d': expected integer, long, short, or byte but got String [ProtoLogArgType]
+                        BubbleLog.d("User %d", s)
+                                               ~
+                src/test/pkg/TestClass.kt:12: Error: Incorrect argument type for format specifier \
+                '%s': expected String but got int [ProtoLogArgType]
+                        BubbleLog.d("Named args %s", eventData = s, parameters = arrayOf(i))
+                                                                                         ~
+                6 errors, 0 warnings
+                """.addLineContinuation()
+            )
+    }
+
+    @Test
+    fun testBubbleLogJavaCaller() {
+        lint()
+            .files(
+                java(
+                    """
+                    package test.pkg;
+
+                    import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
+
+                    class TestClass {
+                        void bad(String s, int i, boolean mIsStatusBarShade) {
+                            BubbleLog.d("User %d", s);
+                            BubbleLog.v("Message %s", s, i);
+                            BubbleLog.v(
+                                "BubbleController.updateBubbleViews() mIsStatusBarShade=%s " +
+                                "hasBubbles=%b", mIsStatusBarShade, hasBubbles()
+                            );
+                            BubbleLog.d("Missing args %s %d", s);
+                            BubbleLog.v("Too many args %s", s, i);
+                            BubbleLog.d("Array type mismatch %d", new Object[] { s });
+                        }
+
+                        boolean hasBubbles() { return true; }
+                    }
+                    """.addLineContinuation()
+                ).indented(),
+                *bubbleLogApi
+            )
+            .run()
+            .expect(
+                """
+                src/test/pkg/TestClass.java:8: Error: Incorrect argument count: format string \
+                    expects 1 arguments but 2 were provided. [ProtoLogArgCount]
+                        BubbleLog.v("Message %s", s, i);
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.java:13: Error: Incorrect argument count: format string \
+                    expects 2 arguments but 1 were provided. [ProtoLogArgCount]
+                        BubbleLog.d("Missing args %s %d", s);
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.java:14: Error: Incorrect argument count: format string \
+                    expects 1 arguments but 2 were provided. [ProtoLogArgCount]
+                        BubbleLog.v("Too many args %s", s, i);
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.java:7: Error: Incorrect argument type for format \
+                    specifier '%d': expected integer, long, short, or byte but got String \
+                    [ProtoLogArgType]
+                        BubbleLog.d("User %d", s);
+                                               ~
+                src/test/pkg/TestClass.java:11: Error: Incorrect argument type for format \
+                    specifier '%s': expected String but got boolean [ProtoLogArgType]
+                            "hasBubbles=%b", mIsStatusBarShade, hasBubbles()
+                                             ~~~~~~~~~~~~~~~~~
+                src/test/pkg/TestClass.java:15: Error: Incorrect argument type for format \
+                    specifier '%d': expected integer, long, short, or byte but got String \
+                    [ProtoLogArgType]
+                        BubbleLog.d("Array type mismatch %d", new Object[] { s });
+                                                                             ~
+                6 errors, 0 warnings
+                """.addLineContinuation()
+            )
+    }
+
     // Substitutes "backslash + new line" with an empty string to imitate line continuation
-    private fun String.addLineContinuation(): String = this.trimIndent().replace("""\\ *\n\h*""".toRegex(), "")
+    private fun String.addLineContinuation(): String =
+        this.trimIndent().replace("""\\ *\n\h*""".toRegex(), "")
 }

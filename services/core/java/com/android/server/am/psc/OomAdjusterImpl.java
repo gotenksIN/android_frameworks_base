@@ -2117,16 +2117,12 @@ public class OomAdjusterImpl extends OomAdjuster {
                     // Go at most to BOUND_TOP, unless requested to elevate
                     // to client's state.
                     clientProcState = PROCESS_STATE_BOUND_TOP;
-                    final boolean enabled = client.getCachedCompatChange(
-                            CACHED_COMPAT_CHANGE_PROCESS_CAPABILITY);
-                    if (enabled) {
-                        if (cr.hasFlag(Context.BIND_INCLUDE_CAPABILITIES)) {
-                            // TOP process passes all capabilities to the service.
-                            capability |= client.getCurCapability();
-                        } else {
-                            // TOP process passes no capability to the service.
-                        }
-                    } else {
+                    // When CACHED_COMPAT_CHANGE_PROCESS_CAPABILITY is enabled, whether capabilities
+                    // are propagated from the TOP process relies on the BIND_INCLUDE_CAPABILITIES
+                    // flag, and this is already considered in preceding code, so within this
+                    // specific block we only need to consider the case when the compat change is
+                    // disabled.
+                    if (!client.getCachedCompatChange(CACHED_COMPAT_CHANGE_PROCESS_CAPABILITY)) {
                         // TOP process passes all capabilities to the service.
                         capability |= client.getCurCapability();
                     }

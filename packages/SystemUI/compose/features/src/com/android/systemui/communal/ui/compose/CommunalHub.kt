@@ -215,6 +215,8 @@ import com.android.systemui.media.remedia.ui.compose.Media
 import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.delay
@@ -1052,19 +1054,36 @@ private fun BoxScope.CommunalHubLazyGrid(
                     false
                 }
 
+            val widgetSizeInfo =
+                calculateWidgetSize(
+                    cellHeight = sizeInfo?.cellSize?.height,
+                    availableHeight = sizeInfo?.availableHeight,
+                    item = item,
+                    isResizable = isResizable,
+                )
+
+            val cellHeightPx =
+                with(LocalDensity.current) { sizeInfo?.cellSize?.height?.toPx() ?: 0f }
+            val spacingPx =
+                with(LocalDensity.current) {
+                    (sizeInfo?.verticalArrangement ?: Dimensions.ItemSpacing).toPx()
+                }
+            val minWidgetConfigSpan = widgetSizeInfo.minConfigSpan(cellHeightPx, spacingPx)
+            val maxWidgetConfigSpan = widgetSizeInfo.maxConfigSpan(cellHeightPx, spacingPx)
+
             // Resizing is only supported for widgets in edit mode.
             val resizeableItemFrameViewModel =
                 if (viewModel is CommunalEditModeViewModel) {
                     rememberViewModel(
-                        key =
-                            if (communalAccessibilityResize()) item.key
-                            else currentItemSpan,
+                        key = if (communalAccessibilityResize()) item.key else currentItemSpan,
                         traceName = "ResizeableItemFrame.viewModel.$index",
                     ) {
                         val componentName =
                             (item as? CommunalContentModel.WidgetContent.Widget)?.componentName
                         viewModel.resizeableItemFrameViewModelFactory.create(
-                            if (communalAccessibilityResize()) componentName else null
+                            if (communalAccessibilityResize()) componentName else null,
+                            minWidgetConfigSpan,
+                            maxWidgetConfigSpan,
                         )
                     }
                 } else {
@@ -1090,14 +1109,6 @@ private fun BoxScope.CommunalHubLazyGrid(
                         targetValue = if (selected) 1f else 0f,
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         label = "Widget resizing outline alpha",
-                    )
-
-                val widgetSizeInfo =
-                    calculateWidgetSize(
-                        cellHeight = sizeInfo?.cellSize?.height,
-                        availableHeight = sizeInfo?.availableHeight,
-                        item = item,
-                        isResizable = isResizable,
                     )
                 ResizableItemFrameWrapper(
                     key = item.key,
@@ -2389,7 +2400,32 @@ class Dimensions(val context: Context, val config: Configuration) {
     }
 }
 
-data class WidgetSizeInfo(val minHeightPx: Int, val maxHeightPx: Int)
+data class WidgetSizeInfo(val minHeightPx: Int, val maxHeightPx: Int) {
+    companion object {
+        private const val DEFAULT_MIN_SPAN = 1
+    }
+
+    fun minConfigSpan(cellHeightPx: Float, spacingPx: Float): Int {
+        return if (cellHeightPx > 0f && minHeightPx > 0) {
+            kotlin.math
+                .ceil((minHeightPx + spacingPx) / (cellHeightPx + spacingPx))
+                .toInt()
+                .coerceAtLeast(DEFAULT_MIN_SPAN)
+        } else {
+            DEFAULT_MIN_SPAN
+        }
+    }
+
+    fun maxConfigSpan(cellHeightPx: Float, spacingPx: Float): Int {
+        val calculatedMaxSpan =
+            if (cellHeightPx > 0f && maxHeightPx < Int.MAX_VALUE) {
+                kotlin.math.floor((maxHeightPx + spacingPx) / (cellHeightPx + spacingPx)).toInt()
+            } else {
+                Int.MAX_VALUE
+            }
+        return kotlin.math.max(minConfigSpan(cellHeightPx, spacingPx), calculatedMaxSpan)
+    }
+}
 
 private fun CommunalContentModel.getSpanOrMax(maxSpan: Int?) =
     if (maxSpan != null) {

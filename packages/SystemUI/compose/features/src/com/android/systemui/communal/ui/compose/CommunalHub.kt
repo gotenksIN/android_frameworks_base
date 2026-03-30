@@ -186,7 +186,6 @@ import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.internal.R.dimen.system_app_widget_background_radius
 import com.android.systemui.Flags
-import com.android.systemui.Flags.communalAccessibilityResize
 import com.android.systemui.Flags.communalHubCancelAddWidget
 import com.android.systemui.Flags.communalResponsiveGrid
 import com.android.systemui.Flags.communalWidgetPopulationOptimization
@@ -317,8 +316,7 @@ fun CommunalHub(
                                 // allows listening for taps on the grid's background to deselect
                                 // items, while also allowing taps on child composables to pass
                                 // through to them.
-                                if (communalAccessibilityResize()) PointerEventPass.Final
-                                else PointerEventPass.Initial
+                                PointerEventPass.Final
                         ) { offset ->
                             // if RTL, flip offset direction from Left side to Right
                             val adjustedOffset =
@@ -332,24 +330,11 @@ fun CommunalHub(
                             val tappedKey =
                                 index?.let { keyAtIndexIfEditable(contentListState.list, index) }
 
-                            if (communalAccessibilityResize()) {
-                                // If we tap on the background, we should deselect whatever was
-                                // selected. Otherwise, the selection/deselection process is
-                                // managed by the WidgetContent itself.
-                                if (tappedKey == null) {
-                                    viewModel.setSelectedKey(null)
-                                }
-                            } else {
-                                viewModel.setSelectedKey(
-                                    if (
-                                        Flags.hubEditModeTouchAdjustments() &&
-                                            selectedKey.value == tappedKey
-                                    ) {
-                                        null
-                                    } else {
-                                        tappedKey
-                                    }
-                                )
+                            // If we tap on the background, we should deselect whatever was
+                            // selected. Otherwise, the selection/deselection process is
+                            // managed by the WidgetContent itself.
+                            if (tappedKey == null) {
+                                viewModel.setSelectedKey(null)
                             }
                         }
                     }
@@ -1075,13 +1060,13 @@ private fun BoxScope.CommunalHubLazyGrid(
             val resizeableItemFrameViewModel =
                 if (viewModel is CommunalEditModeViewModel) {
                     rememberViewModel(
-                        key = if (communalAccessibilityResize()) item.key else currentItemSpan,
+                        key = item.key,
                         traceName = "ResizeableItemFrame.viewModel.$index",
                     ) {
                         val componentName =
                             (item as? CommunalContentModel.WidgetContent.Widget)?.componentName
                         viewModel.resizeableItemFrameViewModelFactory.create(
-                            if (communalAccessibilityResize()) componentName else null,
+                            componentName,
                             minWidgetConfigSpan,
                             maxWidgetConfigSpan,
                         )
@@ -1723,7 +1708,7 @@ private fun WidgetContent(
                 .focusRequester(focusRequester)
                 .focusable(interactionSource = interactionSource)
                 .then(selectableModifier)
-                .thenIf(communalAccessibilityResize() && viewModel.isEditMode) {
+                .thenIf(viewModel.isEditMode) {
                     Modifier.pointerInput(isSelected, model.key) {
                         observeTaps {
                             if (isSelected && Flags.hubEditModeTouchAdjustments()) {

@@ -314,6 +314,7 @@ package android {
     field public static final String REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND = "android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND";
     field public static final String REQUEST_COMPANION_USE_DATA_IN_BACKGROUND = "android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND";
     field public static final String REQUEST_DELETE_PACKAGES = "android.permission.REQUEST_DELETE_PACKAGES";
+    field @FlaggedApi("com.android.window.flags.request_fullscreen_api_permission") public static final String REQUEST_FULLSCREEN_MODE = "android.permission.REQUEST_FULLSCREEN_MODE";
     field public static final String REQUEST_IGNORE_BATTERY_OPTIMIZATIONS = "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS";
     field public static final String REQUEST_INSTALL_PACKAGES = "android.permission.REQUEST_INSTALL_PACKAGES";
     field public static final String REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE = "android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE";
@@ -4731,7 +4732,7 @@ package android.app {
     method @Deprecated public final void removeDialog(int);
     method public void reportFullyDrawn();
     method public android.view.DragAndDropPermissions requestDragAndDropPermissions(android.view.DragEvent);
-    method public void requestFullscreenMode(int, @Nullable android.os.OutcomeReceiver<Void, Throwable>);
+    method @RequiresPermission(android.Manifest.permission.REQUEST_FULLSCREEN_MODE) public void requestFullscreenMode(int, @Nullable android.os.OutcomeReceiver<Void, Throwable>);
     method @FlaggedApi("com.android.window.flags.enable_desktop_windowing_app_to_web_education") public final void requestOpenInBrowserEducation();
     method public final void requestPermissions(@NonNull String[], int);
     method @FlaggedApi("android.permission.flags.device_aware_permission_apis_enabled") public final void requestPermissions(@NonNull String[], int, int);

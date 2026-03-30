@@ -22,7 +22,7 @@ cc_defaults {
         "libcutils",
         "libgui",
         "libhwui",
-        "libjnigraphics",
+        "libjnigraphics_preapex",
         "libui",
         "libutils",
     ],

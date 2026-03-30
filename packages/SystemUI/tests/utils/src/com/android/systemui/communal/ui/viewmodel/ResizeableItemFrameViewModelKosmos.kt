@@ -22,13 +22,27 @@ import com.android.systemui.kosmos.Kosmos
 
 val Kosmos.resizeableItemFrameViewModel by
     Kosmos.Fixture {
-        ResizeableItemFrameViewModel(uiEventLogger = uiEventLogger, componentName = null)
+        ResizeableItemFrameViewModel(
+            uiEventLogger = uiEventLogger,
+            componentName = null,
+            1,
+            Int.MAX_VALUE,
+        )
     }
 
 val Kosmos.resizeableItemFrameViewModelFactory by
     Kosmos.Fixture {
         object : ResizeableItemFrameViewModel.Factory {
-            override fun create(componentName: ComponentName?) =
-                ResizeableItemFrameViewModel(uiEventLogger, componentName)
+            override fun create(
+                componentName: ComponentName?,
+                minWidgetConfigSpan: Int,
+                maxWidgetConfigSpan: Int,
+            ) =
+                ResizeableItemFrameViewModel(
+                    uiEventLogger,
+                    componentName,
+                    minWidgetConfigSpan,
+                    maxWidgetConfigSpan,
+                )
         }
     }

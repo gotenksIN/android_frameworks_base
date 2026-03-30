@@ -68,11 +68,17 @@ class ResizeableItemFrameViewModel
 constructor(
     private val uiEventLogger: UiEventLogger,
     @Assisted private val componentName: ComponentName?,
+    @Assisted("minWidgetConfigSpan") private val minWidgetConfigSpan: Int,
+    @Assisted("maxWidgetConfigSpan") private val maxWidgetConfigSpan: Int,
 ) : HydratedActivatable(enableEnqueuedActivations = true) {
 
     @AssistedFactory
     interface Factory {
-        fun create(componentName: ComponentName?): ResizeableItemFrameViewModel
+        fun create(
+            componentName: ComponentName?,
+            @Assisted("minWidgetConfigSpan") minWidgetConfigSpan: Int,
+            @Assisted("maxWidgetConfigSpan") maxWidgetConfigSpan: Int,
+        ): ResizeableItemFrameViewModel
     }
 
     private val _visibleAccessibilityResizeHandle = mutableStateOf<ResizeHandle?>(null)
@@ -339,8 +345,10 @@ constructor(
         }
         val currentRow = layoutInfo.currentRow
         val currentSpan = layoutInfo.currentSpan
-        val minItemSpan = layoutInfo.minSpans
-        val maxItemSpan = layoutInfo.maxSpans
+        val minItemSpan =
+            layoutInfo.minSpans.coerceAtLeast(minWidgetConfigSpan).coerceAtMost(currentSpan)
+        val maxItemSpan =
+            layoutInfo.maxSpans.coerceAtMost(maxWidgetConfigSpan).coerceAtLeast(currentSpan)
         val totalSpans = layoutInfo.totalSpans
 
         // The maximum row this handle can be dragged to.
@@ -373,10 +381,14 @@ constructor(
     }
 
     private fun isResizeAllowed(handle: ResizeHandle, layoutInfo: GridLayoutInfo): Boolean {
-        val minItemSpan = layoutInfo.minSpans
-        val maxItemSpan = layoutInfo.maxSpans
         val currentRow = layoutInfo.currentRow
         val currentSpan = layoutInfo.currentSpan
+
+        val minItemSpan =
+            layoutInfo.minSpans.coerceAtLeast(minWidgetConfigSpan).coerceAtMost(currentSpan)
+        val maxItemSpan =
+            layoutInfo.maxSpans.coerceAtMost(maxWidgetConfigSpan).coerceAtLeast(currentSpan)
+
         val atMinSize = currentSpan == minItemSpan
 
         // If already at the minimum size and in the first row, item cannot be expanded from the top

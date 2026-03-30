@@ -17,38 +17,28 @@
 package android.processor.devicepolicy.test
 
 import android.processor.devicepolicy.protos.PolicyMetadata
-import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata
-import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.ListPolicyMetadata
 import android.tools.policymetadata.Generator
 import org.junit.Test
 
 class ListOfStringGeneratorTest {
-
-    private fun listOfStringTestPolicy(
-        name: String,
-        resolutionMechanism: ListPolicyMetadata.ResolutionMechanism =
-            ListPolicyMetadata.ResolutionMechanism.newBuilder().setCustom(true).build(),
-    ): PolicyMetadata.Builder =
-        PolicyMetadata.newBuilder()
-            .setIdentifier(simpleNameToFieldName(name))
-            .setTypeSpecificMetadata(
-                TypeSpecificPolicyMetadata.newBuilder()
-                    .setListMetadata(
-                        TypeSpecificPolicyMetadata.ListPolicyMetadata.newBuilder()
-                            .setStringMetadata(
-                                TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder()
-                            )
-                            .setResolutionMechanism(resolutionMechanism)
-                    )
-            )
+    private fun listOfStringTestPolicy(name: String): PolicyMetadata.Builder =
+        PolicyMetadata.newBuilder().apply {
+            identifier = simpleNameToFieldName(name)
+            typeSpecificMetadataBuilder.listMetadataBuilder.apply {
+                resolutionMechanismBuilder.custom = true
+                stringMetadataBuilder.apply {}
+            }
+        }
 
     @Test
     fun test_outputMatches() {
         val javaFile =
             Generator.generate(
                 listOfStringTestPolicy("test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY")
-                    .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
-                    .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                    .apply {
+                        addAllowedScopes(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE)
+                        affectedResource = PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
+                    }
             )
 
         javaFile.assertContainsPolicy(
@@ -67,6 +57,7 @@ class ListOfStringGeneratorTest {
                           /* requiredPermission= */ null,
                           /* requiredCrossUserPermission= */ null,
                           /* allowedDpcTypes= */ Set.of(),
+                          /* resolutionMechanism= */ null,
                           /* emptyStringAllowed= */ false,
                           /* unprintableCharactersAllowed= */ false,
                           /* maxLength= */ Integer.MAX_VALUE
@@ -82,33 +73,27 @@ class ListOfStringGeneratorTest {
     fun test_conflictResolutionUnion_outputMatches() {
         val javaFile =
             Generator.generate(
-                listOfStringTestPolicy(
-                        "test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY",
-                        resolutionMechanism =
-                            ListPolicyMetadata.ResolutionMechanism.newBuilder()
-                                .setUnion(true)
-                                .build(),
-                    )
-                    .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
-                    .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                listOfStringTestPolicy("test.package.PolicyContainer.MY_TEST_LIST_POLICY").apply {
+                    typeSpecificMetadataBuilder.listMetadataBuilder.resolutionMechanismBuilder
+                        .union = true
+                }
             )
 
         javaFile.assertContainsPolicy(
             includes = listOf("android.app.admin.PolicyIdentifier", "java.lang.String"),
-            staticImports = listOf("test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY"),
+            staticImports = listOf("test.package.PolicyContainer.MY_TEST_LIST_POLICY"),
             code =
                 """
                   policies.add(new ListPolicyMetadata<String>(
-                      /* id= */ MY_TEST_STRING_LIST_POLICY,
+                      /* id= */ MY_TEST_LIST_POLICY,
                       /* elementMetadata= */ new StringPolicyMetadata(
-                          /* id= */ new PolicyIdentifier<String>(MY_TEST_STRING_LIST_POLICY.getId() + "#elements"),
-                          /* allowedScopes= */ Set.of(
-                              2
-                          ),
-                          /* affectedResource= */ 1,
+                          /* id= */ new PolicyIdentifier<String>(MY_TEST_LIST_POLICY.getId() + "#elements"),
+                          /* allowedScopes= */ Set.of(),
+                          /* affectedResource= */ 0,
                           /* requiredPermission= */ null,
                           /* requiredCrossUserPermission= */ null,
                           /* allowedDpcTypes= */ Set.of(),
+                          /* resolutionMechanism= */ null,
                           /* emptyStringAllowed= */ false,
                           /* unprintableCharactersAllowed= */ false,
                           /* maxLength= */ Integer.MAX_VALUE

@@ -28,6 +28,7 @@ import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.ListPoli
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.LongPolicyMetadata
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.LongPolicyMetadata.ResolutionMechanism as LongResolutionMechanismProto
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.StringPolicyMetadata
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.StringPolicyMetadata.ResolutionMechanism as StringResolutionMechanismProto
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.TypeMetadataCase
 import com.squareup.javapoet.ClassName
 import com.squareup.javapoet.CodeBlock
@@ -394,42 +395,56 @@ object Generator {
             }
     }
 
-    private val stringPolicyMetadataType = ClassName.get(METADATA_PACKAGE, "StringPolicyMetadata")
-
-    private fun CodeBlock.Builder.addStringMetadataInformation(
-        stringMetadata: StringPolicyMetadata
-    ): CodeBlock.Builder {
-        add("/* emptyStringAllowed= */ \$L,\n", stringMetadata.emptyStringAllowed)
-        add(
-            "/* unprintableCharactersAllowed= */ \$L,\n",
-            stringMetadata.unprintableCharactersAllowed,
-        )
-        val maxLength =
-            if (stringMetadata.hasMaxLength()) {
-                CodeBlock.of("\$L", stringMetadata.maxLength)
-            } else {
-                CodeBlock.of("Integer.MAX_VALUE")
-            }
-        add("/* maxLength= */ \$L", maxLength)
-        return this
-    }
-
     // Returns a CodeBlock containing `new StringPolicyMetadata(<policy-id>, ....)` .
     private fun generateStringPolicyMetadata(
         policy: PolicyMetadata,
         stringMetadata: StringPolicyMetadata = policy.typeSpecificMetadata.stringMetadata,
         policyId: CodeBlock = policy.getPolicyIdCodeBlock(),
-    ) =
-        CodeBlock.builder()
-            .add("new \$T(\n", stringPolicyMetadataType)
-            .indent()
-            .addPolicyArguments(policy, policyId)
-            .add(",\n")
-            .addStringMetadataInformation(stringMetadata)
-            .add("\n")
-            .unindent()
-            .add(")")
-            .build()
+    ) = StringGenerator(policy, policyId, stringMetadata).generate()
+
+    class StringGenerator(
+        val policy: PolicyMetadata,
+        val policyId: CodeBlock,
+        val metadata: StringPolicyMetadata,
+    ) {
+        private val stringPolicyMetadataType =
+            ClassName.get(METADATA_PACKAGE, "StringPolicyMetadata")
+
+        fun generate() =
+            CodeBlock.builder()
+                .add("new \$T(\n", stringPolicyMetadataType)
+                .indent()
+                .addPolicyArguments(policy, policyId)
+                .add(",\n")
+                .add("/* resolutionMechanism= */ \$L,\n", generateResolutionMechanism())
+                .addStringMetadataInformation()
+                .unindent()
+                .add(")")
+                .build()
+
+        private fun CodeBlock.Builder.addStringMetadataInformation() =
+            this.add("/* emptyStringAllowed= */ \$L,\n", metadata.emptyStringAllowed)
+                .add(
+                    "/* unprintableCharactersAllowed= */ \$L,\n",
+                    metadata.unprintableCharactersAllowed,
+                )
+                .add("/* maxLength= */ \$L\n", generateMaxLength())
+
+        private fun generateResolutionMechanism(): CodeBlock =
+            when (metadata.resolutionMechanism.mechanismCase) {
+                StringResolutionMechanismProto.MechanismCase.MECHANISM_NOT_SET,
+                StringResolutionMechanismProto.MechanismCase.CUSTOM -> CodeBlock.of("null")
+                StringResolutionMechanismProto.MechanismCase.NOT_COEXISTABLE ->
+                    CodeBlock.of("new \$T()", notCoexistableType)
+            }
+
+        private fun generateMaxLength() =
+            if (metadata.hasMaxLength()) {
+                CodeBlock.of("\$L", metadata.maxLength)
+            } else {
+                CodeBlock.of("Integer.MAX_VALUE")
+            }
+    }
 
     private val packagePolicyMetadataType = ClassName.get(METADATA_PACKAGE, "PackagePolicyMetadata")
 

@@ -55,22 +55,20 @@ class PackageManagerBubbleAppInfoProvider @Inject constructor() : BubbleAppInfoP
 
             // Try to use the name and icon from the activity info if the component is available.
             // The badge icon should still be from application info.
-            if (Flags.useBubbleIconFromActivityInfo()) {
-                val intent = bubble.intent
-                val component = intent?.component
-                if (intent != null && component != null) {
-                    val activityInfo = pm.getActivityInfo(component, /* flags= */ 0)
-                    val activityName = activityInfo.loadLabel(pm)?.toString()
-                    val icon = getActivityInfoIcon(activityInfo, bubble.packageName)
-                    val activityInfoIcon = icon?.loadDrawable(context)
-                    if (activityName != null && activityInfoIcon != null) {
-                        return BubbleAppInfo(
-                            appName = activityName,
-                            appIcon = activityInfoIcon,
-                            badgeIcon = appIcon,
-                            user = bubble.user,
-                        )
-                    }
+            val intent = bubble.intent
+            val component = intent?.component
+            if (intent != null && component != null) {
+                val activityInfo = pm.getActivityInfo(component, /* flags= */ 0)
+                val activityName = activityInfo.loadLabel(pm)?.toString()
+                val icon = getActivityInfoIcon(activityInfo, bubble.packageName)
+                val activityInfoIcon = icon?.loadDrawable(context)
+                if (activityName != null && activityInfoIcon != null) {
+                    return BubbleAppInfo(
+                        appName = activityName,
+                        appIcon = activityInfoIcon,
+                        badgeIcon = appIcon,
+                        user = bubble.user,
+                    )
                 }
             }
             return BubbleAppInfo(

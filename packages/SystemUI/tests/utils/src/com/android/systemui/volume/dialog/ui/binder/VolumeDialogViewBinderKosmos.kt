@@ -22,6 +22,7 @@ import com.android.systemui.volume.dialog.captions.ui.binder.volumeDialogCaption
 import com.android.systemui.volume.dialog.captions.ui.viewmodel.volumeDialogCaptionsButtonViewModelKosmos
 import com.android.systemui.volume.dialog.ringer.volumeDialogRingerViewBinder
 import com.android.systemui.volume.dialog.settings.ui.binder.volumeDialogSettingsButtonViewBinder
+import com.android.systemui.volume.dialog.settings.ui.viewmodel.volumeDialogSettingsButtonViewModel
 import com.android.systemui.volume.dialog.sliders.ui.volumeDialogSlidersViewBinder
 import com.android.systemui.volume.dialog.ui.utils.jankListenerFactory
 import com.android.systemui.volume.dialog.ui.viewmodel.volumeDialogViewModel
@@ -45,6 +46,7 @@ val Kosmos.volumeDialogViewBinder by
             applicationContext,
             volumeDialogViewModel,
             volumeDialogCaptionsButtonViewModelKosmos,
+            volumeDialogSettingsButtonViewModel,
             jankListenerFactory,
             volumeTracer,
             volumeDialogViewBinders,

@@ -1926,6 +1926,16 @@ flag {
 }
 
 flag {
+   name: "volume_dialog_horizontal_no_buttons"
+   namespace: "systemui"
+   description: "Correct sizing and padding when the volume dialog has no buttons"
+   bug: "494251776"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "wakefulness_events_shared_flow"
     namespace: "systemui"
     description: "Add/use wakefulnessEvents SharedFlow in PowerInteractor"

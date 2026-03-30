@@ -2154,6 +2154,51 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
+    public void setInteractive_inBlockedState_setsImePolicyFallbackDisplay() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        setupMockMirror();
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(
+                mA11yEmbeddedConnectionReceiver, new SurfaceControl());
+        mirror.setInteractive(false);
+
+        try (InBlockedState inBlockedState = new InBlockedState()) {
+            clearInvocations(mVirtualDevice);
+            mirror.setInteractive(true);
+
+            // Verifies that the IME policy is set to FALLBACK_DISPLAY when the mirror becomes
+            // interactive
+            verify(mVirtualDevice).setDisplayImePolicy(
+                    eq(VIRTUAL_DISPLAY_ID), eq(WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY));
+        }
+        mSession.requestUnblock();
+        waitForIdle();
+
+        // Verifies that the IME policy is reverted to HIDE when the session becomes active
+        // (non-interactive mirror)
+        verify(mVirtualDevice).setDisplayImePolicy(
+                eq(VIRTUAL_DISPLAY_ID), eq(WindowManager.DISPLAY_IME_POLICY_HIDE));
+    }
+
+    @Test
+    public void setInteractive_inBlockedState_setsImePolicyHide() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        setupMockMirror();
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(
+                mA11yEmbeddedConnectionReceiver, new SurfaceControl());
+
+        try (InBlockedState inBlockedState = new InBlockedState()) {
+            mirror.setInteractive(true);
+            clearInvocations(mVirtualDevice);
+
+            mirror.setInteractive(false);
+
+            // Verifies that the IME policy is set to HIDE when the mirror becomes non-interactive
+            verify(mVirtualDevice).setDisplayImePolicy(
+                    eq(VIRTUAL_DISPLAY_ID), eq(WindowManager.DISPLAY_IME_POLICY_HIDE));
+        }
+    }
+
+    @Test
     public void isSessionActive_activeState_returnsTrue() throws Exception {
         createComputerControlSession(mDefaultParams);
         assertThat(mSession.isSessionActive()).isTrue();

@@ -26,6 +26,12 @@ interface NotificationRulesInteractor {
     /** The list of custom rules created by the user. */
     val customRules: List<RuleModel>
 
+    /**
+     * A list of the user's custom rules that have the bundle action. The action is guaranteed to be
+     * of type [ActionModel.Bundle].
+     */
+    val bundleRules: List<RuleModel>
+
     /** Creates a draft rule based on the freeform text inputted by the user. */
     suspend fun createDraftRuleFromFreeformText(
         action: ActionModel,

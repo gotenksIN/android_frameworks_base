@@ -79,4 +79,73 @@ class NotificationRulesInteractorTest : SysuiTestCase() {
 
             assertThat(result).isEmpty()
         }
+
+    @Test
+    fun bundleRules_filtersOutSystemRules() =
+        kosmos.runTest {
+            val userRule =
+                RuleModel(
+                    id = 100,
+                    action = ActionModel.Bundle(name = "Test Bundle", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val systemRule =
+                RuleModel(
+                    id = NotificationRule.RESERVED_ID_PROMOTED,
+                    action =
+                        ActionModel.Bundle(name = "Test System Bundle", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = true,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(userRule, systemRule))
+
+            val result = underTest.bundleRules
+
+            assertThat(result).containsExactly(userRule)
+        }
+
+    @Test
+    fun bundleRules_onlyIncludesBundleAction() =
+        kosmos.runTest {
+            val highlightAndAlertRule =
+                RuleModel(
+                    id = 100,
+                    action = ActionModel.HighlightAndAlert,
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val highlightRule =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Highlight,
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val silenceRule =
+                RuleModel(
+                    id = 102,
+                    action = ActionModel.Silence,
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val bundleRule =
+                RuleModel(
+                    id = 103,
+                    action =
+                        ActionModel.Bundle(name = "Test System Bundle", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val blockRule =
+                RuleModel(id = 104, action = ActionModel.Block, filter = null, isSystemRule = false)
+
+            fakeNotificationRulesRepository.rules.addAll(
+                listOf(highlightAndAlertRule, highlightRule, silenceRule, bundleRule, blockRule)
+            )
+
+            val result = underTest.bundleRules
+
+            assertThat(result).containsExactly(bundleRule)
+        }
 }

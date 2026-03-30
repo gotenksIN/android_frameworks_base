@@ -16,26 +16,15 @@
 
 package com.android.systemui.statusbar.notification.collection.coordinator
 
-import android.app.INotificationManager
-import android.app.NotificationManager.ACTION_DYNAMIC_BUNDLE_MODIFIED
-import android.app.NotificationManager.DYNAMIC_BUNDLE_MODIFICATION_TYPE_ADDED
-import android.app.NotificationManager.DYNAMIC_BUNDLE_MODIFICATION_TYPE_REMOVED
-import android.app.NotificationManager.EXTRA_DYNAMIC_BUNDLE
-import android.app.NotificationManager.EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Build
 import android.os.SystemProperties
 import android.os.UserHandle
-import android.service.notification.DynamicBundle
 import androidx.annotation.VisibleForTesting
-import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.qualifiers.Application
-import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
-import com.android.systemui.settings.UserTracker
+import com.android.systemui.notifications.intelligence.rules.domain.interactor.NotificationRulesInteractor
+import com.android.systemui.notifications.intelligence.rules.shared.NmContextualDisplayLaunch
+import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
 import com.android.systemui.statusbar.notification.Bundles
 import com.android.systemui.statusbar.notification.OnboardingAffordanceManager
 import com.android.systemui.statusbar.notification.collection.BundleEntry
@@ -53,9 +42,8 @@ import com.android.systemui.statusbar.notification.collection.listbuilder.plugga
 import com.android.systemui.statusbar.notification.collection.listbuilder.pluggable.NotifFilter
 import com.android.systemui.statusbar.notification.collection.render.BundleBarn
 import com.android.systemui.statusbar.notification.row.data.model.AppData
-import com.android.systemui.statusbar.notification.shared.NmContextualDisplay
+import com.android.systemui.util.compose.state.SnapshotFlowBuilder
 import com.android.systemui.util.time.SystemClock
-import java.util.concurrent.Executor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -69,23 +57,41 @@ constructor(
     private val systemClock: SystemClock,
     @Application private val coroutineScope: CoroutineScope,
     @Bundles private val onboardingAffordanceManager: OnboardingAffordanceManager,
-    private val notificationManager: INotificationManager,
-    @Main private val mainExecutor: Executor,
-    @Background private val backgroundExecutor: Executor,
-    private val userTracker: UserTracker,
-    private val broadcastDispatcher: BroadcastDispatcher,
+    private val notificationRulesInteractor: NotificationRulesInteractor,
+    @Main private val snapshotFlowBuilder: SnapshotFlowBuilder,
 ) : Coordinator {
 
     val bundler =
         object : NotifBundler("NotifBundler") {
-            // Use list instead of set to keep fixed order
-            override val bundleSpecs: MutableList<BundleSpec> =
-                mutableListOf(
+            private val systemBundleSpecs =
+                listOf(
                     BundleSpec.NEWS,
                     BundleSpec.SOCIAL_MEDIA,
                     BundleSpec.PROMOTIONS,
                     BundleSpec.RECOMMENDED,
                 )
+
+            private val customRuleBundleSpecs: List<BundleSpec>
+                get() =
+                    if (NmContextualDisplayLaunch.isEnabled) {
+                        notificationRulesInteractor.bundleRules.map { rule ->
+                            check(rule.action is ActionModel.Bundle) {
+                                "NotificationRulesInteractor.bundleRules contains non-bundle action"
+                            }
+                            val bundleAction = rule.action as ActionModel.Bundle
+                            BundleSpec.fromRuleBundle(
+                                rule.id,
+                                bundleName = bundleAction.name,
+                                bundleEmoji = bundleAction.emojiIcon,
+                            )
+                        }
+                    } else {
+                        emptyList()
+                    }
+
+            // Use list instead of set to keep fixed order
+            override val bundleSpecs: List<BundleSpec>
+                get() = systemBundleSpecs + customRuleBundleSpecs
 
             private val bundleIds = this.bundleSpecs.map { it.key }.toMutableList()
 
@@ -116,51 +122,19 @@ constructor(
                 return notifEntry.representativeEntry?.channel?.id?.takeIf { it in this.bundleIds }
             }
 
-            private val invalidator = object : Invalidator("dynamic bundles") {}
-
-            private val broadcastReceiver: BroadcastReceiver =
-                object : BroadcastReceiver() {
-                    override fun onReceive(context: Context, intent: Intent) {
-                        val dynamicBundle =
-                            intent.getParcelableExtra(
-                                EXTRA_DYNAMIC_BUNDLE,
-                                DynamicBundle::class.java,
-                            )!!
-                        val modificationType =
-                            intent.getIntExtra(EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE, -1)
-                        when (modificationType) {
-                            DYNAMIC_BUNDLE_MODIFICATION_TYPE_ADDED -> {
-                                val bundleSpec = BundleSpec.fromDynamicBundle(dynamicBundle)
-                                bundleSpecs.add(bundleSpec)
-                                bundleIds.add(bundleSpec.key)
-                            }
-                            DYNAMIC_BUNDLE_MODIFICATION_TYPE_REMOVED -> {
-                                val bundleSpec = BundleSpec.fromDynamicBundle(dynamicBundle)
-                                bundleSpecs.remove(bundleSpec)
-                                bundleIds.remove(bundleSpec.key)
-                            }
-                        }
-                        invalidator.invalidateList("dynamic bundle list changed")
-                    }
-                }
+            private val invalidator = object : Invalidator("rule bundles") {}
 
             init {
-                if (NmContextualDisplay.isEnabled) {
-                    backgroundExecutor.execute {
-                        val dynamicBundles =
-                            notificationManager.getDynamicBundles(null, userTracker.userHandle)
-                        for (dynamicBundle in dynamicBundles) {
-                            val bundleSpec = BundleSpec.fromDynamicBundle(dynamicBundle)
-                            bundleSpecs.add(bundleSpec)
-                            bundleIds.add(bundleSpec.key)
-                        }
-                        mainExecutor.execute {
-                            invalidator.invalidateList("dynamic bundles loaded")
-                        }
+                if (NmContextualDisplayLaunch.isEnabled) {
+                    coroutineScope.launch {
+                        snapshotFlowBuilder
+                            .snapshotFlow { customRuleBundleSpecs }
+                            .collect {
+                                // Because ruleBundleSpecs is backed by snapshot state, this lambda
+                                // will only be invoked when the list changes
+                                invalidator.invalidateList("Rule bundles changed")
+                            }
                     }
-                    val intentFilter = IntentFilter()
-                    intentFilter.addAction(ACTION_DYNAMIC_BUNDLE_MODIFIED)
-                    broadcastDispatcher.registerReceiver(broadcastReceiver, intentFilter)
                 }
             }
         }

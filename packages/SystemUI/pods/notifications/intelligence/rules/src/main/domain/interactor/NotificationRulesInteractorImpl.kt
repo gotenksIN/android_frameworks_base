@@ -31,6 +31,9 @@ constructor(private val repository: NotificationRulesRepository) : NotificationR
     override val customRules: List<RuleModel>
         get() = repository.rules.filter { !it.isSystemRule }
 
+    override val bundleRules: List<RuleModel>
+        get() = customRules.filter { it.action is ActionModel.Bundle }
+
     override suspend fun createDraftRuleFromFreeformText(
         action: ActionModel,
         text: String,

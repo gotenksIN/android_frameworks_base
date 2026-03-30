@@ -2774,6 +2774,9 @@
     <!-- Text for a button that will un-select all selected items. [CHAR LIMIT=NONE]-->
     <string name="notification_rules_deselect_all" translatable="false">Deselect all</string>
 
+    <!-- Default title for a bundle that will group multiple notifications together. -->
+    <string name="notification_rules_default_bundle_title" translatable="false">Notification Organizer</string>
+
     <!-- Summary of battery saver not available [CHAR LIMIT=NONE] -->
 
     <!-- Title of switch for battery saver [CHAR LIMIT=NONE] -->

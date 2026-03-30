@@ -30,6 +30,7 @@ import com.android.systemui.statusbar.notification.stack.BUCKET_DYNAMIC_BUNDLE
 import com.android.systemui.statusbar.notification.stack.BUCKET_NEWS
 import com.android.systemui.statusbar.notification.stack.BUCKET_PROMO
 import com.android.systemui.statusbar.notification.stack.BUCKET_RECS
+import com.android.systemui.statusbar.notification.stack.BUCKET_RULE_BUNDLE
 import com.android.systemui.statusbar.notification.stack.BUCKET_SOCIAL
 
 /** Represents the title of a bundle. */
@@ -158,5 +159,31 @@ data class BundleSpec(
                 bundleType = dynamicBundle.dynamicBundleType,
             )
         }
+
+        /** Creates a bundle spec based on a bundle defined in a notification rule. */
+        fun fromRuleBundle(ruleId: Int, bundleName: String?, bundleEmoji: String?): BundleSpec {
+            return BundleSpec(
+                // TODO: b/498187439 - Using the rule ID as the key means that two rules with the
+                // same bundle name & emoji will still be marked as two different bundles, even
+                // though the two bundles will look the same in the shade.
+                key = NotificationChannel.getChannelIdForBundleType(ruleId)!!,
+                titleText =
+                    if (bundleName != null) {
+                        BundleTitle.LoadedString(bundleName)
+                    } else {
+                        DEFAULT_RULE_BUNDLE_TITLE
+                    },
+                summaryText = null,
+                icon = BundleIcon.Emoji(bundleEmoji ?: DEFAULT_RULE_BUNDLE_EMOJI),
+                bucket = BUCKET_RULE_BUNDLE,
+                bundleType = ruleId,
+            )
+        }
+
+        private val DEFAULT_RULE_BUNDLE_TITLE =
+            BundleTitle.StringResource(
+                com.android.systemui.res.R.string.notification_rules_default_bundle_title
+            )
+        private const val DEFAULT_RULE_BUNDLE_EMOJI = "\uD83D\uDCD2"
     }
 }

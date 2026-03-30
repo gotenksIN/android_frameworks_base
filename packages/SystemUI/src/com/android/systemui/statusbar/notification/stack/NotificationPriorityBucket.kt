@@ -68,3 +68,4 @@ const val BUCKET_PROMO = 13
 const val BUCKET_SILENT = 6
 const val BUCKET_HIGHLIGHTS = 14
 const val BUCKET_DYNAMIC_BUNDLE = 15
+const val BUCKET_RULE_BUNDLE = 16

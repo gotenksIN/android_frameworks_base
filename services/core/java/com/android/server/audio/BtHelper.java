@@ -345,7 +345,6 @@ public class BtHelper {
         @Override
         public void dump(PrintWriter pw, String prefix) {
             pw.println(prefix + "mScoAudioState: " + scoAudioStateToString(mScoAudioState));
-            pw.println(prefix + "mSupportsBleHearingAids: " + mSupportsBleHearingAids);
         }
 
         /**
@@ -714,6 +713,10 @@ public class BtHelper {
                     mBluetoothProfileServiceListener, BluetoothProfile.A2DP);
             adapter.getProfileProxy(mDeviceBroker.getContext(),
                     mBluetoothProfileServiceListener, BluetoothProfile.A2DP_SINK);
+            if (mSupportsBleHearingAids) {
+                adapter.getProfileProxy(mDeviceBroker.getContext(),
+                        mBluetoothProfileServiceListener, BluetoothProfile.HAP_CLIENT);
+            }
             adapter.getProfileProxy(mDeviceBroker.getContext(),
                     mBluetoothProfileServiceListener, BluetoothProfile.HEARING_AID);
             adapter.getProfileProxy(mDeviceBroker.getContext(),
@@ -723,10 +726,6 @@ public class BtHelper {
             if (blePeripheralDevices()) {
                 adapter.getProfileProxy(mDeviceBroker.getContext(),
                         mBluetoothProfileServiceListener, BluetoothProfile.LE_AUDIO_PERIPHERAL);
-            }
-            if (mSupportsBleHearingAids) {
-                adapter.getProfileProxy(mDeviceBroker.getContext(),
-                        mBluetoothProfileServiceListener, BluetoothProfile.HAP_CLIENT);
             }
         }
     }
@@ -1045,6 +1044,7 @@ public class BtHelper {
                 if (mSupportsBleHearingAids) {
                     mHapClient = null;
                 }
+                break;
             default:
                 if (blePeripheralDevices() && profile == BluetoothProfile.LE_AUDIO_PERIPHERAL) {
                     if (mLeAudioPeripheral != null && mLeAudioPeripheralCallback != null) {
@@ -1164,6 +1164,7 @@ public class BtHelper {
                     }
                     mHapClient = (BluetoothHapClient) proxy;
                 }
+                return;
             default:
                 if (blePeripheralDevices() && profile == BluetoothProfile.LE_AUDIO_PERIPHERAL) {
                     if (((BluetoothLeAudioPeripheral) proxy).equals(mLeAudioPeripheral)) {
@@ -1614,8 +1615,12 @@ public class BtHelper {
             case BluetoothProfile.HEARING_AID:
                 return AudioSystem.DEVICE_OUT_HEARING_AID;
             case BluetoothProfile.LE_AUDIO:
-                boolean isHap = mSupportsBleHearingAids && mHapClient != null
-                        && mHapClient.getConnectedDevices().contains(device);
+                AudioDeviceAttributes ada = mDeviceBroker.getConnectedDeviceForAddress(
+                        device.getAddress(), !isLeOutput);
+                boolean isHap = ((mSupportsBleHearingAids && mHapClient != null
+                            && mHapClient.getConnectedDevices().contains(device))
+                        || (ada != null
+                            && AudioSystem.isBluetoothLeHearingAidDevice(ada.getInternalType())));
                 if (isLeOutput) {
                     return isHap ? AudioSystem.DEVICE_OUT_BLE_HEARING_AID
                             : AudioSystem.DEVICE_OUT_BLE_HEADSET;
@@ -1781,6 +1786,7 @@ public class BtHelper {
         pw.println("\n" + prefix + "mLeAudio: " + mLeAudio);
         pw.println(prefix + "mA2dp: " + mA2dp);
         pw.println(prefix + "mLeAudioPeripheral: " + mLeAudioPeripheral);
+        pw.println(prefix + "mSupportsBleHearingAids: " + mSupportsBleHearingAids);
         if (mSupportsBleHearingAids) {
             pw.println(prefix + "mHapClient: " + mHapClient);
         }

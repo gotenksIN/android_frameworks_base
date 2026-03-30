@@ -132,6 +132,34 @@ class NotificationRulesRepositoryTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun fetchInitialRules_systemRule_isSystemRuleTrue() =
+        kosmos.runTest {
+            val rule = createRule(id = NotificationRule.RESERVED_ID_PROMOTED)
+            putRulesIntoNotificationManager(listOf(rule))
+
+            underTest.start()
+            val result = underTest.rules
+
+            assertThat(result).hasSize(1)
+            assertThat(result[0].isSystemRule).isTrue()
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun fetchInitialRules_systemRule_isSystemRuleFalse() =
+        kosmos.runTest {
+            val rule = createRule(id = 101)
+            putRulesIntoNotificationManager(listOf(rule))
+
+            underTest.start()
+            val result = underTest.rules
+
+            assertThat(result).hasSize(1)
+            assertThat(result[0].isSystemRule).isFalse()
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
     fun fetchInitialRules_unknownAction_filteredOut() =
         kosmos.runTest {
             val rule = createRule(action = NotificationRule.Action.Builder(100).build())
@@ -600,6 +628,7 @@ class NotificationRulesRepositoryTest : SysuiTestCase() {
             assertThat(savedRule.filter!!.includedApps)
                 .isEqualTo(IncludedAppsModel(listOf(FAKE_APP)))
             assertThat(savedRule.filter!!.keywords).isEqualTo(KeywordsModel(listOf("dog")))
+            assertThat(savedRule.isSystemRule).isFalse()
         }
 
     @Test
@@ -653,6 +682,7 @@ class NotificationRulesRepositoryTest : SysuiTestCase() {
             assertThat(savedRule.filter!!.includedApps)
                 .isEqualTo(IncludedAppsModel(listOf(FAKE_APP)))
             assertThat(savedRule.filter!!.keywords).isEqualTo(KeywordsModel(listOf("dog")))
+            assertThat(savedRule.isSystemRule).isFalse()
         }
 
     @Test

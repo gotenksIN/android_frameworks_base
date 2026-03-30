@@ -208,6 +208,7 @@ constructor(
                 } else {
                     null
                 },
+            isSystemRule = NotificationRule.isSystemRule(this.id),
         )
     }
 

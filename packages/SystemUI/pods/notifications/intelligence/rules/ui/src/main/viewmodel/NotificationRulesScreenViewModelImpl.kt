@@ -49,7 +49,7 @@ constructor(
     private val logger = Logger(logBuffer, "ScreenViewModel")
 
     override val rules: List<RuleModel>
-        get() = interactor.rules
+        get() = interactor.customRules
 
     override val currentScreen: RulesScreenViewState
         get() = backStack[backStack.size - 1]

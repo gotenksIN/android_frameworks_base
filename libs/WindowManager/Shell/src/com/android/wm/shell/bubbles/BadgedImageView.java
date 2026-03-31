@@ -23,6 +23,7 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -170,6 +171,9 @@ public class BadgedImageView extends ConstraintLayout {
         }
         mDotColor = bubble.getDotColor();
         mDrawParams.setDotColor(mDotColor);
+        // The outline color will always be white since icon themes
+        // are not applied to app icons here.
+        mDrawParams.setOutlineColor(Color.WHITE);
         invalidate();
     }
 

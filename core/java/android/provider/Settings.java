@@ -9046,6 +9046,15 @@ public final class Settings {
                 "lock_screen_allow_private_notifications";
 
         /**
+         * Whether the user has provided consent to show notes on the lock screen.
+         * Type: int (0 for not consented, 1 for consented)
+         *
+         * @hide
+         */
+        public static final String LOCK_SCREEN_NOTE_TAKING_CONSENT =
+                "lock_screen_note_taking_consent";
+
+        /**
          * When set by a user, allows notification remote input atop a securely locked screen
          * without having to unlock
          * @hide

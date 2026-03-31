@@ -444,12 +444,23 @@ internal class NoteTaskQuickAffordanceConfigTest : SysuiTestCase() {
 
     // region getPickerScreenState
     @Test
-    fun getPickerScreenState_defaultNoteAppSet_shouldReturnDefault() = runTest {
-        val underTest = createUnderTest(isEnabled = true)
+    fun getPickerScreenState_isEnabledFalse_shouldReturnUnavailableOnDevice() = runTest {
+        val underTest = createUnderTest(isEnabled = false)
 
         assertThat(underTest.getPickerScreenState())
-            .isEqualTo(KeyguardQuickAffordanceConfig.PickerScreenState.Default())
+            .isEqualTo(KeyguardQuickAffordanceConfig.PickerScreenState.UnavailableOnDevice)
     }
+
+    @Test
+    fun getPickerScreenState_lockscreenNoteTakingDisabled_shouldReturnUnavailableOnDevice() =
+        runTest {
+            val underTest = createUnderTest(isEnabled = true)
+            whenever(lockscreenNoteTakingAvailability.shouldShowNotesInLockscreenShortcutPicker())
+                .thenReturn(false)
+
+            assertThat(underTest.getPickerScreenState())
+                .isEqualTo(KeyguardQuickAffordanceConfig.PickerScreenState.UnavailableOnDevice)
+        }
 
     @Test
     fun getPickerScreenState_noDefaultNoteAppSet_shouldReturnDisabled() = runTest {
@@ -470,15 +481,12 @@ internal class NoteTaskQuickAffordanceConfigTest : SysuiTestCase() {
     }
 
     @Test
-    fun getPickerScreenState_lockscreenNoteTakingDisabled_shouldReturnUnavailableOnDevice() =
-        runTest {
-            val underTest = createUnderTest(isEnabled = true)
-            whenever(lockscreenNoteTakingAvailability.shouldShowNotesInLockscreenShortcutPicker())
-                .thenReturn(false)
+    fun getPickerScreenState_defaultNoteAppSet_shouldReturnDefault() = runTest {
+        val underTest = createUnderTest(isEnabled = true)
 
-            assertThat(underTest.getPickerScreenState())
-                .isEqualTo(KeyguardQuickAffordanceConfig.PickerScreenState.UnavailableOnDevice)
-        }
+        assertThat(underTest.getPickerScreenState())
+            .isEqualTo(KeyguardQuickAffordanceConfig.PickerScreenState.Default())
+    }
 
     // endregion
 

@@ -502,6 +502,13 @@ flag {
 }
 
 flag {
+    name: "enabled_notes_lockscreen_consent_flow"
+    namespace: "note"
+    description: "Whether to show lock screen consent flow for notes lock screen entry points"
+    bug: "491809338"
+}
+
+flag {
     name: "example_flag"
     namespace: "systemui"
     description: "An Example Flag"

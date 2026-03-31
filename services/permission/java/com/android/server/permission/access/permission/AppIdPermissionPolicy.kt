@@ -1518,7 +1518,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
         return when {
             packageState.isVendor || packageState.isOdm ->
                 permissionAllowlist.getVendorSignatureAppAllowlistState(packageName, permissionName)
-            packageState.isProduct ->
+            packageState.isProduct && packageState.apexModuleName == null ->
                 permissionAllowlist.getProductSignatureAppAllowlistState(
                     packageName,
                     permissionName,
@@ -1621,7 +1621,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
                     packageName,
                     permissionName,
                 )
-            packageState.isProduct ->
+            packageState.isProduct && apexModuleName == null ->
                 permissionAllowlist.getProductPrivilegedAppAllowlistState(
                     packageName,
                     permissionName,

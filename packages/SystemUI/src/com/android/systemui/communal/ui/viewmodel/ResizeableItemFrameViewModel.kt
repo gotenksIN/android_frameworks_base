@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import com.android.app.tracing.coroutines.coroutineScopeTraced as coroutineScope
 import com.android.internal.logging.UiEventLogger
-import com.android.systemui.Flags.communalAccessibilityResize
 import com.android.systemui.communal.ui.metrics.CommunalUiEvent
 import com.android.systemui.lifecycle.HydratedActivatable
 import dagger.assisted.Assisted
@@ -277,10 +276,8 @@ constructor(
             )
             .filter { it.spans != 0 }
             .onEach {
-                if (communalAccessibilityResize()) {
-                    topDragState.snapTo(0)
-                    bottomDragState.snapTo(0)
-                }
+                topDragState.snapTo(0)
+                bottomDragState.snapTo(0)
             }
 
     /** Observes the resize info flow and executes the given action when a resize occurs. */

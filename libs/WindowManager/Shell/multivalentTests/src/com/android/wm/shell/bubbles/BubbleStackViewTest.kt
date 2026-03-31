@@ -168,7 +168,9 @@ class BubbleStackViewTest {
 
     @After
     fun tearDown() {
-        PhysicsAnimatorTestUtils.tearDown()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            PhysicsAnimatorTestUtils.tearDown()
+        }
     }
 
     @Test

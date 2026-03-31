@@ -387,14 +387,9 @@ class LaunchParamsController {
         int PHASE_WINDOWING_MODE = 1;
 
         /**
-         * Stops once we are done with display area calculation.
-         */
-        int PHASE_DISPLAY_AREA = 2;
-
-        /**
          * Stops once we are done with window bounds calculation.
          */
-        int PHASE_BOUNDS = 3;
+        int PHASE_BOUNDS = 2;
 
         /**
          * Returns the launch params that the provided activity launch params should be overridden

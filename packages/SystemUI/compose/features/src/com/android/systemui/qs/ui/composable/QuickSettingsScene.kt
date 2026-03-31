@@ -55,6 +55,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -338,7 +340,8 @@ private fun ContentScope.QuickSettingsScene(
                 shouldIncludeHeadsUpSpace = false,
                 isActivated = false,
                 modifier =
-                    Modifier.fillMaxWidth()
+                    Modifier.semantics { hideFromAccessibility() }
+                        .fillMaxWidth()
                         // Match the screen height with the scrim, so it covers the whole screen,
                         // when the stack "passes by" during the QS -> Gone transition.
                         .height(LocalWindowInfo.current.containerSize.height.dp)

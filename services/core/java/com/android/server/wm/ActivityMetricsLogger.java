@@ -161,6 +161,12 @@ class ActivityMetricsLogger {
     private static final long UNKNOWN_VISIBILITY_CHECK_DELAY_MS = 3000;
 
     /**
+     * Delay before canceling transition info when the launching activity finishes before
+     * trampolining to another activity.
+     */
+    private static final long UNKNOWN_TRAMPOLINE_CHECK_DELAY_MS = 300;
+
+    /**
      * If the recents animation is finished before the delay since the window drawn, do not log the
      * action because the duration is too small that may be just an accidentally touch.
      */
@@ -1140,6 +1146,7 @@ class ActivityMetricsLogger {
                     // then do not abort the tracker because a new activity will be added.
                     || !task.isClearingToReuseTask()
                     || !r.mAtmService.getActivityStartController().isInExecution()) {
+                logAppTransitionCancel(info);
                 abort(info, "activity removed");
             }
         }
@@ -1190,7 +1197,8 @@ class ActivityMetricsLogger {
         if (!r.isVisibleRequested() || r.finishing) {
             // Check if the tracker can be cancelled because the last launched activity may be
             // no longer visible.
-            scheduleCheckActivityToBeDrawn(r, 0 /* delay */);
+            scheduleCheckActivityToBeDrawn(r,
+                    r.finishing ? UNKNOWN_TRAMPOLINE_CHECK_DELAY_MS : 0 /* delay */);
         }
     }
 

@@ -69,6 +69,7 @@ constructor(
     private val logger = Logger(logBuffer, "RulesRepository")
 
     override var rules = mutableStateListOf<RuleModel>()
+        private set
 
     private val availableRuleIds = mutableStateListOf<Int>().apply { addAll(RULE_ID_RANGE) }
 
@@ -159,6 +160,31 @@ constructor(
             }
         }
         return savedRule != null
+    }
+
+    override suspend fun deleteRule(ruleId: Int): Boolean {
+        NmContextualDisplayLaunch.expectInNewMode()
+
+        val wasDeletedSuccessfully =
+            withContext(backgroundDispatcher) { notificationManager.removeNotificationRule(ruleId) }
+        if (wasDeletedSuccessfully) {
+            withContext(mainDispatcher) {
+                val deletedInternally = rules.removeIf { it.id == ruleId }
+                if (deletedInternally) {
+                    logger.i({ "Successfully deleted rule with id=$int1" }) { int1 = ruleId }
+                } else {
+                    logger.w({
+                        "Rule with id=$int1 successfully deleted in NotificationManager " +
+                            "but was not present internally"
+                    }) {
+                        int1 = ruleId
+                    }
+                }
+            }
+        } else {
+            logger.e({ "Unable to delete rule with id=$int1" }) { int1 = ruleId }
+        }
+        return wasDeletedSuccessfully
     }
 
     @MainThread // Keep on the main thread so that two rules can't take the same ID

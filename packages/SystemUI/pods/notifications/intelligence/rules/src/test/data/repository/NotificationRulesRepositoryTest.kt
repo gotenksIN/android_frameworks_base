@@ -1079,6 +1079,68 @@ class NotificationRulesRepositoryTest : SysuiTestCase() {
             assertThat(underTest.rules[1].filter).isNull()
         }
 
+    @Test
+    @DisableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun deleteRule_flagDisabled_logsWtf() =
+        kosmos.runTest {
+            putRulesIntoNotificationManager(listOf(createRule(id = 100)))
+            underTest.start()
+
+            assertLogsWtf { runBlocking { underTest.deleteRule(100) } }
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun deleteRule_notificationManagerReturnsTrue_returnsTrue_andRuleDeleted() =
+        kosmos.runTest {
+            putRulesIntoNotificationManager(
+                listOf(createRule(id = 100), createRule(id = 101), createRule(id = 102))
+            )
+            underTest.start()
+
+            whenever(notificationManager.removeNotificationRule(102)).thenReturn(true)
+            val result = underTest.deleteRule(102)
+
+            assertThat(result).isTrue()
+            assertThat(underTest.rules).hasSize(2)
+            assertThat(underTest.rules[0].id).isEqualTo(100)
+            assertThat(underTest.rules[1].id).isEqualTo(101)
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun deleteRule_notificationManagerReturnsFalse_returnsFalse_andRuleNotDeleted() =
+        kosmos.runTest {
+            putRulesIntoNotificationManager(
+                listOf(createRule(id = 100), createRule(id = 101), createRule(id = 102))
+            )
+            underTest.start()
+
+            whenever(notificationManager.removeNotificationRule(102)).thenReturn(false)
+            val result = underTest.deleteRule(102)
+
+            assertThat(result).isFalse()
+            assertThat(underTest.rules).hasSize(3)
+            assertThat(underTest.rules[0].id).isEqualTo(100)
+            assertThat(underTest.rules[1].id).isEqualTo(101)
+            assertThat(underTest.rules[2].id).isEqualTo(102)
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun deleteRule_forRuleThatDoesNotExist_noOp() =
+        kosmos.runTest {
+            putRulesIntoNotificationManager(listOf(createRule(id = 100), createRule(id = 101)))
+            underTest.start()
+
+            whenever(notificationManager.removeNotificationRule(any())).thenReturn(true)
+            underTest.deleteRule(111)
+
+            assertThat(underTest.rules).hasSize(2)
+            assertThat(underTest.rules[0].id).isEqualTo(100)
+            assertThat(underTest.rules[1].id).isEqualTo(101)
+        }
+
     private fun createRule(
         id: Int = FAKE_ID,
         action: NotificationRule.Action =

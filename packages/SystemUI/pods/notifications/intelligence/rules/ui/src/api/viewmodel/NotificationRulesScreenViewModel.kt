@@ -39,6 +39,12 @@ public interface NotificationRulesScreenViewModel : Activatable {
     public val currentScreen: RulesScreenViewState
 
     /**
+     * If there was an error in deleting a rule, this has the ID of the rule with the error. Null
+     * otherwise.
+     */
+    val ruleWithDeletionError: Int?
+
+    /**
      * Transforms [rule] into a readable string. Because this is a read-only view, individual fields
      * are more visually prominent but not clickable.
      */
@@ -50,6 +56,12 @@ public interface NotificationRulesScreenViewModel : Activatable {
      * @param userContext a context specific to the user that owns the notification rule.
      */
     suspend fun loadContactBitmapFromUri(uri: Uri, userContext: Context, @Px sizePx: Int): Bitmap?
+
+    /**
+     * Deletes the rule with the given ID. [ruleWithDeletionError] will update based on whether the
+     * rule was deleted successfully or not.
+     */
+    fun deleteRule(ruleId: Int)
 
     public interface Factory {
         public fun create(backStack: List<RulesScreenViewState>): NotificationRulesScreenViewModel

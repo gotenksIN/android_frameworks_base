@@ -31,7 +31,6 @@ import android.app.KeyguardManager;
 import android.app.NotificationManager;
 import android.app.StatsManager;
 import android.app.StatusBarManager;
-import android.app.ThemeManager;
 import android.app.UiModeManager;
 import android.app.WallpaperManager;
 import android.app.admin.DevicePolicyManager;
@@ -448,13 +447,6 @@ public class FrameworkServicesModule {
     @Singleton
     static KeyguardManager provideKeyguardManager(Context context) {
         return context.getSystemService(KeyguardManager.class);
-    }
-
-    @Provides
-    @Singleton
-    @Nullable
-    static ThemeManager provideThemeManager(Context context) {
-        return context.getSystemService(ThemeManager.class);
     }
 
     @Provides

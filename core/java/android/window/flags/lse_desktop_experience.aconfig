@@ -1279,4 +1279,14 @@ flag {
     }
 }
 
+flag {
+    name: "use_base_intent_label_for_app_header_title"
+    namespace: "lse_desktop_experience"
+    description: "Use the activity label of the base intent component for the App Header title."
+    bug: "432299378"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
 # go/keep-sorted end

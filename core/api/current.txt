@@ -26237,6 +26237,7 @@ package android.media {
     method public final void notifySessionReleased(@NonNull String);
     method public final void notifySessionUpdated(@NonNull android.media.RoutingSessionInfo);
     method @CallSuper @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
+    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public void onCreateSession(@NonNull android.media.MediaRoute2ProviderService.SessionCreationParams);
     method public abstract void onCreateSession(long, @NonNull String, @NonNull String, @Nullable android.os.Bundle);
     method public abstract void onDeselectRoute(long, @NonNull String, @NonNull String);
     method public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference);
@@ -26255,6 +26256,13 @@ package android.media {
     field public static final int REASON_UNKNOWN_ERROR = 0; // 0x0
     field public static final long REQUEST_ID_NONE = 0L; // 0x0L
     field public static final String SERVICE_INTERFACE = "android.media.MediaRoute2ProviderService";
+  }
+
+  @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final class MediaRoute2ProviderService.SessionCreationParams {
+    method @NonNull public String getInitiallySelectedRouteId();
+    method public long getRequestId();
+    method @NonNull public android.os.Bundle getSessionHints();
+    method @NonNull public String getTargetPackageName();
   }
 
   public class MediaRouter {

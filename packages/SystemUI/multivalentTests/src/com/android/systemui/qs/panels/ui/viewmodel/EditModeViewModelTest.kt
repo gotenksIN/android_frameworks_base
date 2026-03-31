@@ -28,10 +28,10 @@ import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.Text
 import com.android.systemui.common.ui.compose.toAnnotatedString
-import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.Kosmos.Fixture
+import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
-import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.plugins.qs.QSTile
 import com.android.systemui.qs.FakeQSFactory
@@ -86,18 +86,17 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     // Only have some configurations so we can test the effect of missing configurations.
     // As the configurations are injected by dagger, we'll have all the existing configurations
-    private val configs =
-        with(kosmos) {
-            setOf(
-                if (QsSplitInternetTile.isEnabled) qsWifiTileConfig else qsInternetTileConfig,
-                qsFlashlightTileConfig,
-                qsBatterySaverTileConfig,
-                qsAlarmTileConfig,
-                qsAirplaneModeTileConfig,
-                qsCameraSensorPrivacyToggleTileConfig,
-                qsMicrophoneSensorPrivacyToggleTileConfig,
-            )
-        }
+    private val Kosmos.configs by Fixture {
+        setOf(
+            if (QsSplitInternetTile.isEnabled) qsWifiTileConfig else qsInternetTileConfig,
+            qsFlashlightTileConfig,
+            qsBatterySaverTileConfig,
+            qsAlarmTileConfig,
+            qsAirplaneModeTileConfig,
+            qsCameraSensorPrivacyToggleTileConfig,
+            qsMicrophoneSensorPrivacyToggleTileConfig,
+        )
+    }
 
     private val serviceInfo1 =
         FakeInstalledTilesComponentRepository.ServiceInfo(
@@ -115,7 +114,7 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             appName2,
         )
 
-    private val underTest: EditModeViewModel by lazy { kosmos.editModeViewModel }
+    private val Kosmos.underTest by Fixture { editModeViewModel }
 
     @Before
     fun setUp() {
@@ -134,420 +133,368 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     fun isEditing() =
-        with(kosmos) {
-            testScope.runTest {
-                val isEditing by collectLastValue(underTest.isEditing)
+        kosmos.runTest {
+            val isEditing by collectLastValue(underTest.isEditing)
 
-                assertThat(isEditing).isFalse()
+            assertThat(isEditing).isFalse()
 
-                underTest.startEditing()
-                assertThat(isEditing).isTrue()
+            underTest.startEditing()
+            assertThat(isEditing).isTrue()
 
-                underTest.stopEditing()
-                assertThat(isEditing).isFalse()
-            }
+            underTest.stopEditing()
+            assertThat(isEditing).isFalse()
         }
 
     @Test
     fun editing_false_emptyFlowOfTiles() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
 
-                assertThat(tiles).isNull()
-            }
+            assertThat(tiles).isNull()
         }
 
     @Test
     fun editing_true_notEmptyTileData() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                assertThat(tiles).isNotEmpty()
-            }
+            assertThat(tiles).isNotEmpty()
         }
 
     @Test
     fun tilesData_hasAllStockTiles() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                assertThat(
-                        tiles!!
-                            .filter { it.tileSpec is TileSpec.PlatformTileSpec }
-                            .map { it.tileSpec }
-                    )
-                    .containsExactlyElementsIn(stockTilesRepository.stockTiles)
-            }
+            assertThat(
+                    tiles!!.filter { it.tileSpec is TileSpec.PlatformTileSpec }.map { it.tileSpec }
+                )
+                .containsExactlyElementsIn(stockTilesRepository.stockTiles)
         }
 
     @Test
     fun tilesData_stockTiles_haveCorrectUiValues() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                tiles!!
-                    .filter { it.tileSpec is TileSpec.PlatformTileSpec }
-                    .forEach {
-                        val data = getEditTileData(it.tileSpec)
+            tiles!!
+                .filter { it.tileSpec is TileSpec.PlatformTileSpec }
+                .forEach {
+                    val data = getEditTileData(it.tileSpec)
 
-                        assertThat(it.label).isEqualTo(data.label.toAnnotatedString(context))
-                        assertThat(it.icon).isEqualTo(data.icon)
-                        assertThat(it.appName).isNull()
-                    }
-            }
+                    assertThat(it.label).isEqualTo(data.label.toAnnotatedString(context))
+                    assertThat(it.icon).isEqualTo(data.icon)
+                    assertThat(it.appName).isNull()
+                }
         }
 
     @Test
     fun tilesData_hasAllCustomTiles() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                assertThat(
-                        tiles!!
-                            .filter { it.tileSpec is TileSpec.CustomTileSpec }
-                            .map { it.tileSpec }
-                    )
-                    .containsExactly(TileSpec.create(component1), TileSpec.create(component2))
-            }
+            assertThat(
+                    tiles!!.filter { it.tileSpec is TileSpec.CustomTileSpec }.map { it.tileSpec }
+                )
+                .containsExactly(TileSpec.create(component1), TileSpec.create(component2))
         }
 
     @Test
     fun tilesData_customTiles_haveCorrectUiValues() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                // service1
-                val model1 = tiles!!.first { it.tileSpec == TileSpec.create(component1) }
-                assertThat(model1.label)
-                    .isEqualTo(Text.Loaded(tileService1).toAnnotatedString(context))
-                assertThat(model1.appName)
-                    .isEqualTo(Text.Loaded(appName1).toAnnotatedString(context))
-                assertThat(model1.icon)
-                    .isEqualTo(Icon.Loaded(drawable1, ContentDescription.Loaded(tileService1)))
+            // service1
+            val model1 = tiles!!.first { it.tileSpec == TileSpec.create(component1) }
+            assertThat(model1.label).isEqualTo(Text.Loaded(tileService1).toAnnotatedString(context))
+            assertThat(model1.appName).isEqualTo(Text.Loaded(appName1).toAnnotatedString(context))
+            assertThat(model1.icon)
+                .isEqualTo(Icon.Loaded(drawable1, ContentDescription.Loaded(tileService1)))
 
-                // service2
-                val model2 = tiles!!.first { it.tileSpec == TileSpec.create(component2) }
-                assertThat(model2.label)
-                    .isEqualTo(Text.Loaded(tileService2).toAnnotatedString(context))
-                assertThat(model2.appName)
-                    .isEqualTo(Text.Loaded(appName2).toAnnotatedString(context))
-                assertThat(model2.icon)
-                    .isEqualTo(Icon.Loaded(drawable2, ContentDescription.Loaded(tileService2)))
-            }
+            // service2
+            val model2 = tiles!!.first { it.tileSpec == TileSpec.create(component2) }
+            assertThat(model2.label).isEqualTo(Text.Loaded(tileService2).toAnnotatedString(context))
+            assertThat(model2.appName).isEqualTo(Text.Loaded(appName2).toAnnotatedString(context))
+            assertThat(model2.icon)
+                .isEqualTo(Icon.Loaded(drawable2, ContentDescription.Loaded(tileService2)))
         }
 
     @Test
     fun currentTiles_inCorrectOrder_markedAsCurrent() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    listOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                listOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec })
-                    .containsExactlyElementsIn(currentTiles)
-                    .inOrder()
-            }
+            assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec })
+                .containsExactlyElementsIn(currentTiles)
+                .inOrder()
         }
 
     @Test
     fun notCurrentTiles() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    listOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                val remainingTiles =
-                    stockTilesRepository.stockTiles.filterNot { it in currentTiles } +
-                        listOf(TileSpec.create(component1))
-                currentTilesInteractor.setTiles(currentTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                listOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            val remainingTiles =
+                stockTilesRepository.stockTiles.filterNot { it in currentTiles } +
+                    listOf(TileSpec.create(component1))
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                assertThat(tiles!!.filterNot { it.isCurrent }.map { it.tileSpec })
-                    .containsExactlyElementsIn(remainingTiles)
-            }
+            assertThat(tiles!!.filterNot { it.isCurrent }.map { it.tileSpec })
+                .containsExactlyElementsIn(remainingTiles)
         }
 
     @Test
     fun currentTilesChange_trackingChange() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                val newTile = TileSpec.create(internetTileName)
-                val position = 1
-                currentTilesInteractor.addTile(newTile, position)
-                currentTiles.add(position, newTile)
+            val newTile = TileSpec.create(internetTileName)
+            val position = 1
+            currentTilesInteractor.addTile(newTile, position)
+            currentTiles.add(position, newTile)
 
-                assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec })
-                    .containsExactlyElementsIn(currentTiles)
-                    .inOrder()
-            }
+            assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec })
+                .containsExactlyElementsIn(currentTiles)
+                .inOrder()
         }
 
     @Test
     fun nonCurrentTiles_orderPreservedWhenCurrentTilesChange() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                val nonCurrentSpecs = tiles!!.filterNot { it.isCurrent }.map { it.tileSpec }
-                val newTile = TileSpec.create(internetTileName)
-                currentTilesInteractor.addTile(newTile)
+            val nonCurrentSpecs = tiles!!.filterNot { it.isCurrent }.map { it.tileSpec }
+            val newTile = TileSpec.create(internetTileName)
+            currentTilesInteractor.addTile(newTile)
 
-                assertThat(tiles!!.filterNot { it.isCurrent }.map { it.tileSpec })
-                    .containsExactlyElementsIn(nonCurrentSpecs - listOf(newTile))
-                    .inOrder()
-            }
+            assertThat(tiles!!.filterNot { it.isCurrent }.map { it.tileSpec })
+                .containsExactlyElementsIn(nonCurrentSpecs - listOf(newTile))
+                .inOrder()
         }
 
     @Test
     fun nonCurrentTiles_haveOnlyAddAction() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                tiles!!
-                    .filterNot { it.isCurrent }
-                    .forEach {
-                        assertThat(it.availableEditActions)
-                            .containsExactly(AvailableEditActions.ADD)
-                    }
-            }
+            tiles!!
+                .filterNot { it.isCurrent }
+                .forEach {
+                    assertThat(it.availableEditActions).containsExactly(AvailableEditActions.ADD)
+                }
         }
 
     @Test
     fun currentTiles_moreThanMinimumTiles_haveRemoveAction() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-                assertThat(currentTiles.size).isGreaterThan(minNumberOfTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
+            assertThat(currentTiles.size).isGreaterThan(minNumberOfTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                tiles!!
-                    .filter { it.isCurrent }
-                    .forEach {
-                        assertThat(it.availableEditActions).contains(AvailableEditActions.REMOVE)
-                    }
-            }
+            tiles!!
+                .filter { it.isCurrent }
+                .forEach {
+                    assertThat(it.availableEditActions).contains(AvailableEditActions.REMOVE)
+                }
         }
 
     @Test
     fun currentTiles_minimumTiles_dontHaveRemoveAction() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-                assertThat(currentTiles.size).isEqualTo(minNumberOfTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
+            assertThat(currentTiles.size).isEqualTo(minNumberOfTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                tiles!!
-                    .filter { it.isCurrent }
-                    .forEach {
-                        assertThat(it.availableEditActions)
-                            .doesNotContain(AvailableEditActions.REMOVE)
-                    }
-            }
+            tiles!!
+                .filter { it.isCurrent }
+                .forEach {
+                    assertThat(it.availableEditActions).doesNotContain(AvailableEditActions.REMOVE)
+                }
         }
 
     @Test
     fun currentTiles_lessThanMinimumTiles_dontHaveRemoveAction() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(TileSpec.create("flashlight"), TileSpec.create("airplane"))
-                currentTilesInteractor.setTiles(currentTiles)
-                assertThat(currentTiles.size).isLessThan(minNumberOfTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(TileSpec.create("flashlight"), TileSpec.create("airplane"))
+            currentTilesInteractor.setTiles(currentTiles)
+            assertThat(currentTiles.size).isLessThan(minNumberOfTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                tiles!!
-                    .filter { it.isCurrent }
-                    .forEach {
-                        assertThat(it.availableEditActions)
-                            .doesNotContain(AvailableEditActions.REMOVE)
-                    }
-            }
+            tiles!!
+                .filter { it.isCurrent }
+                .forEach {
+                    assertThat(it.availableEditActions).doesNotContain(AvailableEditActions.REMOVE)
+                }
         }
 
     @Test
     fun currentTiles_haveMoveAction() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(component2),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(component2),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            underTest.startEditing()
 
-                tiles!!
-                    .filter { it.isCurrent }
-                    .forEach {
-                        assertThat(it.availableEditActions).contains(AvailableEditActions.MOVE)
-                    }
-            }
+            tiles!!
+                .filter { it.isCurrent }
+                .forEach { assertThat(it.availableEditActions).contains(AvailableEditActions.MOVE) }
         }
 
     @Test
     fun tileNotAvailable_notShowing() =
-        with(kosmos) {
-            testScope.runTest {
-                val unavailableTile = "work"
-                qsTileFactory = FakeQSFactory { spec ->
-                    FakeQSTile(userTracker.userId, spec != unavailableTile)
-                }
-                tileAvailabilityInteractorsMap =
-                    mapOf(
-                        unavailableTile to
-                            FakeTileAvailabilityInteractor(
-                                emptyMap<Int, Flow<Boolean>>().withDefault { flowOf(false) }
-                            )
-                    )
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-
-                underTest.startEditing()
-
-                assertThat(tiles!!.none { it.tileSpec == TileSpec.create(unavailableTile) })
-                    .isTrue()
+        kosmos.runTest {
+            val unavailableTile = "work"
+            qsTileFactory = FakeQSFactory { spec ->
+                FakeQSTile(userTracker.userId, spec != unavailableTile)
             }
+            tileAvailabilityInteractorsMap =
+                mapOf(
+                    unavailableTile to
+                        FakeTileAvailabilityInteractor(
+                            emptyMap<Int, Flow<Boolean>>().withDefault { flowOf(false) }
+                        )
+                )
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
+
+            underTest.startEditing()
+
+            assertThat(tiles!!.none { it.tileSpec == TileSpec.create(unavailableTile) }).isTrue()
         }
 
     @Test
     fun currentTiles_moveTileDown() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-                underTest.startEditing()
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(internetTileName),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
+            underTest.startEditing()
 
-                // Move flashlight tile to index 3
-                underTest.addTile(TileSpec.create("flashlight"), 3)
+            // Move flashlight tile to index 3
+            underTest.addTile(TileSpec.create("flashlight"), 3)
 
-                assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec.spec })
-                    .containsExactly("airplane", internetTileName, "alarm", "flashlight")
-                    .inOrder()
-            }
+            assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec.spec })
+                .containsExactly("airplane", internetTileName, "alarm", "flashlight")
+                .inOrder()
         }
 
     @Test
     fun currentTiles_moveTileUp() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-                underTest.startEditing()
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(internetTileName),
+                    TileSpec.create("alarm"),
+                )
+            currentTilesInteractor.setTiles(currentTiles)
+            underTest.startEditing()
 
-                // Move alarm tile to index 0
-                underTest.addTile(TileSpec.create("alarm"), 0)
+            // Move alarm tile to index 0
+            underTest.addTile(TileSpec.create("alarm"), 0)
 
-                assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec.spec })
-                    .containsExactly("alarm", "flashlight", "airplane", internetTileName)
-                    .inOrder()
-            }
+            assertThat(tiles!!.filter { it.isCurrent }.map { it.tileSpec.spec })
+                .containsExactly("alarm", "flashlight", "airplane", internetTileName)
+                .inOrder()
         }
 
     // UI EVENT TESTS
@@ -695,61 +642,57 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     fun currentTiles_checksForDualTarget() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-
-                val tile =
-                    currentTilesInteractor.currentTiles.value.find { it.spec.spec == "flashlight" }
-
-                (tile!!.tile as FakeQSTile).changeState(
-                    QSTile.State().apply { handlesSecondaryClick = true }
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(internetTileName),
+                    TileSpec.create("alarm"),
                 )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            val tile =
+                currentTilesInteractor.currentTiles.value.find { it.spec.spec == "flashlight" }
 
-                assertThat(tiles!!.filter { it.isDualTarget }.map { it.tileSpec.spec })
-                    .containsExactly("flashlight")
-            }
+            (tile!!.tile as FakeQSTile).changeState(
+                QSTile.State().apply { handlesSecondaryClick = true }
+            )
+
+            underTest.startEditing()
+
+            assertThat(tiles!!.filter { it.isDualTarget }.map { it.tileSpec.spec })
+                .containsExactly("flashlight")
         }
 
     @Test
     fun removeTile_noLongerDualTarget() =
-        with(kosmos) {
-            testScope.runTest {
-                val tiles by collectLastValue(underTest.tiles)
-                val currentTiles =
-                    mutableListOf(
-                        TileSpec.create("flashlight"),
-                        TileSpec.create("airplane"),
-                        TileSpec.create(internetTileName),
-                        TileSpec.create("alarm"),
-                    )
-                currentTilesInteractor.setTiles(currentTiles)
-
-                val tile =
-                    currentTilesInteractor.currentTiles.value.find { it.spec.spec == "flashlight" }
-                (tile!!.tile as FakeQSTile).changeState(
-                    QSTile.State().apply { handlesSecondaryClick = true }
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles)
+            val currentTiles =
+                mutableListOf(
+                    TileSpec.create("flashlight"),
+                    TileSpec.create("airplane"),
+                    TileSpec.create(internetTileName),
+                    TileSpec.create("alarm"),
                 )
+            currentTilesInteractor.setTiles(currentTiles)
 
-                underTest.startEditing()
+            val tile =
+                currentTilesInteractor.currentTiles.value.find { it.spec.spec == "flashlight" }
+            (tile!!.tile as FakeQSTile).changeState(
+                QSTile.State().apply { handlesSecondaryClick = true }
+            )
 
-                assertThat(tiles!!.filter { it.isDualTarget }.map { it.tileSpec.spec })
-                    .containsExactly("flashlight")
+            underTest.startEditing()
 
-                underTest.removeTile(TileSpec.create("flashlight"))
+            assertThat(tiles!!.filter { it.isDualTarget }.map { it.tileSpec.spec })
+                .containsExactly("flashlight")
 
-                assertThat(tiles!!.filter { it.isDualTarget }.map { it.tileSpec.spec }).isEmpty()
-            }
+            underTest.removeTile(TileSpec.create("flashlight"))
+
+            assertThat(tiles!!.filter { it.isDualTarget }.map { it.tileSpec.spec }).isEmpty()
         }
 
     companion object {
@@ -763,7 +706,8 @@ class EditModeViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         private val tileService2 = "Tile Service 2"
         private val component2 = ComponentName("pkg2", "srv2")
 
-        private val internetTileName = if (QsSplitInternetTile.isEnabled) "wifi" else "internet"
+        private val internetTileName
+            get() = if (QsSplitInternetTile.isEnabled) "wifi" else "internet"
 
         private fun TileSpec.missingConfigEditTileData(): EditTileData {
             return EditTileData(

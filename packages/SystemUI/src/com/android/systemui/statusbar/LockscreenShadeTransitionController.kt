@@ -446,7 +446,8 @@ constructor(
             if (field != value || forceApplyAmount) {
                 field = value
                 if (SceneContainerFlag.isEnabled) {
-                    // TODO(b/359957196) do we need to do anything here?
+                    // No additional logic is needed in Flexiglass as notification peeking is not
+                    // supported. See b/359957196 for context.
                 } else if (
                     !nsslController.isInLockedDownShade() || field == 0f || forceApplyAmount
                 ) {

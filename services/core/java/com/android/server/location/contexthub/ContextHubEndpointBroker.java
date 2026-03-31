@@ -639,6 +639,7 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
         params.sourceId = mHalEndpointInfo.id;
         params.msg = halMessage;
         params.sessionId = sessionId;
+        Binder.allowBlocking(callback.asBinder());
         IEndpointCommunication.IRegisterOffloadSinkCallback halCallback =
                 new IEndpointCommunication.IRegisterOffloadSinkCallback.Stub() {
                     @Override
@@ -935,8 +936,24 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
                     "onDataFlowHostSinkRegistered: "
                             + mEndpointInfo
                             + " doesn't have permission for "
-                            + source
-                            + " - dropping");
+                            + source);
+            unregisterDataFlowHostSink(context.id);
+            return;
+        }
+
+        try {
+            Binder.withCleanCallingIdentity(
+                    () -> {
+                        if (!notePermissions(source)) {
+                            throw new RuntimeException(
+                                "onDataFlowHostSinkRegistered: "
+                                        + mEndpointInfo
+                                        + " doesn't have AppOps permission for "
+                                        + source);
+                        }
+                    });
+        } catch (RuntimeException e) {
+            Log.e(TAG, e.getMessage());
             unregisterDataFlowHostSink(context.id);
             return;
         }

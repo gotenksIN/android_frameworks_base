@@ -488,6 +488,16 @@ flag {
 }
 
 flag {
+    name: "enable_qs_tile_tooltips"
+    namespace: "systemui"
+    description: "Enables tooltips for QuickSettings tiles"
+    bug: "459961514"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_suggested_device_ui"
     namespace: "systemui"
     description: "Enables the UI for the suggested devices feature."
@@ -624,16 +634,6 @@ flag {
     metadata {
        purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "fix_main_thread_blocking_on_first_unlock"
-   namespace: "systemui"
-   description: "Fixes main thread blocking Binder calls during the first unlock."
-   bug: "491497495"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1640,6 +1640,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "start_on_gone_scene_if_no_lockscreen"
+    namespace: "systemui"
+    description: "Start on the Gone scene if the current user has no lockscreen"
+    bug: "495877718"
 }
 
 flag {

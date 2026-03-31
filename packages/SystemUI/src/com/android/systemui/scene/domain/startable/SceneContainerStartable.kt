@@ -1112,20 +1112,24 @@ constructor(
                     if (keyguardEnabledInteractor.isKeyguardEnabled.value) {
                         deviceEntryInteractor.lockNow("Screen timed out or WM#lockNow() called")
 
-                        val isDreaming =
+                        val isOccludedOrDreaming =
                             if (DriveDreamStateFromOcclusion.isEnabled) {
                                 getOcclusionTargetScene(
                                     occlusionInteractor.showWhenLockedActivityInfo.value,
                                     occlusionInteractor.occlusionState.value,
-                                ) == Scenes.Dream
+                                ) != null
                             } else {
-                                keyguardInteractor.isDreamingNotDozing.value
+                                val dreamingNotDozing = keyguardInteractor.isDreamingNotDozing.value
+                                val isOccluded = occlusionInteractor.isKeyguardOccluded.value
+                                dreamingNotDozing || isOccluded
                             }
 
-                        // If we're dreaming, DreamStartable (or handleOcclusionAndDreaming) will
-                        // take us to Scenes.Dream.
-                        if (!isDreaming) {
-                            switchToScene(Scenes.Lockscreen, "Not dreaming, and $reason")
+                        // If we're dreaming/occluded, DreamStartable or handleOcclusionAndDreaming
+                        // will take us to Scenes.Dream or Scenes.Occluded. In this case, avoid
+                        // forcing the lockscreen scene as this would result in the lockscreen
+                        // displaying over the occluding activity.
+                        if (!isOccludedOrDreaming) {
+                            switchToScene(Scenes.Lockscreen, "Not dreaming/occluded, and $reason")
                         }
                     }
                 }
@@ -1213,7 +1217,7 @@ constructor(
                         // wait for transition to complete before notifying Notifications to avoid
                         // a flicker during the unlock animation: b/454362854
                         if (unlockStatus.deviceUnlockSource?.dismissesLockscreen == true) {
-                            snapshotFlow { !onOrLeavingLockscreenScene() || onNotifShadeOverlay() }
+                            snapshotFlow { !onOrLeavingKeyguard() || onNotifShadeOverlay() }
                                 .first { it }
                         }
                     }
@@ -1224,9 +1228,18 @@ constructor(
         }
     }
 
-    private fun onOrLeavingLockscreenScene() =
-        sceneInteractor.transitionState.isIdle(Scenes.Lockscreen) ||
-            sceneInteractor.transitionState.isTransitioning(from = Scenes.Lockscreen)
+    /**
+     * Returns `true` if currently on the keyguard (defined as the `Lockscreen` scene or `Bouncer`
+     * overlay), or if leaving the keyguard; `false` otherwise
+     */
+    private fun onOrLeavingKeyguard(): Boolean {
+        return with(sceneInteractor.transitionState) {
+            isIdle(Scenes.Lockscreen) ||
+                isTransitioning(from = Scenes.Lockscreen) ||
+                isIdle(Overlays.Bouncer) ||
+                isTransitioning(from = Overlays.Bouncer)
+        }
+    }
 
     private fun onNotifShadeOverlay() =
         Overlays.NotificationsShade in sceneInteractor.transitionState.currentOverlays &&

@@ -186,16 +186,6 @@ flag {
 }
 
 flag {
-    name: "fix_bubble_swipe_up_gesture"
-    namespace: "multitasking"
-    description: "Fixes the swipe up gesture getting broken due to bubbles."
-    bug: "444859270"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "add_one_off_handler_leashes"
     namespace: "multitasking"
     description: "Add one-off leashes to non-Shell handlers (Remote, Recents, etc.) when starting or taking over an animation."
@@ -505,6 +495,26 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where persistent bubble stash progress is incorrect after transition from home."
     bug: "487826634"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_insets_when_invisible"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubbles would still be in the insets even when invisible"
+    bug: "494114931"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_bar_visibility_update_dropped"
+    namespace: "multitasking"
+    description: "Fixes bubble bar visibility update being dropped when animations are interrupted"
+    bug: "474032293"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

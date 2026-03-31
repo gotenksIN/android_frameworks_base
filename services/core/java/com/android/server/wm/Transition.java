@@ -1812,7 +1812,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final ChangeInfo changeInfo = mChanges.get(dc);
                 if (changeInfo != null
                         && changeInfo.mRotation != dc.getWindowConfiguration().getRotation()) {
-                    dc.mAppCompatCameraPolicy.onScreenRotationAnimationFinished();
+                    mWmService.mAppCompatCameraPolicy.onScreenRotationAnimationFinished(dc);
                 }
             }
             if (mTransientLaunches != null) {
@@ -2172,9 +2172,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final WindowContainer<?> wc = mTargets.get(i).mContainer;
             if (setClientDrawnCornerRadii()) {
                 Task task = wc.asTask();
+                if (task == null) {
+                    if (wc.asActivityRecord() != null) {
+                        task = wc.asActivityRecord().getTask();
+                    } else if (wc.asTaskFragment() != null) {
+                        task = wc.asTaskFragment().getTask();
+                    }
+                }
                 if (task != null) {
                     SurfaceControl sc = task.getSurfaceControl();
-                    transaction.toggleClientDrawnRoundedCornersOpt(sc, /* enable= */false);
+                    transaction.toggleClientDrawnRoundedCornersOpt(sc, /* enable= */ false);
                     mController.onRoundedCornerOptDisabled(task);
                 }
             }

@@ -22,6 +22,7 @@ import static com.android.internal.widget.remotecompose.core.documentation.Docum
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 
+import com.android.internal.widget.remotecompose.core.CoreDocument;
 import com.android.internal.widget.remotecompose.core.Operation;
 import com.android.internal.widget.remotecompose.core.Operations;
 import com.android.internal.widget.remotecompose.core.PaintContext;
@@ -33,7 +34,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.LayoutCo
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.ComponentMeasure;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.MeasurePass;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.Size;
-import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.WidthInModifierOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DimensionInModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.utils.DebugLog;
 import com.android.internal.widget.remotecompose.core.serialize.MapSerializer;
 
@@ -204,7 +205,7 @@ public class FlowLayout extends RowLayout {
                 componentHeight = 0f;
             } else if (hasWeight(c)) {
                 // need to check if we have minimum width
-                WidthInModifierOperation widthInConstraints =
+                DimensionInModifierOperation widthInConstraints =
                         ((LayoutComponent) c).getWidthModifier().getWidthIn();
                 if (widthInConstraints != null) {
                     float min = widthInConstraints.getMin();
@@ -237,7 +238,11 @@ public class FlowLayout extends RowLayout {
                 currentRowMaxHeight = 0;
             }
             currentRow.add(c);
-            currentWidth += componentWidth + mSpacedBy;
+            float spacedBy = mSpacedBy;
+            if (context.getDensityBehavior() == CoreDocument.DENSITY_BEHAVIOR_DP) {
+                spacedBy *= context.getDensity();
+            }
+            currentWidth += componentWidth + spacedBy;
             currentRowMaxHeight = Math.max(currentRowMaxHeight, componentHeight);
         }
         DebugLog.s(() -> "COMPUTED " + rows.size() + " SEGMENTS OF ROWS for " + this + " ("

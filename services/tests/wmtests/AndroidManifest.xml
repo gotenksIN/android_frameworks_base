@@ -91,6 +91,9 @@
                   android:turnScreenOn="true"
                   android:showWhenLocked="true"/>
         <activity android:name="android.view.cts.surfacevalidator.CapturedActivity"/>
+        <activity android:name="com.android.server.wm.WindowLayoutObserverTests$TestActivity"
+                  android:screenOrientation="locked"
+                  android:configChanges="resourcesUnused" />
 
         <activity android:name="com.android.server.wm.SurfaceSyncGroupTests$TestActivity"
             android:screenOrientation="locked"

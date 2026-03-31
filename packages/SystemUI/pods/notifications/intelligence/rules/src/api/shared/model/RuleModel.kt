@@ -22,17 +22,19 @@ package com.android.systemui.notifications.intelligence.rules.shared.model
  *
  * See also: [DraftRuleModel] for rules that are still being drafted.
  */
-public data class RuleModel(
+data class RuleModel(
     /** A unique identifier for the rule. See [android.app.NotificationRule.getId]. */
-    public val id: Int,
+    val id: Int,
     /** The action to apply to the notification. See [android.app.NotificationRule.getAction]. */
-    public val action: ActionModel,
+    val action: ActionModel,
     /**
      * The filter for which notifications this rule applies to. Null if no filters are included.
      *
      * TODO: b/478225883 - Support a list of filters.
      */
-    public val filter: FilterModel?,
+    val filter: FilterModel?,
+    /** True if this is a system-owned rule. See [android.app.NotificationRule.isSystemRule]. */
+    val isSystemRule: Boolean = false,
 )
 
 /** Represents a specific filter on a rule. See [android.app.NotificationRule.Filter]. */

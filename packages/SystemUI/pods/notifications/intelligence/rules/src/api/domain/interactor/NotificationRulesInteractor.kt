@@ -23,8 +23,14 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.RuleMo
 
 /** An interactor for a user's current notification rules and methods for updating those rules. */
 interface NotificationRulesInteractor {
-    /** A list of the user's current rules. Backed by snapshot state. */
-    val rules: List<RuleModel>
+    /** The list of custom rules created by the user. */
+    val customRules: List<RuleModel>
+
+    /**
+     * A list of the user's custom rules that have the bundle action. The action is guaranteed to be
+     * of type [ActionModel.Bundle].
+     */
+    val bundleRules: List<RuleModel>
 
     /** Creates a draft rule based on the freeform text inputted by the user. */
     suspend fun createDraftRuleFromFreeformText(

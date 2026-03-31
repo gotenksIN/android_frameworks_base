@@ -5657,6 +5657,7 @@ public final class Settings {
          * 3 - Strong vibrations
          * @hide
          */
+        @Readable
         public static final String ALARM_VIBRATION_INTENSITY =
                 "alarm_vibration_intensity";
 

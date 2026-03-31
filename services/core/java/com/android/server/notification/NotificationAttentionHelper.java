@@ -185,7 +185,7 @@ public final class NotificationAttentionHelper {
     private LogicalLight mPriorityNotificationLight;
 
     private final boolean mUseAttentionLight;
-    boolean mHasLight;
+    boolean mHasNotificationLight;
     private final boolean mEnableNotificationAccessibilityEvents;
 
     private final SettingsObserver mSettingsObserver;
@@ -250,7 +250,7 @@ public final class NotificationAttentionHelper {
 
         Resources resources = context.getResources();
         mUseAttentionLight = resources.getBoolean(R.bool.config_useAttentionLight);
-        mHasLight =
+        mHasNotificationLight =
                 resources.getBoolean(com.android.internal.R.bool.config_intrusiveNotificationLed);
         mEnableNotificationAccessibilityEvents =
                 resources.getBoolean(
@@ -603,7 +603,7 @@ public final class NotificationAttentionHelper {
             if (mUseAttentionLight && mAttentionLight != null) {
                 mAttentionLight.pulse();
             }
-            if (favoritesIncomingCallLights() && isCallLight(record) && !wasShowLights) {
+            if (favoritesIncomingCallLights() && usesPriorityLight(record) && !wasShowLights) {
                 startPriorityNotificationLight();
             }
             blink = true;
@@ -1037,7 +1037,7 @@ public final class NotificationAttentionHelper {
             return;
         }
 
-        boolean isCallLight = isCallLight(record);
+        boolean isCallLight = usesPriorityLight(record);
 
 
         if (isCallLight) {
@@ -1062,7 +1062,7 @@ public final class NotificationAttentionHelper {
         }
 
         if (favoritesIncomingCallLights()) {
-            if (!isCallLight(ledNotification) || mUserPresent || isInCall()) {
+            if (!usesPriorityLight(ledNotification) || mUserPresent || isInCall()) {
                 stopPriorityNotificationLight();
             }
         }
@@ -1117,17 +1117,18 @@ public final class NotificationAttentionHelper {
             return false;
         }
 
-        // device lacks light
-        if (!mHasLight && mPriorityNotificationLight == null) {
+        // no light available on device
+        if (!mHasNotificationLight && mPriorityNotificationLight == null) {
             return false;
         }
+
         // user turned lights off globally
         if (!mNotificationPulseEnabled) {
             return false;
         }
-        // the notification/channel has no light
-        // TODO (b/491071211): Investigate why light is sometimes null.
-        if (record.getLight() == null && !isCallLight(record)) {
+
+        // no light available for this notification
+        if (!hasRequiredLight(record)) {
             return false;
         }
         // unimportant notification
@@ -1159,7 +1160,15 @@ public final class NotificationAttentionHelper {
         return true;
     }
 
-   private boolean isCallLight(NotificationRecord record) {
+    /** Checks weather device has any light that should be used for the notification. */
+    private boolean hasRequiredLight(final NotificationRecord record) {
+        boolean couldUsePriorityNotificationLight = usesPriorityLight(record);
+        boolean couldUseNotificationLight = mHasNotificationLight && record.getLight() != null;
+
+        return couldUsePriorityNotificationLight || couldUseNotificationLight;
+    }
+
+   private boolean usesPriorityLight(NotificationRecord record) {
         if (!favoritesIncomingCallLights() || mPriorityNotificationLight == null) return false;
 
         if (record == null

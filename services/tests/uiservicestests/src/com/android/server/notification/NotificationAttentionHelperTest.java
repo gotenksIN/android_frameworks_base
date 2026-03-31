@@ -1662,7 +1662,7 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
 
     @Test
     public void testLightsNoLightOnDevice() {
-        mAttentionHelper.mHasLight = false;
+        mAttentionHelper.mHasNotificationLight = false;
         mAttentionHelper.setLights(null);
         NotificationRecord r = getLightsNotification();
         mAttentionHelper.buzzBeepBlinkLocked(r, DEFAULT_SIGNALS);
@@ -1721,6 +1721,40 @@ public class NotificationAttentionHelperTest extends UiServiceTestCase {
         mAttentionHelper.buzzBeepBlinkLocked(r, DEFAULT_SIGNALS);
         verifyNeverAttentionLights();
         assertEquals(-1, r.getLastAudiblyAlertedMs());
+    }
+
+    @Test
+    public void testCanShowLightsLocked_noLight_noCallLight() {
+        NotificationRecord r = getQuietNotification();
+        r.setSystemImportance(IMPORTANCE_DEFAULT);
+
+        // record.getLight() == null, isCallLight = false
+        assertFalse(mAttentionHelper.canShowLightsLocked(r, DEFAULT_SIGNALS, true));
+    }
+
+    @Test
+    public void testCanShowLightsLocked_hasLight_noCallLight() {
+        NotificationRecord r = getLightsNotification();
+        r.setSystemImportance(IMPORTANCE_DEFAULT);
+
+        // record.getLight() != null, isCallLight = false
+        assertTrue(mAttentionHelper.canShowLightsLocked(r, DEFAULT_SIGNALS, true));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_FAVORITES_INCOMING_CALL_LIGHTS)
+    public void testCanShowLightsLocked_noLight_isCallLight() {
+        initAttentionHelper(mTestFlagResolver);
+        mAttentionHelper.setScreenOn(false);
+        mAttentionHelper.setUserPresent(false);
+
+        // isCallLight = true
+        NotificationRecord r = getIncomingCallRecord(mId, true);
+        r.setSystemImportance(IMPORTANCE_DEFAULT);
+        // Ensure record.getLight() is null
+        r.getChannel().enableLights(false);
+
+        assertTrue(mAttentionHelper.canShowLightsLocked(r, DEFAULT_SIGNALS, true));
     }
 
     @Test

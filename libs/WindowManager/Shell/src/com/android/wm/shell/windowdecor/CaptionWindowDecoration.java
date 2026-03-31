@@ -318,15 +318,12 @@ public class CaptionWindowDecoration extends WindowDecoration<WindowDecorLinearL
                     WindowManagerGlobal.getWindowSession(),
                     mMainExecutor,
                     mBgExecutor,
-                    mTaskInfo,
                     mHandler,
                     mChoreographer,
                     mDisplay.getDisplayId(),
                     mDecorationContainerSurface,
                     mDragPositioningCallback,
                     mSurfaceControlBuilderSupplier,
-                    mSurfaceControlTransactionSupplier,
-                    mDisplayController,
                     event -> {
                         final boolean isDown = event.getAction() == ACTION_DOWN;
                         final boolean isUpOrCancel =

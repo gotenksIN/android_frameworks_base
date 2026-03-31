@@ -121,13 +121,13 @@ constructor(
                     flowOf(null)
                 } else {
                     if (NewSatelliteIcon.isEnabled) {
-                        combine(it.networkName, mobileDataContentName) {
+                        combine(it.customizedNetworkName, mobileDataContentName) {
                             networkNameModel,
                             dataContentDescription ->
                             mobileDataContentConcat(networkNameModel.name, dataContentDescription)
                         }
                     } else {
-                        combine(it.networkName, it.signalLevelIcon, mobileDataContentName) {
+                        combine(it.customizedNetworkName, it.signalLevelIcon, mobileDataContentName) {
                                 networkNameModel,
                                 signalIcon,
                                 dataContentDescription ->

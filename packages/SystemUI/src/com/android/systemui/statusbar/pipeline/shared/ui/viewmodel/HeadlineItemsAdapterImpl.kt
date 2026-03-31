@@ -28,7 +28,7 @@ import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel.Ch
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel.Content
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModel
 import com.android.systemui.statusbar.notification.shared.StatusBarHeadline
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.StatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarVisibilityInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.model.HeadlineItemImpl
 import java.text.NumberFormat
 import javax.inject.Inject
@@ -40,13 +40,13 @@ import kotlinx.coroutines.flow.map
 class HeadlineItemsAdapterImpl
 @Inject
 constructor(
-    @DisplayAware statusBarVisibilityInteractor: StatusBarVisibilityInteractor,
+    @DisplayAware homeStatusBarVisibilityInteractor: HomeStatusBarVisibilityInteractor,
     @DisplayAware private val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel,
 ) : HeadlineItemsAdapter {
 
     private val canShowHeadline: Flow<Boolean> =
         if (StatusBarHeadline.isEnabled) {
-            statusBarVisibilityInteractor.canShowOngoingActivityChips
+            homeStatusBarVisibilityInteractor.canShowOngoingActivityChips
         } else {
             flowOf(false)
         }

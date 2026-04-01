@@ -26,6 +26,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.content.res.Resources;
+import android.os.PermissionEnforcer;
 import android.os.UserHandle;
 import android.permission.PermissionManager;
 import android.service.personalcontext.Flags;
@@ -63,6 +64,7 @@ public class AccessController {
             ACCESS_RECEIVE_HINTS_PERMISSION,
             ACCESS_PUBLISH_INSIGHTS_PERMISSION,
             ACCESS_RECEIVE_INSIGHTS_PERMISSION,
+            ACCESS_HOST_INSIGHT_SURFACE_PERMISSION,
             ACCESS_PCC,
             ACCESS_PCC_OR_AUTO_COMPANION_ROLE,
             ACCESS_REGISTER_VISUALIZER,
@@ -100,14 +102,36 @@ public class AccessController {
     /** Access to receive insights via permissions. */
     public static final int ACCESS_RECEIVE_INSIGHTS_PERMISSION = 1 << 8;
 
+    /** Access to host insight surface */
+    public static final int ACCESS_HOST_INSIGHT_SURFACE_PERMISSION = 1 << 9;
+
     /** Component is PCC compliant. */
-    public static final int ACCESS_PCC = 1 << 9;
+    public static final int ACCESS_PCC = 1 << 10;
 
     /** Component is PCC compliant or has the automotive companion app role. */
-    public static final int ACCESS_PCC_OR_AUTO_COMPANION_ROLE = 1 << 10;
+    public static final int ACCESS_PCC_OR_AUTO_COMPANION_ROLE = 1 << 11;
 
     /** Access to register a visualizer. */
-    public static final int ACCESS_REGISTER_VISUALIZER = 1 << 11;
+    public static final int ACCESS_REGISTER_VISUALIZER = 1 << 12;
+
+    /** All access flags related to permissions */
+    public static final int ACCESS_ALL_PERMISSIONS =
+            ACCESS_PUBLISH_HINTS_PERMISSION
+                    | ACCESS_RECEIVE_HINTS_PERMISSION
+                    | ACCESS_PUBLISH_INSIGHTS_PERMISSION
+                    | ACCESS_RECEIVE_INSIGHTS_PERMISSION
+                    | ACCESS_HOST_INSIGHT_SURFACE_PERMISSION;
+
+    /** All access flags related to allowlists */
+    public static final int ACCESS_ALL_ALLOWLISTS =
+            ACCESS_PUBLISH_HINTS_ALLOWLIST
+            | ACCESS_RECEIVE_HINTS_ALLOWLIST
+            | ACCESS_PUBLISH_INSIGHTS_ALLOWLIST
+            | ACCESS_RECEIVE_INSIGHTS_ALLOWLIST
+            | ACCESS_FILTER_INSIGHTS_ALLOWLIST;
+
+    /** Access to bind context via permissions. */
+    public static final int ACCESS_BIND_CONTEXT_PERMISSION = 1 << 13;
 
     /** Interface to inject dependencies. */
     public interface Injector {
@@ -116,6 +140,9 @@ public class AccessController {
 
         /** Get {@link PackageManager}. */
         PackageManager getPackageManager();
+
+        /** Get {@link PermissionEnforcer}. */
+        PermissionEnforcer getPermissionEnforcer();
 
         /** Get {@link PermissionManager}. */
         PermissionManager getPermissionManager();
@@ -140,6 +167,11 @@ public class AccessController {
             }
 
             @Override
+            public PermissionEnforcer getPermissionEnforcer() {
+                return PermissionEnforcer.fromContext(context);
+            }
+
+            @Override
             public PermissionManager getPermissionManager() {
                 return context.getSystemService(PermissionManager.class);
             }
@@ -161,6 +193,7 @@ public class AccessController {
             RESULT_ALLOWED,
             RESULT_DENIED,
             RESULT_BYPASSED,
+            RESULT_SYSTEM,
     })
     public @interface AccessResult {
     }
@@ -168,11 +201,14 @@ public class AccessController {
     /** Allowed. */
     public static final int RESULT_ALLOWED = 0;
 
-    /** Allowed. */
+    /** Denied. */
     public static final int RESULT_DENIED = 1;
 
-    /** Allowed. */
+    /** Bypassed. */
     public static final int RESULT_BYPASSED = 2;
+
+    /** System. */
+    public static final int RESULT_SYSTEM = 3;
 
     /** Listener for access checks. */
     public interface EventListener {
@@ -186,6 +222,8 @@ public class AccessController {
 
     private final Resources mResources;
     private final PackageManager mPackageManager;
+
+    private final PermissionEnforcer mPermissionEnforcer;
     private final PermissionManager mPermissionManager;
     private final RoleManager mRoleManager;
     private final UserHandle mUser;
@@ -210,6 +248,7 @@ public class AccessController {
         mPermissionManager = injector.getPermissionManager();
         mRoleManager = injector.getRoleManager();
         mEventListener = injector.getEventListener();
+        mPermissionEnforcer = injector.getPermissionEnforcer();
         mUser = user;
     }
 
@@ -280,6 +319,9 @@ public class AccessController {
             result &= checkPccFlag(serviceInfo);
         } else if ((accessFlags & ACCESS_PCC_OR_AUTO_COMPANION_ROLE) != 0) {
             result &= checkPccOrAutoCompanionFlag(serviceInfo);
+        } else if ((accessFlags & ACCESS_BIND_CONTEXT_PERMISSION) != 0) {
+            result &= Manifest.permission.BIND_CONTEXT_COMPONENT_SERVICE.equals(
+                    serviceInfo.permission);
         }
 
         return result & isPackageAllowed(
@@ -298,6 +340,10 @@ public class AccessController {
     public boolean isPackageAllowed(String packageName, @Access int accessFlags) {
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Log.d(TAG, "Checking package " + packageName);
+        }
+
+        if (PersonalContextManagerService.isSystemPackage(packageName)) {
+            return true;
         }
 
         boolean result = true;
@@ -393,10 +439,50 @@ public class AccessController {
                         ? RESULT_ALLOWED : RESULT_DENIED);
     }
 
+    /**
+     * Checks and enforces permissions associated with the provided access flags.
+     */
+    public void enforcePermissions(int pid, int uid, @Access int accessFlags) {
+        HashSet<String> permissions = new HashSet<>();
+
+        if ((accessFlags & ACCESS_RECEIVE_HINTS_PERMISSION) != 0) {
+            permissions.add(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_HINTS);
+        }
+
+        if ((accessFlags & ACCESS_PUBLISH_HINTS_PERMISSION) != 0) {
+            permissions.add(Manifest.permission.PERSONAL_CONTEXT_PUBLISH_HINTS);
+        }
+
+        if ((accessFlags & ACCESS_RECEIVE_INSIGHTS_PERMISSION) != 0) {
+            permissions.add(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS);
+        }
+
+        if ((accessFlags & ACCESS_PUBLISH_INSIGHTS_PERMISSION) != 0) {
+            permissions.add(Manifest.permission.PERSONAL_CONTEXT_PUBLISH_INSIGHTS);
+        }
+
+        if ((accessFlags & ACCESS_HOST_INSIGHT_SURFACE_PERMISSION) != 0) {
+            permissions.add(Manifest.permission.PERSONAL_CONTEXT_HOST_INSIGHT_SURFACE);
+        }
+
+        if (permissions.isEmpty()) {
+            return;
+        }
+
+        String[] permissionArray = new String[permissions.size()];
+        permissions.toArray(permissionArray);
+
+        mPermissionEnforcer.enforcePermissionAllOf(permissionArray, pid, uid);
+    }
+
     /** Performs checks for a permission. */
     private boolean checkPermission(String packageName, String permission) {
         if (!Flags.enforcePersonalContextPermissions()) {
             return makeAccessDecision(packageName, "Permission " + permission, RESULT_BYPASSED);
+        }
+
+        if (PersonalContextManagerService.isSystemPackage(packageName)) {
+            return makeAccessDecision(packageName, "Permission " + permission, RESULT_SYSTEM);
         }
 
         final int permissionResult = mPermissionManager.checkPackageNamePermission(
@@ -419,6 +505,10 @@ public class AccessController {
                 : mResources.getResourceName(allowListResId));
         if (!Flags.enforcePersonalContextAllowlistAccessControl()) {
             return makeAccessDecision(packageName, description, RESULT_BYPASSED);
+        }
+
+        if (PersonalContextManagerService.isSystemPackage(packageName)) {
+            return makeAccessDecision(packageName, description, RESULT_SYSTEM);
         }
 
         if (!mAllowLists.contains(allowListResId)) {

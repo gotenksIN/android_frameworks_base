@@ -27,13 +27,13 @@ android_ravenwood_test {
         "ravenwood-junit-impl",
     ],
     srcs: [
-        "test/**/*.java",
-        "test/**/*.kt",
-        "test/**/*.aidl",
+        "src/**/*.java",
+        "src/**/*.kt",
+        "src/**/*.aidl",
     ],
     data: [
         "data/**/*",
-        "ravenwood.prop",
+        "ravenwood.sysprop",
     ],
     test_options: {
         // This is injected outside of the <test> element.

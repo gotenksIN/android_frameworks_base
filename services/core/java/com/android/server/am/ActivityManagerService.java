@@ -550,6 +550,7 @@ import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.SELinuxUtil;
 import com.android.server.power.stats.BatteryStatsImpl;
 import com.android.server.privatecompute.PccSandboxManagerInternal;
+import com.android.server.privatecompute.PrivateComputeStatsLogUtil;
 import com.android.server.sdksandbox.SdkSandboxManagerLocal;
 import com.android.server.stats.pull.StatsPullAtomService;
 import com.android.server.stats.pull.StatsPullAtomServiceInternal;
@@ -9776,6 +9777,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             mAppOpsService.systemReady();
             mProcessList.onSystemReady();
             mAppRestrictionController.onSystemReady();
+            mMemoryLimiter.onSystemReady();
             mSystemReady = true;
             t.traceEnd();
         }
@@ -9988,8 +9990,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         private void handleLimitReached(int uid) {
-            Slog.wtf(TAG, "Uid " + uid + " sent too many Binders to uid "
-                    + Process.myUid());
+            final String packageName = mPackageManagerInt.getNameForUid(uid);
+            Slog.wtf(TAG, "Uid " + uid + " [" + packageName + "]"
+                    + " sent too many Binders to uid " + Process.myUid());
             BinderProxy.dumpProxyDebugInfo();
             CriticalEventLog.getInstance().logExcessiveBinderCalls(uid);
             if (uid == Process.SYSTEM_UID) {
@@ -10015,7 +10018,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public void onWarningThresholdReached(int uid) {
-            Slog.w(TAG, "Uid " + uid + " sent too many ("
+            final String packageName = mPackageManagerInt.getNameForUid(uid);
+            Slog.w(TAG, "Uid " + uid + " [" + packageName + "]" + " sent too many ("
                     + BINDER_PROXY_WARNING_WATERMARK + ") Binders to uid " + Process.myUid());
             FrameworkStatsLog.write(FrameworkStatsLog.EXCESSIVE_BINDER_PROXY_COUNT_REPORTED, uid);
         }
@@ -15165,10 +15169,16 @@ public class ActivityManagerService extends IActivityManager.Stub
                 proc = startProcessLocked(app.processName, app, false, 0, hostingRecord,
                         ZYGOTE_POLICY_FLAG_SYSTEM_PROCESS, false, false);
             }
+
             if (proc == null) {
                 Slog.e(TAG, "Unable to start backup agent process " + r);
                 return false;
             }
+
+            if (enablePccFrameworkSupport() && app.shouldBackupAgentRunInPccProcess()) {
+                PrivateComputeStatsLogUtil.logPccBackupAgentStarted();
+            }
+
             mProcessList.getAppStartInfoTracker().handleProcessBackupStart(startTimeNs, proc, r,
                     !isProcessStarted);
 

@@ -18,7 +18,9 @@ package com.android.server.privatecompute;
 
 import static android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT;
 import static com.android.server.privatecompute.AuditModeTestUtils.TEST_PACKAGE_NAME;
-import static com.android.server.privatecompute.AuditModeTestUtils.TEST_TIMESTAMP;
+import static com.android.server.privatecompute.AuditModeTestUtils.TEST_CURRENT_TIME_MILLIS;
+import static com.android.server.privatecompute.AuditModeTestUtils.TEST_PACKAGE_NAME;
+import static com.android.server.privatecompute.AuditModeTestUtils.TEST_REALTIME_NANOS;
 import static com.android.server.privatecompute.AuditModeTestUtils.TEST_UID;
 import static com.android.server.privatecompute.AuditModeTestUtils.assertEqualsToTestBundle;
 import static com.android.server.privatecompute.AuditModeTestUtils.getTestBundle;
@@ -79,6 +81,7 @@ public class AuditModeContextTest {
         when(mInjector.auditModeMaxLogFiles()).thenReturn(MAX_FILES);
         mAuditModeContext =
                 new AuditModeContext(
+                        UserHandle.getUserId(TEST_UID),
                         newDirectExecutorService(),
                         newDirectExecutorService(),
                         mTemporaryFolder.getRoot(),
@@ -91,7 +94,7 @@ public class AuditModeContextTest {
         // Currently this test's implementation is identical to testStopAuditing_writesPendingData,
         // but in the future we might change how we write. These are two different behaviors that
         // need to be tested.
-        mAuditModeContext.writeToAuditLog(getTestBundle(), TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(getTestBundle(), TEST_PACKAGE_NAME, TEST_UID);
 
         mAuditModeContext.stopAuditing(); // Triggers a write with pending data
 
@@ -104,17 +107,17 @@ public class AuditModeContextTest {
     @Test
     public void testWriteToAuditLog_bufferFull_getsWrittenToDisk() throws Exception {
         PersistableBundle testBundle = getTestBundle();
-        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
         int entrySize = entry.toByteArray().length;
         int nEntriesToWrite = (int) Math.floor(1024 * MAX_SIZE_KILOBYTES / (double) entrySize);
         for (int i = 0; i < nEntriesToWrite; i++) {
-            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         }
         File file = mAuditModeContext.getCurrentAuditLogFile();
         assertThat(file.length()).isEqualTo(0); // no write yet
 
         // buffer full, triggers a write
-        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
 
         assertThat(file.length()).isNotEqualTo(0); // write triggered
     }
@@ -122,19 +125,35 @@ public class AuditModeContextTest {
     @Test
     public void testWriteToAuditLog_whenBufferFull_createsNewFile() throws Exception {
         PersistableBundle testBundle = getTestBundle();
-        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
         int entrySize = entry.toByteArray().length;
         int nEntriesToWrite = (int) Math.floor(1024 * MAX_SIZE_KILOBYTES / (double) entrySize);
         for (int i = 0; i < nEntriesToWrite; i++) {
-            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         }
         File file = mAuditModeContext.getCurrentAuditLogFile();
 
         // buffer full, triggers a write
-        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
 
         File newFile = mAuditModeContext.getCurrentAuditLogFile();
         assertThat(newFile.getName()).isNotEqualTo(file.getName());
+    }
+
+    @Test
+    public void testWriteToAuditLog_differentUser_throwsSecurityException() {
+        AuditModeContext auditModeContext =
+                new AuditModeContext(
+                        UserHandle.getUserId(TEST_UID) + 1,
+                        newDirectExecutorService(),
+                        newDirectExecutorService(),
+                        mTemporaryFolder.getRoot(),
+                        mInjector);
+        assertThrows(
+                SecurityException.class,
+                () ->
+                        auditModeContext.writeToAuditLog(
+                                getTestBundle(), TEST_PACKAGE_NAME, TEST_UID));
     }
 
     @Test
@@ -143,6 +162,7 @@ public class AuditModeContextTest {
         File newFolder = mTemporaryFolder.newFolder();
         AuditModeContext auditModeContext =
                 new AuditModeContext(
+                        UserHandle.getUserId(TEST_UID),
                         newDirectExecutorService(),
                         newDirectExecutorService(),
                         newFolder,
@@ -150,11 +170,11 @@ public class AuditModeContextTest {
         PersistableBundle testBundle = getTestBundle();
         File file0 = auditModeContext.getCurrentAuditLogFile();
         // This creates MAX_FILES files.
-        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
         int entrySize = entry.toByteArray().length;
         int nEntriesToWrite = (int) Math.floor(1024 * MAX_SIZE_KILOBYTES / (double) entrySize);
         for (int i = 0; i < MAX_FILES * nEntriesToWrite; i++) {
-            auditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+            auditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         }
         PersistableBundle testBundle2 = testBundle.deepCopy();
         testBundle2.putInt("test_key2", 123);
@@ -167,7 +187,7 @@ public class AuditModeContextTest {
         }
 
         // Act: write one more bundle to the ringbuffer, then trigger a write.
-        auditModeContext.writeToAuditLog(testBundle2, TEST_PACKAGE_NAME);
+        auditModeContext.writeToAuditLog(testBundle2, TEST_PACKAGE_NAME, TEST_UID);
         auditModeContext.stopAuditing();
 
         // Assert: Should behave like a ringbuffer, and overwrite the first file.
@@ -188,15 +208,15 @@ public class AuditModeContextTest {
             fileOutputStream.flush();
         }
         PersistableBundle testBundle = getTestBundle();
-        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
         int entrySize = entry.toByteArray().length;
         int nEntriesToWrite = (int) Math.floor(1024 * MAX_SIZE_KILOBYTES / (double) entrySize);
         for (int i = 0; i < nEntriesToWrite; i++) {
-            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         }
 
         // buffer full, triggers a write
-        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
 
         DataInputStream stream = new DataInputStream(new FileInputStream(file));
         List<AuditLogEntry> entries = readAuditLogFileFromStream(stream);
@@ -210,7 +230,7 @@ public class AuditModeContextTest {
         PersistableBundle testBundle = getTestBundle();
         File file = mAuditModeContext.getCurrentAuditLogFile();
 
-        mAuditModeContext.writeToAuditLog(testBundle, packageName);
+        mAuditModeContext.writeToAuditLog(testBundle, packageName, TEST_UID);
 
         mAuditModeContext.stopAuditing(); // flushes 1 log entry to disk
         DataInputStream stream = new DataInputStream(new FileInputStream(file));
@@ -221,7 +241,7 @@ public class AuditModeContextTest {
 
     @Test
     public void testStopAuditing_writesPendingData() throws Exception {
-        mAuditModeContext.writeToAuditLog(getTestBundle(), TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(getTestBundle(), TEST_PACKAGE_NAME, TEST_UID);
 
         mAuditModeContext.stopAuditing();
 
@@ -234,15 +254,15 @@ public class AuditModeContextTest {
     @Test
     public void testStopAuditing_whenStopped_noMoreDataIsWritten() throws Exception {
         PersistableBundle testBundle = getTestBundle();
-        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         mAuditModeContext.stopAuditing(); // flushes 1 log entry to disk
-        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
         int entrySize = entry.toByteArray().length;
         int nEntriesToWrite = (int) Math.floor(1024 * MAX_SIZE_KILOBYTES / (double) entrySize);
 
         // nEntriesToWrite writes, would trigger a write if not for the stopAuditing()
         for (int i = 0; i < nEntriesToWrite; i++) {
-            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         }
 
         File file = mAuditModeContext.getCurrentAuditLogFile();
@@ -259,8 +279,12 @@ public class AuditModeContextTest {
         ExecutorService writerExecutor = AuditModeContext.getDiskWriterExecutorService();
         mAuditModeContext =
                 new AuditModeContext(
-                        serializerExecutor, writerExecutor, mTemporaryFolder.getRoot(), mInjector);
-        mAuditModeContext.writeToAuditLog(getTestBundle(), TEST_PACKAGE_NAME);
+                        UserHandle.getUserId(TEST_UID),
+                        serializerExecutor,
+                        writerExecutor,
+                        mTemporaryFolder.getRoot(),
+                        mInjector);
+        mAuditModeContext.writeToAuditLog(getTestBundle(), TEST_PACKAGE_NAME, TEST_UID);
         serializerExecutor.awaitTermination(10, TimeUnit.SECONDS); // Wait for the pending tasks.
         writerExecutor.awaitTermination(10, TimeUnit.SECONDS); // Wait for the pending write.
 
@@ -284,7 +308,11 @@ public class AuditModeContextTest {
         ExecutorService writerExecutor = AuditModeContext.getDiskWriterExecutorService();
         mAuditModeContext =
                 new AuditModeContext(
-                        serializerExecutor, writerExecutor, mTemporaryFolder.getRoot(), mInjector);
+                        UserHandle.getUserId(TEST_UID),
+                        serializerExecutor,
+                        writerExecutor,
+                        mTemporaryFolder.getRoot(),
+                        mInjector);
         CountDownLatch slowTaskStarted = new CountDownLatch(1);
         CountDownLatch allowSlowTaskToFinish = new CountDownLatch(1);
         serializerExecutor.execute( // Add a slow task to the serializerExecutor
@@ -299,16 +327,16 @@ public class AuditModeContextTest {
                 });
         slowTaskStarted.await(1, TimeUnit.SECONDS); // Wait until the slow task has started
         PersistableBundle testBundle = getTestBundle();
-        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry = new AuditLogEntry(testBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
         int entrySize = entry.toByteArray().length;
         int nEntriesToWrite = (int) Math.floor(1024 * MAX_SIZE_KILOBYTES / (double) entrySize);
         for (int i = 0; i < nEntriesToWrite; i++) {
-            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+            mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         }
 
         // Act: Triggers a write by the serializerExecutor, who is busy with the slow task.
         long startTime = System.currentTimeMillis();
-        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME);
+        mAuditModeContext.writeToAuditLog(testBundle, TEST_PACKAGE_NAME, TEST_UID);
         long endTime = System.currentTimeMillis();
 
         // Assert: The write should be fast, even though the executor is busy with the slow task.
@@ -326,7 +354,8 @@ public class AuditModeContextTest {
     public void testSerializeAndWrite_invalidBundle_throwsSecurityExceptionAndDoesNotWrite()
             throws Exception {
         PersistableBundle invalidBundle = getDeepNestedBundle101();
-        AuditLogEntry entry = new AuditLogEntry(invalidBundle, 234L, TEST_PACKAGE_NAME, 123);
+        AuditLogEntry entry =
+                new AuditLogEntry(invalidBundle, 234L, 234000L, TEST_PACKAGE_NAME, 123);
 
         assertThrows(SecurityException.class, () -> mAuditModeContext.serializeAndWrite(entry));
 
@@ -376,7 +405,13 @@ public class AuditModeContextTest {
         AuditLogEntry entry1 = getTestEntry();
         PersistableBundle bundle2 = new PersistableBundle();
         bundle2.putInt("test_key", 123);
-        AuditLogEntry entry2 = new AuditLogEntry(bundle2, TEST_TIMESTAMP + 1L, "other_package", 23);
+        AuditLogEntry entry2 =
+                new AuditLogEntry(
+                        bundle2,
+                        TEST_REALTIME_NANOS + 1L,
+                        TEST_CURRENT_TIME_MILLIS + 1000L,
+                        "other_package",
+                        23);
         writer.writeEntries(ImmutableList.of(entry1.toByteArray(), entry2.toByteArray()));
         assertThat(folder.listFiles()).hasLength(1);
 
@@ -385,11 +420,13 @@ public class AuditModeContextTest {
         assertThat(entries).hasSize(2);
         assertEquals(entries.get(0).mCallingPackage, TEST_PACKAGE_NAME);
         assertEquals(entries.get(0).mCallingUid, TEST_UID);
-        assertEquals(entries.get(0).mTimestamp, TEST_TIMESTAMP);
+        assertEquals(entries.get(0).mRealTimeNanos, TEST_REALTIME_NANOS);
+        assertEquals(entries.get(0).mCurrentTimeMillis, TEST_CURRENT_TIME_MILLIS);
         assertEqualsToTestBundle(entries.get(0).mData);
         assertThat(entries.get(1).mCallingPackage).isEqualTo("other_package");
         assertThat(entries.get(1).mCallingUid).isEqualTo(23);
-        assertEquals(entries.get(1).mTimestamp, TEST_TIMESTAMP + 1L);
+        assertEquals(entries.get(1).mRealTimeNanos, TEST_REALTIME_NANOS + 1L);
+        assertEquals(entries.get(1).mCurrentTimeMillis, TEST_CURRENT_TIME_MILLIS + 1000L);
         assertEquals(entries.get(1).mData.getInt("test_key"), 123);
     }
 
@@ -404,7 +441,13 @@ public class AuditModeContextTest {
         PersistableBundle bundle2 = new PersistableBundle();
         bundle2.putInt("test_key", 123);
         AuditLogFileWriter writer2 = new AuditLogFileWriter(file2);
-        AuditLogEntry entry2 = new AuditLogEntry(bundle2, TEST_TIMESTAMP + 2L, "other_package", 23);
+        AuditLogEntry entry2 =
+                new AuditLogEntry(
+                        bundle2,
+                        TEST_REALTIME_NANOS + 2L,
+                        TEST_CURRENT_TIME_MILLIS + 2000L,
+                        "other_package",
+                        23);
         writer2.writeEntries(ImmutableList.of(entry2.toByteArray()));
         assertThat(folder.listFiles()).hasLength(2);
 
@@ -413,11 +456,13 @@ public class AuditModeContextTest {
         assertThat(entries).hasSize(2);
         assertEquals(entries.get(0).mCallingPackage, TEST_PACKAGE_NAME);
         assertEquals(entries.get(0).mCallingUid, TEST_UID);
-        assertEquals(entries.get(0).mTimestamp, TEST_TIMESTAMP);
+        assertEquals(entries.get(0).mRealTimeNanos, TEST_REALTIME_NANOS);
+        assertEquals(entries.get(0).mCurrentTimeMillis, TEST_CURRENT_TIME_MILLIS);
         assertEqualsToTestBundle(entries.get(0).mData);
         assertThat(entries.get(1).mCallingPackage).isEqualTo("other_package");
         assertThat(entries.get(1).mCallingUid).isEqualTo(23);
-        assertEquals(entries.get(1).mTimestamp, TEST_TIMESTAMP + 2L);
+        assertEquals(entries.get(1).mRealTimeNanos, TEST_REALTIME_NANOS + 2L);
+        assertEquals(entries.get(1).mCurrentTimeMillis, TEST_CURRENT_TIME_MILLIS + 2000L);
         assertEquals(entries.get(1).mData.getInt("test_key"), 123);
     }
 
@@ -438,7 +483,12 @@ public class AuditModeContextTest {
         assertThat(UserHandle.getUserId(logUid)).isNotEqualTo(userId);
         File folder = mTemporaryFolder.newFolder();
         AuditLogEntry entry =
-                new AuditLogEntry(getTestBundle(), TEST_TIMESTAMP, TEST_PACKAGE_NAME, logUid);
+                new AuditLogEntry(
+                        getTestBundle(),
+                        TEST_REALTIME_NANOS,
+                        TEST_CURRENT_TIME_MILLIS,
+                        TEST_PACKAGE_NAME,
+                        logUid);
         AuditLogFileWriter writer = new AuditLogFileWriter(folder);
         writer.writeEntries(ImmutableList.of(entry.toByteArray()));
 
@@ -455,7 +505,12 @@ public class AuditModeContextTest {
         File folder = mTemporaryFolder.newFolder();
         File file = new File(folder, "audit_log.0.bin");
         AuditLogEntry entry =
-                new AuditLogEntry(getTestBundle(), TEST_TIMESTAMP, TEST_PACKAGE_NAME, logUid);
+                new AuditLogEntry(
+                        getTestBundle(),
+                        TEST_REALTIME_NANOS,
+                        TEST_CURRENT_TIME_MILLIS,
+                        TEST_PACKAGE_NAME,
+                        logUid);
         AuditLogFileWriter writer = new AuditLogFileWriter(file);
         writer.writeEntries(ImmutableList.of(entry.toByteArray()));
 
@@ -464,7 +519,8 @@ public class AuditModeContextTest {
         assertThat(entries).hasSize(1);
         assertEquals(entries.get(0).mCallingPackage, TEST_PACKAGE_NAME);
         assertEquals(entries.get(0).mCallingUid, logUid);
-        assertEquals(entries.get(0).mTimestamp, TEST_TIMESTAMP);
+        assertEquals(entries.get(0).mRealTimeNanos, TEST_REALTIME_NANOS);
+        assertEquals(entries.get(0).mCurrentTimeMillis, TEST_CURRENT_TIME_MILLIS);
         assertEqualsToTestBundle(entries.get(0).mData);
     }
 
@@ -479,10 +535,15 @@ public class AuditModeContextTest {
         File folder = mTemporaryFolder.newFolder();
         File file = new File(folder, "audit_log.1.bin");
         AuditLogEntry entry1 =
-                new AuditLogEntry(getTestBundle(), TEST_TIMESTAMP, TEST_PACKAGE_NAME, logUid1);
+                new AuditLogEntry(
+                        getTestBundle(),
+                        TEST_REALTIME_NANOS,
+                        TEST_CURRENT_TIME_MILLIS,
+                        TEST_PACKAGE_NAME,
+                        logUid1);
         PersistableBundle bundle2 = new PersistableBundle();
         bundle2.putInt("test_key", 123);
-        AuditLogEntry entry2 = new AuditLogEntry(bundle2, 234L, "other_package", logUid2);
+        AuditLogEntry entry2 = new AuditLogEntry(bundle2, 234L, 234000L, "other_package", logUid2);
         AuditLogFileWriter writer = new AuditLogFileWriter(file);
         writer.writeEntries(ImmutableList.of(entry1.toByteArray(), entry2.toByteArray()));
 
@@ -491,7 +552,8 @@ public class AuditModeContextTest {
         assertThat(entries).hasSize(1);
         assertEquals(entries.get(0).mCallingPackage, TEST_PACKAGE_NAME);
         assertEquals(entries.get(0).mCallingUid, logUid1);
-        assertEquals(entries.get(0).mTimestamp, TEST_TIMESTAMP);
+        assertEquals(entries.get(0).mRealTimeNanos, TEST_REALTIME_NANOS);
+        assertEquals(entries.get(0).mCurrentTimeMillis, TEST_CURRENT_TIME_MILLIS);
         assertEqualsToTestBundle(entries.get(0).mData);
     }
 

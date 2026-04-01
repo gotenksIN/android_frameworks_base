@@ -51,6 +51,9 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.display.domain.interactor.ShadeExpansionTargetDisplayInteractor
+import com.android.systemui.shade.domain.interactor.DisplayAwareShadeElementToggleInteractor
+import com.android.systemui.shade.domain.interactor.NotificationShadeElement
+import com.android.systemui.shade.domain.interactor.QSShadeElement
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.chips.mediaprojection.domain.model.MediaProjectionStopDialogModel
 import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppChipViewModel
@@ -76,8 +79,8 @@ import com.android.systemui.statusbar.pipeline.shared.domain.interactor.StatusBa
 import com.android.systemui.statusbar.pipeline.shared.ui.model.ChipsVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombinedVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
-import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityState
 import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
+import com.android.systemui.statusbar.quickactions.ime.domain.interactor.ImeIndicatorChipInteractor
 import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipsViewModel
 import com.android.systemui.statusbar.quickactions.shared.model.QuickActionChipModel
@@ -164,6 +167,12 @@ interface HomeStatusBarViewModel : Activatable {
     /** Notifies that there was a long press on the status bar. */
     fun onStatusBarLongPressed()
 
+    /** Notifies that the clock container was clicked. */
+    fun onClockClicked()
+
+    /** Notifies that the status bar's blank space was clicked. */
+    fun onSpacerClicked()
+
     /** Notifies that the system icons container was clicked. */
     fun onQuickSettingsChipClicked()
 
@@ -194,16 +203,16 @@ interface HomeStatusBarViewModel : Activatable {
     val isHomeStatusBarAllowed: StateFlow<Boolean>
 
     /** True if the operator name view is not hidden due to HUN or other visibility state */
-    val shouldShowOperatorNameView: Boolean
-    val isClockVisible: VisibilityModel
-    val isNotificationIconContainerVisible: VisibilityModel
+    val shouldShowOperatorNameView: Flow<Boolean>
+    val isClockVisible: Flow<VisibilityModel>
+    val isNotificationIconContainerVisible: Flow<VisibilityModel>
 
     /**
      * Pair of (system info visibility, event animation state). The animation state can be used to
      * respond to the system event chip animations. In all cases, system info visibility correctly
      * models the View.visibility for the system info area
      */
-    val systemInfoCombinedVis: SystemInfoCombinedVisibilityModel
+    val systemInfoCombinedVis: StateFlow<SystemInfoCombinedVisibilityModel>
 
     /** Which icons to block from the home status bar */
     val iconBlockList: Flow<List<String>>
@@ -283,6 +292,10 @@ constructor(
     sceneInteractor: SceneInteractor,
     private val shadeInteractor: ShadeInteractor,
     private val shadeExpansionTargetDisplayInteractor: ShadeExpansionTargetDisplayInteractor,
+    private val displayAwareShadeElementToggleInteractor: DisplayAwareShadeElementToggleInteractor,
+    private val qsShadeElement: QSShadeElement,
+    private val notificationElement: NotificationShadeElement,
+    private val imeIndicatorChipInteractor: ImeIndicatorChipInteractor,
     shareToAppChipViewModel: ShareToAppChipViewModel,
     @DisplayAware private val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel,
     statusBarPopupChipsViewModelFactory: StatusBarPopupChipsViewModel.Factory,
@@ -407,7 +420,7 @@ constructor(
     private val shadeInvocationSplitRatio: Float =
         resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
 
-    override val shouldShowOperatorNameView: Boolean by
+    override val shouldShowOperatorNameView: Flow<Boolean> =
         combine(
                 statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
                 homeStatusBarInteractor.visibilityViaDisableFlags,
@@ -424,7 +437,6 @@ constructor(
                 initialValue = false,
             )
             .flowOn(bgDispatcher)
-            .hydratedStateOf(traceName = "shouldShowOperatorNameView", initialValue = false)
 
     private val chipsVisibilityModel: StateFlow<ChipsVisibilityModel> =
         if (StatusBarHeadline.isEnabled) {
@@ -472,6 +484,30 @@ constructor(
         scrollToTopInteractor.onScrollToTop(thisDisplayId, eventX.toInt())
     }
 
+    override fun onClockClicked() {
+        // ImeIndicator is a QuickActions LaunchChip (not PopupChip), with no associated popups. On
+        // click it launches the InputMethodPicker (SystemUI Dialog, via InputMethodManager API)
+        // that appears as if it were a StatusBar popup, thus is required to mimic the behaviour of
+        // StatusBar popups. In particular, click on StatusBar clock should hide InputMethodPicker
+        // for consistency, like how they currently trigger the open StatusBar popup (if any) to
+        // dismiss (by virtue of the click falling outside the bounds of that popup).
+        // TODO: b/478352392 - Consider achieving the same effect by hiding InputMethodPicker upon
+        // "out-of-bounds click" instead, via SceneContainerViewModel.onEmptySpaceMotionEvent().
+        imeIndicatorChipInteractor.hideInputMethodPicker(thisDisplayId)
+    }
+
+    override fun onSpacerClicked() {
+        // ImeIndicator is a QuickActions LaunchChip (not PopupChip), with no associated popups. On
+        // click it launches the InputMethodPicker (SystemUI Dialog, via InputMethodManager API)
+        // that appears as if it were a StatusBar popup, thus is required to mimic the behaviour of
+        // StatusBar popups. In particular, click on StatusBar spacer should hide InputMethodPicker
+        // for consistency, like how they currently trigger the open StatusBar popup (if any) to
+        // dismiss (by virtue of the click falling outside the bounds of that popup).
+        // TODO: b/478352392 - Consider achieving the same effect by hiding InputMethodPicker upon
+        // "out-of-bounds click" instead, via SceneContainerViewModel.onEmptySpaceMotionEvent().
+        imeIndicatorChipInteractor.hideInputMethodPicker(thisDisplayId)
+    }
+
     override fun onStatusBarLongPressed() {
         shadeInteractor.expandNotificationsShade(
             loggingReason = "HomeStatusBarViewModel.onStatusBarLongPressed"
@@ -479,20 +515,13 @@ constructor(
     }
 
     override fun onQuickSettingsChipClicked() {
-        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) {
-            return
-        }
-        shadeInteractor.toggleQuickSettingsShade(
-            loggingReason = "HomeStatusBarViewModel.onQuickSettingsChipClicked"
-        )
+        displayAwareShadeElementToggleInteractor.toggleShadeElement(qsShadeElement, thisDisplayId)
     }
 
     override fun onNotificationIconChipClicked() {
-        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) {
-            return
-        }
-        shadeInteractor.toggleNotificationsShade(
-            loggingReason = "HomeStatusBarViewModel.onNotificationIconChipClicked"
+        displayAwareShadeElementToggleInteractor.toggleShadeElement(
+            notificationElement,
+            thisDisplayId,
         )
     }
 
@@ -526,7 +555,7 @@ constructor(
             hasChips && canShowChips
         }
 
-    override val isClockVisible: VisibilityModel by
+    override val isClockVisible: Flow<VisibilityModel> =
         combine(
                 statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
                 homeStatusBarInteractor.visibilityViaDisableFlags,
@@ -542,12 +571,8 @@ constructor(
                 initialValue = VisibilityModel(false.toVisibleOrInvisible(), false),
             )
             .flowOn(bgDispatcher)
-            .hydratedStateOf(
-                traceName = "isClockVisible",
-                initialValue = VisibilityModel(VisibilityState.INVISIBLE, false),
-            )
 
-    override val isNotificationIconContainerVisible: VisibilityModel by
+    override val isNotificationIconContainerVisible: Flow<VisibilityModel> =
         combine(
                 statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
                 isAnyChipVisible,
@@ -569,13 +594,9 @@ constructor(
             .logDiffsForTable(
                 tableLogBuffer = tableLogger,
                 columnPrefix = COL_PREFIX_NOTIF_CONTAINER,
-                initialValue = VisibilityModel(VisibilityState.GONE, false),
+                initialValue = VisibilityModel(false.toVisibleOrInvisible(), false),
             )
             .flowOn(bgDispatcher)
-            .hydratedStateOf(
-                traceName = "isNotificationIconContainerVisible",
-                initialValue = VisibilityModel(VisibilityState.GONE, false),
-            )
 
     private val isSystemInfoVisible =
         combine(
@@ -587,7 +608,7 @@ constructor(
             VisibilityModel(showSystemInfo.toVisibleOrGone(), visibilityViaDisableFlags.animate)
         }
 
-    override val systemInfoCombinedVis: SystemInfoCombinedVisibilityModel by
+    override val systemInfoCombinedVis =
         combine(isSystemInfoVisible, animations.animationState) { sysInfoVisible, animationState ->
                 SystemInfoCombinedVisibilityModel(sysInfoVisible, animationState)
             }
@@ -596,19 +617,12 @@ constructor(
                 tableLogBuffer = tableLogger,
                 columnPrefix = COL_PREFIX_SYSTEM_INFO,
                 initialValue =
-                    SystemInfoCombinedVisibilityModel(
-                        VisibilityModel(VisibilityState.VISIBLE, false),
-                        Idle,
-                    ),
+                    SystemInfoCombinedVisibilityModel(VisibilityModel(View.VISIBLE, false), Idle),
             )
-            .flowOn(bgDispatcher)
-            .hydratedStateOf(
-                traceName = "systemInfoCombinedVis",
-                initialValue =
-                    SystemInfoCombinedVisibilityModel(
-                        VisibilityModel(VisibilityState.VISIBLE, false),
-                        Idle,
-                    ),
+            .stateIn(
+                bgDisplayScope,
+                SharingStarted.WhileSubscribed(),
+                SystemInfoCombinedVisibilityModel(VisibilityModel(View.VISIBLE, false), Idle),
             )
 
     override val iconBlockList: Flow<List<String>> =
@@ -642,12 +656,14 @@ constructor(
         enqueueOnActivatedScope { userLogoutInteractor.logOutToSystemUser() }
     }
 
-    private fun Boolean.toVisibleOrGone(): VisibilityState {
-        return if (this) VisibilityState.VISIBLE else VisibilityState.GONE
+    @View.Visibility
+    private fun Boolean.toVisibleOrGone(): Int {
+        return if (this) View.VISIBLE else View.GONE
     }
 
-    private fun Boolean.toVisibleOrInvisible(): VisibilityState =
-        if (this) VisibilityState.VISIBLE else VisibilityState.INVISIBLE
+    // Similar to the above, but uses INVISIBLE in place of GONE
+    @View.Visibility
+    private fun Boolean.toVisibleOrInvisible(): Int = if (this) View.VISIBLE else View.INVISIBLE
 
     override suspend fun onActivated() {
         coroutineScope {

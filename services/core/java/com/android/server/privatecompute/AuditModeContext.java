@@ -38,13 +38,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-/* Current Audit Mode limitations (tracked in b/461406944):
- * - Audit mode is set to true. Instead, a system property should be introduced to toggle
- *   audit mode on/off.
- * - Incoming data is not sanitized. Depends on ag/36599762.
- * - If the logging frequency is too high, the log might be incomplete.
- * - The first logging file is always "0".
- */
 
 /**
  * Manages the state of audit mode; when on, collects logs and periodically writes them to disk.
@@ -89,12 +82,16 @@ class AuditModeContext {
     @GuardedBy("mLock")
     private AuditLogInMemoryBuffer mAuditLogInMemoryBuffer;
 
+    final int mUserId;
+
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     AuditModeContext(
+            int userId,
             ExecutorService serializerExecutor,
             ExecutorService diskWriterExecutor,
             File folder,
             Injector injector) {
+        mUserId = userId;
         mBundleSerializerExecutor = serializerExecutor;
         mDiskWriterExecutor = diskWriterExecutor;
         mFolder = folder;
@@ -119,15 +116,16 @@ class AuditModeContext {
      * Instantiates an AuditModeContext, including an output stream to the audit log file, or
      * returns null if an error occurred.
      */
-    public static @NonNull AuditModeContext create(File folder) {
+    public static @NonNull AuditModeContext create(int userId, File folder) {
         return new AuditModeContext(
+                userId,
                 getBundleSerializerExecutorService(),
                 getDiskWriterExecutorService(),
                 folder,
                 new Injector());
     }
 
-    /** Deletes all audit log files from the default audit log directory. */
+    /** Deletes all audit log files from the user's audit log directory. */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     static void deleteAuditLogFiles(File dir) {
         if (dir.exists()) {
@@ -170,18 +168,23 @@ class AuditModeContext {
      *
      * <p>If the in-memory queue is full, it is emptied and asynchronously written to disk.
      */
-    void writeToAuditLog(@NonNull PersistableBundle data, @NonNull String packageName) {
+    void writeToAuditLog(@NonNull PersistableBundle data, @NonNull String packageName,
+                         int callingUid) {
         synchronized (mLock) {
             if (mIsStopping) {
                 return;
             }
         }
+        if (UserHandle.getUserId(callingUid) != mUserId) {
+            throw new SecurityException("Attempted to write to audit log from a different user.");
+        }
         AuditLogEntry entry =
                 new AuditLogEntry(
                         data,
                         SystemClock.elapsedRealtimeNanos(),
+                        System.currentTimeMillis(),
                         packageName,
-                        Binder.getCallingUid());
+                        callingUid);
         mBundleSerializerExecutor.execute(
                 () -> {
                     try {
@@ -285,7 +288,7 @@ class AuditModeContext {
             return new ArrayList<>();
         }
         List<AuditLogEntry> entries = AuditLogFileWriter.readEntriesForFiles(Arrays.asList(files));
-        entries.sort(Comparator.comparingLong(entry -> entry.mTimestamp));
+        entries.sort(Comparator.comparingLong(entry -> entry.mRealTimeNanos));
         return entries;
     }
 }

@@ -4921,6 +4921,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     </plurals>
 
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_bundle_text_description" translatable="false">\u0020into <annotation bundleName="true">\u201c<xliff:g id="bundleName">^1</xliff:g>\u201d</annotation> bundle with <annotation bundleEmoji="true"><xliff:g id="bundleEmoji">^2</xliff:g></annotation> emoji</string>
 
     <!-- Text for a button letting users edit a particular notification rule. [CHAR LIMIT=30]-->

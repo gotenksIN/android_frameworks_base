@@ -53,6 +53,7 @@ import android.view.inputmethod.ImeTracker;
 import android.window.ScreenCaptureInternal;
 import android.window.ScreenCaptureInternal.ScreenshotHardwareBuffer;
 
+import com.android.internal.os.IResultReceiver;
 import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.server.input.InputManagerService;
 import com.android.server.wm.SensitiveContentPackages.PackageInfo;
@@ -1365,4 +1366,32 @@ public abstract class WindowManagerInternal {
      * @param canStealTopFocus The override value, or {@code null} to clear the override.
      */
     public abstract void setCanStealTopFocusForDisplay(int displayId, boolean canStealTopFocus);
+
+    /**
+     * Set the receiver for the {@link android.view.accessibility.IAccessibilityEmbeddedConnection}
+     * of the focused window on the given display. The receiver is updated as the focused window
+     * changes.
+     *
+     * <p>This API is designed to be controlled by a single source and callers should not use this
+     * unless they are the designated owner.
+     *
+     * @param displayId The display on which to track the connection.
+     * @param receiver  The receiver to receive the connection status, using
+     *                  {@link android.view.WindowManager#PARCEL_KEY_A11Y_EMBEDDED_CONNECTION}.
+     */
+    // TODO: b/493338658 - In the long term, explore setting up A11y embedding connections through
+    //  SurfaceControl via WindowInfosListener.
+    public abstract void setFocusedA11yEmbeddedConnectionReceiverOnDisplay(int displayId,
+            @Nullable IResultReceiver receiver);
+
+    /**
+     * Sets whether the system theme is ready.
+     *
+     * <p>When false, the screen is blocked from turning on during boot. When true, WindowManager
+     * will attempt to turn on the screen if all other conditions (like wallpaper and lockscreen
+     * being drawn) are met.
+     *
+     * @param ready True if the theme is ready, false otherwise.
+     */
+    public abstract void setThemeReady(boolean ready);
 }

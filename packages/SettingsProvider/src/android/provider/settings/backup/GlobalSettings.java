@@ -48,7 +48,7 @@ public class GlobalSettings {
         Settings.Global.AUTO_TIME_ZONE,
         Settings.Global.TIME_ZONE_NOTIFICATIONS,
         Settings.Global.TIME_ZONE_OFFSET_CHANGE_NOTIFICATIONS,
-        Settings.Global.USER_HOME_TIME_ZONE_ID,
+        Settings.Global.HOME_TIME_ZONE_ID,
         Settings.Global.POWER_SOUNDS_ENABLED,
         Settings.Global.DOCK_SOUNDS_ENABLED,
         Settings.Global.CHARGING_SOUNDS_ENABLED,
@@ -130,6 +130,10 @@ public class GlobalSettings {
         Settings.Global.Wearable.GESTURE_CUSTOMIZE_MEDIA_CONTROLS_PRIMARY_ACTION,
         Settings.Global.Wearable.GESTURE_CUSTOMIZE_WORKOUT_CONTROLS_PRIMARY_ACTION,
         Settings.Global.Wearable.GESTURE_CUSTOMIZE_ALARM_PRIMARY_ACTION,
+        Settings.Global.Wearable.RAISE_TO_TALK_ENABLED,
+        Settings.Global.Wearable.RAISE_TO_TALK_VISUAL_INDICATOR_ENABLED,
+        Settings.Global.Wearable.RAISE_TO_TALK_GESTURE_SENSITIVITY,
+        Settings.Global.Wearable.RAISE_TO_TALK_VOICE_SENSITIVITY,
         Settings.Global.Wearable.REMOTE_GESTURES_ENABLED,
         Settings.Global.Wearable.ALWAYS_ROUTE_GESTURES_TO_REMOTE_CLIENTS,
         Settings.Global.Wearable.WEAR_BUG_REPORT_WARNING_VISIBILITY_STATE,
@@ -144,5 +148,6 @@ public class GlobalSettings {
         Settings.Global.WATCH_RANGING_SUPPORTED_BY_PRIMARY_DEVICE,
         Settings.Global.MINMODE_ACTIVE,
         Settings.Global.WATCH_RANGING_AVAILABLE,
+        Settings.Global.Wearable.WEAR_SATELLITE_MODE_ENABLED,
     };
 }

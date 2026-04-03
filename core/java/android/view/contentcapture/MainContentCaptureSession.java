@@ -204,7 +204,7 @@ public final class MainContentCaptureSession extends ContentCaptureSession {
         public void send(int resultCode, Bundle resultData) {
             final MainContentCaptureSession mainSession = mMainSession.get();
             if (mainSession == null) {
-                Log.w(TAG, "received result after mina session released");
+                Log.w(TAG, "received result after main session released");
                 return;
             }
             final IBinder binder;
@@ -678,6 +678,17 @@ public final class MainContentCaptureSession extends ContentCaptureSession {
 
     private void flushIfNeeded(@FlushReason int reason) {
         checkOnContentCaptureThread();
+        // Drain the UI-thread queue into the buffer
+        final List<ContentCaptureEvent> batchEvents = clearBufferEvents();
+        for (int i = 0; i < batchEvents.size(); i++) {
+            sendEvent(batchEvents.get(i));
+        }
+        // Send a Content Capture Flush Event
+        if (reason == FLUSH_REASON_TEXT_CHANGE_TIMEOUT) {
+            final ContentCaptureEvent flushEvent =
+                    new ContentCaptureEvent(mId, TYPE_SESSION_FLUSH);
+            sendEvent(flushEvent);
+        }
         if (mEvents == null || mEvents.isEmpty()) {
             if (sVerbose) Log.v(TAG, "Nothing to flush");
             return;
@@ -874,6 +885,10 @@ public final class MainContentCaptureSession extends ContentCaptureSession {
                 .setComposingIndex(composingStart, composingEnd)
                 .setSelectionIndex(startIndex, endIndex);
         enqueueEvent(event);
+        // Schedule a flush on Text Change.
+        runOnContentCaptureThread(() -> {
+            scheduleFlush(FLUSH_REASON_TEXT_CHANGE_TIMEOUT, /* checkExisting= */ true);
+        });
     }
 
     @Override
@@ -887,18 +902,12 @@ public final class MainContentCaptureSession extends ContentCaptureSession {
     @Override
     public void internalNotifyViewTreeEvent(int sessionId, boolean started) {
         final int type = started ? TYPE_VIEW_TREE_APPEARING : TYPE_VIEW_TREE_APPEARED;
-        final boolean disableFlush = mManager.getFlushViewTreeAppearingEventDisabled();
-        final boolean forceFlush = disableFlush ? !started : FORCE_FLUSH;
 
         final ContentCaptureEvent event = new ContentCaptureEvent(sessionId, type);
 
-        if (Flags.reduceBinderTransactionEnabled()) {
-            // Don't force a flush for view tree events. A dedicated flush event will be sent
-            // after the entire view tree is processed, reducing binder transactions.
-            enqueueEvent(event);
-        } else {
-            enqueueEvent(event, forceFlush);
-        }
+        // Don't force a flush for view tree events. A dedicated flush event will be sent
+        // after the entire view tree is processed, reducing binder transactions.
+        enqueueEvent(event);
     }
 
     @Override

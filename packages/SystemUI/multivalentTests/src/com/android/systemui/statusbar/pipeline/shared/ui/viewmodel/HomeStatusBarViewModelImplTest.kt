@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
 
+// Force re-run
+
 import android.app.StatusBarManager.DISABLE2_NONE
 import android.app.StatusBarManager.DISABLE_CLOCK
 import android.app.StatusBarManager.DISABLE_NONE
@@ -43,6 +45,7 @@ import com.android.systemui.display.data.repository.fake
 import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.flags.andSceneContainer
+import com.android.systemui.inputmethod.data.repository.fakeInputMethodRepository
 import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFaceAuthRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
@@ -73,6 +76,8 @@ import com.android.systemui.screenrecord.data.repository.screenRecordRepository
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
 import com.android.systemui.shade.data.repository.statusBarTouchShadeDisplayPolicy
 import com.android.systemui.shade.domain.interactor.enableDualShade
+import com.android.systemui.shade.domain.interactor.notificationElement
+import com.android.systemui.shade.domain.interactor.qsElement
 import com.android.systemui.shade.shadeTestUtil
 import com.android.systemui.statusbar.chips.mediaprojection.domain.interactor.MediaProjectionChipInteractorTest.Companion.NORMAL_PACKAGE
 import com.android.systemui.statusbar.chips.mediaprojection.domain.interactor.MediaProjectionChipInteractorTest.Companion.setUpPackageManagerForMediaProjection
@@ -108,6 +113,7 @@ import com.android.systemui.statusbar.pipeline.shared.domain.interactor.setHomeS
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.setHomeStatusBarInteractorShowOperatorName
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvisioningRepository
+import com.android.systemui.statusbar.quickactions.ime.domain.interactor.imeIndicatorChipInteractor
 import com.android.systemui.statusbar.window.shared.model.StatusBarWindowState
 import com.android.systemui.testKosmos
 import com.android.systemui.user.data.repository.fakeUserRepository
@@ -569,7 +575,10 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         kosmos.runTest {
             // home status bar not allowed
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(false, taskInfo = null)
+            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
+                false,
+                taskInfo = null,
+            )
 
             assertThat(underTest.ongoingActivityChips.areChipsAllowed).isFalse()
         }
@@ -908,7 +917,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
             if (SceneContainerFlag.isEnabled) {
                 kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-                kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(
+                kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
                     true,
                     taskInfo = null,
                 )
@@ -1349,6 +1358,38 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    fun onClockClicked_hidesInputMethodPicker() =
+        kosmos.runTest {
+            imeIndicatorChipInteractor.hideInputMethodPicker(testableContext.displayId)
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNull()
+
+            underTest.onClockClicked()
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNull()
+
+            imeIndicatorChipInteractor.toggleInputMethodPicker(testableContext.displayId)
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNotNull()
+
+            underTest.onClockClicked()
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNull()
+        }
+
+    @Test
+    fun onSpacerClicked_hidesInputMethodPicker() =
+        kosmos.runTest {
+            imeIndicatorChipInteractor.hideInputMethodPicker(testableContext.displayId)
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNull()
+
+            underTest.onSpacerClicked()
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNull()
+
+            imeIndicatorChipInteractor.toggleInputMethodPicker(testableContext.displayId)
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNotNull()
+
+            underTest.onSpacerClicked()
+            assertThat(fakeInputMethodRepository.inputMethodPickerShownDisplayId).isNull()
+        }
+
+    @Test
     @EnableFlags(FLAG_SCENE_CONTAINER, StatusBarForDesktop.FLAG_NAME, FLAG_DUAL_SHADE)
     fun onQuickSettingsChipClicked_qsShadeIsOpen_collapsesShade() =
         kosmos.runTest {
@@ -1385,6 +1426,26 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
     @Test
     @EnableFlags(FLAG_SCENE_CONTAINER, StatusBarForDesktop.FLAG_NAME, FLAG_DUAL_SHADE)
+    fun onQuickSettingsChipClicked_displayDiffers_setsExpansionIntent() =
+        kosmos.runTest {
+            enableDualShade()
+            val fakeShadeDisplaysRepository = kosmos.fakeShadeDisplaysRepository
+            val statusBarTouchShadeDisplayPolicy = kosmos.statusBarTouchShadeDisplayPolicy
+
+            // ViewModel is for display 0 (default). Set active display to 2.
+            fakeShadeDisplaysRepository.setDisplayId(2)
+            kosmos.displayRepository.addDisplays(
+                display(id = 0, type = android.view.Display.TYPE_INTERNAL)
+            )
+
+            underTest.onQuickSettingsChipClicked()
+
+            assertThat(statusBarTouchShadeDisplayPolicy.consumeExpansionIntent())
+                .isEqualTo(kosmos.qsElement)
+        }
+
+    @Test
+    @EnableFlags(FLAG_SCENE_CONTAINER, StatusBarForDesktop.FLAG_NAME, FLAG_DUAL_SHADE)
     fun onNotificationIconChipClicked_notificationsShadeIsOpen_collapsesShade() =
         kosmos.runTest {
             enableDualShade()
@@ -1404,6 +1465,26 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             underTest.onNotificationIconChipClicked()
 
             assertThat(currentOverlays).doesNotContain(Overlays.NotificationsShade)
+        }
+
+    @Test
+    @EnableFlags(FLAG_SCENE_CONTAINER, StatusBarForDesktop.FLAG_NAME, FLAG_DUAL_SHADE)
+    fun onNotificationIconChipClicked_displayDiffers_setsExpansionIntent() =
+        kosmos.runTest {
+            enableDualShade()
+            val fakeShadeDisplaysRepository = kosmos.fakeShadeDisplaysRepository
+            val statusBarTouchShadeDisplayPolicy = kosmos.statusBarTouchShadeDisplayPolicy
+
+            // ViewModel is for display 0 (default). Set active display to 2.
+            fakeShadeDisplaysRepository.setDisplayId(2)
+            kosmos.displayRepository.addDisplays(
+                display(id = 0, type = android.view.Display.TYPE_INTERNAL)
+            )
+
+            underTest.onNotificationIconChipClicked()
+
+            assertThat(statusBarTouchShadeDisplayPolicy.consumeExpansionIntent())
+                .isEqualTo(kosmos.notificationElement)
         }
 
     @EnableSceneContainer
@@ -1446,7 +1527,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
-    fun onShadeExpansionIntent_setsTargetDisplay() =
+    fun onShadeExpansionIntent_notConsumed_setsTargetDisplayAndIntent() =
         kosmos.runTest {
             displayRepository.addDisplays(display(id = EXTERNAL_DISPLAY, type = TYPE_EXTERNAL))
 
@@ -1456,8 +1537,27 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             val eventX = 123f
             val statusBarWidth = 1080
 
-            underTest.onShadeExpansionIntent(eventX, statusBarWidth)
+            underTest.onShadeExpansionIntent(eventX, statusBarWidth, isConsumed = false)
+
             assertThat(displayId).isEqualTo(EXTERNAL_DISPLAY)
+            assertThat(statusBarTouchShadeDisplayPolicy.consumeExpansionIntent()).isNotNull()
+        }
+
+    @Test
+    fun onShadeExpansionIntent_isConsumed_setsTargetDisplayOnly() =
+        kosmos.runTest {
+            displayRepository.addDisplays(display(id = EXTERNAL_DISPLAY, type = TYPE_EXTERNAL))
+
+            val underTest = homeStatusBarViewModelFactory(EXTERNAL_DISPLAY)
+            val displayId by collectLastValue(statusBarTouchShadeDisplayPolicy.displayId)
+
+            val eventX = 123f
+            val statusBarWidth = 1080
+
+            underTest.onShadeExpansionIntent(eventX, statusBarWidth, isConsumed = true)
+
+            assertThat(displayId).isEqualTo(EXTERNAL_DISPLAY)
+            assertThat(statusBarTouchShadeDisplayPolicy.consumeExpansionIntent()).isNull()
         }
 
     @Test

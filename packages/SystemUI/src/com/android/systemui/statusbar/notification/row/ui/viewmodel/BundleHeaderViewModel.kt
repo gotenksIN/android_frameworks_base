@@ -24,6 +24,8 @@ import androidx.compose.runtime.setValue
 import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.notifications.ui.composable.row.BundleHeader
+import com.android.systemui.statusbar.notification.collection.BundleIcon
+import com.android.systemui.statusbar.notification.collection.BundleTitle
 import com.android.systemui.statusbar.notification.row.dagger.BundleRowScope
 import com.android.systemui.statusbar.notification.row.domain.interactor.BundleInteractor
 import dagger.assisted.AssistedFactory
@@ -33,7 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 class BundleHeaderViewModel @AssistedInject constructor(private val interactor: BundleInteractor) :
     HydratedActivatable() {
 
-    val titleText: Int
+    val titleText: BundleTitle
         get() = interactor.titleText
 
     val summaryText: String? = interactor.summaryText
@@ -41,14 +43,11 @@ class BundleHeaderViewModel @AssistedInject constructor(private val interactor: 
     val numberOfChildren: Int?
         get() = interactor.numberOfChildren
 
-    val bundleIcon: Int
+    val bundleIcon: BundleIcon
         get() = interactor.bundleIcon
 
     val previewIcons: List<Drawable> by
-        interactor.previewIcons.hydratedStateOf(
-            traceName = "previewIcons",
-            initialValue = emptyList(),
-        )
+        interactor.previewIcons.hydratedStateOf(initialValue = emptyList())
 
     var state: MutableSceneTransitionLayoutState? by interactor::state
 

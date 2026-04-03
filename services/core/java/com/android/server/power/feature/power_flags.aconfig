@@ -32,14 +32,6 @@ flag {
 }
 
 flag {
-    name: "per_display_wake_by_touch"
-    namespace: "power"
-    description: "Feature flag to enable per-display wake by touch"
-    bug: "343295183"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "lock_on_unplug"
     namespace: "lse_desktop_experience"
     description: "Fixes device locking when all remaining external displays are unplugged"
@@ -64,13 +56,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "enable_app_wakelock_data_source"
-    namespace: "power"
-    description: "Feature flag to enable a new Perfetto data source for tracing app wakelocks."
-    bug: "400774865"
 }
 
 flag {
@@ -132,6 +117,17 @@ flag {
     namespace: "power"
     description: "When enabled, tag database will not churn old values when a non-existent tag wakelock is released"
     bug: "478418224"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_inset_focus_rings_in_suw"
+    namespace: "power"
+    description: "Decides whether to enable inset focus rings in the reboot into safe mode dialog during the SuW."
+    bug: "484084632"
+    is_fixed_read_only: true
     metadata {
       purpose: PURPOSE_BUGFIX
     }

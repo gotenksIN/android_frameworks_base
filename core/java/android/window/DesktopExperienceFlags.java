@@ -54,9 +54,6 @@ import java.util.function.BooleanSupplier;
 @RavenwoodKeepWholeClass
 public enum DesktopExperienceFlags {
     // go/keep-sorted start
-    CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT(
-            Flags::closeFullscreenAndSplitscreenKeyboardShortcut, false,
-            Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT),
     DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW(Flags::deferResumeFocusInNonFocusedWindow, false,
             Flags.FLAG_DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW),
     DIMMING_WALLPAPER_FOR_MAXIMIZED_AND_TILED(Flags::dimmingWallpaperForMaximizedAndTiled, true,
@@ -77,8 +74,6 @@ public enum DesktopExperienceFlags {
     ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX(
             Flags::enableDesktopFirstBasedDefaultToDesktopBugfix, true,
             Flags.FLAG_ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX),
-    ENABLE_DESKTOP_FIRST_BASED_DRAG_TO_MAXIMIZE(Flags::enableDesktopFirstBasedDragToMaximize, true,
-            Flags.FLAG_ENABLE_DESKTOP_FIRST_BASED_DRAG_TO_MAXIMIZE),
     ENABLE_DESKTOP_FIRST_POLICY_IN_LPM(Flags::enableDesktopFirstPolicyInLpm, false,
             Flags.FLAG_ENABLE_DESKTOP_FIRST_POLICY_IN_LPM),
     ENABLE_DESKTOP_FIRST_TOP_FULLSCREEN_BUGFIX(Flags::enableDesktopFirstTopFullscreenBugfix,
@@ -132,9 +127,6 @@ public enum DesktopExperienceFlags {
             true, Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM),
     ENABLE_TASKBAR_CONNECTED_DISPLAYS(Flags::enableTaskbarConnectedDisplays, true,
             Flags.FLAG_ENABLE_TASKBAR_CONNECTED_DISPLAYS),
-    ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS(
-            Flags::enableWindowingTransitionHandlersObservers, true,
-            Flags.FLAG_ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS),
     ENABLE_WINDOW_DECORATION_REFACTOR(Flags::enableWindowDecorationRefactor, false,
             Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR),
     ENABLE_WINDOW_REPOSITIONING_API(Flags::enableWindowRepositioningApi, false,

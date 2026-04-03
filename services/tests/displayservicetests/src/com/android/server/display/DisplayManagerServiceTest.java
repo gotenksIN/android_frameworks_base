@@ -48,12 +48,12 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
 import static com.android.graphics.surfaceflinger.flags.Flags.FLAG_FORCE_SDR_INVALID_HDR_TYPE;
 import static com.android.server.display.ExternalDisplayPolicy.ENABLE_ON_CONNECT;
-import static com.android.server.display.TestUtilsKt.createInMemoryPersistentDataStore;
 import static com.android.server.display.TestUtilsKt.createSensor;
 import static com.android.server.display.TestUtilsKt.createTestDisplayAddress;
 import static com.android.server.display.TestUtilsKt.TEST_SENSOR_TYPE;
 import static com.android.server.display.VirtualDisplayAdapter.UNIQUE_ID_PREFIX;
 import static com.android.server.display.config.DisplayDeviceConfigTestUtilsKt.createSensorData;
+import static com.android.server.display.persistence.PersistentDataStoreTestUtilsKt.createInMemoryPersistentDataStore;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -199,6 +199,7 @@ import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.notifications.DisplayNotificationManager;
+import com.android.server.display.persistence.PersistentDataStoreDelegate;
 import com.android.server.display.plugin.PluginManager;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.lights.LightsManager;
@@ -340,7 +341,7 @@ public class DisplayManagerServiceTest {
                         Handler handler, DisplayAdapter.Listener displayAdapterListener,
                         DisplayManagerFlags flags,
                         DisplayNotificationManager displayNotificationManager,
-                        boolean stableEdidsFlag) {
+                        boolean stableEdidsFlag, ModeRequestManager modeRequestManager) {
                     return new LocalDisplayAdapter(syncRoot, context, handler,
                             displayAdapterListener, flags,
                             mMockedDisplayNotificationManager,
@@ -350,7 +351,7 @@ public class DisplayManagerServiceTest {
                                         getSurfaceControlProxy() {
                                     return mSurfaceControlProxy;
                                 }
-                            }, stableEdidsFlag);
+                            }, stableEdidsFlag, modeRequestManager);
                 }
 
                 @Override
@@ -397,7 +398,8 @@ public class DisplayManagerServiceTest {
         LocalDisplayAdapter getLocalDisplayAdapter(SyncRoot syncRoot, Context context,
                 Handler handler, DisplayAdapter.Listener displayAdapterListener,
                 DisplayManagerFlags flags,
-                DisplayNotificationManager displayNotificationManager, boolean stableEdidsFlag) {
+                DisplayNotificationManager displayNotificationManager, boolean stableEdidsFlag,
+                                                   ModeRequestManager modeRequestManager) {
             return new LocalDisplayAdapter(
                     syncRoot,
                     context,
@@ -410,7 +412,7 @@ public class DisplayManagerServiceTest {
                         public LocalDisplayAdapter.SurfaceControlProxy getSurfaceControlProxy() {
                             return mSurfaceControlProxy;
                         }
-                    }, false);
+                    }, false, modeRequestManager);
         }
 
         @Override
@@ -446,7 +448,7 @@ public class DisplayManagerServiceTest {
         }
 
         @Override
-        PersistentDataStore getPersistentDataStore() {
+        PersistentDataStoreDelegate getPersistentDataStore() {
             return createInMemoryPersistentDataStore();
         }
     }

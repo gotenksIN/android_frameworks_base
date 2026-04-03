@@ -17,7 +17,6 @@
 package com.android.systemui.globalactions;
 
 import static android.content.pm.UserInfo.FLAG_ADMIN;
-import static android.os.UserHandle.USER_SYSTEM;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 
@@ -57,6 +56,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManagerPolicyConstants;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.window.OnBackInvokedCallback;
@@ -79,6 +80,8 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.broadcast.BroadcastSender;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
+import com.android.systemui.deviceentry.data.repository.FakeDeviceEntryRepository;
+import com.android.systemui.deviceentry.shared.model.DeviceUnlockStatus;
 import com.android.systemui.display.data.repository.FakeDisplayWindowPropertiesRepository;
 import com.android.systemui.globalactions.data.repository.FakeGlobalActionsRepository;
 import com.android.systemui.globalactions.domain.interactor.GlobalActionsInteractor;
@@ -116,6 +119,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import kotlinx.coroutines.test.TestScope;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -162,6 +167,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     private SelectedUserInteractor mFakeSelectedUserInteractor;
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     private FakeExecutor mBackgroundExecutor;
+    private FakeDeviceEntryRepository mFakeDeviceEntryRepository;
+    private TestScope mTestScope;
     private GlobalActionsDialogLite.ActionsDialogLiteDelegate.Factory mDelegateFactory;
 
     @Before
@@ -193,6 +200,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         mInteractor = kosmos.getGlobalActionsInteractor();
         mRepository = kosmos.getGlobalActionsRepository();
         mBackgroundExecutor = kosmos.getFakeExecutor();
+        mFakeDeviceEntryRepository = kosmos.getFakeDeviceEntryRepository();
+        mTestScope = kosmos.getTestScope();
         mDelegateFactory = kosmos.getActionsDialogLiteDelegateFactory();
 
         ColorExtractor.GradientColors backdropColors = new ColorExtractor.GradientColors();
@@ -1573,9 +1582,9 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS_IN_SUW)
-    public void testMyAdapter_getView_suwFocusRing_setsFocusListener() {
-        mockConfigurationForInsetFocusRings(/* enableConfig= */ true, /* inSuw= */ true);
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS)
+    public void testMyAdapter_getView_insetFocusRing_setsFocusListener() {
+        mockConfigurationForInsetFocusRings(/* enableConfig= */ true);
 
         GlobalActionsDialogLite globalActionsDialogLite = createGlobalActionsDialogLite();
         globalActionsDialogLite.showOrHideDialog(false, true, null, Display.DEFAULT_DISPLAY);
@@ -1598,9 +1607,9 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     }
 
     @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS_IN_SUW)
-    public void testMyAdapter_getView_suwFocusRing_whenFlagDisabled_doesNotSetFocusListener() {
-        mockConfigurationForInsetFocusRings(/* enableConfig= */ true, /* inSuw= */ true);
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS)
+    public void testMyAdapter_getView_insetFocusRing_whenFlagDisabled_doesNotSetFocusListener() {
+        mockConfigurationForInsetFocusRings(/* enableConfig= */ true);
 
         GlobalActionsDialogLite globalActionsDialogLite = createGlobalActionsDialogLite();
         globalActionsDialogLite.showOrHideDialog(false, true, null, Display.DEFAULT_DISPLAY);
@@ -1614,9 +1623,9 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS_IN_SUW)
-    public void testMyAdapter_getView_suwFocusRing_whenConfigDisabled_doesNotSetFocusListener() {
-        mockConfigurationForInsetFocusRings(/* enableConfig= */ false, /* inSuw= */ true);
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS)
+    public void testMyAdapter_getView_insetFocusRing_whenConfigDisabled_doesNotSetFocusListener() {
+        mockConfigurationForInsetFocusRings(/* enableConfig= */ false);
 
         GlobalActionsDialogLite globalActionsDialogLite = createGlobalActionsDialogLite();
         globalActionsDialogLite.showOrHideDialog(false, true, null, Display.DEFAULT_DISPLAY);
@@ -1630,29 +1639,70 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_INSET_FOCUS_RINGS_IN_SUW)
-    public void testMyAdapter_getView_suwFocusRing_whenNotInSuw_doesNotSetFocusListener() {
-        mockConfigurationForInsetFocusRings(/* enableConfig= */ true, /* inSuw= */ false);
-
+    public void testMyAdapter_getView_setsAccessibilityRoleButton() {
+        setMaxShownPowerItems(1);
+        mRepository.setPossibleGlobalActions(List.of(GlobalActionType.POWER));
         GlobalActionsDialogLite globalActionsDialogLite = createGlobalActionsDialogLite();
         globalActionsDialogLite.showOrHideDialog(false, true, null, Display.DEFAULT_DISPLAY);
 
         GlobalActionsDialogLite.MyAdapter adapter = globalActionsDialogLite.new MyAdapter();
         ViewGroup parent = new LinearLayout(mContext);
-        View view = adapter.getView(/* position= */ 0, /* convertView= */ null, parent);
 
-        View.OnFocusChangeListener listener = view.getOnFocusChangeListener();
-        assertThat(listener).isNull();
+        View view = adapter.getView(/* position= */ 0, /* convertView= */ null, parent);
+        View.AccessibilityDelegate delegate = view.getAccessibilityDelegate();
+        assertThat(delegate).isNotNull();
+
+        AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain();
+        delegate.onInitializeAccessibilityNodeInfo(view, info);
+
+        assertThat(info.getClassName().toString()).isEqualTo(Button.class.getName());
     }
 
-    private void mockConfigurationForInsetFocusRings(boolean enableConfig, boolean inSuw) {
+    private void mockConfigurationForInsetFocusRings(boolean enableConfig) {
         setMaxShownPowerItems(1);
         mRepository.setPossibleGlobalActions(List.of(GlobalActionType.POWER));
         when(mResources.getBoolean(com.android.internal.R.bool.config_enableInsetFocusRingsInSuw))
                 .thenReturn(enableConfig);
-        when(mUserTracker.getUserId()).thenReturn(USER_SYSTEM);
-        mSecureSettings.putIntForUser(
-                Settings.Secure.USER_SETUP_COMPLETE, /* value= */ inSuw ? 0 : 1, USER_SYSTEM);
+    }
+
+    @Test
+    public void testDeviceGoesFromEnteredToLocked_dismissesDialog() throws InterruptedException {
+        setMaxShownPowerItems(4);
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCK,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
+        when(mKeyguardStateController.isMethodSecure()).thenReturn(true);
+        when(mKeyguardStateController.isUnlocked()).thenReturn(true);
+        GlobalActionsDialogLite globalActionsDialogLite = createGlobalActionsDialogLite();
+        final var latch = new CountDownLatch(1);
+        globalActionsDialogLite.setDismissLatchForTesting(latch);
+
+        // Device is unlocked at first
+        mFakeDeviceEntryRepository.getDeviceUnlockStatus().setValue(
+                new DeviceUnlockStatus(true, null));
+
+        // Show dialog
+        globalActionsDialogLite.showOrHideDialog(false, true, null, Display.DEFAULT_DISPLAY);
+        assertThat(globalActionsDialogLite.mDelegate).isNotNull();
+        assertThat(globalActionsDialogLite.mDelegate.mCurrentDialog).isNotNull();
+        globalActionsDialogLite.mDelegate.mCurrentDialog.setDismissOverride(null);
+        mTestableLooper.processAllMessages();
+
+        // Then device gets locked
+        mFakeDeviceEntryRepository.getDeviceUnlockStatus().setValue(
+                new DeviceUnlockStatus(false, null));
+        mTestScope.getTestScheduler().runCurrent();
+        mTestableLooper.processAllMessages();
+
+        // Dialog should be dismissed
+        final boolean completed = latch.await(TIMEOUT_IN_SECONDS, TimeUnit.SECONDS);
+        if (!completed) {
+            fail("Timed out waiting for delegate to be dismissed");
+        }
+        assertThat(globalActionsDialogLite.mDelegate).isNull();
     }
 
     /**

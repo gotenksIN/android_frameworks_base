@@ -86,7 +86,7 @@ private fun TopRow(viewModel: BundleHeaderGutsViewModel, modifier: Modifier = Mo
     ) {
         BundleIcon(viewModel.bundleIcon, large = true, modifier = Modifier.padding(end = 16.dp))
         Text(
-            text = stringResource(viewModel.titleText),
+            text = viewModel.titleText.getComposableText(),
             style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.primary,
             overflow = TextOverflow.Ellipsis,

@@ -31,6 +31,8 @@ import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.log.table.logcatTableLogBuffer
 import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.securelockdevice.domain.interactor.secureLockDeviceInteractor
+import com.android.systemui.user.data.repository.userSwitcherRepository
+import com.android.systemui.user.domain.interactor.selectedUserInteractor
 import com.android.systemui.util.settings.data.repository.userAwareSecureSettingsRepository
 
 val Kosmos.deviceUnlockedInteractor by Fixture {
@@ -46,10 +48,12 @@ val Kosmos.deviceUnlockedInteractor by Fixture {
             systemPropertiesHelper = fakeSystemPropertiesHelper,
             secureSettingsRepository = userAwareSecureSettingsRepository,
             keyguardInteractor = keyguardInteractor,
+            selectedUserInteractor = selectedUserInteractor,
             tableLogBuffer = logcatTableLogBuffer(this, "sceneFrameworkTableLogBuffer"),
             biometricUnlockInteractor = biometricUnlockInteractor,
             keyguardEnabledInteractor = keyguardEnabledInteractor,
             lockAfterDelayInteractor = lockAfterDelayInteractor,
+            userSwitcherRepository = userSwitcherRepository,
         )
         .apply { activateIn(testScope) }
 }

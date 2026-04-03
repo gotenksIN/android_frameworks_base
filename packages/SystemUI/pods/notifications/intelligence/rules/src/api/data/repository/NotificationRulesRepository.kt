@@ -24,16 +24,25 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.RuleMo
 /**
  * A repository storing a user's current notification rules and methods for updating those rules.
  */
-public interface NotificationRulesRepository {
+interface NotificationRulesRepository {
     /** A list of the user's current rules. */
-    public val rules: List<RuleModel>
+    val rules: List<RuleModel>
 
     /** Creates a draft rule based on the freeform text inputted by the user. */
-    public suspend fun createDraftRuleFromFreeformText(
+    suspend fun createDraftRuleFromFreeformText(
         action: ActionModel,
         text: String,
     ): ResponseModel<DraftRuleModel>
 
-    /** Creates a new rule and adds it to the list of saved rules. */
-    public fun createRule(newRule: RuleModel)
+    /**
+     * Saves the given [rule] to system_server. Returns true if the rule was saved successfully and
+     * false if there was an error when saving.
+     */
+    suspend fun saveRule(rule: DraftRuleModel): Boolean
+
+    /**
+     * Deletes the rule with the given ID. Returns true if the rule was deleted successfully and
+     * false if there was an error when deleting.
+     */
+    suspend fun deleteRule(ruleId: Int): Boolean
 }

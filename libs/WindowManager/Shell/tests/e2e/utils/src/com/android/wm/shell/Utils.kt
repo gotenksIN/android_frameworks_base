@@ -30,11 +30,13 @@ import android.tools.flicker.rules.ChangeDisplayOrientationRule
 import android.tools.flicker.rules.LaunchAppRule
 import android.tools.flicker.rules.RemoveAllTasksButHomeRule
 import android.tools.traces.component.ComponentNameMatcher
+import android.tools.traces.component.IComponentNameMatcher
 import android.tools.traces.parsers.WindowManagerStateHelper
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By.res
 import androidx.test.uiautomator.UiDevice
+import com.android.launcher3.tapl.BaseOverview
+import com.android.launcher3.tapl.LauncherInstrumentation
 import java.io.IOException
 import org.junit.rules.RuleChain
 
@@ -113,6 +115,25 @@ object Utils {
             ?.getTaskDisplayArea(ComponentNameMatcher.LAUNCHER)
             ?.windowingMode == WINDOWING_MODE_FREEFORM
 
+    /** Waits for the activity to be visible and in the expected windowing mode. */
+    fun waitForAndVerifyActivityState(
+        wmHelper: WindowManagerStateHelper,
+        componentMatcher: IComponentNameMatcher,
+        windowingMode: Int,
+    ) {
+        val packageName = componentMatcher.packageName
+        wmHelper
+            .StateSyncBuilder()
+            .withAppTransitionIdle()
+            .add("$packageName is visible") { dump ->
+                dump.wmState.isActivityVisible(componentMatcher)
+            }
+            .add("$packageName is in windowing mode $windowingMode") { dump ->
+                dump.wmState.getTaskForActivity(componentMatcher)?.windowingMode == windowingMode
+            }
+            .waitForAndVerify()
+    }
+
     /** Clears remembered bounds for all packages. */
     fun clearAllRememberedDesktopBounds() {
         try {
@@ -153,6 +174,21 @@ object Utils {
         } catch (e: IOException) {
             Log.e("TestUtils", "Failed to set app links user selection", e)
         }
+    }
+
+    /**
+     * Convenient function supporting overview switch on both cases where home screen is shown
+     * behind freeform tasks or completely hidden behind a task.
+     *
+     * @see [LauncherInstrumentation.shouldShowHomeBehindDesktop]
+     */
+    fun switchToOverview(tapl: LauncherInstrumentation): BaseOverview {
+        // If home screen is shown behind freeform tasks, overview couldn't be launched by
+        // interacting with launched apps, i.e. swiping up will not work, and 3 nav bars don't
+        // appear on the taskbar. Therefore, it has to be opened through keyboard shortcut
+        return if (tapl.shouldShowHomeBehindDesktop()) {
+            tapl.workspace.openOverviewFromActionPlusTabKeyboardShortcut()
+        } else tapl.launchedAppState.switchToOverview()
     }
 
     /**

@@ -39,11 +39,6 @@ public class PowerManagerFlags {
             Flags.FLAG_ENABLE_EARLY_SCREEN_TIMEOUT_DETECTOR,
             Flags::enableEarlyScreenTimeoutDetector);
 
-    private final FlagState mPerDisplayWakeByTouch = new FlagState(
-            Flags.FLAG_PER_DISPLAY_WAKE_BY_TOUCH,
-            Flags::perDisplayWakeByTouch
-    );
-
     private final FlagState mLockOnUnplug =
             new FlagState(Flags.FLAG_LOCK_ON_UNPLUG,
                     Flags::lockOnUnplug);
@@ -51,10 +46,6 @@ public class PowerManagerFlags {
     private final FlagState mDisableFrozenProcessWakelocks =
             new FlagState(Flags.FLAG_DISABLE_FROZEN_PROCESS_WAKELOCKS,
                     Flags::disableFrozenProcessWakelocks);
-
-    private final FlagState mEnableAppWakelockDataSource =
-            new FlagState(Flags.FLAG_ENABLE_APP_WAKELOCK_DATA_SOURCE,
-                    Flags::enableAppWakelockDataSource);
 
     private final FlagState mPartialSleepWakelocks = new FlagState(
             Flags.FLAG_PARTIAL_SLEEP_WAKELOCKS,
@@ -72,13 +63,6 @@ public class PowerManagerFlags {
     /** Returns whether early-screen-timeout-detector is enabled on not. */
     public boolean isEarlyScreenTimeoutDetectorEnabled() {
         return mEarlyScreenTimeoutDetectorFlagState.isEnabled();
-    }
-
-    /**
-     * @return Whether per-display wake by touch is enabled or not.
-     */
-    public boolean isPerDisplayWakeByTouchEnabled() {
-        return mPerDisplayWakeByTouch.isEnabled();
     }
 
     /**
@@ -103,13 +87,6 @@ public class PowerManagerFlags {
     }
 
     /**
-     * @return Whether the new Perfetto data source for tracing app wakelocks is enabled
-     */
-    public boolean isAppWakelockDataSourceEnabled() {
-        return mEnableAppWakelockDataSource.isEnabled();
-    }
-
-    /**
      * @return Whether new wakelock to keep device asleep - for the user, but ensures the CPU
      * remains awake - is enabled.
      */
@@ -131,10 +108,8 @@ public class PowerManagerFlags {
     public void dump(PrintWriter pw) {
         pw.println("PowerManagerFlags:");
         pw.println(" " + mEarlyScreenTimeoutDetectorFlagState);
-        pw.println(" " + mPerDisplayWakeByTouch);
         pw.println(" " + mLockOnUnplug);
         pw.println(" " + mDisableFrozenProcessWakelocks);
-        pw.println(" " + mEnableAppWakelockDataSource);
         pw.println(" " + mPartialSleepWakelocks);
         pw.println(" " + mSeparateTimeoutsFlicker);
         pw.println(" " + mWaitForUserBootComplete);

@@ -36,6 +36,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ProviderInfo;
@@ -55,6 +56,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseBooleanArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -112,6 +114,9 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
     @GuardedBy("mLock")
     final Set<String> mPccAllowedPackagesForTesting = new ArraySet<>();
 
+    @GuardedBy("mLock")
+    private final SparseBooleanArray mPcsUidCache = new SparseBooleanArray();
+
     @VisibleForTesting
     static final int[] TRUSTED_UIDS = new int[]{
             Process.BLUETOOTH_UID,
@@ -150,6 +155,7 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
         mPopulateTrustedAndAllowedPackagesFuture = mExecutor.submit(() -> {
             populatePccTrustedPackages();
             populatePccAllowedPackages();
+            populatePcsUids();
         });
         mPackageManagerInternal.getPackageList(new PackageReceiver());
 
@@ -167,6 +173,26 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
             mPopulateTrustedAndAllowedPackagesFuture.get();
         } catch (Exception e) {
             Slog.e(TAG, "Error populating PCC packages", e);
+        }
+    }
+
+    @VisibleForTesting
+    void populatePcsUids() {
+        List<PackageInfo> packages = mContext.getPackageManager().getPackagesHoldingPermissions(
+                new String[]{android.Manifest.permission.PROVIDE_PRIVATE_COMPUTE_SERVICES},
+                PackageManager.MATCH_DIRECT_BOOT_AWARE | PackageManager.MATCH_DIRECT_BOOT_UNAWARE);
+
+        synchronized (mLock) {
+            StringBuilder s = new StringBuilder();
+            if (packages != null) {
+                for (PackageInfo info : packages) {
+                    if (info.applicationInfo != null) {
+                        mPcsUidCache.put(info.applicationInfo.uid, true);
+                        s.append(info.applicationInfo.uid).append(",");
+                    }
+                }
+            }
+            Slog.d(TAG, "Populated PCC gateway app UIDs cache with UIDs: " + s);
         }
     }
 
@@ -395,7 +421,22 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
      * services.
      */
     public boolean isPrivateComputeServicesUid(int uid) {
-        return mPccSandboxManagerService.isPrivateComputeServicesUid(uid);
+        // Do not cache the result for shell UID. In CTS tests, shell gets temporary elevated
+        // privileges for setup purposes.
+        if (uid == Process.SHELL_UID) {
+            return mPccSandboxManagerService.isPrivateComputeServicesUid(uid);
+        }
+        synchronized (mLock) {
+            int index = mPcsUidCache.indexOfKey(uid);
+            if (index >= 0) {
+                return mPcsUidCache.valueAt(index);
+            }
+        }
+        boolean isPcs = mPccSandboxManagerService.isPrivateComputeServicesUid(uid);
+        synchronized (mLock) {
+            mPcsUidCache.put(uid, isPcs);
+        }
+        return isPcs;
     }
 
     /**
@@ -447,13 +488,11 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
      */
     public IBinder createPccProxyIfNeeded(ComponentName name, int userId, Intent intent,
             IBinder binder, int clientUid) {
-        if (isTrustedClient(clientUid)) {
-            return binder;
-        }
-
-        binder = validatePccServiceBinder(binder);
-        if (binder == null) {
-            return null;
+        if (!isTrustedClient(clientUid)) {
+            binder = validatePccServiceBinder(binder);
+            if (binder == null) {
+                return null;
+            }
         }
 
         synchronized (mLock) {
@@ -461,21 +500,23 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
                     intent);
             PccServiceInfo pccServiceInfo = mPccServiceConnections.get(binder);
             if (pccServiceInfo == null) {
-                PccServiceProxy proxyBinder = new PccServiceProxy(binder);
                 DeathRecipient deathRecipient = new DeathRecipient(binder);
                 try {
                     binder.linkToDeath(deathRecipient, 0);
-                    pccServiceInfo = new PccServiceInfo(proxyBinder, deathRecipient);
+                    pccServiceInfo = new PccServiceInfo(this, binder, deathRecipient);
                     pccServiceInfo.mConnectionInfos.add(newConnectionInfo);
                     mPccServiceConnections.put(binder, pccServiceInfo);
                 } catch (RemoteException e) {
                     Slog.w(TAG, "Failed to link to death recipient, service has died: " + binder,
                             e);
-                    proxyBinder.destroy();
                     return null;
                 }
             } else {
                 pccServiceInfo.mConnectionInfos.add(newConnectionInfo);
+            }
+
+            if (isTrustedClient(clientUid)) {
+                return binder;
             }
 
             return pccServiceInfo.getWrappedBinder();
@@ -520,14 +561,9 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
      * @param userId    The user ID of the client process.
      * @param intent    The Intent used to bind to the service.
      * @param binder    The raw IBinder of the PCC service.
-     * @param clientUid The UID of the client process.
      */
     public void removePccProxyIfNeeded(ComponentName name, int userId, Intent intent,
-            IBinder binder, int clientUid) {
-        if (isTrustedClient(clientUid)) {
-            return;
-        }
-
+            IBinder binder) {
         synchronized (mLock) {
             if (!mPccServiceConnections.containsKey(binder)) {
                 Slog.w(TAG, "Cannot find PCC connection for the binder: " + binder);
@@ -542,7 +578,7 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
             if (serviceInfo.mConnectionInfos.isEmpty()) {
                 mPccServiceConnections.remove(binder);
                 binder.unlinkToDeath(serviceInfo.mDeathRecipient, 0);
-                serviceInfo.getWrappedBinder().destroy();
+                serviceInfo.destroy();
             }
         }
     }
@@ -655,12 +691,25 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
     private final class PackageReceiver implements PackageManagerInternal.PackageListObserver {
         @Override
         public void onPackageAdded(@NonNull String packageName, int uid) {
+            synchronized (mLock) {
+                mPcsUidCache.delete(uid);
+            }
             logWhenPccNotAllowed(packageName, uid);
         }
 
         @Override
         public void onPackageChanged(@NonNull String packageName, int uid) {
+            synchronized (mLock) {
+                mPcsUidCache.delete(uid);
+            }
             logWhenPccNotAllowed(packageName, uid);
+        }
+
+        @Override
+        public void onPackageRemoved(@NonNull String packageName, int uid) {
+            synchronized (mLock) {
+                mPcsUidCache.delete(uid);
+            }
         }
 
         private void logWhenPccNotAllowed(@NonNull String packageName, int uid) {
@@ -817,17 +866,31 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
     @VisibleForTesting
     static final class PccServiceInfo {
         private final List<PccServiceConnectionInfo> mConnectionInfos;
-        private final PccServiceProxy mProxy;
         private final IBinder.DeathRecipient mDeathRecipient;
+        private final IBinder mRealBinder;
+        private final PccSandboxManagerInternal mPccSandboxManagerInternal;
 
-        PccServiceInfo(PccServiceProxy proxy, IBinder.DeathRecipient deathRecipient) {
-            this.mProxy = proxy;
-            this.mConnectionInfos = new ArrayList<>(1);
-            this.mDeathRecipient = deathRecipient;
+        private PccServiceProxy mProxy;
+
+        PccServiceInfo(PccSandboxManagerInternal pccSandboxManagerInternal, IBinder realBinder,
+                IBinder.DeathRecipient deathRecipient) {
+            mPccSandboxManagerInternal = pccSandboxManagerInternal;
+            mRealBinder = realBinder;
+            mDeathRecipient = deathRecipient;
+            mConnectionInfos = new ArrayList<>(1);
         }
 
         public PccServiceProxy getWrappedBinder() {
+            if (mProxy == null) {
+                mProxy = mPccSandboxManagerInternal.new PccServiceProxy(mRealBinder);
+            }
             return mProxy;
+        }
+
+        public void destroy() {
+            if (mProxy != null) {
+                mProxy.destroy();
+            }
         }
 
         @VisibleForTesting
@@ -840,6 +903,10 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
             return mDeathRecipient;
         }
 
+        @VisibleForTesting
+        PccServiceProxy getPccServiceProxy() {
+            return mProxy;
+        }
     }
 
     private final class DeathRecipient implements IBinder.DeathRecipient {
@@ -854,7 +921,7 @@ public class PccSandboxManagerInternal implements OnRoleHoldersChangedListener {
             synchronized (mLock) {
                 PccServiceInfo serviceInfo = mPccServiceConnections.remove(mRealBinder);
                 if (serviceInfo != null) {
-                    serviceInfo.getWrappedBinder().destroy();
+                    serviceInfo.destroy();
                 }
             }
         }

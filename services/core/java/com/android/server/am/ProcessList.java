@@ -102,6 +102,7 @@ import android.annotation.SpecialUsers.CanBeALL;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityManager.ProcessCapability;
+import android.app.ActivityManager.ProcessState;
 import android.app.ActivityThread;
 import android.app.AppGlobals;
 import android.app.AppProtoEnums;
@@ -157,6 +158,7 @@ import android.util.ArraySet;
 import android.util.BoostFramework;
 import android.util.DebugUtils;
 import android.util.EventLog;
+import android.util.IndentingPrintWriter;
 import android.util.LongSparseArray;
 import android.util.Pair;
 import android.util.Slog;
@@ -1191,11 +1193,13 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
-    public static String makeProcStateString(int curProcState) {
+    /** Returns a readable string representation of the given process state. */
+    public static String makeProcStateString(@ProcessState int curProcState) {
         return ActivityManager.procStateToString(curProcState);
     }
 
-    public static int makeProcStateProtoEnum(int curProcState) {
+    /** Maps a process state integer to its corresponding AppProtoEnums value. */
+    public static int makeProcStateProtoEnum(@ProcessState int curProcState) {
         switch (curProcState) {
             case ActivityManager.PROCESS_STATE_PERSISTENT:
                 return AppProtoEnums.PROCESS_STATE_PERSISTENT;
@@ -1420,7 +1424,8 @@ public final class ProcessList extends ProcessListInternal
             mPendingMemState = -1;
         }
 
-        public void dumpLine(PrintWriter pw) {
+        /** Dumps the current tracking information of the tracker to the given printer. */
+        public void dumpLine(@NonNull PrintWriter pw) {
             pw.print("best=");
             pw.print(mTotalHighestMem);
             pw.print(" (");
@@ -1454,7 +1459,9 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
-    public static boolean procStatesDifferForMem(int procState1, int procState2) {
+    /** Returns true if the two process states represent different memory buckets. */
+    public static boolean procStatesDifferForMem(@ProcessState int procState1,
+            @ProcessState int procState2) {
         return sProcStateToProcMem[procState1] != sProcStateToProcMem[procState2];
     }
 
@@ -1462,8 +1469,9 @@ public final class ProcessList extends ProcessListInternal
         return test ? PSS_TEST_MIN_TIME_FROM_STATE_CHANGE : PSS_MIN_TIME_FROM_STATE_CHANGE;
     }
 
-    public static long computeNextPssTime(int procState, ProcStateMemTracker tracker, boolean test,
-            boolean sleeping, long now, long earliest) {
+    /** Computes the next scheduled time to perform a PSS memory sample for a process. */
+    public static long computeNextPssTime(@ProcessState int procState, ProcStateMemTracker tracker,
+            boolean test, boolean sleeping, long now, long earliest) {
         boolean first;
         float scalingFactor;
         final int memState = sProcStateToProcMem[procState];
@@ -1533,12 +1541,12 @@ public final class ProcessList extends ProcessListInternal
             return;
 
         long start = SystemClock.elapsedRealtime();
-        ByteBuffer buf = ByteBuffer.allocate(4 * 5);
+        ByteBuffer buf = ByteBuffer.allocate(4 * 6);
         buf.putInt(LMK_PROCPRIO);
         buf.putInt(pid);
         buf.putInt(uid);
         buf.putInt(amt);
-        buf.putInt(0);
+        buf.putInt(0); // PROC_TYPE_APP
         buf.putInt(forLmkdOnly ? 1 : 0);
         writeLmkd(buf, null);
         long now = SystemClock.elapsedRealtime();
@@ -2188,6 +2196,10 @@ public final class ProcessList extends ProcessListInternal
             runtimeFlags |= Zygote.getMemorySafetyRuntimeFlags(
                     definingAppInfo, app.processInfo, instructionSet, mPlatformCompat);
 
+            if (isOutgoingTransactionsAuditable(definingAppInfo.uid)) {
+                runtimeFlags |= Zygote.AUDIT_OUTGOING_TRANSACTIONS;
+            }
+
             // the per-user SELinux context must be set
             if (TextUtils.isEmpty(app.info.seInfoUser)) {
                 Slog.wtf(ActivityManagerService.TAG, "SELinux tag not defined",
@@ -2242,6 +2254,23 @@ public final class ProcessList extends ProcessListInternal
                     + (TextUtils.isEmpty(app.info.seInfoUser) ? "" : app.info.seInfoUser)
                     + extraInfo;
         }
+    }
+
+    /**
+     * Returns true if the process should have its binder transactions auditable, false otherwise.
+     */
+    boolean isOutgoingTransactionsAuditable(int processUid) {
+        if (!enablePccFrameworkSupport()) {
+            return false;
+        }
+        if (Process.isPrivateComputeCoreUid(processUid)) {
+            return true;
+        }
+        PccSandboxManagerInternal manager = getPccSandboxManagerInternal();
+        if (manager != null) {
+            return manager.isPrivateComputeServicesUid(processUid);
+        }
+        return false;
     }
 
     @GuardedBy("mService")
@@ -3861,7 +3890,7 @@ public final class ProcessList extends ProcessListInternal
      * @param maxProcState
      */
     @GuardedBy({"mService", "mProcLock"})
-    void killAllBackgroundProcessesExceptLSP(int minTargetSdk, int maxProcState) {
+    void killAllBackgroundProcessesExceptLSP(int minTargetSdk, @ProcessState int maxProcState) {
         final ArrayList<ProcessRecord> procs = new ArrayList<>();
         final int NP = mProcessNames.getMap().size();
         for (int ip = 0; ip < NP; ip++) {
@@ -4518,7 +4547,7 @@ public final class ProcessList extends ProcessListInternal
         }
         outInfo.lastTrimLevel = app.mProfile.getTrimMemoryLevel();
         final ProcessRecordInternal state = app;
-        final int procState = state.getProcState();
+        final @ProcessState int procState = state.getProcState();
         outInfo.importance = ActivityManager.RunningAppProcessInfo
                                 .procStateToImportanceForTargetSdk(procState, clientTargetSdk);
         if (outInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_BACKGROUND) {
@@ -4822,7 +4851,9 @@ public final class ProcessList extends ProcessListInternal
                     pw.print(r.isPersistent() ? "  *PERS*" : "  *APP*");
                     pw.print(" UID "); pw.print(procs.keyAt(ia));
                     pw.print(" "); pw.println(r);
-                    r.dump(pw, "    ");
+
+                    // TODO: b/492052422 - Use IndentingPrintWriter for the whole dumpProcessesLSP.
+                    r.dump(new IndentingPrintWriter(pw, "  ", "    "));
                     if (r.isPersistent()) {
                         numPers++;
                     }
@@ -4960,7 +4991,7 @@ public final class ProcessList extends ProcessListInternal
                         if (adj != 0) {
                             return adj;
                         }
-                        final int procState = object2.first.getSetProcState()
+                        final @ProcessState int procState = object2.first.getSetProcState()
                                 - object1.first.getSetProcState();
                         if (procState != 0) {
                             return procState;
@@ -5590,7 +5621,7 @@ public final class ProcessList extends ProcessListInternal
      * if not running
      */
     @GuardedBy(anyOf = {"mService", "mProcLock"})
-    int getUidProcStateLOSP(int uid) {
+    @ProcessState int getUidProcStateLOSP(int uid) {
         UidRecordInternal uidRec = mActiveUids.get(uid);
         return uidRec == null ? PROCESS_STATE_NONEXISTENT : uidRec.getCurProcState();
     }

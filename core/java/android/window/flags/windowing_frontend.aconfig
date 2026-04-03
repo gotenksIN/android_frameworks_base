@@ -12,11 +12,20 @@ flag {
 }
 
 flag {
-  name: "release_all_transition_surfaces"
+  name: "show_ime_layering_target_when_adding"
+  namespace: "windowing_frontend"
+  description: "Prevent IME flickering when adding a layering target"
+  bug: "495662368"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "release_all_transition_surfaces_on_idle"
   namespace: "windowing_frontend"
   description: "Reduce offscreen layers which rely on GC to release"
   bug: "429548260"
-  is_fixed_read_only: true
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -81,16 +90,6 @@ flag {
 }
 
 flag {
-  name: "avoid_intermediate_destroying_state"
-  namespace: "windowing_frontend"
-  description: "Prevent intermediate destroying state from affecting visibility"
-  bug: "479716606"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "use_client_surface"
   namespace: "windowing_frontend"
   description: "Let regular windows create their own surface"
@@ -133,6 +132,16 @@ flag {
   namespace: "windowing_frontend"
   description: "Reduce binder calls that query display id using a token"
   bug: "476026852"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "reduce_window_traversal_on_entering"
+  namespace: "windowing_frontend"
+  description: "Reduce unnecessary window traversal when an entering animation is done"
+  bug: "493429456"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -344,16 +353,6 @@ flag {
 
 
 flag {
-    name: "predictive_back_fix_ime_events_skip_back_dispatcher"
-    namespace: "windowing_frontend"
-    description: "Fixes a bug that prevented IMEs to send back events to the app's dispatcher"
-    bug: "460382604"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "transit_invisible_existence_change"
     namespace: "windowing_frontend"
     description: "Allow invisible containers to be in a transition if gone or created"
@@ -483,7 +482,7 @@ flag {
 }
 
 flag {
-    name: "cross_display_transition"
+    name: "cross_display_transition_v2"
     namespace: "windowing_frontend"
     description: "Cross fade transition between two displays"
     bug: "481219379"

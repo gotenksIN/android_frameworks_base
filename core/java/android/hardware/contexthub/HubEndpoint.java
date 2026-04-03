@@ -27,7 +27,6 @@ import android.annotation.Size;
 import android.annotation.SystemApi;
 import android.chre.flags.Flags;
 import android.content.Context;
-import android.hardware.contexthub.DataFlowId;
 import android.hardware.contexthub.HubEndpointInfo.HubEndpointIdentifier;
 import android.hardware.location.ContextHubTransaction;
 import android.hardware.location.ContextHubTransactionHelper;
@@ -48,6 +47,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,7 +130,10 @@ public class HubEndpoint {
     @GuardedBy("mLock")
     private final SparseArray<HubEndpointSession> mActiveSessions = new SparseArray<>();
 
+    private final Object mNativeLock = new Object();
+
     /** The native handle obtained in native_init. */
+    @GuardedBy("mNativeLock")
     private long mNativeHandle = 0;
 
     /** Callback used to deliver events from JNI thread context. */
@@ -226,6 +229,10 @@ public class HubEndpoint {
      * @param regionId The ID of the shared data region.
      * @param regionSize The size of the shared data region in bytes.
      * @param regionFd The file descriptor of the shared data region.
+     * @param metadataRegionId The ID of the shared data region for metadata. If there is no
+     *     separate metadata region, this should be -1.
+     * @param metadataRegionSize The size of the shared data region for metadata in bytes.
+     * @param metadataRegionFd The file descriptor of the shared data region for metadata.
      * @param dataFlowHubId The hub ID of the data flow.
      * @param dataFlowId The ID of the data flow.
      * @param sourceId The ID of the source endpoint, scoped to dataFlowHubId.
@@ -243,6 +250,9 @@ public class HubEndpoint {
             int regionId,
             long regionSize,
             int regionFd,
+            int metadataRegionId,
+            long metadataRegionSize,
+            int metadataRegionFd,
             long dataFlowHubId,
             int dataFlowId,
             long sourceId,
@@ -338,10 +348,10 @@ public class HubEndpoint {
 
     /**
      * @param handle The native handle created in native_init.
-     * @param producerRegionId The ID of the producer's shared data region.
+     * @param sourceRegionId The ID of the producer's shared data region.
      * @param dataFlowId The ID of the data flow.
-     * @param consumerHubId The hub ID of the consumer.
-     * @param consumerEndpointId The endpoint ID of the consumer.
+     * @param sinkHubId The hub ID of the consumer.
+     * @param sinkEndpointId The endpoint ID of the consumer.
      * @param regionId The ID of the consumer's shared data region.
      * @param regionSize The size of the consumer's shared data region in bytes.
      * @param regionFd The file descriptor of the consumer's shared data region.
@@ -359,6 +369,25 @@ public class HubEndpoint {
             int regionId,
             long regionSize,
             int regionFd,
+            int notificationPolicy,
+            int notificationPolicyData,
+            boolean canOverwrite);
+
+    /**
+     * @param handle The native handle created in native_init.
+     * @param sourceRegionId The ID of the producer's shared data region.
+     * @param sinkHubId The hub ID of the consumer.
+     * @param sinkEndpointId The endpoint ID of the consumer.
+     * @param notificationPolicy The notification policy for new data alerts.
+     * @param notificationPolicyData The data associated with the notification policy.
+     * @param canOverwrite Whether the source can overwrite the sink's read position.
+     * @return The consumer descriptor offset.
+     */
+    private native int native_addOffloadSinkInPrimaryRegion(
+            long handle,
+            int sourceRegionId,
+            long sinkHubId,
+            long sinkEndpointId,
             int notificationPolicy,
             int notificationPolicyData,
             boolean canOverwrite);
@@ -415,7 +444,10 @@ public class HubEndpoint {
                 @Override
                 public void onNotificationCallback(long hubId, int dataFlowId, boolean waking) {
                     if (hubId == mAssignedHubEndpointInfo.getIdentifier().getHub()) {
-                        DataFlowSource source = mSources.get(dataFlowId);
+                        DataFlowSource source;
+                        synchronized (mLock) {
+                            source = mSources.get(dataFlowId);
+                        }
                         if (source != null) {
                             if (!source.onNotificationCallback(
                                     DataFlowCallback.SOURCE_EVENT_WRITABLE)) {
@@ -434,7 +466,10 @@ public class HubEndpoint {
                         DataFlowId fullDataFlowId = new DataFlowId();
                         fullDataFlowId.hubId = hubId;
                         fullDataFlowId.id = dataFlowId;
-                        DataFlowSink sink = mSinks.get(new DataFlowIdWrapper(fullDataFlowId));
+                        DataFlowSink sink;
+                        synchronized (mLock) {
+                            sink = mSinks.get(new DataFlowIdWrapper(fullDataFlowId));
+                        }
                         if (sink != null) {
                             if (!sink.onNotificationCallback(
                                     DataFlowCallback.SINK_EVENT_READABLE)) {
@@ -452,9 +487,11 @@ public class HubEndpoint {
             };
 
     /** The sources associated with this endpoint. */
+    @GuardedBy("mLock")
     private final Map<Integer, DataFlowSource> mSources = new HashMap<>();
 
     /** The sinks associated with this endpoint. */
+    @GuardedBy("mLock")
     private final Map<DataFlowIdWrapper, DataFlowSink> mSinks = new HashMap<>();
 
     private final IContextHubEndpointCallback mServiceCallback =
@@ -581,7 +618,9 @@ public class HubEndpoint {
                     DataFlowDataConfig config =
                             enableHostSinkFromContext(context, source.getIdentifier());
                     DataFlowSink sink = createDataFlowSink(config, context);
-                    mSinks.put(new DataFlowIdWrapper(context.id), sink);
+                    synchronized (mLock) {
+                        mSinks.put(new DataFlowIdWrapper(context.id), sink);
+                    }
 
                     Log.d(TAG, "onDataFlowHostSinkRegistered: sink = " + sink);
 
@@ -630,7 +669,10 @@ public class HubEndpoint {
                 public void onDataFlowOffloadEndpointUnregistered(
                         DataFlowId dataFlowId, HubEndpointInfo endpoint) throws RemoteException {
                     if (mAssignedHubEndpointInfo.getIdentifier().getHub() == dataFlowId.hubId) {
-                        DataFlowSource source = mSources.get(dataFlowId.id);
+                        DataFlowSource source;
+                        synchronized (mLock) {
+                            source = mSources.get(dataFlowId.id);
+                        }
                         if (source == null) {
                             Log.w(
                                     TAG,
@@ -654,7 +696,10 @@ public class HubEndpoint {
                                     });
                         }
                     } else {
-                        DataFlowSink sink = mSinks.get(new DataFlowIdWrapper(dataFlowId));
+                        DataFlowSink sink;
+                        synchronized (mLock) {
+                            sink = mSinks.get(new DataFlowIdWrapper(dataFlowId));
+                        }
                         if (sink == null) {
                             Log.w(
                                     TAG,
@@ -673,6 +718,30 @@ public class HubEndpoint {
                                         mDataFlowCallback.onDataFlowSinkEvent(
                                                 sink, DataFlowCallback.SINK_EVENT_STOPPED);
                                     });
+                        }
+                    }
+                }
+
+                @Override
+                public void onDataFlowsInaccessible(DataFlowId[] dataFlowIds)
+                        throws RemoteException {
+                    for (DataFlowId dataFlowId : dataFlowIds) {
+                        if (dataFlowId.hubId == mAssignedHubEndpointInfo.getIdentifier().getHub()) {
+                            DataFlowSource source;
+                            synchronized (mLock) {
+                                source = mSources.get(dataFlowId.id);
+                            }
+                            if (source != null) {
+                                source.cancel();
+                            }
+                        } else {
+                            DataFlowSink sink;
+                            synchronized (mLock) {
+                                sink = mSinks.get(new DataFlowIdWrapper(dataFlowId));
+                            }
+                            if (sink != null) {
+                                sink.cancel();
+                            }
                         }
                     }
                 }
@@ -819,15 +888,17 @@ public class HubEndpoint {
             mAssignedHubEndpointInfo = serviceToken.getAssignedHubEndpointInfo();
             mServiceToken = serviceToken;
 
-            if (Flags.fmcqImplementation()) {
-                mNativeHandle =
-                        native_init(
-                                mEpollLooper.getQueue(),
-                                mJniCallback,
-                                mAssignedHubEndpointInfo.getIdentifier().getHub(),
-                                mAssignedHubEndpointInfo.getIdentifier().getEndpoint());
-            } else {
-                mNativeHandle = 0;
+            synchronized (mNativeLock) {
+                if (Flags.fmcqImplementation()) {
+                    mNativeHandle =
+                            native_init(
+                                    mEpollLooper.getQueue(),
+                                    mJniCallback,
+                                    mAssignedHubEndpointInfo.getIdentifier().getHub(),
+                                    mAssignedHubEndpointInfo.getIdentifier().getEndpoint());
+                } else {
+                    mNativeHandle = 0;
+                }
             }
         } catch (RemoteException e) {
             Log.e(TAG, "registerEndpoint: failed to register endpoint", e);
@@ -851,9 +922,11 @@ public class HubEndpoint {
             e.rethrowFromSystemServer();
         }
 
-        if (mNativeHandle != 0) {
-            native_deinit(mNativeHandle);
-            mNativeHandle = 0;
+        synchronized (mNativeLock) {
+            if (mNativeHandle != 0) {
+                native_deinit(mNativeHandle);
+                mNativeHandle = 0;
+            }
         }
     }
 
@@ -1021,16 +1094,22 @@ public class HubEndpoint {
                 elementSize = -1;
             }
 
-            int[] dataFlowValues =
-                    native_createDataFlowInfo(
-                            mNativeHandle,
-                            region.id,
-                            region.sizeBytes,
-                            region.sharedMemory.getFd(),
-                            elementSize,
-                            elementAlignment,
-                            minElementCount,
-                            maxElementCount);
+            int[] dataFlowValues;
+            synchronized (mNativeLock) {
+                if (mNativeHandle == 0) {
+                    throw new IllegalStateException("Endpoint is not registered.");
+                }
+                dataFlowValues =
+                        native_createDataFlowInfo(
+                                mNativeHandle,
+                                region.id,
+                                region.sizeBytes,
+                                region.sharedMemory.getFd(),
+                                elementSize,
+                                elementAlignment,
+                                minElementCount,
+                                maxElementCount);
+            }
             if (dataFlowValues == null) {
                 throw new IllegalStateException("Failed to create DataFlowInfo");
             } else if (dataFlowValues.length != NATIVE_CREATE_DATA_FLOW_INFO_ARRAY_SIZE) {
@@ -1044,15 +1123,23 @@ public class HubEndpoint {
             info.alertFds.halAck = ParcelFileDescriptor.adoptFd(dataFlowValues[3]);
             dataFlowId = Optional.of(mServiceToken.registerDataFlowHostSource(info));
 
-            if (!native_activateDataFlow(mNativeHandle, dataFlowId.get(), region.id)) {
-                throw new IllegalStateException("Failed to activate DataFlow");
+            synchronized (mNativeLock) {
+                if (mNativeHandle == 0) {
+                    throw new ConcurrentModificationException(
+                            "Endpoint unregistered simultaneously with API call.");
+                }
+                if (!native_activateDataFlow(mNativeHandle, dataFlowId.get(), region.id)) {
+                    throw new IllegalStateException("Failed to activate DataFlow");
+                }
             }
 
             DataFlowId dataFlowIdObj = new DataFlowId();
-            dataFlowIdObj.hubId = mPendingHubEndpointInfo.getIdentifier().getHub();
+            dataFlowIdObj.hubId = mAssignedHubEndpointInfo.getIdentifier().getHub();
             dataFlowIdObj.id = dataFlowId.get();
             ret = new DataFlowSource(dataConfig, this, region, info, dataFlowIdObj);
-            mSources.put(dataFlowIdObj.id, ret);
+            synchronized (mLock) {
+                mSources.put(dataFlowIdObj.id, ret);
+            }
         } catch (RemoteException e) {
             e.rethrowFromSystemServer();
         } finally {
@@ -1309,8 +1396,14 @@ public class HubEndpoint {
             @Nullable HubMessage msg)
             throws IllegalStateException {
         HubEndpointIdentifier id = sinkInfo.getIdentifier();
-        int[] offloadSinkValues =
-                native_addOffloadSink(mNativeHandle, region.id, id.getHub(), id.getEndpoint());
+        int[] offloadSinkValues;
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            offloadSinkValues =
+                    native_addOffloadSink(mNativeHandle, region.id, id.getHub(), id.getEndpoint());
+        }
         if (offloadSinkValues == null) {
             throw new IllegalStateException("Failed to add offload sink");
         } else if (offloadSinkValues.length != NATIVE_ADD_OFFLOAD_SINK_ARRAY_SIZE) {
@@ -1343,25 +1436,42 @@ public class HubEndpoint {
                     @Override
                     public long addSinkInRegion(@Nullable SharedDataRegion region)
                             throws RemoteException {
-                        Log.d(TAG, "addSinkInRegion: region id=" + region.id);
-                        if (region == null) {
-                            Log.e(TAG, "addSinkInRegion: region is null");
-                            // TODO(b/460528144): Create a new region
-                            return 0;
-                        }
+                        synchronized (mNativeLock) {
+                            if (mNativeHandle == 0) {
+                                throw new ConcurrentModificationException(
+                                        "Endpoint unregistered simultaneously with API call.");
+                            }
+                            if (region == null) {
+                                Log.d(
+                                        TAG,
+                                        "addSinkInRegion: region is null, add offload sink in"
+                                                + " primary region.");
+                                return native_addOffloadSinkInPrimaryRegion(
+                                        mNativeHandle,
+                                        context.info.region.id,
+                                        id.getHub(),
+                                        id.getEndpoint(),
+                                        newDataAlertPolicy.getPolicyType(),
+                                        newDataAlertPolicy.getData(),
+                                        canOverwrite);
+                            }
 
-                        return native_mapOffloadSinkRegion(
-                                mNativeHandle,
-                                context.info.region.id,
-                                dataFlowId.id,
-                                id.getHub(),
-                                id.getEndpoint(),
-                                region.id,
-                                region.sizeBytes,
-                                region.sharedMemory.getFd(),
-                                newDataAlertPolicy.getPolicyType(),
-                                newDataAlertPolicy.getData(),
-                                canOverwrite);
+                            Log.d(
+                                    TAG,
+                                    "addSinkInRegion: add offload sink in region id=" + region.id);
+                            return native_mapOffloadSinkRegion(
+                                    mNativeHandle,
+                                    context.info.region.id,
+                                    dataFlowId.id,
+                                    id.getHub(),
+                                    id.getEndpoint(),
+                                    region.id,
+                                    region.sizeBytes,
+                                    region.sharedMemory.getFd(),
+                                    newDataAlertPolicy.getPolicyType(),
+                                    newDataAlertPolicy.getData(),
+                                    canOverwrite);
+                        }
                     }
                 };
 
@@ -1412,17 +1522,32 @@ public class HubEndpoint {
                 offset += buffer.remaining();
             }
         }
-        return native_sourcePush(mNativeHandle, region.id, combinedData, allOrNothing);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            return native_sourcePush(mNativeHandle, region.id, combinedData, allOrNothing);
+        }
     }
 
     /** @hide */
     boolean sourceFull(@NonNull SharedDataRegion region) {
-        return native_sourceFull(mNativeHandle, region.id);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            return native_sourceFull(mNativeHandle, region.id);
+        }
     }
 
     /** @hide */
     int sourceSize(@NonNull SharedDataRegion region) {
-        return native_sourceSize(mNativeHandle, region.id, /* includeReserved= */ true);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            return native_sourceSize(mNativeHandle, region.id, /* includeReserved= */ true);
+        }
     }
 
     /** @hide */
@@ -1431,23 +1556,33 @@ public class HubEndpoint {
             @NonNull HubEndpointInfo sinkInfo,
             @NonNull DataFlowNewDataAlertPolicy newDataAlertPolicy,
             boolean canOverwrite) {
-        native_updateSinkPolicy(
-                mNativeHandle,
-                region.id,
-                sinkInfo.getIdentifier().getHub(),
-                sinkInfo.getIdentifier().getEndpoint(),
-                newDataAlertPolicy.getPolicyType(),
-                newDataAlertPolicy.getData(),
-                canOverwrite);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            native_updateSinkPolicy(
+                    mNativeHandle,
+                    region.id,
+                    sinkInfo.getIdentifier().getHub(),
+                    sinkInfo.getIdentifier().getEndpoint(),
+                    newDataAlertPolicy.getPolicyType(),
+                    newDataAlertPolicy.getData(),
+                    canOverwrite);
+        }
     }
 
     /** @hide */
     void removeOffloadSink(@NonNull SharedDataRegion region, @NonNull HubEndpointInfo sinkInfo) {
-        native_removeOffloadSink(
-                mNativeHandle,
-                region.id,
-                sinkInfo.getIdentifier().getHub(),
-                sinkInfo.getIdentifier().getEndpoint());
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            native_removeOffloadSink(
+                    mNativeHandle,
+                    region.id,
+                    sinkInfo.getIdentifier().getHub(),
+                    sinkInfo.getIdentifier().getEndpoint());
+        }
     }
 
     /** @hide */
@@ -1461,10 +1596,17 @@ public class HubEndpoint {
             } catch (RemoteException e) {
                 e.rethrowFromSystemServer();
             }
-            mSources.remove(dataFlowId.get());
+            synchronized (mLock) {
+                mSources.remove(dataFlowId.get());
+            }
         }
         if (regionId.isPresent()) {
-            native_removeHostSource(mNativeHandle, regionId.get());
+            synchronized (mNativeLock) {
+                if (mNativeHandle == 0) {
+                    throw new IllegalStateException("Endpoint is not registered.");
+                }
+                native_removeHostSource(mNativeHandle, regionId.get());
+            }
             try {
                 mServiceToken.freeSharedDataRegion(regionId.get());
             } catch (RemoteException e) {
@@ -1482,52 +1624,96 @@ public class HubEndpoint {
     /** @hide */
     @NonNull
     byte[] sinkRequestData(DataFlowSinkContext context, int elementCount, boolean allOrNothing) {
-        return native_sinkRequestData(
-                mNativeHandle, context.id.hubId, context.id.id, elementCount, allOrNothing);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            return native_sinkRequestData(
+                    mNativeHandle, context.id.hubId, context.id.id, elementCount, allOrNothing);
+        }
     }
 
     /** @hide */
     void sinkSyncToSource(DataFlowSinkContext context, int offset) {
-        if (!native_sinkSyncToSource(mNativeHandle, context.id.hubId, context.id.id, offset)) {
-            Log.e(TAG, "syncToSource: failed to sync to source");
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            if (!native_sinkSyncToSource(mNativeHandle, context.id.hubId, context.id.id, offset)) {
+                Log.e(TAG, "syncToSource: failed to sync to source");
+            }
         }
     }
 
     /** @hide */
     boolean sinkSourceCanOverwriteReadPosition(DataFlowSinkContext context) {
-        return native_sinkSourceCanOverwriteReadPosition(
-                mNativeHandle, context.id.hubId, context.id.id);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            return native_sinkSourceCanOverwriteReadPosition(
+                    mNativeHandle, context.id.hubId, context.id.id);
+        }
     }
 
     /** @hide */
     int sinkSize(DataFlowSinkContext context) {
-        return native_sinkSize(mNativeHandle, context.id.hubId, context.id.id);
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            return native_sinkSize(mNativeHandle, context.id.hubId, context.id.id);
+        }
     }
 
     /** @hide */
     void removeSink(DataFlowSinkContext context) {
-        native_removeHostSink(mNativeHandle, context.id.hubId, context.id.id);
-        mSinks.remove(new DataFlowIdWrapper(context.id));
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            native_removeHostSink(mNativeHandle, context.id.hubId, context.id.id);
+        }
+        synchronized (mLock) {
+            mSinks.remove(new DataFlowIdWrapper(context.id));
+        }
     }
 
     private DataFlowDataConfig enableHostSinkFromContext(
             DataFlowSinkContext context, HubEndpointInfo.HubEndpointIdentifier sourceId) {
-        int[] hostSinkValues =
-                native_enableHostSink(
-                        mNativeHandle,
-                        context.info.region.id,
-                        context.info.region.sizeBytes,
-                        context.info.region.sharedMemory.getFd(),
-                        context.id.hubId,
-                        context.id.id,
-                        sourceId.getEndpoint(),
-                        context.alertFds.waking.getFd(),
-                        context.alertFds.nonWaking.getFd(),
-                        context.alertFds.halAck.getFd(),
-                        context.info.alertFds.waking.getFd(),
-                        context.info.alertFds.nonWaking.getFd(),
-                        context.info.metadataOffsetBytes,
-                        context.metadataOffsetBytes);
+        int[] hostSinkValues;
+        synchronized (mNativeLock) {
+            if (mNativeHandle == 0) {
+                throw new IllegalStateException("Endpoint is not registered.");
+            }
+            int metadataRegionId = -1;
+            long metadataRegionSize = 0;
+            int metadataRegionFd = -1;
+            if (context.sinkMetadataRegion != null) {
+                metadataRegionId = context.sinkMetadataRegion.id;
+                metadataRegionSize = context.sinkMetadataRegion.sizeBytes;
+                metadataRegionFd = context.sinkMetadataRegion.sharedMemory.getFd();
+            }
+            hostSinkValues =
+                    native_enableHostSink(
+                            mNativeHandle,
+                            context.info.region.id,
+                            context.info.region.sizeBytes,
+                            context.info.region.sharedMemory.getFd(),
+                            metadataRegionId,
+                            metadataRegionSize,
+                            metadataRegionFd,
+                            context.id.hubId,
+                            context.id.id,
+                            sourceId.getEndpoint(),
+                            context.alertFds.waking.getFd(),
+                            context.alertFds.nonWaking.getFd(),
+                            context.alertFds.halAck.getFd(),
+                            context.info.alertFds.waking.getFd(),
+                            context.info.alertFds.nonWaking.getFd(),
+                            context.info.metadataOffsetBytes,
+                            context.metadataOffsetBytes);
+        }
         if (hostSinkValues == null) {
             Log.e(TAG, "enableHostSinkFromContext: failed to enable host sink");
             return null;

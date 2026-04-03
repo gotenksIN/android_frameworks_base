@@ -16,20 +16,11 @@
 
 package com.android.systemui.statusbar.notification.collection.coordinator
 
-import android.app.INotificationManager
 import android.app.NotificationChannel
 import android.app.NotificationChannel.PROMOTIONS_ID
-import android.app.NotificationManager.ACTION_DYNAMIC_BUNDLE_MODIFIED
-import android.app.NotificationManager.DYNAMIC_BUNDLE_MODIFICATION_TYPE_ADDED
-import android.app.NotificationManager.DYNAMIC_BUNDLE_MODIFICATION_TYPE_REMOVED
-import android.app.NotificationManager.EXTRA_DYNAMIC_BUNDLE
-import android.app.NotificationManager.EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE
-import android.content.Intent
-import android.content.applicationContext
 import android.os.UserHandle
+import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
-import android.service.notification.DynamicBundle
-import android.testing.TestableLooper
 import android.util.Pair
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MotionScheme
@@ -37,13 +28,20 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.broadcast.broadcastDispatcher
+import com.android.systemui.kosmos.backgroundScope
 import com.android.systemui.kosmos.currentValue
+import com.android.systemui.kosmos.runTest
+import com.android.systemui.notifications.intelligence.rules.data.repository.fakeNotificationRulesRepository
+import com.android.systemui.notifications.intelligence.rules.domain.interactor.notificationRulesInteractor
+import com.android.systemui.notifications.intelligence.rules.shared.NmContextualDisplayLaunch
+import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 import com.android.systemui.notifications.ui.composable.row.BundleHeader
-import com.android.systemui.settings.UserTracker
 import com.android.systemui.statusbar.notification.OnboardingAffordanceManager
 import com.android.systemui.statusbar.notification.collection.BundleEntry
+import com.android.systemui.statusbar.notification.collection.BundleIcon
 import com.android.systemui.statusbar.notification.collection.BundleSpec
+import com.android.systemui.statusbar.notification.collection.BundleTitle
 import com.android.systemui.statusbar.notification.collection.GroupEntry
 import com.android.systemui.statusbar.notification.collection.InternalNotificationsApi
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
@@ -53,21 +51,17 @@ import com.android.systemui.statusbar.notification.collection.render.BundleBarn
 import com.android.systemui.statusbar.notification.row.data.model.AppData
 import com.android.systemui.statusbar.notification.row.data.repository.TEST_BUNDLE_SPEC
 import com.android.systemui.statusbar.notification.row.data.repository.TEST_BUNDLE_SPEC_2
-import com.android.systemui.testKosmos
-import com.android.systemui.util.concurrency.FakeExecutor
-import com.android.systemui.util.time.FakeSystemClock
+import com.android.systemui.testKosmosNew
+import com.android.systemui.util.compose.state.snapshotFlowBuilder
 import com.android.systemui.util.time.SystemClock
 import com.google.common.truth.Correspondence
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.any
 import org.mockito.Mock
 import org.mockito.Mockito.`when` as whenever
 import org.mockito.MockitoAnnotations
@@ -79,19 +73,11 @@ import org.mockito.MockitoAnnotations
 )
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-@TestableLooper.RunWithLooper
 class BundleCoordinatorTest : SysuiTestCase() {
-    private val kosmos = testKosmos()
+    private val kosmos = testKosmosNew()
     @Mock private lateinit var bundleBarn: BundleBarn
     @Mock private lateinit var systemClock: SystemClock
     @Mock private lateinit var sectionHeaderVisProvider: SectionHeaderVisibilityProvider
-
-    @Mock private lateinit var notificationManager: INotificationManager
-    @Mock private lateinit var userTracker: UserTracker
-
-    private var executor: FakeExecutor = FakeExecutor(FakeSystemClock())
-
-    private val broadcastDispatcher = kosmos.broadcastDispatcher
 
     private val onboardingMgr by lazy {
         OnboardingAffordanceManager("test bundle onboarding", sectionHeaderVisProvider)
@@ -108,18 +94,18 @@ class BundleCoordinatorTest : SysuiTestCase() {
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
-        coordinator =
-            BundleCoordinator(
-                bundleBarn,
-                systemClock,
-                TestScope(UnconfinedTestDispatcher()),
-                onboardingMgr,
-                notificationManager,
-                executor,
-                executor,
-                userTracker,
-                broadcastDispatcher,
-            )
+        coordinator = createBundleCoordinator()
+    }
+
+    private fun createBundleCoordinator(): BundleCoordinator {
+        return BundleCoordinator(
+            bundleBarn,
+            systemClock,
+            kosmos.backgroundScope,
+            onboardingMgr,
+            kosmos.notificationRulesInteractor,
+            kosmos.snapshotFlowBuilder,
+        )
     }
 
     @Test
@@ -579,78 +565,237 @@ class BundleCoordinatorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
-    fun testAddDynamicBundles() {
-        val bundles = listOf(DynamicBundle(130, "Group Chats"), DynamicBundle(140, "Spoilers"))
-        whenever(notificationManager.getDynamicBundles(any(), any())).thenReturn(bundles)
+    @DisableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_rulesFlagOff_onlyHasSystemBundles() =
+        kosmos.runTest {
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Bundle(name = "Bundle #1", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val bundleRule2 =
+                RuleModel(
+                    id = 102,
+                    action = ActionModel.Bundle(name = "Bundle #2", emojiIcon = "\uD83C\uDF81"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1, bundleRule2))
 
-        executor.runAllReady()
+            val newCoordinator = createBundleCoordinator()
 
-        // 4 static bundles and 2 dynamic bundles
-        assertThat(coordinator.bundler.bundleSpecs)
-            .comparingElementsUsing<BundleSpec, Int>(
-                Correspondence.transforming({ it?.bundleType }, "bundleType")
-            )
-            .containsExactly(1, 2, 3, 4, 130, 140)
-    }
+            // Because the flag is off, there should be 4 system bundles and NO rule bundles
+            assertThat(newCoordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4)
+        }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
-    fun testAddDynamicBundles_afterBoot() {
-        val bundles =
-            mutableListOf(DynamicBundle(130, "Group Chats"), DynamicBundle(140, "Spoilers"))
-        whenever(notificationManager.getDynamicBundles(any(), any())).thenReturn(bundles)
-
-        executor.runAllReady()
-
-        val newBundle = DynamicBundle(150, "bundle!")
-        bundles.add(newBundle)
-        broadcastDispatcher.sendIntentToMatchingReceiversOnly(
-            kosmos.applicationContext,
-            Intent(ACTION_DYNAMIC_BUNDLE_MODIFIED).apply {
-                putExtra(
-                    EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE,
-                    DYNAMIC_BUNDLE_MODIFICATION_TYPE_ADDED,
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_hasSystemBundlesAndInitialRuleBundles() =
+        kosmos.runTest {
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Bundle(name = "Bundle #1", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = false,
                 )
-                putExtra(EXTRA_DYNAMIC_BUNDLE, newBundle)
-            },
-        )
+            val bundleRule2 =
+                RuleModel(
+                    id = 102,
+                    action = ActionModel.Bundle(name = "Bundle #2", emojiIcon = "\uD83C\uDF81"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1, bundleRule2))
 
-        // 4 static bundles and 3 dynamic bundles
-        assertThat(coordinator.bundler.bundleSpecs)
-            .comparingElementsUsing<BundleSpec, Int>(
-                Correspondence.transforming({ it?.bundleType }, "bundleType")
-            )
-            .containsExactly(1, 2, 3, 4, 130, 140, 150)
-    }
+            // WHEN a new coordinator is created
+            val newCoordinator = createBundleCoordinator()
+
+            // THEN it immediately has 4 system bundles and 2 rule bundles
+            assertThat(newCoordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4, 101, 102)
+
+            assertThat(newCoordinator.bundler.bundleSpecs[4].titleText)
+                .isEqualTo(BundleTitle.LoadedString("Bundle #1"))
+            assertThat(newCoordinator.bundler.bundleSpecs[4].icon)
+                .isEqualTo(BundleIcon.Emoji("\uD83D\uDCE6"))
+
+            assertThat(newCoordinator.bundler.bundleSpecs[5].titleText)
+                .isEqualTo(BundleTitle.LoadedString("Bundle #2"))
+            assertThat(newCoordinator.bundler.bundleSpecs[5].icon)
+                .isEqualTo(BundleIcon.Emoji("\uD83C\uDF81"))
+        }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
-    fun testRemoveDynamicBundles() {
-        val removable = DynamicBundle(140, "Spoilers")
-        val bundles = mutableListOf(DynamicBundle(130, "Group Chats"), removable)
-        whenever(notificationManager.getDynamicBundles(any(), any())).thenReturn(bundles)
-
-        executor.runAllReady()
-
-        broadcastDispatcher.sendIntentToMatchingReceiversOnly(
-            kosmos.applicationContext,
-            Intent(ACTION_DYNAMIC_BUNDLE_MODIFIED).apply {
-                putExtra(
-                    EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE,
-                    DYNAMIC_BUNDLE_MODIFICATION_TYPE_REMOVED,
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_addBundleRule() =
+        kosmos.runTest {
+            // Verify we start with 4 static bundles
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
                 )
-                putExtra(EXTRA_DYNAMIC_BUNDLE, removable)
-            },
-        )
+                .containsExactly(1, 2, 3, 4)
 
-        // 4 static bundles and 1 dynamic bundle
-        assertThat(coordinator.bundler.bundleSpecs)
-            .comparingElementsUsing<BundleSpec, Int>(
-                Correspondence.transforming({ it?.bundleType }, "bundleType")
-            )
-            .containsExactly(1, 2, 3, 4, 130)
-    }
+            // WHEN a new rule is added to the repo
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Bundle(name = "Bundle #1", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1))
+
+            // THEN the coordinator is updated with 4 static bundles and 1 new rule bundle
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4, 101)
+
+            assertThat(coordinator.bundler.bundleSpecs[4].titleText)
+                .isEqualTo(BundleTitle.LoadedString("Bundle #1"))
+            assertThat(coordinator.bundler.bundleSpecs[4].icon)
+                .isEqualTo(BundleIcon.Emoji("\uD83D\uDCE6"))
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_addBundleRule_ignoresSystemRules() =
+        kosmos.runTest {
+            // Verify we start with 4 static bundles
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4)
+
+            // WHEN a new rule is added to the repo, but it's a system rule
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Bundle(name = "Bundle #1", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = true,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1))
+
+            // THEN the coordinator does not process the new system rule
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4)
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_addBundleRule_ignoresNonBundleRules() =
+        kosmos.runTest {
+            // Verify we start with 4 static bundles
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4)
+
+            // WHEN a new rule is added to the repo, but it's a not a bundle rule
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Highlight,
+                    filter = null,
+                    isSystemRule = false,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1))
+
+            // THEN the coordinator does not process the new rule
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4)
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_addBundleRule_ruleBundleNameAndEmojiNull() =
+        kosmos.runTest {
+            // Verify we start with 4 static bundles
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4)
+
+            // WHEN a new bundle rule is added to the repo with null name & emoji
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Bundle(name = null, emojiIcon = null),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1))
+
+            // THEN the coordinator is updated with 4 static bundles and 1 new rule bundle
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4, 101)
+
+            // AND some sort of title and icon is automatically filled in
+            assertThat(coordinator.bundler.bundleSpecs[4].titleText).isNotNull()
+            assertThat(coordinator.bundler.bundleSpecs[4].icon).isNotNull()
+        }
+
+    @Test
+    @EnableFlags(NmContextualDisplayLaunch.FLAG_NAME)
+    fun bundleSpecs_removeBundleRule() =
+        kosmos.runTest {
+            val bundleRule1 =
+                RuleModel(
+                    id = 101,
+                    action = ActionModel.Bundle(name = "Bundle #1", emojiIcon = "\uD83D\uDCE6"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            val bundleRule2 =
+                RuleModel(
+                    id = 102,
+                    action = ActionModel.Bundle(name = "Bundle #2", emojiIcon = "\uD83C\uDF81"),
+                    filter = null,
+                    isSystemRule = false,
+                )
+            fakeNotificationRulesRepository.rules.addAll(listOf(bundleRule1, bundleRule2))
+
+            val newCoordinator = createBundleCoordinator()
+
+            // 4 system bundles and 2 rule bundles
+            assertThat(newCoordinator.bundler.bundleSpecs).hasSize(6)
+
+            // WHEN a rule is removed
+            fakeNotificationRulesRepository.rules.remove(bundleRule1)
+
+            // THEN the coordinator is updated
+            assertThat(newCoordinator.bundler.bundleSpecs).hasSize(5)
+            assertThat(coordinator.bundler.bundleSpecs)
+                .comparingElementsUsing<BundleSpec, Int>(
+                    Correspondence.transforming({ it?.bundleType }, "bundleType")
+                )
+                .containsExactly(1, 2, 3, 4, 102)
+        }
 
     private fun makeEntryOfChannelType(
         type: String,

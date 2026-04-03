@@ -46,7 +46,7 @@ import co.nstant.in.cbor.model.UnsignedInteger;
 public final class TrustTokenMasterKeyTest {
     // COSE IANA IDs needed for Ed25519 CoseKey
     private static final DataItem KEY_PARAMETER_KEY_TYPE = new UnsignedInteger(1);
-    private static final DataItem KEY_TYPE_EC2 = new UnsignedInteger(2);
+    private static final DataItem KEY_TYPE_OKP = new UnsignedInteger(1);
     private static final DataItem KEY_PARAMETER_CURVE = new NegativeInteger(-1);
     private static final DataItem KEY_PARAMETER_X = new NegativeInteger(-2);
     private static final DataItem CURVE_OKP_ED25519 = new UnsignedInteger(6);
@@ -144,7 +144,7 @@ public final class TrustTokenMasterKeyTest {
         var coseKey = (Map) items.get(0);
         var keyType = coseKey.get(KEY_PARAMETER_KEY_TYPE);
         var curve = coseKey.get(KEY_PARAMETER_CURVE);
-        if (!keyType.equals(KEY_TYPE_EC2) || !curve.equals(CURVE_OKP_ED25519)) {
+        if (!keyType.equals(KEY_TYPE_OKP) || !curve.equals(CURVE_OKP_ED25519)) {
             throw new IllegalArgumentException(
                     "invalid key: not a Ed25519 key, key_type=" + keyType + ", curve=" + curve);
         }

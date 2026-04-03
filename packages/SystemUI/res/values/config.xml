@@ -107,7 +107,7 @@
 
     <!-- Tiles native to System UI. Order should match "quick_settings_tiles_default" -->
     <string name="quick_settings_tiles_stock" translatable="false">
-        internet,wifi,bt,flashlight,dnd,modes_dnd,alarm,airplane,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,location,hotspot,inversion,saver,dark,work,night,reverse,reduce_brightness,qr_code_scanner,onehanded,color_correction,font_scaling,record_issue,hearing_devices,notes,desktopeffects,cell,battery_charging
+        internet,wifi,bt,flashlight,dnd,modes_dnd,alarm,airplane,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,location,hotspot,inversion,saver,dark,work,night,reverse,reduce_brightness,qr_code_scanner,onehanded,color_correction,font_scaling,record_issue,hearing_devices,notes,desktopeffects,cell
     </string>
 
     <!-- The tiles to display in QuickSettings -->
@@ -117,6 +117,9 @@
     <string name="quick_settings_tiles_retail_mode" translatable="false">
         night,dark,dnd,flashlight,rotation,location
     </string>
+
+    <!-- Whether to disable dual shade educational tooltips -->
+    <bool name="config_disableDualShadeEducationalTooltips">false</bool>
 
     <!-- Tiles to auto add to Quick Settings upon first change of a given secure setting.
          The syntax is setting-name:spec. If the tile is a TileService, the spec should be specified
@@ -532,6 +535,9 @@
          1: Recommend a UI optimized for stylus input. -->
     <integer name="config_preferredNotesMode">1</integer>
 
+    <!-- Whether note taking on the lock screen is supported without user consent flow. -->
+    <bool name="config_supportLegacyUnconsentedLockScreenNoteTaking">true</bool>
+
     <!-- The component name of the screenshot editing activity that provides the App Clips flow.
          The App Clips flow includes taking a screenshot, showing user screenshot cropping activity
          and finally letting user send the screenshot to the calling notes app. This activity
@@ -926,6 +932,9 @@
     <!-- Flag to enable privacy chip animation, it shall be true for normal case -->
     <bool name="config_enablePrivacyChipAnimation">true</bool>
 
+    <!-- Flag to enable connected display chip, true by default -->
+    <bool name="config_isStatusBarConnectedDisplayChipEnabled">true</bool>
+
     <!-- How often in milliseconds to jitter the dream overlay in order to avoid burn-in. -->
     <integer name="config_dreamOverlayBurnInProtectionUpdateIntervalMillis">1000</integer>
 
@@ -1235,4 +1244,15 @@
     revealing the blur underneath, or fully opaque.
     -->
     <bool name="config_translucentStandalonePowerMenu">true</bool>
+
+    <!--
+    Certain devices may not ever want to show lockscreen content, and should be directed
+    immediately to a bouncer.
+    -->
+    <bool name="config_alwaysShowBouncerWhenLocked">false</bool>
+
+    <!--
+    Indicates whether to use the Alerts channel for storage notifications.
+    -->
+    <bool name="config_storageNotificationsUseAlertsChannel">false</bool>
 </resources>

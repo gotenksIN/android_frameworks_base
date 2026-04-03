@@ -49,23 +49,33 @@ public class BluetoothDeviceProcessor
 
     interface Callback {
         void onBluetoothCompanionDeviceConnected(int associationId, int userId);
-
         void onBluetoothCompanionDeviceDisconnected(int associationId, int userId);
-
         void onDevicePresenceEventByUuid(ObservableUuid uuid, int event);
     }
 
-    @NonNull
-    private final AssociationStore mAssociationStore;
-    @NonNull
-    private final ObservableUuidStore mObservableUuidStore;
-    @NonNull
-    private final Callback mCallback;
+    private static class ConnectedDevice {
+        final BluetoothDevice mDevice;
+        boolean mIsLeConnected = false;
+        boolean mIsBredrConnected = false;
+        boolean mNotified = false;
 
-    /** A set of ALL connected BT device (not only companion.) */
+        ConnectedDevice(BluetoothDevice device) {
+            this.mDevice = device;
+        }
+
+        boolean isFullyDisconnected() {
+            return !mIsLeConnected && !mIsBredrConnected;
+        }
+    }
+
+    @NonNull private final AssociationStore mAssociationStore;
+    @NonNull private final ObservableUuidStore mObservableUuidStore;
+    @NonNull private final Callback mCallback;
+
+    /** Map of MAC address to our internal tracking object */
     @GuardedBy("mAllConnectedDevices")
     @NonNull
-    private final Map<MacAddress, BluetoothDevice> mAllConnectedDevices = new HashMap<>();
+    private final Map<MacAddress, ConnectedDevice> mAllConnectedDevices = new HashMap<>();
 
     BluetoothDeviceProcessor(@NonNull AssociationStore associationStore,
             @NonNull ObservableUuidStore observableUuidStore, @NonNull Callback callback) {
@@ -80,54 +90,71 @@ public class BluetoothDeviceProcessor
         mAssociationStore.registerLocalListener(this);
     }
 
-    /**
-     * Overrides
-     * {@link BluetoothAdapter.BluetoothConnectionCallback#onDeviceConnected(BluetoothDevice)}.
-     */
     @Override
     public void onDeviceConnected(@NonNull BluetoothDevice device) {
         final MacAddress macAddress = MacAddress.fromString(device.getAddress());
+        int transportToNotify = -1;
 
         synchronized (mAllConnectedDevices) {
-            if (mAllConnectedDevices.put(macAddress, device) != null) {
-                Slog.i(TAG, "Device " + device.getAddress()
-                        + " already marked as connected. Skipping duplicate event.");
-                return;
+            ConnectedDevice cd = mAllConnectedDevices.computeIfAbsent(
+                    macAddress, k -> new ConnectedDevice(device));
+
+            cd.mIsBredrConnected = device.isConnected(BluetoothDevice.TRANSPORT_BREDR);
+            cd.mIsLeConnected = device.isConnected(BluetoothDevice.TRANSPORT_LE);
+
+            if (!cd.mNotified && (cd.mIsBredrConnected || cd.mIsLeConnected)) {
+                cd.mNotified = true;
+                transportToNotify = cd.mIsBredrConnected ? BluetoothDevice.TRANSPORT_BREDR
+                        : BluetoothDevice.TRANSPORT_LE;
             }
         }
 
-
-        onDeviceConnectivityChanged(device, true);
+        if (transportToNotify != -1) {
+            Slog.i(TAG, "Device connected: " + device.getAddress()
+                    + " on transport " + transportToNotify);
+            onDeviceConnectivityChanged(device, true);
+        }
     }
 
-    /**
-     * Overrides
-     * {@link BluetoothAdapter.BluetoothConnectionCallback#onDeviceConnected(BluetoothDevice)}.
-     * Also invoked when user turns BT off while the device is connected.
-     */
     @Override
-    public void onDeviceDisconnected(@NonNull BluetoothDevice device,
-            int reason) {
-        final MacAddress macAddress = MacAddress.fromString(device.getAddress());
+    public void onDeviceDisconnected(@NonNull BluetoothDevice device, int reason) {
+        final MacAddress mac = MacAddress.fromString(device.getAddress());
+        boolean shouldNotifyDisconnect = false;
 
         synchronized (mAllConnectedDevices) {
-            if (mAllConnectedDevices.remove(macAddress) == null) {
-                Slog.i(TAG, "Device " + device.getAddress()
-                        + " not found as connected. Skipping disconnect event");
-                return;
+            ConnectedDevice cd = mAllConnectedDevices.get(mac);
+            if (cd == null) return;
+
+            cd.mIsBredrConnected = device.isConnected(BluetoothDevice.TRANSPORT_BREDR);
+            cd.mIsLeConnected = device.isConnected(BluetoothDevice.TRANSPORT_LE);
+
+            if (cd.isFullyDisconnected()) {
+                mAllConnectedDevices.remove(mac);
+                if (cd.mNotified) {
+                    shouldNotifyDisconnect = true;
+                }
+            } else {
+                Slog.d(TAG, "Device " + device.getAddress() + " still has an active transport "
+                        + "(BR/EDR=" + cd.mIsBredrConnected + ", LE=" + cd.mIsLeConnected
+                        + "). Waiting for total disconnection.");
             }
         }
 
-        onDeviceConnectivityChanged(device, false);
+        if (shouldNotifyDisconnect) {
+            Slog.i(TAG, "Device disconnected: " + device.getAddress());
+            onDeviceConnectivityChanged(device, false);
+        }
     }
 
-    private void onDeviceConnectivityChanged(@NonNull BluetoothDevice device, boolean connected) {
+    private void onDeviceConnectivityChanged(@NonNull BluetoothDevice device,
+            boolean connected) {
         int userId = UserHandle.myUserId();
         final List<AssociationInfo> associations =
                 mAssociationStore.getActiveAssociationsByAddress(device.getAddress());
 
         for (AssociationInfo association : associations) {
             if (!association.isNotifyOnDeviceNearby()) continue;
+
             final int id = association.getId();
             if (connected) {
                 mCallback.onBluetoothCompanionDeviceConnected(id, association.getUserId());
@@ -153,14 +180,11 @@ public class BluetoothDeviceProcessor
     @Override
     public void onAssociationAdded(AssociationInfo association) {
         synchronized (mAllConnectedDevices) {
-            if (mAllConnectedDevices.containsKey(association.getDeviceMacAddress())) {
+            ConnectedDevice tracked = mAllConnectedDevices.get(association.getDeviceMacAddress());
+            if (tracked != null) {
                 mCallback.onBluetoothCompanionDeviceConnected(
                         association.getId(), association.getUserId());
-            } else {
-                Slog.i(TAG, "onAssociationAdded: Device " + association.getDeviceMacAddress()
-                        + " is not currently connected.");
             }
         }
     }
-
 }

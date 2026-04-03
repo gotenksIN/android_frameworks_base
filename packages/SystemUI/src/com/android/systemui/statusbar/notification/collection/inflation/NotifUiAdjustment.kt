@@ -40,6 +40,7 @@ internal constructor(
     val isGroupSummary: Boolean,
     val summarization: String?,
     val isBundled: Boolean,
+    val isPromotedNotifShowingFutureTime: Boolean,
 ) {
     companion object {
         @JvmStatic
@@ -59,6 +60,8 @@ internal constructor(
                 !oldAdjustment.isGroupSummary && newAdjustment.isGroupSummary -> true
                 oldAdjustment.summarization != newAdjustment.summarization -> true
                 oldAdjustment.isBundled != newAdjustment.isBundled -> true
+                oldAdjustment.isPromotedNotifShowingFutureTime !=
+                    newAdjustment.isPromotedNotifShowingFutureTime -> true
                 else -> false
             }
 

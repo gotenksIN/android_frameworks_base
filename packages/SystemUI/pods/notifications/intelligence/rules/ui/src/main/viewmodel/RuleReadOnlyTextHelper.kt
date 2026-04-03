@@ -19,9 +19,10 @@ package com.android.systemui.notifications.intelligence.rules.ui.viewmodel
 import android.content.res.Resources
 import com.android.systemui.log.core.Logger
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.IncludedAppsModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.KeywordsModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.PeopleModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.PersonModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 
 /**
@@ -33,8 +34,8 @@ internal fun buildReadOnlyRuleText(
     resources: Resources,
     logger: Logger,
 ): RuleDisplayModel {
-    val appsText: SingleFieldTextModel<AppModel>? =
-        rule.filter.includedApps?.let {
+    val appsText: TextModel.SingleFieldTextModel<AppModel>? =
+        rule.filter?.includedApps?.let {
             createReadOnlyIncludedAppsText(
                 selectedIncludedApps = it,
                 resources = resources,
@@ -42,15 +43,29 @@ internal fun buildReadOnlyRuleText(
             )
         }
 
-    val contactsText: SingleFieldTextModel<ContactModel>? =
-        rule.filter.contacts?.let {
-            createReadOnlyContactsText(
-                selectedContacts = it,
+    val peopleText: TextModel.SingleFieldTextModel<PersonModel>? =
+        rule.filter?.people?.let {
+            createReadOnlyPeopleText(selectedPeople = it, resources = resources, logger = logger)
+        }
+
+    val keywordsText: TextModel.SingleFieldTextModel<String>? =
+        rule.filter?.keywords?.let {
+            createReadOnlyKeywordsText(
+                selectedKeywords = it,
                 resources = resources,
                 logger = logger,
             )
         }
-    return buildRuleText(appsText = appsText, contactsText = contactsText, resources = resources)
+
+    val bundleText = createBundleText(rule.action, resources = resources, logger = logger)
+
+    return buildRuleText(
+        appsText = appsText,
+        peopleText = peopleText,
+        keywordsText = keywordsText,
+        bundleText = bundleText,
+        resources = resources,
+    )
 }
 
 /** Creates text representation for the included apps filter field. */
@@ -58,28 +73,46 @@ private fun createReadOnlyIncludedAppsText(
     selectedIncludedApps: IncludedAppsModel,
     resources: Resources,
     logger: Logger,
-): SingleFieldTextModel<AppModel> {
+): TextModel.SingleFieldTextModel<AppModel> {
     return createMultiItemText(
         items = selectedIncludedApps.apps,
-        id = { it.uniqueId },
+        iconId = { it.uniqueId },
         label = { it.label },
         onClick = null,
+        itemTextString = ItemTextStringConstants.includedAppString,
         resources = resources,
         logger = logger,
     )
 }
 
-/** Creates text representation for the contacts filter field. */
-private fun createReadOnlyContactsText(
-    selectedContacts: ContactsModel,
+/** Creates text representation for the people filter field. */
+private fun createReadOnlyPeopleText(
+    selectedPeople: PeopleModel,
     resources: Resources,
     logger: Logger,
-): SingleFieldTextModel<ContactModel> {
+): TextModel.SingleFieldTextModel<PersonModel> {
     return createMultiItemText(
-        items = selectedContacts.contacts,
-        id = { it.id },
+        items = selectedPeople.people,
+        iconId = { it.id },
         label = { it.displayLabel },
         onClick = null,
+        itemTextString = ItemTextStringConstants.personString,
+        resources = resources,
+        logger = logger,
+    )
+}
+
+private fun createReadOnlyKeywordsText(
+    selectedKeywords: KeywordsModel,
+    resources: Resources,
+    logger: Logger,
+): TextModel.SingleFieldTextModel<String> {
+    return createMultiItemText(
+        items = selectedKeywords.keywords,
+        iconId = null, // No icon for keywords
+        label = { it },
+        onClick = null,
+        itemTextString = ItemTextStringConstants.keywordString,
         resources = resources,
         logger = logger,
     )

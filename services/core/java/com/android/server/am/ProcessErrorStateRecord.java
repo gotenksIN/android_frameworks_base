@@ -28,6 +28,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ANR;
 import static com.android.server.am.ActivityManagerService.MY_PID;
 import static com.android.server.am.ProcessRecord.TAG;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.AnrController;
@@ -55,6 +56,7 @@ import android.os.incremental.IncrementalManager;
 import android.os.incremental.IncrementalMetrics;
 import android.provider.Settings;
 import android.util.EventLog;
+import android.util.IndentingPrintWriter;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
 
@@ -65,6 +67,7 @@ import com.android.internal.os.ProcessCpuTracker;
 import com.android.internal.os.ProcfsMemoryUtil.MemorySnapshot;
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.os.anr.AnrLatencyTracker;
+import com.android.internal.security.VerityUtils;
 import com.android.internal.util.FrameworkStatsLog;
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
 import com.android.server.am.trace.SmartTraceUtils;
@@ -77,7 +80,6 @@ import com.android.server.Watchdog;
 import com.android.server.wm.WindowProcessController;
 
 import java.io.File;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -179,6 +181,12 @@ class ProcessErrorStateRecord {
     @SubReason
     private int mPendingCrashSubReason = ApplicationExitInfo.SUBREASON_UNKNOWN;
 
+    /**
+     * Pending crash description, will be used when the app actually crashes.
+     */
+    @GuardedBy("mService")
+    private String mPendingCrashDescription;
+
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     boolean isBad() {
         return mBad;
@@ -260,6 +268,25 @@ class ProcessErrorStateRecord {
     @GuardedBy("mService")
     void setPendingCrashSubReason(@SubReason int subReason) {
         mPendingCrashSubReason = subReason;
+    }
+
+    /**
+     * @return the pending crash description.
+     */
+    @GuardedBy("mService")
+    @Nullable
+    String getPendingCrashDescription() {
+        return mPendingCrashDescription;
+    }
+
+    /**
+     * Set the pending crash description.
+     *
+     * @param description the description for the crash.
+     */
+    @GuardedBy("mService")
+    void setPendingCrashDescription(String description) {
+        mPendingCrashDescription = description;
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
@@ -521,8 +548,12 @@ class ProcessErrorStateRecord {
                 });
             }
         }
-        // Build memory headers for the ANRing process.
-        LinkedHashMap<String, String> memoryHeaders = buildMemoryHeadersFor(pid);
+        // Build memory and fs-verity headers for the ANRing process.
+        LinkedHashMap<String, String> extraHeaders = buildMemoryHeadersFor(pid);
+        if (extraHeaders == null) {
+            extraHeaders = new LinkedHashMap<>();
+        }
+        appendFsVerityHeaders(extraHeaders);
 
         // Get critical event log before logging the ANR so that it doesn't occur in the log.
         latencyTracker.criticalEventLogStarted();
@@ -636,7 +667,7 @@ class ProcessErrorStateRecord {
         File tracesFile = StackTracesDumpHelper.dumpStackTraces(firstPids,
                 isSilentAnr ? null : processCpuTracker, isSilentAnr ? null : lastPids,
                 nativePidsFuture, tracesFileException, firstPidEndOffset, annotation,
-                criticalEventLog, memoryHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
+                criticalEventLog, extraHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
                 latencyTracker, timeoutRecord);
 
 // QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
@@ -800,7 +831,8 @@ class ProcessErrorStateRecord {
                 incrementalMetrics != null ? incrementalMetrics.getLastReadErrorNumber()
                         : 0,
                 incrementalMetrics != null ? incrementalMetrics.getTotalDelayedReadsDurationMillis()
-                        : -1);
+                        : -1,
+                anrInfo != null ? anrInfo.getAnrId() : 0);
         final ProcessRecord parentPr = parentProcess != null
                 ? (ProcessRecord) parentProcess.mOwner : null;
         mService.addErrorToDropBox("anr", mApp, mApp.processName, activityShortComponentName,
@@ -971,6 +1003,25 @@ class ProcessErrorStateRecord {
             resolver.getUserId()) != 0;
     }
 
+    private void appendFsVerityHeaders(@NonNull LinkedHashMap<String, String> headers) {
+        if (mApp.info == null) {
+            return;
+        }
+        if (mApp.info.sourceDir != null) {
+            headers.put("BaseFsVerity",
+                    Boolean.toString(VerityUtils.hasFsverity(mApp.info.sourceDir)));
+        }
+        if (mApp.info.splitSourceDirs != null) {
+            for (int i = 0; i < mApp.info.splitSourceDirs.length; i++) {
+                String splitDir = mApp.info.splitSourceDirs[i];
+                if (splitDir != null) {
+                    headers.put("SplitFsVerity" + i,
+                            Boolean.toString(VerityUtils.hasFsverity(splitDir)));
+                }
+            }
+        }
+    }
+
     private @Nullable LinkedHashMap<String, String> buildMemoryHeadersFor(int pid) {
         if (pid <= 0) {
             Slog.i(TAG, "Memory header requested with invalid pid: " + pid);
@@ -1014,23 +1065,22 @@ class ProcessErrorStateRecord {
         setCrashing(false);
         setNotResponding(false);
         setPendingCrashSubReason(ApplicationExitInfo.SUBREASON_UNKNOWN);
+        setPendingCrashDescription(null);
     }
 
-    void dump(PrintWriter pw, String prefix, long nowUptime) {
+    void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
         synchronized (mProcLock) {
             if (mCrashing || mDialogController.hasCrashDialogs() || mNotResponding
                     || mDialogController.hasAnrDialogs() || mBad) {
-                pw.print(prefix);
-                pw.print(" mCrashing=" + mCrashing);
-                pw.print(" " + mDialogController.getCrashDialogs());
-                pw.print(" mNotResponding=" + mNotResponding);
-                pw.print(" " + mDialogController.getAnrDialogs());
-                pw.print(" bad=" + mBad);
+                pw.print("mCrashing", mCrashing);
+                pw.print(mDialogController.getCrashDialogs() + " ");
+                pw.print("mNotResponding", mNotResponding);
+                pw.print(mDialogController.getAnrDialogs() + " ");
+                pw.print("bad", mBad);
 
                 // mCrashing or mNotResponding is always set before errorReportReceiver
                 if (mErrorReportReceiver != null) {
-                    pw.print(" errorReportReceiver=");
-                    pw.print(mErrorReportReceiver.flattenToShortString());
+                    pw.print("errorReportReceiver", mErrorReportReceiver.flattenToShortString());
                 }
                 pw.println();
             }

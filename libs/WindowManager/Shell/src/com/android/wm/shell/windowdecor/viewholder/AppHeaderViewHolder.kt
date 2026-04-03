@@ -26,8 +26,10 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnLongClickListener
+import android.view.ViewTreeObserver
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
@@ -96,7 +98,7 @@ class AppHeaderViewHolder(
     private val desktopModeUiEventLogger: DesktopModeUiEventLogger,
     private val dimensions: HeaderDimensions,
     private val focusTransitionObserver: FocusTransitionObserver,
-    private val decorThemeUtilFactory: DecorThemeUtil.Factory,
+    decorThemeUtilFactory: DecorThemeUtil.Factory,
 ) : WindowDecorationViewHolder<AppHeaderViewHolder.HeaderData>() {
 
     data class HeaderData(
@@ -161,9 +163,26 @@ class AppHeaderViewHolder(
     private lateinit var currentTaskInfo: RunningTaskInfo
     private var isTaskInFullImmersiveState: Boolean = false
 
+    private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+
     init {
         if (Flags.interceptTouchEventForAppHeaderDragMove()) {
             captionView.setGestureInterceptor(gestureInterceptor)
+            val onTouch =
+                View.OnTouchListener { _, event ->
+                    // Only move to front on down to prevent 2+ tasks from fighting
+                    // (and thus flickering) for front status when drag-moving them simultaneously
+                    // with
+                    // two pointers.
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                        windowDecorationActions.onCaptionViewReceivedInteraction(currentTaskInfo)
+                    }
+                    return@OnTouchListener false
+                }
+            closeWindowButton.setOnTouchListener(onTouch)
+            maximizeWindowButton.setOnTouchListener(onTouch)
+            minimizeWindowButton.setOnTouchListener(onTouch)
+            openMenuButton.setOnTouchListener(onTouch)
         } else {
             captionView.setOnTouchListener(gestureInterceptor)
             captionHandle.setOnTouchListener(gestureInterceptor)
@@ -685,6 +704,23 @@ class AppHeaderViewHolder(
         if (headerType != Header.Type.DEFAULT) {
             return false
         }
+
+        if (captionView.width == 0) {
+            // Before the first layout pass, we can't reliably determine the visibility of the app
+            // name. For now let's assume it is visible until the first layout pass.
+            if (layoutListener == null) {
+                layoutListener =
+                    ViewTreeObserver.OnGlobalLayoutListener {
+                        captionView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
+                        layoutListener = null
+
+                        appNameTextView.isVisible = shouldAddAppName(headerType)
+                    }
+                captionView.viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
+            }
+            return true
+        }
+
         val openMenuWidthWithText =
             if (appNameTextView.isVisible) {
                 openMenuButton.width

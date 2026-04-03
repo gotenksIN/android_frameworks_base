@@ -16,13 +16,20 @@
 
 package com.android.server.aiseal;
 
+import android.annotation.NonNull;
+import android.content.BroadcastReceiver;
+import android.content.ComponentCallbacks2;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.res.Configuration;
 import android.os.Environment;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
 import android.os.RemoteException;
 import android.os.SELinux;
 import android.os.ServiceManager;
+import android.os.UserHandle;
 import android.text.format.DateUtils;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -34,14 +41,17 @@ import com.android.server.SystemService;
 import com.android.server.SystemService.TargetUser;
 
 import java.io.File;
+import java.util.Objects;
 import java.util.Set;
 
 /** AiSeal system service. */
-public class AiSealSystemService extends SystemService {
+public class AiSealSystemService extends SystemService implements ComponentCallbacks2 {
 
     private static final String TAG = "AiSealSystemService";
     private static final String AISEAL_PRIVATE_FOLDER = "AiSeal";
     private static final String KEK_FILENAME = "kek";
+
+    private final Context mContext;
 
     // Synchronizes user state changes with the AiSeal internal service connection.
     private static final Object sLock = new Object();
@@ -54,11 +64,19 @@ public class AiSealSystemService extends SystemService {
 
     public AiSealSystemService(Context context) {
         super(context);
+        mContext = Objects.requireNonNull(context);
     }
 
     @Override
     public void onStart() {
+        Slog.i(TAG, "AiSealSystemService has started, connecting to AiSeal internal service");
         connectAiSealInternalService();
+        getContext().registerComponentCallbacks(this);
+        mContext.registerReceiverForAllUsers(
+            new UserActionReceiver(),
+            new IntentFilter(Intent.ACTION_USER_REMOVED),
+            /* broadcastPermission= */ null,
+            /* scheduler= */ null);
     }
 
     @Override
@@ -84,9 +102,12 @@ public class AiSealSystemService extends SystemService {
     @GuardedBy("sLock")
     private void connectAiSealInternalServiceLocked() {
         // Reset the service to null if we are currently connected to it.
-        mAiSealInternalService = null;
+        if (mAiSealInternalService != null) {
+            Slog.w(TAG, "Connecting to AiSealInternalService twice");
+            mAiSealInternalService = null;
+        }
 
-        Slog.i(TAG, "Connecting to AiSeal internal service");
+        Slog.d(TAG, "Connecting to AiSeal internal service");
         IBinder binder = ServiceManager.getService("aiseal_internal");
         if (binder != null) {
             try {
@@ -94,7 +115,7 @@ public class AiSealSystemService extends SystemService {
                         new DeathRecipient() {
                             @Override
                             public void binderDied() {
-                                Slog.w(TAG, "AiSeal died; reconnecting");
+                                Slog.wtf(TAG, "AiSeal died; reconnecting");
                                 connectAiSealInternalService();
                             }
                         },
@@ -107,7 +128,7 @@ public class AiSealSystemService extends SystemService {
         if (binder != null) {
             mAiSealInternalService = IAiSealInternalService.Stub.asInterface(binder);
         } else {
-            Slog.w(TAG, "AiSeal internal service not yet available; trying again");
+            Slog.d(TAG, "AiSeal internal service not yet available; trying again");
         }
 
         if (mAiSealInternalService == null) {
@@ -124,6 +145,7 @@ public class AiSealSystemService extends SystemService {
 
     @GuardedBy("sLock")
     private void onAiSealInternalServiceConnectedLocked() {
+        Slog.i(TAG, "Connected to AiSeal internal service");
         for (int userId : mUnlockedUsers) {
             notifyUserUnlockingLocked(userId);
         }
@@ -136,7 +158,7 @@ public class AiSealSystemService extends SystemService {
             notifyUserUnlockingLocked(userId);
         } else {
             // The user will be unlocked in onAiSealInternalServiceConnected().
-            Slog.i(TAG, "Not yet connected to AiSeal to unlock user " + userId);
+            Slog.w(TAG, "Not yet connected to AiSeal to unlock user " + userId);
         }
     }
 
@@ -146,16 +168,16 @@ public class AiSealSystemService extends SystemService {
         if (mAiSealInternalService != null) {
             notifyUserStoppedLocked(userId);
         } else {
-            Slog.i(TAG, "Not yet connected to AiSeal to stop user " + userId);
+            Slog.w(TAG, "Not yet connected to AiSeal to stop user " + userId);
         }
     }
 
     /** AiSeal notifyUserUnlockingLocked */
     @GuardedBy("sLock")
     public void notifyUserUnlockingLocked(int userId) {
+        Slog.i(TAG, "Unlocking user " + userId);
         try {
-            File kekFile = Environment.buildPath(Environment.getDataSystemCeDirectory(userId),
-                    AISEAL_PRIVATE_FOLDER, KEK_FILENAME);
+            File kekFile = getKekFile(userId);
             kekFile.getParentFile().mkdirs();
             SELinux.restorecon(kekFile.getParentFile());
             mAiSealInternalService.onUserUnlocking(userId, kekFile.getAbsolutePath());
@@ -167,10 +189,71 @@ public class AiSealSystemService extends SystemService {
     /** AiSeal notifyUserStoppedLocked */
     @GuardedBy("sLock")
     public void notifyUserStoppedLocked(int userId) {
+        Slog.i(TAG, "Stopping user " + userId);
         try {
             mAiSealInternalService.onUserStopped(userId);
         } catch (Exception e) {
             Slog.wtf(TAG, "Unable to stop user " + userId, e);
         }
+    }
+
+    private class UserActionReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(@NonNull Context context, @NonNull Intent intent) {
+            Objects.requireNonNull(context);
+            Objects.requireNonNull(intent);
+            if (Intent.ACTION_USER_REMOVED.equals(intent.getAction())) {
+                UserHandle userHandle = intent.getParcelableExtra(Intent.EXTRA_USER);
+                if (userHandle == null) {
+                    Slog.e(TAG,
+                            "Extra " + Intent.EXTRA_USER + " is missing in the intent: " + intent);
+                    return;
+                }
+                onUserRemoved(userHandle);
+            } else {
+                Slog.e(TAG, "Received unknown intent: " + intent);
+            }
+        }
+    }
+
+    // Delete all AiSeal data to ensure the user data is properly destroyed when a user profile is
+    // removed.
+    private void onUserRemoved(@NonNull UserHandle userHandle) {
+        Objects.requireNonNull(userHandle);
+        try {
+            synchronized (sLock) {
+                mAiSealInternalService.onUserRemoved(userHandle.getIdentifier());
+            }
+        } catch (Exception e) {
+            Slog.wtf(TAG, "Failed to remove AiSeal data for user " + userHandle);
+        }
+    }
+
+    private File getKekFile(int userId) {
+        return Environment.buildPath(Environment.getDataSystemCeDirectory(userId),
+                AISEAL_PRIVATE_FOLDER, KEK_FILENAME);
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        Slog.i(TAG, "onTrimMemory level=" + level);
+        // We trim on any memory pressure signal.
+        synchronized (sLock) {
+            if (mAiSealInternalService != null) {
+                try {
+                    mAiSealInternalService.trimMemory();
+                } catch (Exception e) {
+                    Slog.e(TAG, "Unable to trim memory", e);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {}
+
+    @Override
+    public void onLowMemory() {
+        onTrimMemory(TRIM_MEMORY_COMPLETE);
     }
 }

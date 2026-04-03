@@ -61,7 +61,6 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 import org.junit.After
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -169,7 +168,9 @@ class BubbleStackViewTest {
 
     @After
     fun tearDown() {
-        PhysicsAnimatorTestUtils.tearDown()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            PhysicsAnimatorTestUtils.tearDown()
+        }
     }
 
     @Test
@@ -238,63 +239,6 @@ class BubbleStackViewTest {
     }
 
     @Test
-    fun expandStack_imeHidden() {
-        val bubble = createAndInflateBubble()
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleStackView.addBubble(bubble)
-            bubbleStackView.setSelectedBubble(bubble)
-        }
-
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
-
-        positioner.setImeVisible(false, 0)
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            // simulate a request from the bubble data listener to expand the stack
-            bubbleStackView.isExpanded = true
-            verify(sysuiProxy).onStackExpandChanged(true)
-            shellExecutor.flushAll()
-        }
-
-        assertThat(bubbleStackViewManager.onImeHidden).isNull()
-    }
-
-    @Test
-    fun collapseStack_imeHidden() {
-        val bubble = createAndInflateBubble()
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleStackView.addBubble(bubble)
-            bubbleStackView.setSelectedBubble(bubble)
-        }
-
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
-
-        positioner.setImeVisible(false, 0)
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            // simulate a request from the bubble data listener to expand the stack
-            bubbleStackView.isExpanded = true
-            verify(sysuiProxy).onStackExpandChanged(true)
-            shellExecutor.flushAll()
-        }
-
-        assertThat(bubbleStackViewManager.onImeHidden).isNull()
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            // simulate a request from the bubble data listener to collapse the stack
-            bubbleStackView.isExpanded = false
-            verify(sysuiProxy).onStackExpandChanged(false)
-            shellExecutor.flushAll()
-        }
-
-        assertThat(bubbleStackViewManager.onImeHidden).isNull()
-    }
-
-    @Test
     fun expandStack_sysUiProxyNotifiedImmediately() {
         val bubble = createAndInflateBubble()
 
@@ -350,8 +294,7 @@ class BubbleStackViewTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE)
-    fun setExpandedTrue_thenDataCollapsed_whenImeHides_doesNotExpand() {
+    fun collapseStack_imeVisible_shouldHideIme() {
         val bubble = createAndInflateBubble()
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -364,83 +307,12 @@ class BubbleStackViewTest {
 
         positioner.setImeVisible(true, 100)
 
-        var onImeHidden: Runnable? = null
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            // 1. Request expansion while IME is visible.
-            bubbleData.isExpanded = true
-            bubbleStackView.isExpanded = true // This will queue the onImeHidden runnable
-            onImeHidden = bubbleStackViewManager.onImeHidden
-            assertThat(onImeHidden).isNotNull()
-
-            // 2. Before IME hides, change the data layer state to collapsed.
-            bubbleData.isExpanded = false
-        }
-
-        // 3. IME hides, and the original expansion runnable is executed.
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            onImeHidden!!.run()
-            shellExecutor.flushAll()
-        }
-
-        // 4. Verify that the stack did NOT expand, because it re-checked bubbleData.isExpanded.
-        assertThat(bubbleStackView.isExpanded).isFalse()
-    }
-
-    @Test
-    fun expandStack_clearsImeRunnable() {
-        val bubble = createAndInflateBubble()
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleStackView.addBubble(bubble)
-            bubbleStackView.setSelectedBubble(bubble)
-        }
-
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
-
-        // Set up a pending runnable to be cleared
-        bubbleStackViewManager.onImeHidden = Runnable {
-            fail("IME runnable should not be called when IME is hidden")
-        }
-
-        positioner.setImeVisible(false, 0)
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            // simulate a request from the bubble data listener to expand the stack
-            bubbleStackView.isExpanded = true
-            verify(sysuiProxy).onStackExpandChanged(true)
-            shellExecutor.flushAll()
-        }
-
-        // Ime runnable is reset
-        assertThat(bubbleStackViewManager.onImeHidden).isNull()
-    }
-
-    @Test
-    fun collapseStack_clearsImeRunnable() {
-        val bubble = createAndInflateBubble()
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleStackView.addBubble(bubble)
-            bubbleStackView.setSelectedBubble(bubble)
-        }
-
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
-
-        positioner.setImeVisible(false, 0)
-
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to expand the stack
             bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             verify(sysuiProxy).onStackExpandChanged(true)
             shellExecutor.flushAll()
-        }
-
-        // Set up a pending runnable to be cleared
-        bubbleStackViewManager.onImeHidden = Runnable {
-            fail("IME runnable should not be called when IME is hidden")
         }
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -451,8 +323,7 @@ class BubbleStackViewTest {
             shellExecutor.flushAll()
         }
 
-        // Check that the runnable is cleared
-        assertThat(bubbleStackViewManager.onImeHidden).isNull()
+        assertThat(bubbleStackViewManager.wasImeHidden).isTrue()
     }
 
     @Test
@@ -530,8 +401,7 @@ class BubbleStackViewTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE)
-    fun tapDifferentBubble_imeVisible_flagDisabled_shouldWaitForIme() {
+    fun tapDifferentBubble_imeVisible_shouldHideImeAndSwitchBubblesImmediately() {
         val bubble1 = createAndInflateChatBubble(key = "bubble1")
         val bubble2 = createAndInflateChatBubble(key = "bubble2")
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -590,154 +460,7 @@ class BubbleStackViewTest {
             shellExecutor.flushAll()
         }
 
-        val onImeHidden = bubbleStackViewManager.onImeHidden
-        assertThat(onImeHidden).isNotNull()
-
-        assertThat(expandListener.bubblesExpandedState).isEqualTo(mapOf("bubble2" to true))
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            onImeHidden!!.run()
-            shellExecutor.flushAll()
-        }
-
-        assertThat(expandListener.bubblesExpandedState)
-            .isEqualTo(mapOf("bubble1" to true, "bubble2" to false))
-        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
-        assertThat(bubbleData.selectedBubble).isEqualTo(bubble1)
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE)
-    fun tapDifferentBubble_imeVisible_flagEnabled_updatesImmediately() {
-        val bubble1 = createAndInflateChatBubble(key = "bubble1")
-        val bubble2 = createAndInflateChatBubble(key = "bubble2")
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleStackView.addBubble(bubble1)
-            bubbleStackView.addBubble(bubble2)
-        }
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-
-        assertThat(bubbleStackView.bubbleCount).isEqualTo(2)
-        assertThat(bubbleData.bubbles).hasSize(2)
-        assertThat(bubbleData.selectedBubble).isEqualTo(bubble2)
-        assertThat(bubble2.iconView).isNotNull()
-
-        val expandListener = FakeBubbleExpandListener()
-        bubbleStackView.setExpandListener(expandListener)
-
-        var lastUpdate: BubbleData.Update? = null
-        val semaphore = Semaphore(0)
-        val listener =
-            BubbleData.Listener { update ->
-                lastUpdate = update
-                semaphore.release()
-            }
-        bubbleData.setListener(listener)
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubble2.iconView!!.performClick()
-            assertThat(bubbleData.isExpanded).isTrue()
-
-            bubbleStackView.setSelectedBubble(bubble2)
-            bubbleStackView.isExpanded = true
-            shellExecutor.flushAll()
-        }
-
-        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
-        assertThat(lastUpdate!!.expanded).isTrue()
-        assertThat(lastUpdate!!.bubbles.map { it.key })
-            .containsExactly("bubble2", "bubble1")
-            .inOrder()
-
-        // wait for idle to allow the animation to start
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        // wait for the expansion animation to complete before interacting with the bubbles
-        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(
-            AnimatableScaleMatrix.SCALE_X,
-            AnimatableScaleMatrix.SCALE_Y,
-        )
-
-        // make the IME visible and tap on bubble1 to select it
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            positioner.setImeVisible(true, 100)
-            bubble1.iconView!!.performClick()
-            // we have to set the selected bubble in the stack view manually because we don't have a
-            // listener wired up.
-            bubbleStackView.setSelectedBubble(bubble1)
-            shellExecutor.flushAll()
-        }
-
-        val onImeHidden = bubbleStackViewManager.onImeHidden
-        assertThat(onImeHidden).isNull()
-
-        assertThat(expandListener.bubblesExpandedState)
-            .isEqualTo(mapOf("bubble1" to true, "bubble2" to false))
-        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
-        assertThat(bubbleData.selectedBubble).isEqualTo(bubble1)
-    }
-
-    @Test
-    fun tapDifferentBubble_imeHidden_updatesImmediately() {
-        val bubble1 = createAndInflateChatBubble(key = "bubble1")
-        val bubble2 = createAndInflateChatBubble(key = "bubble2")
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleStackView.addBubble(bubble1)
-            bubbleStackView.addBubble(bubble2)
-        }
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-
-        assertThat(bubbleStackView.bubbleCount).isEqualTo(2)
-        assertThat(bubbleData.bubbles).hasSize(2)
-        assertThat(bubbleData.selectedBubble).isEqualTo(bubble2)
-        assertThat(bubble2.iconView).isNotNull()
-
-        val expandListener = FakeBubbleExpandListener()
-        bubbleStackView.setExpandListener(expandListener)
-
-        var lastUpdate: BubbleData.Update? = null
-        val semaphore = Semaphore(0)
-        val listener =
-            BubbleData.Listener { update ->
-                lastUpdate = update
-                semaphore.release()
-            }
-        bubbleData.setListener(listener)
-
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubble2.iconView!!.performClick()
-            assertThat(bubbleData.isExpanded).isTrue()
-
-            bubbleStackView.setSelectedBubble(bubble2)
-            bubbleStackView.isExpanded = true
-            shellExecutor.flushAll()
-        }
-
-        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
-        assertThat(lastUpdate!!.expanded).isTrue()
-        assertThat(lastUpdate!!.bubbles.map { it.key })
-            .containsExactly("bubble2", "bubble1")
-            .inOrder()
-
-        // wait for idle to allow the animation to start
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        // wait for the expansion animation to complete before interacting with the bubbles
-        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(
-            AnimatableScaleMatrix.SCALE_X,
-            AnimatableScaleMatrix.SCALE_Y,
-        )
-
-        // make the IME hidden and tap on bubble1 to select it
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            positioner.setImeVisible(false, 0)
-            bubble1.iconView!!.performClick()
-            // we have to set the selected bubble in the stack view manually because we don't have a
-            // listener wired up.
-            bubbleStackView.setSelectedBubble(bubble1)
-            shellExecutor.flushAll()
-        }
-
-        val onImeHidden = bubbleStackViewManager.onImeHidden
-        assertThat(onImeHidden).isNull()
+        assertThat(bubbleStackViewManager.wasImeHidden).isTrue()
 
         assertThat(expandListener.bubblesExpandedState)
             .isEqualTo(mapOf("bubble1" to true, "bubble2" to false))
@@ -1937,7 +1660,7 @@ class BubbleStackViewTest {
     }
 
     private class FakeBubbleStackViewManager : BubbleStackViewManager {
-        var onImeHidden: Runnable? = null
+        var wasImeHidden: Boolean = false
 
         override fun onAllBubblesAnimatedOut() {}
 
@@ -1945,12 +1668,8 @@ class BubbleStackViewTest {
 
         override fun checkNotificationPanelExpandedState(callback: Consumer<Boolean>) {}
 
-        override fun hideCurrentInputMethod(onImeHidden: Runnable?) {
-            this.onImeHidden = onImeHidden
-        }
-
-        override fun clearImeHiddenRunnable() {
-            this.onImeHidden = null
+        override fun hideCurrentInputMethod() {
+            wasImeHidden = true
         }
 
         override fun isGestureNavigationMode() = false

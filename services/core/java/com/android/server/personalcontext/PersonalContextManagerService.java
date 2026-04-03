@@ -24,7 +24,6 @@ import android.annotation.PermissionManuallyEnforced;
 import android.annotation.RequiresNoPermission;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
-import android.app.ActivityManagerInternal;
 import android.app.BroadcastOptions;
 import android.app.role.RoleManager;
 import android.content.Context;
@@ -36,10 +35,13 @@ import android.os.Binder;
 import android.os.ParcelUuid;
 import android.os.PermissionEnforcer;
 import android.os.Process;
+import android.os.RemoteException;
+import android.os.ResultReceiver;
+import android.os.ShellCallback;
+import android.os.ShellCommand;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
-import android.service.personalcontext.Flags;
 import android.service.personalcontext.IPersonalContextManager;
 import android.service.personalcontext.PersonalContextManager;
 import android.service.personalcontext.RenderToken;
@@ -57,6 +59,7 @@ import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.service.personalcontext.insight.PublishedContextInsight;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
 import android.service.personalcontext.insight.interaction.InsightEvent;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -107,9 +110,21 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public class PersonalContextManagerService extends SystemService {
     private static final String TAG = "PersonalContext";
+    protected static final String SYSTEM_PACKAGE = "android";
 
     @VisibleForTesting
     static final String ROLE_SYSTEM_UI_INTELLIGENCE = "android.app.role.SYSTEM_UI_INTELLIGENCE";
+
+    /**
+     * Default value for the per-app personal context mode setting, if
+     * {@link Settings.Secure.PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT} is not present and the app's
+     * setting value has not been manually changed.
+     *
+     * <p>0 means disabled, 1 means enabled.
+     *
+     * @see PersonalContextManager#isPersonalContextModeEnabled(String)
+     */
+    public static final int PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT_VALUE = 0;
 
     static final SecretKeySpec HINT_SIGNING_KEY;
 
@@ -156,13 +171,15 @@ public class PersonalContextManagerService extends SystemService {
 
     /** Encapsulates all state associated with a specific user. */
     private record UserState(
+            @NonNull OperatingModeProvider operatingModeProvider,
             @NonNull ContextComponentManager componentManager,
             @NonNull ContextComponentMonitor monitor,
             @NonNull HintInvalidationUnderstander hintInvalidationUnderstander,
             @NonNull NotificationActionRenderer notificationActionRenderer,
             @NonNull EmbeddedInsightRenderer embeddedInsightRenderer,
             @Nullable TextClassificationActionRenderer textClassificationActionRenderer,
-            @NonNull SettingObserver observer) {
+            @NonNull SettingObserver observer,
+            @NonNull AccessController accessController) {
         /** Unregisters the monitor and setting observer, cleaning up the user state. */
         void cleanup() {
             monitor.unregister();
@@ -181,53 +198,66 @@ public class PersonalContextManagerService extends SystemService {
          * @return A new {@link EmbeddedInsightRenderer} instance.
          */
         EmbeddedInsightRenderer createEmbeddedInsightRenderer(
-                Context userContext, Executor executor);
+                Context userContext, AccessController accessController, Executor executor);
+    }
+
+    /** Factory interface for creating {@link AccessController} instances. */
+    public interface AccessControllerFactory {
+        /** Create an {@link AccessController} instance. */
+        AccessController createAccessController(
+                Context context, AccessController.EventListener eventListener, UserHandle user);
     }
 
     // TODO(b/454430085): Inject these fields.
     private final ScheduledExecutorService mExecutor = Executors.newSingleThreadScheduledExecutor();
     private final SparseArray<UserState> mUserStates = new SparseArray<>();
     private final ContextLogger mLogger = new ContextLogger();
-
     private final RoleManager mRoleManager;
-    private final ActivityManagerInternal mActivityManager;
     private final PackageManagerInternal mPackageManager;
     private final ContentCaptureManagerInternal mContentCaptureManagerInternal;
     private final EmbeddedInsightRendererFactory mEmbeddedInsightRendererFactory;
-
-    private final AccessController mAccessController;
+    private final AccessControllerFactory mAccessControllerFactory;
     private final PersonalContextManagerInternal mInternalService = new LocalService();
+    private @PersonalContextManager.OperatingMode int mCurrentOperatingMode =
+            PersonalContextManager.OPERATING_MODE_DEFAULT;
+
+    private final SparseArray<OperatingModeProvider> mOperatingModeProviders = new SparseArray<>();
 
     public PersonalContextManagerService(Context context) {
-        this(context, new AccessController(context), EmbeddedInsightRenderer::new);
+        this(context, EmbeddedInsightRenderer::new, AccessController::new);
     }
 
     protected PersonalContextManagerService(
             Context context,
-            AccessController controller,
-            EmbeddedInsightRendererFactory embeddedInsightRendererFactory) {
+            EmbeddedInsightRendererFactory embeddedInsightRendererFactory,
+            AccessControllerFactory accessControllerFactory) {
         super(context);
 
         mRoleManager = context.getSystemService(RoleManager.class);
-        mActivityManager = getLocalService(ActivityManagerInternal.class);
         mPackageManager = getLocalService(PackageManagerInternal.class);
         mContentCaptureManagerInternal = getLocalService(ContentCaptureManagerInternal.class);
-        mAccessController = controller;
         mEmbeddedInsightRendererFactory = embeddedInsightRendererFactory;
+        mAccessControllerFactory = accessControllerFactory;
     }
 
-    private void checkUidAccess(int uid, @AccessController.Access int access) {
-        if (!mAccessController.hasAccess(uid, access)) {
+    private boolean areOperatingModePropertyFlagsPresentForUser(int userId,
+            @OperatingModeProvider.OperatingPropertyFlag int propertyFlags) {
+        return getOperatingModeProvider(userId).hasProperties(propertyFlags);
+    }
+
+    private void checkUidAccess(
+            UserState userState, int userId, int uid, @AccessController.Access  int accessFlags) {
+        if (!userState.accessController.isAnyPackageForUidAllowed(uid,
+                getOperatingModeProvider(userId).filterAccessFlags(accessFlags))) {
             throw new SecurityException(
-                    "component (uid=" + uid + ") not allowed to perform operation requiring access:"
-                            + access);
+                    "component (uid=" + uid + ") not allowed to perform operation");
         }
     }
 
     @Override
     public void onStart() {
         publishBinderService(
-                PersonalContextManager.PERSONAL_CONTEXT_SERVICE,
+                Context.PERSONAL_CONTEXT_SERVICE,
                 new BinderService(this, mPackageManager));
         publishLocalService(PersonalContextManagerInternal.class, mInternalService);
         Slog.i(TAG, "Personal Context Service started");
@@ -245,14 +275,17 @@ public class PersonalContextManagerService extends SystemService {
 
             Slog.i(TAG, "Creating new state for user " + userId);
             Context userContext = getContext().createContextAsUser(user.getUserHandle(), 0);
+            final OperatingModeProvider operatingModeProvider = getOperatingModeProvider(userId);
+            final AccessController accessController =
+                    mAccessControllerFactory.createAccessController(
+                            getContext(), mLogger, user.getUserHandle());
             final ContextComponentManager componentManager =
                     new ContextComponentManager(userContext, user.getUserHandle(),
-                            mAccessController);
+                            operatingModeProvider, accessController);
             final ContextComponentMonitor monitor = new ContextComponentMonitor(componentManager);
             final HintInvalidationUnderstander hintInvalidationUnderstander =
-                    new HintInvalidationUnderstander(
-                            (insight, componentId) ->
-                                    startInsightWorkflow(userId, componentId, Set.of(insight)));
+                    new HintInvalidationUnderstander((insight, componentId) ->
+                            startPublishedInsightWorkflow(userId, componentId, Set.of(insight)));
             final SettingObserver observer = new SettingObserver(userContext, mExecutor,
                     () -> handleIsEnabledSettingChanged(userId), 0);
             final NotificationActionRenderer notificationActionRenderer =
@@ -264,7 +297,7 @@ public class PersonalContextManagerService extends SystemService {
                                     new ContextActionResolver(userContext)));
             final EmbeddedInsightRenderer embeddedInsightRenderer =
                     mEmbeddedInsightRendererFactory.createEmbeddedInsightRenderer(
-                            userContext, Executors.newSingleThreadExecutor());
+                            userContext, accessController, Executors.newSingleThreadExecutor());
 
             TextClassificationActionRenderer textClassificationActionRenderer;
             PersonalContextBridge tcPersonalContextBridge =
@@ -283,13 +316,15 @@ public class PersonalContextManagerService extends SystemService {
             mUserStates.put(
                     userId,
                     new UserState(
+                            operatingModeProvider,
                             componentManager,
                             monitor,
                             hintInvalidationUnderstander,
                             notificationActionRenderer,
                             embeddedInsightRenderer,
                             textClassificationActionRenderer,
-                            observer));
+                            observer,
+                            accessController));
         }
     }
 
@@ -332,6 +367,7 @@ public class PersonalContextManagerService extends SystemService {
                 userState.cleanup();
             }
             mUserStates.remove(userId);
+            mOperatingModeProviders.remove(userId);
         }
     }
 
@@ -357,17 +393,21 @@ public class PersonalContextManagerService extends SystemService {
 
         final ContextComponentManager componentManager = userState.componentManager();
 
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Slog.d(TAG, "Registering internal components for user " + userId);
-        }
-        componentManager.register(userState.hintInvalidationUnderstander());
-        componentManager.register(userState.notificationActionRenderer());
-        componentManager.register(userState.embeddedInsightRenderer());
-        if (userState.textClassificationActionRenderer != null) {
-            componentManager.register(userState.textClassificationActionRenderer());
-        }
+        if (areOperatingModePropertyFlagsPresentForUser(userId,
+                OperatingModeProvider.OPERATING_PROPERTY_FLAG_BUILT_IN_COMPONENTS)) {
+            if (Log.isLoggable(TAG, Log.DEBUG)) {
+                Slog.d(TAG, "Registering internal components for user " + userId);
+            }
 
-        userState.embeddedInsightRenderer().onRegistered();
+            componentManager.register(userState.hintInvalidationUnderstander());
+            componentManager.register(userState.notificationActionRenderer());
+            componentManager.register(userState.embeddedInsightRenderer());
+            if (userState.textClassificationActionRenderer != null) {
+                componentManager.register(userState.textClassificationActionRenderer());
+            }
+
+            userState.embeddedInsightRenderer().onRegistered();
+        }
 
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Slog.d(TAG, "Registering external components for user " + userId);
@@ -414,6 +454,30 @@ public class PersonalContextManagerService extends SystemService {
         return null;
     }
 
+    // TODO(b/497092547): Move someplace better.
+    protected static boolean isSystemPackage(String packageName) {
+        return TextUtils.equals(SYSTEM_PACKAGE, packageName);
+    }
+
+    private String getPackageNameForUid(int uid) {
+        if (Process.SYSTEM_UID == uid) {
+            return SYSTEM_PACKAGE;
+        }
+        return mPackageManager.getNameForUid(uid);
+    }
+
+    private void validateHints(int userId, int callingUid, Set<ContextHint> hints) {
+        for (ContextHint hint : hints) {
+            String targetPackage = hint.getSourcePackageName();
+            if (targetPackage != null
+                    && !isPersonalContextModeEnabled(targetPackage, callingUid, userId)) {
+                throw new IllegalStateException(TextUtils.formatSimple(
+                        "Personal Context is disabled for package %s, used by hint %s",
+                        targetPackage, hint.getHintId()));
+            }
+        }
+    }
+
     @VisibleForTesting
     void startRefinerWorkflow(
             @UserIdInt int userId,
@@ -426,11 +490,26 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
-        final ContextComponentManager componentManager = getComponentManagerForUser(userId);
-        if (componentManager == null) {
+        final String packageName = getPackageNameForUid(callingUid);
+        if (!isPersonalContextModeEnabled(packageName, callingUid, userId)) {
+            throw new IllegalStateException("Personal Context is disabled for publishing package");
+        }
+
+        validateHints(userId, callingUid, hints);
+        validateHints(userId, callingUid, attributionHints);
+
+        final UserState userState = getUserStateSynchronized(userId);
+        if (userState == null) {
             Slog.w(TAG, "Cannot start refiner workflow, no component manager for user " + userId);
             return;
         }
+
+        checkUidAccess(
+                userState,
+                userId,
+                callingUid,
+                AccessController.ACCESS_PUBLISH_HINTS_ALLOWLIST
+                        | AccessController.ACCESS_PUBLISH_HINTS_PERMISSION);
 
         try {
             final Set<PublishedContextHint> signedAttributionHints = new HashSet<>();
@@ -446,21 +525,39 @@ public class PersonalContextManagerService extends SystemService {
             }
 
             RefinerWorkflow.start(
-                    componentManager,
+                    userState.componentManager,
                     signedHints,
                     renderTokens,
                     HINT_SIGNING_KEY,
                     mLogger,
                     mExecutor,
                     (componentId, insights)
-                            -> startInsightWorkflow(userId, componentId, insights));
+                            -> startPublishedInsightWorkflow(userId, componentId, insights));
         } catch (GeneralSecurityException e) {
             throw new RuntimeException(e);
         }
     }
 
     @VisibleForTesting
-    void startInsightWorkflow(@UserIdInt int userId, UUID componentId,
+    void startInsightWorkflow(int callingUid, @UserIdInt int userId, UUID componentId,
+            Set<ContextInsight> insights) {
+        final UserState userState = getUserStateSynchronized(userId);
+        if (userState == null) {
+            Slog.w(TAG, "Cannot start refiner workflow, no component manager for user " + userId);
+            return;
+        }
+
+        checkUidAccess(
+                userState,
+                userId,
+                callingUid,
+                AccessController.ACCESS_PUBLISH_INSIGHTS_ALLOWLIST
+                        | AccessController.ACCESS_PUBLISH_INSIGHTS_PERMISSION);
+
+        startPublishedInsightWorkflow(userId, componentId, insights);
+    }
+
+    void startPublishedInsightWorkflow(@UserIdInt int userId, UUID componentId,
             Set<ContextInsight> insights) {
         if (!isEnabledForUser(userId)) {
             Slog.w(TAG, "Can't start insight workflow because personal context is not enabled.");
@@ -472,19 +569,14 @@ public class PersonalContextManagerService extends SystemService {
             publishedInsights.add(new PublishedContextInsight(insight, componentId));
         }
 
-        startPublishedInsightWorkflow(userId, componentId, publishedInsights);
-    }
-
-    private void startPublishedInsightWorkflow(@UserIdInt int userId, UUID componentId,
-            Set<PublishedContextInsight> insights) {
         final ContextComponentManager componentManager = getComponentManagerForUser(userId);
         if (componentManager == null) {
             Slog.w(TAG, "Cannot start renderer workflow, no component manager for user " + userId);
             return;
         }
 
-        RendererWorkflow.start(componentManager, insights, HINT_SIGNING_KEY, mLogger,
-                mExecutor);
+        RendererWorkflow.start(
+                componentManager, publishedInsights, HINT_SIGNING_KEY, mLogger, mExecutor);
     }
 
     /** Returns the component manager for the given user, for testing purposes. */
@@ -504,6 +596,7 @@ public class PersonalContextManagerService extends SystemService {
     }
 
     private void registerInsightSurfaceClient(
+            int callingUid,
             int userId,
             InsightSurfaceClientInfo clientInfo) {
         if (!isEnabledForUser(userId)) {
@@ -514,8 +607,16 @@ public class PersonalContextManagerService extends SystemService {
 
         final UserState userState = getUserStateSynchronized(userId);
         if (userState == null) {
+            Slog.e(TAG, "No user state when registering insight surface client");
             return;
         }
+
+        checkUidAccess(
+                userState,
+                userId,
+                callingUid,
+                AccessController.ACCESS_PUBLISH_HINTS_ALLOWLIST
+                        | AccessController.ACCESS_RECEIVE_INSIGHTS_ALLOWLIST);
 
         userState.embeddedInsightRenderer.registerInsightSurfaceClient(clientInfo);
     }
@@ -545,6 +646,12 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
+        checkUidAccess(
+                userState,
+                userId,
+                callingUid,
+                AccessController.ACCESS_PUBLISH_HINTS_ALLOWLIST);
+
         final RenderToken renderToken =
                 userState.embeddedInsightRenderer.getRenderTokenForClient(clientInfo);
         if (renderToken == null) {
@@ -553,6 +660,23 @@ public class PersonalContextManagerService extends SystemService {
         }
 
         startRefinerWorkflow(userId, callingUid, hints, Set.of(renderToken), emptySet());
+    }
+
+    private boolean isPersonalContextModeEnabled(
+            String packageName, int callingUid, @UserIdInt int userId) {
+        // Manifest.permission.QUERY_ALL_PACKAGES permission is enforced inside package manager.
+        int personalContextMode = mPackageManager.getPersonalContextMode(
+                packageName, callingUid, userId);
+        if (personalContextMode == PackageManager.PERSONAL_CONTEXT_MODE_UNSET) {
+            // Mode is unset for this app, check the default value.
+            return Settings.Secure.getIntForUser(
+                    getContext().getContentResolver(),
+                    Settings.Secure.PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT,
+                    PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT_VALUE,
+                    userId) == 1;
+        } else {
+            return personalContextMode == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -606,6 +730,26 @@ public class PersonalContextManagerService extends SystemService {
         }
     }
 
+    private void enforceAccess(int pid, int uid, int userId,
+            @AccessController.Access int accessFlags) {
+        final UserState userState = getUserStateSynchronized(userId);
+
+        if (userState == null) {
+            Slog.e(
+                    TAG,
+                    TextUtils.formatSimple(
+                            "No user state when enforcing permissions %s", accessFlags));
+            throw new RuntimeException("Service not available");
+        }
+
+        final OperatingModeProvider operatingModeProvider = getOperatingModeProvider(userId);
+        final @AccessController.Access int filteredFlags =
+                operatingModeProvider.filterAccessFlags(accessFlags);
+
+        userState.accessController.enforcePermissions(uid, pid, filteredFlags);
+        checkUidAccess(userState, userId, uid, filteredFlags);
+    }
+
     private void reportEvent(
             int userId,
             int callingUid,
@@ -626,7 +770,7 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
-        final String packageName = mPackageManager.getNameForUid(callingUid);
+        final String packageName = getPackageNameForUid(callingUid);
         refiner.handleEvent(packageName, event);
     }
 
@@ -641,6 +785,36 @@ public class PersonalContextManagerService extends SystemService {
         }
 
         userState.embeddedInsightRenderer().updateClientInfo(oldClientInfo, newClientInfo);
+    }
+
+    private OperatingModeProvider getOperatingModeProvider(int userId) {
+        if (!mOperatingModeProviders.contains(userId)) {
+            final OperatingModeProvider provider = new OperatingModeProvider();
+            provider.setMode(mCurrentOperatingMode);
+            mOperatingModeProviders.put(userId, provider);
+        }
+
+        return mOperatingModeProviders.get(userId);
+    }
+
+    private void updateOperatingMode(@PersonalContextManager.OperatingMode int operatingMode) {
+        mCurrentOperatingMode = operatingMode;
+        for (int i = mOperatingModeProviders.size() - 1; i >= 0; --i) {
+            setOperatingMode(mOperatingModeProviders.keyAt(i), mCurrentOperatingMode);
+        }
+    }
+
+    @VisibleForTesting
+    protected void setOperatingMode(int userId,
+            @PersonalContextManager.OperatingMode int operatingMode) {
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Slog.d(TAG, "service::setOperatingMode. userId:" + userId + " operatingMode:"
+                    + operatingMode);
+        }
+        getOperatingModeProvider(userId).setMode(operatingMode);
+
+        unregisterComponentsForCurrentUser(userId, "operating mode changed to:" + operatingMode);
+        registerComponentsForCurrentUser(userId, "operating mode changed:" + operatingMode);
     }
 
     // TODO(b/492179930): Remove this synchronized block and replace it with a better thread-safe
@@ -658,18 +832,17 @@ public class PersonalContextManagerService extends SystemService {
             Set<PublishedContextHint> attributionHints)
             throws GeneralSecurityException {
         return new PublishedContextHint.Builder(hint, HINT_SIGNING_KEY)
-                .setOriginatingPackage(mPackageManager.getNameForUid(callingUid))
+                .setOriginatingPackage(getPackageNameForUid(callingUid))
                 .addRenderTokens(renderTokens)
                 .addAttributionHints(attributionHints)
                 .build();
     }
 
     private boolean isEnabledForUser(int userId) {
-        // TODO(b/477958468): Make the default "disabled".
         return Settings.Secure.getIntForUser(
                 getContext().getContentResolver(),
                 Settings.Secure.PERSONAL_CONTEXT_ENABLED,
-                1, userId) == 1;
+                0, userId) == 1;
     }
 
     @VisibleForTesting
@@ -713,25 +886,24 @@ public class PersonalContextManagerService extends SystemService {
         public boolean isPersonalContextModeEnabled(String packageName, @UserIdInt int userId) {
             final int callingUid = Binder.getCallingUid();
 
-            // Manifest.permission.QUERY_ALL_PACKAGES permission is enforced inside package manager.
-            return Boolean.TRUE.equals(
-                    Binder.withCleanCallingIdentity(
-                            () -> {
-                                int personalContextMode =
-                                        mPackageManager.getPersonalContextMode(
-                                                packageName, callingUid, userId);
-                                return personalContextMode
-                                        == PackageManager.PERSONAL_CONTEXT_MODE_UNSET
-                                        || personalContextMode
-                                        == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
-                            }));
+            return Boolean.TRUE.equals(Binder.withCleanCallingIdentity(() ->
+                    getService().isPersonalContextModeEnabled(packageName, callingUid, userId)));
         }
 
+        private boolean enforcePermissions(int userId) {
+            return getService().areOperatingModePropertyFlagsPresentForUser(userId,
+                    OperatingModeProvider.OPERATING_PROPERTY_FLAG_ENFORCE_PERMISSIONS);
+        }
+
+        @SuppressWarnings("MissingEnforcePermissionHelper")
         @EnforcePermission(android.Manifest.permission.CHANGE_PERSONAL_CONTEXT_MODE)
         @Override
         public void setPersonalContextModeEnabled(
                 String packageName, @UserIdInt int userId, boolean enabled) {
-            setPersonalContextModeEnabled_enforcePermission();
+            if (enforcePermissions(userId)) {
+                setPersonalContextModeEnabled_enforcePermission();
+            }
+
             final int callingUid = Binder.getCallingUid();
             Binder.withCleanCallingIdentity(
                     () -> {
@@ -747,14 +919,9 @@ public class PersonalContextManagerService extends SystemService {
                     });
         }
 
-        // Suppressing warning as enforcement is currently behind a flag
-        @SuppressWarnings("MissingEnforcePermissionHelper")
-        @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_READ_SETTINGS)
+        @RequiresNoPermission
         @Override
         public boolean isEnabled(int userId) {
-            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
-                isEnabled_enforcePermission();
-            }
             verifyUser(userId);
             return Boolean.TRUE.equals(
                     Binder.withCleanCallingIdentity(
@@ -766,7 +933,7 @@ public class PersonalContextManagerService extends SystemService {
         @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_WRITE_SETTINGS)
         @Override
         public void setEnabled(int userId, boolean enabled) {
-            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
+            if (enforcePermissions(userId)) {
                 setEnabled_enforcePermission();
             }
             verifyUser(userId);
@@ -789,33 +956,22 @@ public class PersonalContextManagerService extends SystemService {
                 List<RenderToken> renderTokens,
                 List<ContextHintWrapper> attributionHints,
                 int userId) {
-            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
-                publishTriggeringHint_enforcePermission();
-            }
+            getService().enforceAccess(getCallingPid(), getCallingUid(), userId,
+                    AccessController.ACCESS_PUBLISH_HINTS_PERMISSION);
+
             verifyUser(userId);
 
             final int callingUid = Binder.getCallingUid();
 
-            // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () -> {
-                        final PersonalContextManagerService service = getService();
-
-                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
-                            service.checkUidAccess(callingUid,
-                                    AccessController.ACCESS_PUBLISH_HINTS);
-                        }
-
-                        service
-                                .startRefinerWorkflow(
-                                        userId,
-                                        callingUid,
-                                        ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
-                                        new HashSet<>(
-                                                renderTokens == null ? List.of() : renderTokens),
-                                        ContextHintWrapper.unwrapInto(attributionHints,
-                                                new HashSet<>()));
-                    });
+                    () -> getService().startRefinerWorkflow(
+                            userId,
+                            callingUid,
+                            ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
+                            new HashSet<>(
+                                    renderTokens == null ? List.of() : renderTokens),
+                            ContextHintWrapper.unwrapInto(attributionHints,
+                                    new HashSet<>())));
         }
 
         // Suppressing warning as enforcement is currently behind a flag
@@ -824,29 +980,20 @@ public class PersonalContextManagerService extends SystemService {
         @Override
         public void publishInsight(List<ContextInsightWrapper> insights, ParcelUuid componentId,
                 int userId) {
-            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
-                publishInsight_enforcePermission();
-            }
+            getService().enforceAccess(getCallingPid(), getCallingUid(), userId,
+                    AccessController.ACCESS_PUBLISH_INSIGHTS_PERMISSION);
+
             verifyUser(userId);
 
             int callingUid = Binder.getCallingUid();
 
             Binder.withCleanCallingIdentity(
-                    () -> {
-
-                        final PersonalContextManagerService service = getService();
-
-                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
-                            service.checkUidAccess(callingUid,
-                                    AccessController.ACCESS_PUBLISH_INSIGHTS);
-                        }
-                        service
-                                .startInsightWorkflow(
-                                        userId,
-                                        componentId.getUuid(),
-                                        ContextInsightWrapper.unwrapInto(
-                                                insights, new HashSet<>()));
-                    });
+                    () -> getService().startInsightWorkflow(
+                            callingUid,
+                            userId,
+                            componentId.getUuid(),
+                            ContextInsightWrapper.unwrapInto(
+                                    insights, new HashSet<>())));
         }
 
         @RequiresNoPermission
@@ -884,27 +1031,18 @@ public class PersonalContextManagerService extends SystemService {
         public void registerInsightSurfaceClient(
                 InsightSurfaceClientInfo clientInfo,
                 int userId) {
-            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
-                registerInsightSurfaceClient_enforcePermission();
-            }
+            getService().enforceAccess(getCallingPid(), getCallingUid(), userId,
+                    AccessController.ACCESS_HOST_INSIGHT_SURFACE_PERMISSION);
+
             verifyUser(userId);
 
             final int callingUid = Binder.getCallingUid();
 
-            // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () -> {
-                        final PersonalContextManagerService service = getService();
-
-                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
-                            service.checkUidAccess(callingUid,
-                                    AccessController.ACCESS_RECEIVE_INSIGHTS
-                                    | AccessController.ACCESS_PUBLISH_HINTS);
-                        }
-                        service.registerInsightSurfaceClient(
-                                userId,
-                                clientInfo);
-                    });
+                    () -> getService().registerInsightSurfaceClient(
+                            callingUid,
+                            userId,
+                            clientInfo));
         }
 
         @PermissionManuallyEnforced
@@ -916,6 +1054,9 @@ public class PersonalContextManagerService extends SystemService {
         @PermissionManuallyEnforced
         @Override
         public void unregisterInsightSurfaceClient(ParcelUuid id, int userId) {
+            getService().enforceAccess(getCallingPid(), getCallingUid(), userId,
+                    AccessController.ACCESS_HOST_INSIGHT_SURFACE_PERMISSION);
+
             verifyUser(userId);
 
             // TODO(b/450547433): Add security checks.
@@ -929,29 +1070,20 @@ public class PersonalContextManagerService extends SystemService {
         @Override
         public void publishInsightSurfaceHints(
                 List<ContextHintWrapper> hints, InsightSurfaceClientInfo clientInfo, int userId) {
-            if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()) {
-                publishInsightSurfaceHints_enforcePermission();
-            }
+            getService().enforceAccess(getCallingPid(), getCallingUid(), userId,
+                    AccessController.ACCESS_PUBLISH_HINTS_ALLOWLIST
+                    | AccessController.ACCESS_PUBLISH_HINTS_PERMISSION);
+
             verifyUser(userId);
 
             final int callingUid = Binder.getCallingUid();
 
-            // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () -> {
-                        final PersonalContextManagerService service = getService();
-
-                        if (Flags.enforcePersonalContextAllowlistAccessControl()) {
-                            service.checkUidAccess(callingUid,
-                                    AccessController.ACCESS_PUBLISH_INSIGHTS);
-                        }
-                        getService()
-                                .publishInsightSurfaceHints(
-                                        userId,
-                                        callingUid,
-                                        ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
-                                        clientInfo);
-                    }
+                    () -> getService().publishInsightSurfaceHints(
+                            userId,
+                            callingUid,
+                            ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
+                            clientInfo)
             );
         }
 
@@ -960,9 +1092,10 @@ public class PersonalContextManagerService extends SystemService {
         public void reportEvent(InsightEvent event, int userId) {
             verifyUser(userId);
 
+            // TODO(b/450547433): Add security checks?
+
             final int callingUid = Binder.getCallingUid();
 
-            // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
                     () -> getService().reportEvent(
                             userId,
@@ -977,6 +1110,19 @@ public class PersonalContextManagerService extends SystemService {
                     insight.getContextInsight().getAttributionDetails();
 
             // TODO(b/475328786): Handle showing the attribution.
+        }
+
+        @SuppressWarnings("MissingEnforcePermissionHelper")
+        @EnforcePermission(Manifest.permission.CHANGE_PERSONAL_CONTEXT_OPERATING_MODE)
+        @Override
+        public void setOperatingMode(int userId, int mode) {
+            if (Log.isLoggable(TAG, Log.DEBUG)) {
+                Slog.d(TAG, "binder::setOperatingMode. userId:" + userId + " mode:" + mode);
+            }
+            setOperatingMode_enforcePermission();
+
+            Binder.withCleanCallingIdentity(
+                    () -> getService().updateOperatingMode(mode));
         }
 
         @PermissionManuallyEnforced
@@ -999,6 +1145,15 @@ public class PersonalContextManagerService extends SystemService {
                 }
             }
 
+            fout.println("Operating modes:");
+            fout.println("================\n");
+            for (int i = 0; i <  service.mOperatingModeProviders.size(); ++i) {
+                int userId = service.mOperatingModeProviders.keyAt(i);
+                fout.println(
+                        "UserId:" + userId
+                                + " Mode:" + service.mOperatingModeProviders.get(userId));
+            }
+
             service.mLogger.dump(fout);
         }
 
@@ -1013,10 +1168,73 @@ public class PersonalContextManagerService extends SystemService {
                     () -> getService().updateEmbeddedClientInfo(
                             userId, oldClientInfo, newClientInfo));
         }
+
+        @RequiresNoPermission
+        @Override
+        public void onShellCommand(@Nullable FileDescriptor in, @Nullable FileDescriptor out,
+                @Nullable FileDescriptor err, @NonNull String[] args,
+                @Nullable ShellCallback callback, @NonNull ResultReceiver resultReceiver)
+                throws RemoteException {
+            (new Shell()).exec(this, in, out, err, args, callback, resultReceiver);
+        }
+
+        private class Shell extends ShellCommand {
+            @SuppressLint("AndroidFrameworkRequiresPermission")
+            @Override
+            public int onCommand(String cmd) {
+                if (cmd == null) {
+                    return handleDefaultCommands(cmd);
+                }
+
+                final PrintWriter pw = getOutPrintWriter();
+                switch (cmd) {
+                    case "set-test-mode" -> {
+                        final int callingUid = Binder.getCallingUid();
+                        if (callingUid != Process.ROOT_UID && callingUid != Process.SHELL_UID) {
+                            pw.println("Error: must be root or shell to use this command");
+                            return -1;
+                        }
+                        final String mode = getNextArgRequired();
+
+                        final int operatingMode;
+                        if (TextUtils.equals(mode, "enabled")) {
+                            operatingMode = PersonalContextManager.OPERATING_MODE_TEST;
+                        } else if (TextUtils.equals(mode, "disabled")) {
+                            operatingMode = PersonalContextManager.OPERATING_MODE_DEFAULT;
+                        } else {
+                            pw.println("Error: mode must be enabled or disabled");
+                            return -1;
+                        }
+
+                        setOperatingMode(UserHandle.getUserId(callingUid), operatingMode);
+                        return 0;
+                    }
+                    default -> {
+                        return handleDefaultCommands(cmd);
+                    }
+                }
+            }
+
+            @Override
+            public void onHelp() {
+                final PrintWriter pw = getOutPrintWriter();
+                pw.println("PersonalContextManager commands:");
+                pw.println("  help");
+                pw.println("    Print this help text.");
+                pw.println("  set-test-mode [enabled/disabled]");
+                pw.println("    Enables or disables test mode");
+            }
+        }
     }
 
     @VisibleForTesting
     class LocalService extends PersonalContextManagerInternal {
+        @Override
+        public boolean isPersonalContextServiceEnabledForPackage(
+                String packageName, @UserIdInt int userId) {
+            return isPersonalContextModeEnabled(packageName, Process.myUid(), userId);
+        }
+
         @Override
         public void onNotificationEvent(@NonNull NotificationEvent event) {
             final StatusBarNotification sbn = getSbnFromNotificationEvent(event);
@@ -1029,6 +1247,12 @@ public class PersonalContextManagerService extends SystemService {
             final UserState userState = getUserStateSynchronized(user.getIdentifier());
             if (userState == null) {
                 Slog.e(TAG, "No user state for user " + user.getIdentifier());
+                return;
+            }
+
+            if (!isPersonalContextServiceEnabledForPackage(
+                    sbn.getPackageName(), user.getIdentifier())) {
+                Slog.i(TAG, "Personal Context disabled for package " + sbn.getPackageName());
                 return;
             }
 
@@ -1053,6 +1277,12 @@ public class PersonalContextManagerService extends SystemService {
             final UserState userState = getUserStateSynchronized(userId);
             if (userState == null) {
                 Slog.e(TAG, "No user state for user " + userId);
+                return;
+            }
+            if (!isPersonalContextServiceEnabledForPackage(
+                    request.getCallingPackageName(), userId)) {
+                Slog.i(TAG,
+                        "Personal Context disabled for package " + request.getCallingPackageName());
                 return;
             }
             if (userState.textClassificationActionRenderer == null) {

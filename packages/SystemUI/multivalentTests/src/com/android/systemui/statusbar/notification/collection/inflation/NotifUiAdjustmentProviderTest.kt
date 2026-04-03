@@ -15,6 +15,7 @@
  */
 package com.android.systemui.statusbar.notification.collection.inflation
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationChannel.SOCIAL_MEDIA_ID
 import android.app.NotificationManager.IMPORTANCE_LOW
@@ -45,6 +46,7 @@ import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.withArgCaptor
 import com.android.systemui.util.settings.FakeSettings
 import com.android.systemui.util.settings.SecureSettings
+import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -72,11 +74,15 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
     private val dirtyListener: Runnable = mock()
     private val userTracker: UserTracker = mock()
     private val groupMembershipManager: GroupMembershipManager = mock()
+    private val systemClock = FakeSystemClock()
 
     private val section = NotifSection(mock(), 0)
     private val entry =
-        NotificationEntryBuilder().setSection(section).setParent(GroupEntry.ROOT_ENTRY).setChannel(
-            NotificationChannel("id", "name", IMPORTANCE_LOW)).build()
+        NotificationEntryBuilder()
+            .setSection(section)
+            .setParent(GroupEntry.ROOT_ENTRY)
+            .setChannel(NotificationChannel("id", "name", IMPORTANCE_LOW))
+            .build()
 
     private lateinit var contentObserver: ContentObserver
 
@@ -89,6 +95,7 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
             sectionStyleProvider,
             userTracker,
             groupMembershipManager,
+            systemClock,
         )
 
     @Before
@@ -294,5 +301,125 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
 
         // Then: Need re-inflation
         assertTrue(NotifUiAdjustment.needReinflate(oldAdjustment, newAdjustment))
+    }
+
+    @Test
+    fun isPromotedNotifShowingFutureTime_false_whenNotPromotedOngoing() {
+        val notif =
+            Notification.Builder(mContext, "id")
+                .setFlag(Notification.FLAG_PROMOTED_ONGOING, false)
+                .setShowWhen(true)
+                .setUsesChronometer(false)
+                .setWhen(systemClock.currentTimeMillis() + 1000)
+                .build()
+        val newEntry =
+            NotificationEntryBuilder()
+                .setSection(section)
+                .setParent(GroupEntry.ROOT_ENTRY)
+                .setNotification(notif)
+                .build()
+
+        val adjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(adjustment.isPromotedNotifShowingFutureTime).isFalse()
+
+        systemClock.advanceTime(2000)
+        val newAdjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(NotifUiAdjustment.needReinflate(adjustment, newAdjustment)).isFalse()
+    }
+
+    @Test
+    fun isPromotedNotifShowingFutureTime_false_whenShowsChronometer() {
+        val notif =
+            Notification.Builder(mContext, "id")
+                .setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setWhen(systemClock.currentTimeMillis() + 1000)
+                .build()
+        val newEntry =
+            NotificationEntryBuilder()
+                .setSection(section)
+                .setParent(GroupEntry.ROOT_ENTRY)
+                .setNotification(notif)
+                .build()
+
+        val adjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(adjustment.isPromotedNotifShowingFutureTime).isFalse()
+
+        systemClock.advanceTime(2000)
+        val newAdjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(NotifUiAdjustment.needReinflate(adjustment, newAdjustment)).isFalse()
+    }
+
+    @Test
+    fun isPromotedNotifShowingFutureTime_false_whenNotShowsTime() {
+        val notif =
+            Notification.Builder(mContext, "id")
+                .setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
+                .setShowWhen(false)
+                .setUsesChronometer(false)
+                .setWhen(systemClock.currentTimeMillis() + 1000)
+                .build()
+        val newEntry =
+            NotificationEntryBuilder()
+                .setSection(section)
+                .setParent(GroupEntry.ROOT_ENTRY)
+                .setNotification(notif)
+                .build()
+
+        val adjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(adjustment.isPromotedNotifShowingFutureTime).isFalse()
+
+        systemClock.advanceTime(2000)
+        val newAdjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(NotifUiAdjustment.needReinflate(adjustment, newAdjustment)).isFalse()
+    }
+
+    @Test
+    fun isPromotedNotifShowingFutureTime_false_whenTimeInPast() {
+        val notif =
+            Notification.Builder(mContext, "id")
+                .setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
+                .setShowWhen(true)
+                .setUsesChronometer(false)
+                .setWhen(systemClock.currentTimeMillis() - 1000)
+                .build()
+        val newEntry =
+            NotificationEntryBuilder()
+                .setSection(section)
+                .setParent(GroupEntry.ROOT_ENTRY)
+                .setNotification(notif)
+                .build()
+
+        val adjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(adjustment.isPromotedNotifShowingFutureTime).isFalse()
+
+        systemClock.advanceTime(2000)
+        val newAdjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(NotifUiAdjustment.needReinflate(adjustment, newAdjustment)).isFalse()
+    }
+
+    @Test
+    fun isPromotedNotifShowingFutureTime_true() {
+        val notif =
+            Notification.Builder(mContext, "id")
+                .setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
+                .setShowWhen(true)
+                .setUsesChronometer(false)
+                .setWhen(systemClock.currentTimeMillis() + 1000)
+                .build()
+        val newEntry =
+            NotificationEntryBuilder()
+                .setSection(section)
+                .setParent(GroupEntry.ROOT_ENTRY)
+                .setNotification(notif)
+                .build()
+
+        val adjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(adjustment.isPromotedNotifShowingFutureTime).isTrue()
+
+        systemClock.advanceTime(2000)
+        val newAdjustment = adjustmentProvider.calculateAdjustment(newEntry)
+        assertThat(NotifUiAdjustment.needReinflate(adjustment, newAdjustment)).isTrue()
     }
 }

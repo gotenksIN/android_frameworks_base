@@ -16,8 +16,9 @@
 
 package com.android.server.personalcontext;
 
+import android.os.UserHandle;
 import android.service.personalcontext.hint.PublishedContextHint;
-import android.service.personalcontext.insight.ContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsight;
 
 import com.android.server.personalcontext.component.Component;
 import com.android.server.personalcontext.component.Refiner;
@@ -33,16 +34,21 @@ import java.util.Map;
 import java.util.Queue;
 
 /** @hide */
-public class ContextLogger
-        implements RefinerWorkflow.EventListener, RendererWorkflow.EventListener {
-    private static final int MAX_RECENT_ITEMS_TO_KEEP = 3;
+public class ContextLogger implements
+        RefinerWorkflow.EventListener,
+        RendererWorkflow.EventListener,
+        AccessController.EventListener {
+    private static final int MAX_RECENT_TIMELINES_TO_KEEP = 3;
+    private static final int MAX_RECENT_ACCESSES_TO_KEEP = 25;
 
     private final Queue<Timeline> mRecentRefinerTimelines = new LinkedList<>();
     private final Map<Long, Timeline> mActiveRefinerTimelines = new HashMap<>();
     private final Queue<Timeline> mRecentRendererTimelines = new LinkedList<>();
     private final Map<Long, Timeline> mActiveRendererTimelines = new HashMap<>();
+    private final Queue<Timeline> mRecentAccessTimelines = new LinkedList<>();
 
     /** Called when a workflow is started. */
+    @Override
     public void onRefinerWorkflowStarted(long flowId, Collection<PublishedContextHint> hints) {
         final Timeline flowTimeline = new Timeline();
 
@@ -55,6 +61,7 @@ public class ContextLogger
     }
 
     /** Called when a set of hints is sent to a refiner. */
+    @Override
     public void onHintsSentToRefiner(
             long flowId, Collection<PublishedContextHint> hints, Refiner refiner) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
@@ -68,6 +75,7 @@ public class ContextLogger
     }
 
     /** Called when a set of hints is received from a refiner. */
+    @Override
     public void onHintsReceivedFromRefiner(
             long flowId, Collection<PublishedContextHint> hints, Refiner refiner) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
@@ -83,6 +91,7 @@ public class ContextLogger
     }
 
     /** Called when a workflow stops. */
+    @Override
     public void onRefinerWorkflowFinished(long flowId) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -93,6 +102,7 @@ public class ContextLogger
     }
 
     /** Called when a workflow has an unexpected error. */
+    @Override
     public void onRefinerWorkflowError(long flowId, Throwable t) {
         Timeline flowTimeline = mActiveRefinerTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -106,13 +116,14 @@ public class ContextLogger
     private void flushRefinerWorkflowTimeline(long flowId, Timeline timeline) {
         mActiveRefinerTimelines.remove(flowId);
         mRecentRefinerTimelines.add(timeline);
-        while (mRecentRefinerTimelines.size() > MAX_RECENT_ITEMS_TO_KEEP) {
+        while (mRecentRefinerTimelines.size() > MAX_RECENT_TIMELINES_TO_KEEP) {
             mRecentRefinerTimelines.remove();
         }
     }
 
     /** Called when a workflow is started. */
-    public void onRendererWorkflowStarted(long flowId, ContextInsight insight) {
+    @Override
+    public void onRendererWorkflowStarted(long flowId, PublishedContextInsight insight) {
         final Timeline flowTimeline = new Timeline();
 
         flowTimeline.addStringDetail("Render workflow %s started", flowId);
@@ -123,7 +134,9 @@ public class ContextLogger
     }
 
     /** Called when an insight is sent to a renderer. */
-    public void onInsightSentToRenderer(long flowId, ContextInsight insight, Renderer renderer) {
+    @Override
+    public void onInsightSentToRenderer(
+            long flowId, PublishedContextInsight insight, Renderer renderer) {
         Timeline flowTimeline = mActiveRendererTimelines.get(flowId);
         if (flowTimeline == null) return;
 
@@ -132,6 +145,7 @@ public class ContextLogger
     }
 
     /** Called when a workflow stops. */
+    @Override
     public void onRendererWorkflowFinished(long flowId) {
         Timeline flowTimeline = mActiveRendererTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -142,6 +156,7 @@ public class ContextLogger
     }
 
     /** Called when a workflow has an unexpected error. */
+    @Override
     public void onRendererWorkflowError(long flowId, Throwable t) {
         Timeline flowTimeline = mActiveRendererTimelines.get(flowId);
         if (flowTimeline == null) return;
@@ -152,10 +167,28 @@ public class ContextLogger
         flushRendererWorkflowTimeline(flowId, flowTimeline);
     }
 
+    @Override
+    public void onAccessChecked(String packageName, UserHandle user, String description,
+            int result) {
+        final Timeline accessTimeline = new Timeline();
+
+        accessTimeline.addStringDetail("%s (Package: %s, User: %s) - %s",
+                description,
+                packageName,
+                user.getIdentifier(),
+                result == AccessController.RESULT_ALLOWED ? "allowed" :
+                        result == AccessController.RESULT_DENIED ? "denied" : "bypassed");
+
+        mRecentAccessTimelines.add(accessTimeline);
+        while (mRecentAccessTimelines.size() > MAX_RECENT_ACCESSES_TO_KEEP) {
+            mRecentAccessTimelines.remove();
+        }
+    }
+
     private void flushRendererWorkflowTimeline(long flowId, Timeline timeline) {
         mActiveRendererTimelines.remove(flowId);
         mRecentRendererTimelines.add(timeline);
-        if (mRecentRendererTimelines.size() > MAX_RECENT_ITEMS_TO_KEEP) {
+        if (mRecentRendererTimelines.size() > MAX_RECENT_TIMELINES_TO_KEEP) {
             mRecentRendererTimelines.remove();
         }
     }
@@ -171,12 +204,19 @@ public class ContextLogger
         dumpTimelines(fout, mRecentRefinerTimelines);
 
         fout.write("Active Render Workflows\n");
-        fout.write("=====================\n");
+        fout.write("=======================\n");
         dumpTimelines(fout, mActiveRendererTimelines.values());
 
         fout.write("Recent Render Workflows\n");
-        fout.write("=====================\n");
+        fout.write("=======================\n");
         dumpTimelines(fout, mRecentRendererTimelines);
+
+        fout.write("Recent Access Checks\n");
+        fout.write("====================\n");
+        for (Timeline timeline : mRecentAccessTimelines) {
+            timeline.dump(fout);
+        }
+        fout.write("\n");
     }
 
     private void dumpTimelines(PrintWriter fout, Collection<Timeline> timelines) {
@@ -216,14 +256,14 @@ public class ContextLogger
             addStringDetail("  Exception: %s", t.getMessage());
         }
 
-        public void addInsightDetail(ContextInsight insight) {
+        public void addInsightDetail(PublishedContextInsight insight) {
             addStringDetail(
                     "  Insight: %s - %s (%s source hints)",
                     insight.getClass().getSimpleName(),
-                    insight.getInsightId(),
-                    insight.getOriginHints().size());
+                    insight.getInsight().getInsightId(),
+                    insight.getInsight().getOriginHints().size());
 
-            addHintListDetail(insight.getOriginHints());
+            addHintListDetail(insight.getInsight().getOriginHints());
         }
 
         public void dump(PrintWriter fout) {

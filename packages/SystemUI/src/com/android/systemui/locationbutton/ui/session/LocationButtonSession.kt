@@ -33,6 +33,7 @@ import android.os.Process
 import android.os.RemoteCallback
 import android.os.RemoteException
 import android.os.Trace
+import android.os.UserHandle
 import android.util.Log
 import android.util.Slog
 import android.view.SurfaceControlViewHost
@@ -44,6 +45,7 @@ import com.android.systemui.locationbutton.domain.interactor.LocationButtonInter
 import com.android.systemui.locationbutton.ui.compose.LocationButton
 import com.android.systemui.locationbutton.ui.view.LocationButtonRootView
 import com.android.systemui.locationbutton.ui.viewmodel.LocationButtonViewModel
+import com.android.systemui.shared.system.SysUiStatsLog
 import java.util.concurrent.Executor
 import java.util.function.Consumer
 
@@ -124,6 +126,25 @@ class LocationButtonSession(
         setupComposeView()
         registerTrustedPresentationListener()
         linkToDeath()
+        logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__OPEN_SESSION)
+    }
+
+    private fun logAtom(action: Int, result: Int = 0) {
+        val model =
+            interactor.getButtonState(sessionId)
+                ?: run {
+                    Slog.w(LOG_TAG, "model not found for session $sessionId")
+                    return
+                }
+        SysUiStatsLog.write(
+            SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED,
+            packageUid,
+            sessionId,
+            action,
+            result,
+            model.textType,
+            model.validationFlags,
+        )
     }
 
     private fun setupComposeView() {
@@ -163,6 +184,10 @@ class LocationButtonSession(
         try {
             if (!isButtonUiInTrustedState) {
                 Slog.w(LOG_TAG, "Location button clicked, but ui state not trusted.")
+                logAtom(
+                    SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__BUTTON_CLICKED,
+                    SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__RESULT__REJECTED_UNTRUSTED,
+                )
                 return
             }
             if (DEBUG) {
@@ -175,15 +200,52 @@ class LocationButtonSession(
                     packageUid,
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
-                locationButtonClient.onPermissionsResult(true)
+                logAtom(
+                    SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__BUTTON_CLICKED,
+                    SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__RESULT__ALREADY_GRANTED,
+                )
+                try {
+                    locationButtonClient.onPermissionsResult(true)
+                } catch (e: RemoteException) {
+                    Slog.e(
+                        LOG_TAG,
+                        "Client died or failed to send permission result, close session.",
+                        e,
+                    )
+                    close()
+                }
                 return
             }
+            logAtom(
+                SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__BUTTON_CLICKED,
+                SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__RESULT__SUCCESS_TRUSTED,
+            )
 
             val remoteCallback = RemoteCallback { bundle ->
                 val isPermissionGranted =
                     bundle?.getBoolean(LocationButtonClient.EXTRA_PERMISSION_RESULT) ?: false
-                locationButtonClient.onPermissionsResult(isPermissionGranted)
+                logAtom(
+                    SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__BUTTON_CLICKED,
+                    if (isPermissionGranted) {
+                        SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__RESULT__PERMISSION_GRANTED
+                    } else {
+                        SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__RESULT__PERMISSION_DENIED
+                    },
+                )
+                try {
+                    locationButtonClient.onPermissionsResult(isPermissionGranted)
+                } catch (e: RemoteException) {
+                    Slog.e(
+                        LOG_TAG,
+                        "Client died or failed to send permission result, close session.",
+                        e,
+                    )
+                    close()
+                }
             }
+
+            val userHandle = UserHandle.getUserHandleForUid(packageUid)
+            val userContext = context.createContextAsUser(userHandle, /* flags= */ 0)
 
             val intent =
                 Intent(LocationButtonClient.ACTION_REQUEST_LOCATION_BUTTON_PERMISSIONS).apply {
@@ -193,7 +255,7 @@ class LocationButtonSession(
                 }
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
             val pendingIntent =
-                PendingIntent.getActivity(context, /* requestCode */ 0, intent, flags)
+                PendingIntent.getActivity(userContext, /* requestCode */ 0, intent, flags)
             try {
                 locationButtonClient.onRequestPermissions(pendingIntent)
             } catch (e: RemoteException) {
@@ -233,6 +295,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setCornerRadius(sessionId, cornerRadius)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_CORNER_RADIUS)
         }
     }
 
@@ -245,6 +308,9 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setPressedCornerRadius(sessionId, cornerRadius)
+            logAtom(
+                SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_PRESSED_CORNER_RADIUS
+            )
         }
     }
 
@@ -262,6 +328,7 @@ class LocationButtonSession(
             // For security, ensure the background is always opaque.
             val opaqueBackgroundColor = ColorUtils.setAlphaComponent(color, 255)
             interactor.setBackgroundColor(sessionId, opaqueBackgroundColor)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_BACKGROUND_COLOR)
         }
     }
 
@@ -277,6 +344,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setTextColor(sessionId, textColor)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_TEXT_COLOR)
         }
     }
 
@@ -292,6 +360,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setIconTint(sessionId, color)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_ICON_TINT)
         }
     }
 
@@ -304,6 +373,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setTextType(sessionId, textType)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_TEXT_TYPE)
         }
     }
 
@@ -326,6 +396,7 @@ class LocationButtonSession(
                     )
                 }
                 surfaceControlViewHost.relayout(model.width, model.height)
+                logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__RESIZE)
             } finally {
                 Trace.endSection()
             }
@@ -341,6 +412,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setPadding(sessionId, left, top, right, bottom)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_PADDING)
         }
     }
 
@@ -356,6 +428,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setStrokeColor(sessionId, color)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_STROKE_COLOR)
         }
     }
 
@@ -368,6 +441,7 @@ class LocationButtonSession(
                 return@execute
             }
             interactor.setStrokeWidth(sessionId, width)
+            logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__SET_STROKE_WIDTH)
         }
     }
 
@@ -388,6 +462,9 @@ class LocationButtonSession(
                     newConfig,
                     displayContext.resources.displayMetrics.density,
                 )
+                logAtom(
+                    SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__CHANGE_CONFIGURATION
+                )
             } finally {
                 Trace.endSection()
             }
@@ -401,6 +478,7 @@ class LocationButtonSession(
                 if (!isActive) {
                     return@execute
                 }
+                logAtom(SysUiStatsLog.LOCATION_BUTTON_SESSION_REPORTED__ACTION__CLOSE_SESSION)
                 isActive = false
                 windowManager.unregisterTrustedPresentationListener(trustedPresentationListener)
                 surfaceControlViewHost.release()

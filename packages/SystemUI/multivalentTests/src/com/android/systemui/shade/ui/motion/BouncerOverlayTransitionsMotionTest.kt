@@ -115,7 +115,7 @@ import platform.test.screenshot.Displays.Phone
 @LargeTest
 @RunWithLooper
 @EnableSceneContainer
-@Ignore("b/481758025")
+@Ignore("b/496045082")
 class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val deviceSpec = DeviceEmulationSpec(Phone)
@@ -270,6 +270,7 @@ class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
             WithStatusIconContext(kosmos.tintedIconManagerFactory) {
                 ObserveReadsRoot {
                     BouncerSceneContainer(
+                        viewModel = vm,
                         state = bouncerSceneContainerState,
                         bouncerOverlay = bouncerOverlay,
                         toBouncerTransitionViewModel = kosmos.toBouncerTransitionViewModel,

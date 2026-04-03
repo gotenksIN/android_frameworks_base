@@ -21,6 +21,7 @@ import android.companion.virtual.computercontrol.IComputerControlLifecycleCallba
 import android.companion.virtual.computercontrol.IInteractiveMirror;
 import android.view.Surface;
 import android.view.SurfaceControl;
+import com.android.internal.os.IResultReceiver;
 
 /**
  * Interface for computer control session management.
@@ -51,7 +52,8 @@ interface IComputerControlSession {
     void longPress(int x, int y);
 
     /** Creates an interactive mirror of the session's virtual display. */
-    IInteractiveMirror createInteractiveMirror(out SurfaceControl mirrorSurface);
+    IInteractiveMirror createInteractiveMirror(in IResultReceiver a11yEmbeddedConnectionReceiver,
+            out SurfaceControl mirrorSurface);
 
     /**
      * Inserts text into the current active input connection. If there is no active input
@@ -68,6 +70,8 @@ interface IComputerControlSession {
     void performAction(int actionCode);
 
     /** Attaches a notification to the session, to make it non-dismissable. */
+    // TODO(b/483645569): Remove when agents start passing a notification as part of the
+    // ComputerControlSessionParams.
     void attachNotificationInfo(int notificationId, in String notificationTag);
 
     /**

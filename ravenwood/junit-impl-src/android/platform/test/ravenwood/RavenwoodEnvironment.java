@@ -167,7 +167,20 @@ public final class RavenwoodEnvironment {
         final var propFile = System.getProperty(
                 "android.ravenwood.prop_file", "ravenwood.properties");
 
-        final var props = RavenwoodSystemProperties.readProperties(propFile);
+        final Map<String, String> props;
+        if (propFile.isEmpty()) {
+            // If the filename is explicitly set to "", then don't read from a file.
+            // In that case, properties need to be set via java system properties; see below.
+            props = new HashMap<>();
+        } else {
+            props = RavenwoodSystemProperties.readProperties(propFile);
+        }
+
+        // Set the values from Java's android.ravenwood.prop_override.xxx properties, if any.
+        // For example, to overridet the package name, run the JVM
+        // with `-Dandroid.ravenwood.prop_override.packageName=PACKAGE_NAME`.
+        RavenwoodSystemProperties.overrideWithJavaProperties(
+                props, "android.ravenwood.prop_override.");
 
         // TODO: Why do we use a random PID? We can get the real PID via JNI. Why not use that?
         final int pid = new Random().nextInt(100, 32768);
@@ -442,13 +455,16 @@ public final class RavenwoodEnvironment {
         return val.split("\\s+");
     }
 
-    /** Property files from each test. Optional. This is relative to the current directory. */
-    private static final String PER_TEST_PROP = "ravenwood.prop";
+    /**
+     * Default filename of the per-test {@link android.os.SystemProperties} override.
+     */
+    private static final String PER_TEST_SYSPROP = "ravenwood.sysprop";
 
     /**
-     * @return per-test property file. Default is {@link #PER_TEST_PROP}.
+     * @return Filename of the per-test {@link android.os.SystemProperties} override.
+     * Default is {@link #PER_TEST_SYSPROP}.
      */
-    public String perTestPropFile() {
-        return System.getProperty("android.ravenwood.per_test_prop_file", PER_TEST_PROP);
+    public String perTestSyspropFile() {
+        return System.getProperty("android.ravenwood.per_test_prop_file", PER_TEST_SYSPROP);
     }
 }

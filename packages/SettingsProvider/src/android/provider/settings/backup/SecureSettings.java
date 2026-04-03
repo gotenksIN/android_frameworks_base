@@ -183,6 +183,7 @@ public class SecureSettings {
         Settings.Secure.HUSH_GESTURE_USED,
         Settings.Secure.IN_CALL_NOTIFICATION_ENABLED,
         Settings.Secure.LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS,
+        Settings.Secure.LOCK_SCREEN_NOTE_TAKING_CONSENT,
         Settings.Secure.LOCK_SCREEN_CUSTOM_CLOCK_FACE,
         Settings.Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS,
         Settings.Secure.LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS,
@@ -344,7 +345,9 @@ public class SecureSettings {
         Settings.Secure.TEXT_SHOW_PASSWORD_TOUCH,
         Settings.Secure.TEXT_SHOW_PASSWORD_PHYSICAL,
         Settings.Secure.PERSONAL_CONTEXT_ENABLED,
+        Settings.Secure.PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT,
         Settings.Secure.LIGHT_ANIMATION_FAVORITE_CALLS_ENABLED,
         Settings.Secure.IME_SWITCHER_BUTTON_IN_NAVBAR_ENABLED,
+        Settings.Secure.RAISE_TRIGGER_DEFAULT_ASSISTANT,
     };
 }

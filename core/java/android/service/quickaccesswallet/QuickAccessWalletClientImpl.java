@@ -68,7 +68,7 @@ public class QuickAccessWalletClientImpl implements QuickAccessWalletClient, Ser
     private final Queue<ApiCaller> mRequestQueue;
     private final Map<WalletServiceEventListener, String> mEventListeners;
     private final Executor mLifecycleExecutor;
-    private boolean mIsConnected;
+    private volatile boolean mIsConnected;
     /** Timeout for active service connections (1 minute) */
     private static final long SERVICE_CONNECTION_TIMEOUT_MS = 60 * 1000;
 

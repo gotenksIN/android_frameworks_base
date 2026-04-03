@@ -1,4 +1,5 @@
-// Signature format: 2.0
+// Signature format: 6.0
+// - style=java
 package android.location {
 
   public class Address implements android.os.Parcelable {
@@ -114,8 +115,8 @@ package android.location {
 
   public static class GnssAntennaInfo.Builder {
     ctor @Deprecated public GnssAntennaInfo.Builder();
-    ctor public GnssAntennaInfo.Builder(double, @NonNull android.location.GnssAntennaInfo.PhaseCenterOffset);
     ctor public GnssAntennaInfo.Builder(@NonNull android.location.GnssAntennaInfo);
+    ctor public GnssAntennaInfo.Builder(double, @NonNull android.location.GnssAntennaInfo.PhaseCenterOffset);
     method @NonNull public android.location.GnssAntennaInfo build();
     method @NonNull public android.location.GnssAntennaInfo.Builder setCarrierFrequencyMHz(@FloatRange(from=0.0f) double);
     method @NonNull public android.location.GnssAntennaInfo.Builder setPhaseCenterOffset(@NonNull android.location.GnssAntennaInfo.PhaseCenterOffset);
@@ -294,6 +295,7 @@ package android.location {
     method public long getReceivedSvTimeUncertaintyNanos();
     method public double getSatelliteInterSignalBiasNanos();
     method @FloatRange(from=0.0) public double getSatelliteInterSignalBiasUncertaintyNanos();
+    method @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") @Nullable public android.location.SatellitePvt getSatellitePvt();
     method public double getSnrInDb();
     method public int getState();
     method public int getSvid();
@@ -309,6 +311,7 @@ package android.location {
     method public boolean hasFullInterSignalBiasUncertaintyNanos();
     method public boolean hasSatelliteInterSignalBiasNanos();
     method public boolean hasSatelliteInterSignalBiasUncertaintyNanos();
+    method @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public boolean hasSatellitePvt();
     method public boolean hasSnrInDb();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final int ADR_STATE_CYCLE_SLIP = 4; // 0x4
@@ -552,16 +555,16 @@ package android.location {
     method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addNmeaListener(@NonNull android.location.OnNmeaMessageListener, @Nullable android.os.Handler);
     method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addNmeaListener(@NonNull java.util.concurrent.Executor, @NonNull android.location.OnNmeaMessageListener);
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void addProximityAlert(double, double, float, long, @NonNull android.app.PendingIntent);
-    method public void addTestProvider(@NonNull String, boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int);
     method public void addTestProvider(@NonNull String, @NonNull android.location.provider.ProviderProperties);
-    method public void addTestProvider(@NonNull String, @NonNull android.location.provider.ProviderProperties, @NonNull java.util.Set<java.lang.String>);
+    method public void addTestProvider(@NonNull String, @NonNull android.location.provider.ProviderProperties, @NonNull java.util.Set<String>);
+    method public void addTestProvider(@NonNull String, boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int);
     method @Deprecated public void clearTestProviderEnabled(@NonNull String);
     method @Deprecated public void clearTestProviderLocation(@NonNull String);
     method @Deprecated public void clearTestProviderStatus(@NonNull String);
-    method @NonNull public java.util.List<java.lang.String> getAllProviders();
+    method @NonNull public java.util.List<String> getAllProviders();
     method @Deprecated @Nullable public String getBestProvider(@NonNull android.location.Criteria, boolean);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void getCurrentLocation(@NonNull String, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.location.Location>);
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void getCurrentLocation(@NonNull String, @NonNull android.location.LocationRequest, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.location.Location>);
+    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void getCurrentLocation(@NonNull String, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.location.Location>);
     method @Nullable public java.util.List<android.location.GnssAntennaInfo> getGnssAntennaInfos();
     method @NonNull public android.location.GnssCapabilities getGnssCapabilities();
     method @Nullable public String getGnssHardwareModelName();
@@ -570,16 +573,16 @@ package android.location {
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public android.location.Location getLastKnownLocation(@NonNull String);
     method @Deprecated @Nullable public android.location.LocationProvider getProvider(@NonNull String);
     method @Nullable public android.location.provider.ProviderProperties getProviderProperties(@NonNull String);
-    method @NonNull public java.util.List<java.lang.String> getProviders(boolean);
-    method @Deprecated @NonNull public java.util.List<java.lang.String> getProviders(@NonNull android.location.Criteria, boolean);
+    method @Deprecated @NonNull public java.util.List<String> getProviders(@NonNull android.location.Criteria, boolean);
+    method @NonNull public java.util.List<String> getProviders(boolean);
     method public boolean hasProvider(@NonNull String);
     method public boolean isLocationEnabled();
     method public boolean isProviderEnabled(@NonNull String);
     method public boolean registerAntennaInfoListener(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssAntennaInfo.Listener);
+    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementRequest, @NonNull java.util.concurrent.Executor, @NonNull android.location.GnssMeasurementsEvent.Callback);
     method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementsEvent.Callback);
     method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementsEvent.Callback, @Nullable android.os.Handler);
     method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssMeasurementsEvent.Callback);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementRequest, @NonNull java.util.concurrent.Executor, @NonNull android.location.GnssMeasurementsEvent.Callback);
     method @Deprecated public boolean registerGnssNavigationMessageCallback(@NonNull android.location.GnssNavigationMessage.Callback);
     method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssNavigationMessageCallback(@NonNull android.location.GnssNavigationMessage.Callback, @Nullable android.os.Handler);
     method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssNavigationMessageCallback(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssNavigationMessage.Callback);
@@ -591,23 +594,23 @@ package android.location {
     method public void removeNmeaListener(@NonNull android.location.OnNmeaMessageListener);
     method @RequiresPermission(anyOf={"android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"}, apis="..22") public void removeProximityAlert(@NonNull android.app.PendingIntent);
     method public void removeTestProvider(@NonNull String);
-    method @RequiresPermission(anyOf={"android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"}, apis="..22") public void removeUpdates(@NonNull android.location.LocationListener);
     method public void removeUpdates(@NonNull android.app.PendingIntent);
-    method public void requestFlush(@NonNull String, @NonNull android.location.LocationListener, int);
+    method @RequiresPermission(anyOf={"android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"}, apis="..22") public void removeUpdates(@NonNull android.location.LocationListener);
     method public void requestFlush(@NonNull String, @NonNull android.app.PendingIntent, int);
+    method public void requestFlush(@NonNull String, @NonNull android.location.LocationListener, int);
+    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, @NonNull android.location.LocationRequest, @NonNull android.app.PendingIntent);
+    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, @NonNull android.location.LocationRequest, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
+    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.app.PendingIntent);
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.location.LocationListener);
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
+    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull android.app.PendingIntent);
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.app.PendingIntent);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull android.app.PendingIntent);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, @NonNull android.location.LocationRequest, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, @NonNull android.location.LocationRequest, @NonNull android.app.PendingIntent);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull String, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
+    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull android.location.Criteria, @NonNull android.app.PendingIntent);
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull android.location.Criteria, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull String, @NonNull android.app.PendingIntent);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull android.location.Criteria, @NonNull android.app.PendingIntent);
+    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull String, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
     method public boolean sendExtraCommand(@NonNull String, @NonNull String, @Nullable android.os.Bundle);
     method public void setTestProviderEnabled(@NonNull String, boolean);
     method public void setTestProviderLocation(@NonNull String, @NonNull android.location.Location);
@@ -670,8 +673,8 @@ package android.location {
   }
 
   public static final class LocationRequest.Builder {
-    ctor public LocationRequest.Builder(long);
     ctor public LocationRequest.Builder(@NonNull android.location.LocationRequest);
+    ctor public LocationRequest.Builder(long);
     method @NonNull public android.location.LocationRequest build();
     method @NonNull public android.location.LocationRequest.Builder clearMinUpdateIntervalMillis();
     method @NonNull public android.location.LocationRequest.Builder setDurationMillis(@IntRange(from=1) long);
@@ -685,6 +688,80 @@ package android.location {
 
   public interface OnNmeaMessageListener {
     method public void onNmeaMessage(String, long);
+  }
+
+  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public final class SatellitePvt implements android.os.Parcelable {
+    method public int describeContents();
+    method @Nullable public android.location.SatellitePvt.ClockInfo getClockInfo();
+    method public int getEphemerisSource();
+    method @FloatRange public double getIonoDelayMeters();
+    method @IntRange(from=0, to=1023) public int getIssueOfDataClock();
+    method @IntRange(from=0, to=1023) public int getIssueOfDataEphemeris();
+    method @Nullable public android.location.SatellitePvt.PositionEcef getPositionEcef();
+    method @IntRange(from=0) public long getTimeOfClockSeconds();
+    method @IntRange(from=0) public long getTimeOfEphemerisSeconds();
+    method @FloatRange public double getTropoDelayMeters();
+    method @Nullable public android.location.SatellitePvt.VelocityEcef getVelocityEcef();
+    method public boolean hasIono();
+    method public boolean hasIssueOfDataClock();
+    method public boolean hasIssueOfDataEphemeris();
+    method public boolean hasPositionVelocityClockInfo();
+    method public boolean hasTimeOfClockSeconds();
+    method public boolean hasTimeOfEphemerisSeconds();
+    method public boolean hasTropo();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt> CREATOR;
+    field public static final int EPHEMERIS_SOURCE_DEMODULATED = 0; // 0x0
+    field public static final int EPHEMERIS_SOURCE_OTHER = 3; // 0x3
+    field public static final int EPHEMERIS_SOURCE_SERVER_LONG_TERM = 2; // 0x2
+    field public static final int EPHEMERIS_SOURCE_SERVER_NORMAL = 1; // 0x1
+  }
+
+  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.Builder {
+    ctor public SatellitePvt.Builder();
+    method @NonNull public android.location.SatellitePvt build();
+    method @NonNull public android.location.SatellitePvt.Builder setClockInfo(@Nullable android.location.SatellitePvt.ClockInfo);
+    method @NonNull public android.location.SatellitePvt.Builder setEphemerisSource(int);
+    method @NonNull public android.location.SatellitePvt.Builder setIonoDelayMeters(@FloatRange(from=0.0f, to=100.0f) double);
+    method @NonNull public android.location.SatellitePvt.Builder setIssueOfDataClock(@IntRange(from=0, to=1023) int);
+    method @NonNull public android.location.SatellitePvt.Builder setIssueOfDataEphemeris(@IntRange(from=0, to=1023) int);
+    method @NonNull public android.location.SatellitePvt.Builder setPositionEcef(@Nullable android.location.SatellitePvt.PositionEcef);
+    method @NonNull public android.location.SatellitePvt.Builder setTimeOfClockSeconds(@IntRange(from=0) long);
+    method @NonNull public android.location.SatellitePvt.Builder setTimeOfEphemerisSeconds(@IntRange(from=0) long);
+    method @NonNull public android.location.SatellitePvt.Builder setTropoDelayMeters(@FloatRange(from=0.0f, to=100.0f) double);
+    method @NonNull public android.location.SatellitePvt.Builder setVelocityEcef(@Nullable android.location.SatellitePvt.VelocityEcef);
+  }
+
+  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.ClockInfo implements android.os.Parcelable {
+    ctor public SatellitePvt.ClockInfo(double, double, double);
+    method public int describeContents();
+    method @FloatRange public double getClockDriftMetersPerSecond();
+    method @FloatRange public double getHardwareCodeBiasMeters();
+    method @FloatRange public double getTimeCorrectionMeters();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt.ClockInfo> CREATOR;
+  }
+
+  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.PositionEcef implements android.os.Parcelable {
+    ctor public SatellitePvt.PositionEcef(double, double, double, double);
+    method public int describeContents();
+    method @FloatRange(from=0.0f, fromInclusive=false) public double getUreMeters();
+    method @FloatRange public double getXMeters();
+    method @FloatRange public double getYMeters();
+    method @FloatRange public double getZMeters();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt.PositionEcef> CREATOR;
+  }
+
+  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.VelocityEcef implements android.os.Parcelable {
+    ctor public SatellitePvt.VelocityEcef(double, double, double, double);
+    method public int describeContents();
+    method @FloatRange(from=0.0f, fromInclusive=false) public double getUreRateMetersPerSecond();
+    method @FloatRange public double getXMetersPerSecond();
+    method @FloatRange public double getYMetersPerSecond();
+    method @FloatRange public double getZMetersPerSecond();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt.VelocityEcef> CREATOR;
   }
 
   public abstract class SettingInjectorService extends android.app.Service {

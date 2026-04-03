@@ -114,6 +114,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.ImpulseO
 import com.android.internal.widget.remotecompose.core.operations.layout.ImpulseProcess;
 import com.android.internal.widget.remotecompose.core.operations.layout.LayoutComponentContent;
 import com.android.internal.widget.remotecompose.core.operations.layout.LoopOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.MultiClickModifier;
 import com.android.internal.widget.remotecompose.core.operations.layout.RootLayoutComponent;
 import com.android.internal.widget.remotecompose.core.operations.layout.TouchCancelModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.TouchDownModifierOperation;
@@ -138,6 +139,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.modifier
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ClipRectModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.CollapsiblePriorityModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ComponentVisibilityOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DimensionConstraintsModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DrawContentOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.GraphicsLayerModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.HeightInModifierOperation;
@@ -1869,10 +1871,12 @@ public class RemoteComposeBuffer {
      * @param spacedBy spacing between items
      */
     public void addFlowStart(
-            int componentId, int animationId, int horizontal, int vertical, float spacedBy) {
+            int componentId, int animationId, int horizontal, int vertical, float spacedBy,
+            int maxItemsInEachRow, int maxLines) {
         mLastComponentId = getComponentId(componentId);
         FlowLayout.apply(
-                mBuffer, mLastComponentId, animationId, horizontal, vertical, spacedBy);
+                mBuffer, mLastComponentId, animationId, horizontal, vertical, spacedBy,
+                maxItemsInEachRow, maxLines);
     }
 
     /**
@@ -2118,55 +2122,22 @@ public class RemoteComposeBuffer {
             boolean autosize,
             int flags) {
         mLastComponentId = getComponentId(componentId);
-        if (mApiLevel < 7) {
-            if (letterSpacing != 0f
-                    || lineHeightAdd != 0f
-                    || lineHeightMultiplier != 1f
-                    || lineBreakStrategy != 0
-                    || hyphenationFrequency != 0
-                    || justificationMode != 0
-                    || underline
-                    || strikethrough
-                    || (fontAxis != null && fontAxis.length > 0)
-                    || (fontAxisValues != null && fontAxisValues.length > 0)
-                    || autosize
-            ) {
-                StringBuilder error = new StringBuilder();
-                error.append("The following text parameters are not supported on API level < 7:\n");
-                if (letterSpacing != 0f) {
-                    error.append("- letterSpacing\n");
-                }
-                if (lineHeightAdd != 0f || lineHeightMultiplier != 1f) {
-                    error.append("- lineHeight\n");
-                }
-                if (lineBreakStrategy != 0) {
-                    error.append("- lineBreakStrategy\n");
-                }
-                if (hyphenationFrequency != 0) {
-                    error.append("- hyphenationFrequency\n");
-                }
-                if (justificationMode != 0) {
-                    error.append("- justificationMode\n");
-                }
-                if (underline) {
-                    error.append("- underline\n");
-                }
-                if (strikethrough) {
-                    error.append("- strikethrough\n");
-                }
-                if ((fontAxis != null && fontAxis.length > 0)
-                        || (fontAxisValues != null && fontAxisValues.length > 0)) {
-                    error.append("- fontAxis\n");
-                }
-                if (autosize) {
-                    error.append("- autosize\n");
-                }
-                throw new RuntimeException(error.toString());
-            }
+
+        boolean useCoreTextComponent = mBuffer.mValidOperations[Operations.CORE_TEXT];
+        if (!useCoreTextComponent) {
             // Use TextLayout as a backstop
-            TextLayout.apply(mBuffer, mLastComponentId, animationId, textId,
-                    color, fontSize, fontStyle, fontWeight, fontFamilyId,
-                    textAlign, overflow, maxLines);
+            if (colorId != -1) {
+                int flagsAndTextAlign =
+                        (TextLayout.FLAG_IS_DYNAMIC_COLOR << 16) | (textAlign & 0xFFFF);
+                TextLayout.apply(mBuffer, mLastComponentId, animationId, textId,
+                        colorId, fontSize, fontStyle, fontWeight, fontFamilyId,
+                        flagsAndTextAlign, overflow, maxLines);
+            } else {
+                TextLayout.apply(mBuffer, mLastComponentId, animationId, textId,
+                        color, fontSize, fontStyle, fontWeight, fontFamilyId,
+                        textAlign, overflow, maxLines);
+
+            }
         } else {
             CoreText.apply(
                     mBuffer,
@@ -2816,6 +2787,13 @@ public class RemoteComposeBuffer {
     }
 
     /**
+     * Add a dimension constraints modifier operation
+     */
+    public void addDimensionConstraintsModifierOperation(int type, float min, float max) {
+        DimensionConstraintsModifierOperation.apply(mBuffer, type, min, max);
+    }
+
+    /**
      * Add a draw content operation
      */
     public void addDrawContentOperation() {
@@ -2841,12 +2819,12 @@ public class RemoteComposeBuffer {
      * Add a semantics modifier operation
      */
     public void addSemanticsModifier(int contentDescriptionId,
-                                     byte role,
-                                     int textId,
-                                     int stateDescriptionId,
-                                     int mode,
-                                     boolean enabled,
-                                     boolean clickable) {
+            byte role,
+            int textId,
+            int stateDescriptionId,
+            int mode,
+            boolean enabled,
+            boolean clickable) {
         CoreSemantics.apply(
                 mBuffer, contentDescriptionId,
                 role,
@@ -2859,6 +2837,14 @@ public class RemoteComposeBuffer {
 
     /**
      * Add a click modifier operation
+     * @param clickType type of click (0=single, 1=long, 2=double)
+     */
+    public void addClickModifierOperation(int clickType) {
+        MultiClickModifier.apply(mBuffer, clickType);
+    }
+
+    /**
+     * Add a click modifier operation (single click)
      */
     public void addClickModifierOperation() {
         ClickModifierOperation.apply(mBuffer);
@@ -2884,12 +2870,12 @@ public class RemoteComposeBuffer {
      * @param exitAnimation exit animation
      */
     public void addAnimationSpecModifier(int animationId,
-                                         float motionDuration,
-                                         int motionEasingType,
-                                         float visibilityDuration,
-                                         int visibilityEasingType,
-                                         int enterAnimation,
-                                         int exitAnimation) {
+            float motionDuration,
+            int motionEasingType,
+            float visibilityDuration,
+            int visibilityEasingType,
+            int enterAnimation,
+            int exitAnimation) {
         AnimationSpec.apply(mBuffer,
                 animationId,
                 motionDuration,

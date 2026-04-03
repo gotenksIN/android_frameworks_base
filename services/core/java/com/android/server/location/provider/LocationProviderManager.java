@@ -455,7 +455,11 @@ public class LocationProviderManager extends
 
             // initialization order is important as there are ordering dependencies
             onLocationPermissionsChanged();
-            onBypassLocationPermissionsChanged(mIsInEmergency);
+            if (!Flags.skipEmergencyCheckWithoutBypass()
+                    || mContext.checkPermission(LOCATION_BYPASS, getIdentity().getPid(),
+                    getIdentity().getUid()) == PERMISSION_GRANTED) {
+                onBypassLocationPermissionsChanged(mIsInEmergency);
+            }
             mForeground = mAppForegroundHelper.isAppForeground(getIdentity().getUid());
             mProviderLocationRequest = calculateProviderLocationRequest();
             mIsUsingHighPower = isUsingHighPower();
@@ -604,7 +608,7 @@ public class LocationProviderManager extends
         boolean onBypassLocationPermissionsChanged(boolean isInEmergency) {
             synchronized (mMultiplexerLock) {
                 boolean bypassPermitted =
-                        Flags.enableLocationBypass() && isInEmergency
+                        isInEmergency
                                 && mContext.checkPermission(
                                 LOCATION_BYPASS, mIdentity.getPid(), mIdentity.getUid())
                                 == PERMISSION_GRANTED;
@@ -1008,7 +1012,7 @@ public class LocationProviderManager extends
 
             // note app ops
             int op =
-                    Flags.enableLocationBypass() && isOnlyBypassPermitted()
+                    isOnlyBypassPermitted()
                             ? AppOpsManager.OP_EMERGENCY_LOCATION
                             : LocationPermissions.asAppOp(getPermissionLevel());
             if (!mAppOpsHelper.noteOpNoThrow(op, getIdentity())) {
@@ -1363,7 +1367,7 @@ public class LocationProviderManager extends
             // lastly - note app ops
             if (fineLocationResult != null) {
                 int op =
-                        Flags.enableLocationBypass() && isOnlyBypassPermitted()
+                        isOnlyBypassPermitted()
                                 ? AppOpsManager.OP_EMERGENCY_LOCATION
                                 : LocationPermissions.asAppOp(getPermissionLevel());
                 if (!mAppOpsHelper.noteOpNoThrow(op, getIdentity())) {
@@ -1845,8 +1849,7 @@ public class LocationProviderManager extends
             int op;
             if (Flags.checkBypassPermissionBeforeEmergencyMode()) {
                 op =
-                        (Flags.enableLocationBypass()
-                                        && !mLocationPermissionsHelper.hasLocationPermissions(
+                        (!mLocationPermissionsHelper.hasLocationPermissions(
                                                 permissionLevel, identity)
                                         && mContext.checkPermission(
                                                         LOCATION_BYPASS,
@@ -1858,8 +1861,7 @@ public class LocationProviderManager extends
                                 : LocationPermissions.asAppOp(permissionLevel);
             } else {
                 op =
-                        (Flags.enableLocationBypass()
-                                        && !mLocationPermissionsHelper.hasLocationPermissions(
+                        (!mLocationPermissionsHelper.hasLocationPermissions(
                                                 permissionLevel, identity)
                                         && mEmergencyHelper.isInEmergency(0)
                                         && mContext.checkPermission(
@@ -2024,7 +2026,13 @@ public class LocationProviderManager extends
                         identity,
                         new GetCurrentLocationTransport(callback),
                         permissionLevel);
-        registerAndHandleIdentity(callback.asBinder(), registration, () -> {
+        boolean checkEmergency = true;
+        if (Flags.skipEmergencyCheckWithoutBypass()) {
+            checkEmergency = mContext.checkPermission(
+                    LOCATION_BYPASS, identity.getPid(), identity.getUid())
+                    == PERMISSION_GRANTED;
+        }
+        registerAndHandleIdentity(callback.asBinder(), registration, checkEmergency, () -> {
             if (!registration.isActive()) {
                 // if the registration never activated, fail it immediately
                 registration.deliverNull();
@@ -2063,6 +2071,7 @@ public class LocationProviderManager extends
         }
     }
 
+    /** Register a location request with a listener */
     public void registerLocationRequest(LocationRequest request, CallerIdentity identity,
             @PermissionLevel int permissionLevel, ILocationListener listener) {
         LocationListenerRegistration registration = new LocationListenerRegistration(
@@ -2070,22 +2079,38 @@ public class LocationProviderManager extends
                 identity,
                 new LocationListenerTransport(listener),
                 permissionLevel);
-        registerAndHandleIdentity(listener.asBinder(), registration, () -> {});
+        boolean checkEmergency = true;
+        if (Flags.skipEmergencyCheckWithoutBypass()) {
+            checkEmergency = mContext.checkPermission(
+                    LOCATION_BYPASS, identity.getPid(), identity.getUid())
+                    == PERMISSION_GRANTED;
+        }
+        registerAndHandleIdentity(listener.asBinder(), registration, checkEmergency, () -> {});
     }
 
-    public void registerLocationRequest(LocationRequest request, CallerIdentity callerIdentity,
+    /** Register a location request with a PendingIntent */
+    public void registerLocationRequest(LocationRequest request, CallerIdentity identity,
             @PermissionLevel int permissionLevel, PendingIntent pendingIntent) {
         LocationPendingIntentRegistration registration = new LocationPendingIntentRegistration(
                 request,
-                callerIdentity,
+                identity,
                 new LocationPendingIntentTransport(mContext, pendingIntent),
                 permissionLevel);
-        registerAndHandleIdentity(pendingIntent, registration, () -> {});
+        boolean checkEmergency = true;
+        if (Flags.skipEmergencyCheckWithoutBypass()) {
+            checkEmergency = mContext.checkPermission(
+                    LOCATION_BYPASS, identity.getPid(), identity.getUid())
+                    == PERMISSION_GRANTED;
+        }
+        registerAndHandleIdentity(pendingIntent, registration, checkEmergency, () -> {});
     }
 
     private <T> void registerAndHandleIdentity(T key, Registration registration,
+                                               boolean checkEmergency,
                                                Runnable postRegistrationRunnable) {
-        registration.updateIsInEmergency();
+        if (checkEmergency) {
+            registration.updateIsInEmergency();
+        }
 
         synchronized (mMultiplexerLock) {
             Preconditions.checkState(mState != STATE_STOPPED);
@@ -2171,9 +2196,7 @@ public class LocationProviderManager extends
         mAppForegroundHelper.addListener(mAppForegroundChangedListener);
         mLocationPowerSaveModeHelper.addListener(mLocationPowerSaveModeChangedListener);
         mScreenInteractiveHelper.addListener(mScreenInteractiveChangedListener);
-        if (Flags.enableLocationBypass()) {
-            mEmergencyHelper.addOnEmergencyStateChangedListener(mEmergencyStateChangedListener);
-        }
+        mEmergencyHelper.addOnEmergencyStateChangedListener(mEmergencyStateChangedListener);
         mPackageResetHelper.register(mPackageResetResponder);
     }
 
@@ -2193,9 +2216,7 @@ public class LocationProviderManager extends
         mAppForegroundHelper.removeListener(mAppForegroundChangedListener);
         mLocationPowerSaveModeHelper.removeListener(mLocationPowerSaveModeChangedListener);
         mScreenInteractiveHelper.removeListener(mScreenInteractiveChangedListener);
-        if (Flags.enableLocationBypass()) {
-            mEmergencyHelper.removeOnEmergencyStateChangedListener(mEmergencyStateChangedListener);
-        }
+        mEmergencyHelper.removeOnEmergencyStateChangedListener(mEmergencyStateChangedListener);
         mPackageResetHelper.unregister(mPackageResetResponder);
     }
 

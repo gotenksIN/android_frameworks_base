@@ -33,10 +33,7 @@ import org.junit.After
 import org.junit.Test
 
 /** Base scenario test for closing a split screen task via the keyboard shortcut. */
-@RequiresFlagsEnabled(
-    Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-    Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT,
-)
+@RequiresFlagsEnabled(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
 abstract class CloseSplitScreenTaskViaKeyboardShortcut : TestScenarioBase() {
     private val tapl = LauncherInstrumentation()
     private val wmHelper = WindowManagerStateHelper(getInstrumentation())

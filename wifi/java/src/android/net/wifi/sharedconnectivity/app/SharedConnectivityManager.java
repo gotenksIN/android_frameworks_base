@@ -34,7 +34,9 @@ import android.net.wifi.sharedconnectivity.service.ISharedConnectivityCallback;
 import android.net.wifi.sharedconnectivity.service.ISharedConnectivityService;
 import android.net.wifi.sharedconnectivity.service.SharedConnectivityService;
 import android.os.Binder;
+import android.os.Flags;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.IInterface;
 import android.os.Looper;
@@ -190,10 +192,32 @@ public class SharedConnectivityManager {
     private final Context mContext;
     private final String mServicePackageName;
     private final String mIntentAction;
+    /**
+     * Service connection for the {@link ISharedConnectivityService}.
+     *
+     * <p>When {@link Flags#fixMainThreadBlockingOnFirstUnlock()} is enabled,
+     * this field must only be accessed on the {@link #mBackgroundHandler} thread. Otherwise,
+     * it is accessed on the main thread.
+     */
     private ServiceConnection mServiceConnection;
     private UserManager mUserManager;
     private Handler mMainHandler;
+    /**
+     * Handler thread and handler for offloading service binding and unbinding.
+     *
+     * <p>These are only initialized and used if
+     * {@link Flags#fixMainThreadBlockingOnFirstUnlock()} is enabled.
+     */
+    private HandlerThread mHandlerThread;
+    private Handler mBackgroundHandler;
 
+    /**
+     * The remaining number of retry attempts for binding to the service.
+     *
+     * <p>When {@link Flags#fixMainThreadBlockingOnFirstUnlock()} is enabled,
+     * this field must only be accessed on the {@link #mBackgroundHandler} thread. Otherwise,
+     * it is accessed on the main thread.
+     */
     private int mRetryCredit = RECOVER_MAXIMUM_RETRY_COUNT;
     // This field is used for reflection during testing, since creating an API needs approval.
     private long mDelayedTimeInMs = RECOVER_DELAYED_TIME_IN_MS;
@@ -244,8 +268,20 @@ public class SharedConnectivityManager {
         mIntentAction = serviceIntentAction;
         mUserManager = context.getSystemService(UserManager.class);
         mMainHandler = new Handler(Looper.getMainLooper());
+        if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+            mHandlerThread = new HandlerThread(TAG);
+            mHandlerThread.start();
+            mBackgroundHandler = mHandlerThread.getThreadHandler();
+        }
     }
 
+    /**
+     * Binds to the shared connectivity service.
+     *
+     * <p>When {@link Flags#fixMainThreadBlockingOnFirstUnlock()} is enabled,
+     * this method must only be called on the {@link #mBackgroundHandler} thread. Otherwise,
+     * it is called on the main thread.
+     */
     private void bind() {
         mServiceConnection = new ServiceConnection() {
             @Override
@@ -276,7 +312,12 @@ public class SharedConnectivityManager {
                     }
                 }
                 // When service disconnected, invoke unbind() to clear connection cache.
-                unbind();
+                if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                    mBackgroundHandler.post(SharedConnectivityManager.this::unbind);
+                    mService = null;
+                } else {
+                    unbind();
+                }
                 // Schedule to reconnect to the remote service.
                 scheduleConnect();
             }
@@ -333,7 +374,11 @@ public class SharedConnectivityManager {
                     }
                     Log.i(TAG, "scheduleConnect: shouldRebind=" + shouldRebind);
                     if (shouldRebind) {
-                        bind();
+                        if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                            mBackgroundHandler.post(this::bind);
+                        } else {
+                            bind();
+                        }
                     }
                 },
                 mDelayedTimeInMs);
@@ -345,7 +390,11 @@ public class SharedConnectivityManager {
             if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
                 Log.i(TAG, "onReceive: ACTION_USER_UNLOCKED");
                 context.unregisterReceiver(mBroadcastReceiver);
-                bind();
+                if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                    mBackgroundHandler.post(SharedConnectivityManager.this::bind);
+                } else {
+                    bind();
+                }
             } else {
                 Log.w(TAG, "onReceive: unexpected action, value=" + intent.getAction());
             }
@@ -392,12 +441,32 @@ public class SharedConnectivityManager {
         return mServiceConnection;
     }
 
+    /**
+     * NonNull when {@link Flags#fixMainThreadBlockingOnFirstUnlock()} is enabled.
+     * @hide
+     */
+    @TestApi
+    @SuppressLint("UnflaggedApi")
+    @Nullable
+    public Handler getBackgroundHandler() {
+        return mBackgroundHandler;
+    }
+
+    /**
+     * Unbinds from the shared connectivity service.
+     *
+     * <p>When {@link Flags#fixMainThreadBlockingOnFirstUnlock()} is enabled,
+     * this method must only be called on the {@link #mBackgroundHandler} thread. Otherwise,
+     * it is called on the main thread.
+     */
     private void unbind() {
         if (mServiceConnection != null) {
             Log.i(TAG, "unbind");
             mContext.unbindService(mServiceConnection);
             mServiceConnection = null;
-            mService = null;
+            if (!Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                mService = null;
+            }
         }
     }
 
@@ -421,7 +490,7 @@ public class SharedConnectivityManager {
         Objects.requireNonNull(executor, "executor cannot be null");
         Objects.requireNonNull(callback, "callback cannot be null");
 
-        if (mProxyMap.containsKey(callback) || mCallbackProxyCache.containsKey(callback)) {
+        if (isCallbackRegistered(callback)) {
             Log.e(TAG, "Callback already registered");
             callback.onRegisterCallbackFailed(new IllegalStateException(
                     "Callback already registered"));
@@ -440,7 +509,11 @@ public class SharedConnectivityManager {
                 mCallbackProxyCache.put(callback, proxy);
             }
             if (shouldBind) {
-                bind();
+                if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                    mBackgroundHandler.post(this::bind);
+                } else {
+                    bind();
+                }
             }
             return;
         }
@@ -459,7 +532,7 @@ public class SharedConnectivityManager {
             @NonNull SharedConnectivityClientCallback callback) {
         Objects.requireNonNull(callback, "callback cannot be null");
 
-        if (!mProxyMap.containsKey(callback) && !mCallbackProxyCache.containsKey(callback)) {
+        if (!isCallbackRegistered(callback)) {
             Log.e(TAG, "Callback not found, cannot unregister");
             return false;
         }
@@ -480,7 +553,11 @@ public class SharedConnectivityManager {
                 shouldUnbind = mCallbackProxyCache.isEmpty();
             }
             if (shouldUnbind) {
-                unbind();
+                if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                    mBackgroundHandler.post(this::unbind);
+                } else {
+                    unbind();
+                }
             }
             return true;
         }
@@ -493,7 +570,12 @@ public class SharedConnectivityManager {
                 shouldUnbind = mProxyMap.isEmpty();
             }
             if (shouldUnbind) {
-                unbind();
+                if (Flags.fixMainThreadBlockingOnFirstUnlock()) {
+                    mBackgroundHandler.post(this::unbind);
+                    mService = null;
+                } else {
+                    unbind();
+                }
             }
         } catch (RemoteException e) {
             Log.e(TAG, "Exception in unregisterCallback", e);
@@ -736,5 +818,14 @@ public class SharedConnectivityManager {
             Log.e(TAG, "Exception in getKnownNetworkConnectionStatus", e);
         }
         return null;
+    }
+
+    /**
+     * Returns true if the callback is currently registered or cached for registration.
+     */
+    private boolean isCallbackRegistered(@NonNull SharedConnectivityClientCallback callback) {
+        synchronized (mProxyDataLock) {
+            return mProxyMap.containsKey(callback) || mCallbackProxyCache.containsKey(callback);
+        }
     }
 }

@@ -76,12 +76,14 @@ test_module_config {
         "com.android.wm.shell.functional.appcompat.ShowAppDialogInDesktopModeTest",
         "com.android.wm.shell.functional.apptoweb.AppToWebFirstRunDialogTest",
         "com.android.wm.shell.functional.clientfullscreenrequest.FullscreenModeRequestFromDesktopAndBackTest",
+        "com.android.wm.shell.functional.desktopfirst.DesktopFirstPolicyTest",
         "com.android.wm.shell.functional.drag.DragAppWindowMultiWindowAndPipTest",
         "com.android.wm.shell.functional.drag.DragAppWindowMultiWindowTest",
         "com.android.wm.shell.functional.drag.DragAppWindowSingleWindowTest",
         "com.android.wm.shell.functional.externaldisplay.DragMoveWindowToNextDisplayTest",
         "com.android.wm.shell.functional.externaldisplay.MaximizeAppWindowWithDragToTopDragZoneInDesktopFirstTest",
         "com.android.wm.shell.functional.externaldisplay.MoveToNextDisplayProjectedTest",
+        "com.android.wm.shell.functional.externaldisplay.ProjectedModeStayOnDeviceTest",
         "com.android.wm.shell.functional.externaldisplay.MoveToNextDisplayTest",
         "com.android.wm.shell.functional.externaldisplay.OpenAppWithExternalDisplayConnectedTest",
         "com.android.wm.shell.functional.externaldisplay.ScaleDensityForExternalDisplayTest",
@@ -221,6 +223,13 @@ test_module_config {
 }
 
 test_module_config {
+    name: "FunctionalTestsDesktopMode-desktopfirst-DesktopFirstPolicyTest",
+    base: "FunctionalTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.functional.desktopfirst.DesktopFirstPolicyTest"],
+}
+
+test_module_config {
     name: "FunctionalTestsDesktopMode-drag-DragAppWindowMultiWindowAndPipTest",
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
@@ -253,6 +262,13 @@ test_module_config {
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.functional.externaldisplay.MoveToNextDisplayProjectedTest"],
+}
+
+test_module_config {
+    name: "FunctionalTestsDesktopMode-externaldisplay-ProjectedModeStayOnDeviceTest",
+    base: "FunctionalTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.functional.externaldisplay.ProjectedModeStayOnDeviceTest"],
 }
 
 test_module_config {

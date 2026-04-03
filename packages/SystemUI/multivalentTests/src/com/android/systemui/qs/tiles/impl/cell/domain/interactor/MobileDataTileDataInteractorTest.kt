@@ -22,6 +22,7 @@ import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.platform.test.flag.junit.FlagsParameterization
+import android.telephony.SubscriptionManager
 import android.text.Html
 import androidx.test.filters.SmallTest
 import com.android.settingslib.mobile.TelephonyIcons
@@ -121,10 +122,12 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    fun tileData_noActiveSim_emitsInactiveModel() =
+    fun tileData_noDefaultDataSim_emitsInactiveModel() =
         kosmos.runTest {
             val tileData by collectLastValue(underTest.tileData())
-            mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(-1)
+            mobileConnectionsRepository.fake.setDefaultDataSubId(
+                SubscriptionManager.INVALID_SUBSCRIPTION_ID
+            )
             runCurrent()
 
             val expectedModel = MobileDataTileModel(isSimActive = false, isEnabled = false)
@@ -132,7 +135,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
         }
 
     @Test
-    fun tileData_activeSim_dataDisabled() =
+    fun tileData_defaultDataSim_dataDisabled() =
         kosmos.runTest {
             val tileData by collectLastValue(underTest.tileData())
             val mobileConnectionRepo =
@@ -140,7 +143,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
                 mapOf(SUB_ID to mobileConnectionRepo)
             )
-            mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(SUB_ID)
+            mobileConnectionsRepository.fake.setDefaultDataSubId(SUB_ID)
             mobileConnectionRepo.dataConnectionState.value = DataConnectionState.Connected
 
             // Set data to disabled
@@ -152,7 +155,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
         }
 
     @Test
-    fun tileData_activeSim_dataEnabled() =
+    fun tileData_defaultDataSim_dataEnabled() =
         kosmos.runTest {
             val tileData by collectLastValue(underTest.tileData())
             val mobileConnectionRepo =
@@ -160,7 +163,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
                 mapOf(SUB_ID to mobileConnectionRepo)
             )
-            mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(SUB_ID)
+            mobileConnectionsRepository.fake.setDefaultDataSubId(SUB_ID)
             mobileConnectionRepo.dataConnectionState.value = DataConnectionState.Connected
             mobileConnectionRepo.dataEnabled.value = true
 
@@ -222,7 +225,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
 
     @Test
     @EnableFlags(NewSatelliteIcon.FLAG_NAME)
-    fun tileData_dataDisconnected_nullSecondaryLabel() =
+    fun tileData_dataDisconnected_showsNetworkName() =
         kosmos.runTest {
             val tileData by collectLastValue(underTest.tileData())
             val mobileConnectionRepo =
@@ -230,15 +233,16 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
                 mapOf(SUB_ID to mobileConnectionRepo)
             )
-            mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(SUB_ID)
+            mobileConnectionsRepository.fake.setDefaultDataSubId(SUB_ID)
             mobileConnectionRepo.dataEnabled.value = true
+            val networkName = "some name"
             mobileConnectionRepo.networkName.value =
-                NetworkNameModel.SubscriptionDerived("some name")
+                NetworkNameModel.SubscriptionDerived(networkName)
 
             mobileConnectionRepo.dataConnectionState.value = DataConnectionState.Disconnected
             runCurrent()
 
-            assertThat(tileData?.secondaryLabel).isNull()
+            assertThat(tileData?.secondaryLabel.toString()).isEqualTo(networkName)
         }
 
     @Test
@@ -251,6 +255,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
                 mapOf(SUB_ID to mobileConnectionRepo)
             )
+            mobileConnectionsRepository.fake.setDefaultDataSubId(SUB_ID)
             mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(SUB_ID)
             mobileConnectionRepo.dataEnabled.value = true
             mobileConnectionRepo.dataConnectionState.value = DataConnectionState.Connected
@@ -311,6 +316,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
                 mapOf(SUB_ID to mobileConnectionRepo)
             )
+            mobileConnectionsRepository.fake.setDefaultDataSubId(SUB_ID)
             mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(SUB_ID)
             mobileConnectionRepo.dataEnabled.value = true
             mobileConnectionRepo.dataConnectionState.value = DataConnectionState.Connected
@@ -346,6 +352,7 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
             mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
                 mapOf(SUB_ID to mobileConnectionRepo)
             )
+            mobileConnectionsRepository.fake.setDefaultDataSubId(SUB_ID)
             mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(SUB_ID)
             mobileConnectionRepo.dataEnabled.value = true
             mobileConnectionRepo.dataConnectionState.value = DataConnectionState.Connected
@@ -366,6 +373,49 @@ class MobileDataTileDataInteractorTest(flags: FlagsParameterization) : SysuiTest
                 context.getString(R.string.mobile_carrier_text_format, networkName, satelliteText)
             assertThat(tileData?.secondaryLabel.toString())
                 .isEqualTo(expectedSatelliteSecondaryLabel.toString())
+        }
+
+    @Test
+    fun tileData_temporarySim_showsActiveSimLabel() =
+        kosmos.runTest {
+            val tileData by collectLastValue(underTest.tileData())
+            val defaultSubId = 1
+            val activeSubId = 2
+            val defaultRepo = FakeMobileConnectionRepository(defaultSubId, mock())
+            val activeRepo = FakeMobileConnectionRepository(activeSubId, mock())
+
+            mobileConnectionsRepository.fake.setMobileConnectionRepositoryMap(
+                mapOf(defaultSubId to defaultRepo, activeSubId to activeRepo)
+            )
+            mobileConnectionsRepository.fake.setDefaultDataSubId(defaultSubId)
+            mobileConnectionsRepository.fake.setActiveMobileDataSubscriptionId(activeSubId)
+
+            // Default SIM is disabled, Active SIM is enabled
+            defaultRepo.dataEnabled.value = false
+            activeRepo.dataEnabled.value = true
+
+            activeRepo.dataConnectionState.value = DataConnectionState.Connected
+            val networkName = "Active Carrier"
+            activeRepo.networkName.value = NetworkNameModel.SubscriptionDerived(networkName)
+            val networkType = TelephonyIcons.LTE
+            activeRepo.setNetworkTypeKey(mobileConnectionsRepository.fake.LTE_KEY)
+
+            runCurrent()
+
+            // Tile should be disabled because default SIM is disabled
+            assertThat(tileData?.isEnabled).isFalse()
+
+            // Label should be from the active SIM as-is
+            val expectedRAT = context.getString(networkType.dataContentDescription)
+            val expectedSecondaryLabel = getSecondaryLabel(networkName, expectedRAT)
+
+            assertThat(tileData?.secondaryLabel.toString())
+                .isEqualTo(expectedSecondaryLabel.toString())
+
+            // Enable default SIM, tile should become enabled
+            defaultRepo.dataEnabled.value = true
+            runCurrent()
+            assertThat(tileData?.isEnabled).isTrue()
         }
 
     private fun getSecondaryLabel(

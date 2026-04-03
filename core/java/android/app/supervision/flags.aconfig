@@ -34,14 +34,6 @@ flag {
 }
 
 flag {
-  name: "enable_app_approval"
-  is_exported: true
-  namespace: "supervision"
-  description: "Flag to enable the App Approval settings in Android settings UI"
-  bug: "390185393"
-}
-
-flag {
   name: "enable_supervision_pin_recovery_screen"
   is_exported: true
   namespace: "supervision"
@@ -88,6 +80,14 @@ flag {
 }
 
 flag {
+ name: "enable_confirm_supervision_approval_api"
+ is_exported: false
+ namespace: "supervision"
+ description: "Flag that enables the ACTION_CONFIRM_SUPERVISION_APPROVAL intent action API"
+ bug: "452112201"
+}
+
+flag {
   name: "enable_supervision_settings_session_updates"
   is_exported: false
   namespace: "supervision"
@@ -115,6 +115,17 @@ flag {
   namespace: "supervision"
   description: "Flag that enables supervision factory reset session updates"
   bug: "471820090"
+}
+
+flag {
+  name: "update_web_content_filters_supported_apps_title"
+  is_exported: false
+  namespace: "supervision"
+  description: "Flag that enables web content filters supported apps title updates"
+  bug: "479257218"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -181,16 +192,6 @@ flag {
 }
 
 flag {
-    name: "app_binding_service_rework"
-    namespace: "supervision"
-    description: "Enables improvements to the AppBinding service connection lifecycle"
-    bug: "475606763"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
- }
-
-flag {
     name: "enable_timeout_in_dispatch_app_service_event"
     namespace: "supervision"
     description: "Enables timeout parameter in dispatchAppServiceEvent"
@@ -206,4 +207,25 @@ flag {
   namespace: "supervision"
   description: "Enables the package usage APIs in Supervision Service"
   bug: "482399702"
+}
+
+flag {
+  name: "remove_role_after_event_dispatch"
+  namespace: "supervision"
+  description: "Removes supervision role only after the 'disable supervision' event has been dispatched."
+  bug: "495425956"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+  name: "enable_remove_device_admin_checks_for_reset_password_token"
+  is_exported: false
+  namespace: "supervision"
+  description: "Removes device admin checks for resetPasswordWithToken-related APIs"
+  bug: "444307589"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

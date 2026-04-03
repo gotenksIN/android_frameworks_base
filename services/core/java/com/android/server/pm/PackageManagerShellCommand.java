@@ -23,6 +23,7 @@ import static android.content.pm.PackageManager.FLAG_PERMISSION_REVOKED_COMPAT;
 import static android.content.pm.PackageManager.FLAG_PERMISSION_REVOKE_WHEN_REQUESTED;
 import static android.content.pm.PackageManager.FLAG_PERMISSION_USER_FIXED;
 import static android.content.pm.PackageManager.FLAG_PERMISSION_USER_SET;
+import static android.content.pm.PackageManager.RESTRICTION_CONFIRM_WITH_SPEEDBUMP;
 import static android.content.pm.PackageManager.RESTRICTION_HIDE_FROM_SUGGESTIONS;
 import static android.content.pm.PackageManager.RESTRICTION_HIDE_NOTIFICATIONS;
 import static android.content.pm.PackageManager.RESTRICTION_NONE;
@@ -2531,6 +2532,9 @@ class PackageManagerShellCommand extends ShellCommand {
                         case "hide-from-suggestions":
                             flags |= PackageManager.RESTRICTION_HIDE_FROM_SUGGESTIONS;
                             break;
+                        case "speedbumps":
+                            flags |= PackageManager.RESTRICTION_CONFIRM_WITH_SPEEDBUMP;
+                            break;
                         default:
                             pw.println("Unrecognized flag: " + flag);
                             return 1;
@@ -2610,6 +2614,8 @@ class PackageManagerShellCommand extends ShellCommand {
                 return "HIDE_FROM_SUGGESTIONS";
             case RESTRICTION_HIDE_NOTIFICATIONS:
                 return "HIDE_NOTIFICATIONS";
+            case RESTRICTION_CONFIRM_WITH_SPEEDBUMP:
+                return "CONFIRM_WITH_SPEEDBUMP";
             default:
                 return "UNKNOWN";
         }
@@ -5153,6 +5159,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      hide-notifications: Hides notifications from this package");
         pw.println("      hide-from-suggestions: Hides this package from suggestions");
         pw.println("        (by the launcher, etc.)");
+        pw.println("      speedbumps: Requires a speedbump to launch the package");
         pw.println("    Any existing flags are overwritten, which also means that if no flags are");
         pw.println("    specified then all existing flags will be cleared.");
         pw.println("");
@@ -5203,7 +5210,8 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("  list users");
         pw.println("    Lists the current users.");
         pw.println("");
-        pw.println("  create-user [--profileOf USER_ID] [--managed] [--restricted] [--guest]");
+        pw.println("  create-user [--profileOf USER_ID] [--managed] [--restricted] [--guest] "
+                + "[--demo]");
         pw.println("       [--user-type USER_TYPE] [--ephemeral] [--for-testing] [--pre-create-only]   USER_NAME");
         pw.println("    Create a new user with the given USER_NAME, printing the new user identifier");
         pw.println("    of the user.");
@@ -5213,6 +5221,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      --managed is shorthand for '--user-type android.os.usertype.profile.MANAGED'.");
         pw.println("      --restricted is shorthand for '--user-type android.os.usertype.full.RESTRICTED'.");
         pw.println("      --guest is shorthand for '--user-type android.os.usertype.full.GUEST'.");
+        pw.println("      --demo is shorthand for '--user-type android.os.usertype.full.DEMO'.");
         pw.println("");
         pw.println("  remove-user [--set-ephemeral-if-in-use | --wait] USER_ID");
         pw.println("    Remove the user with the given USER_IDENTIFIER, deleting all data");

@@ -25,13 +25,6 @@ flag {
 }
 
 flag {
-    name: "enable_location_bypass"
-    namespace: "location"
-    description: "Enable location bypass feature"
-    bug: "301150056"
-}
-
-flag {
     name: "location_bypass"
     is_exported: true
     namespace: "location"
@@ -191,6 +184,16 @@ flag {
 }
 
 flag {
+    name: "location_auditing"
+    namespace: "location"
+    description: "Flag for auditing MLS violations"
+    bug: "431045539"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "support_codetype_in_gnss_status"
     namespace: "location"
     description: "Support code type and elapsed real time in GnssStatus"
@@ -217,6 +220,16 @@ flag {
 }
 
 flag {
+    name: "skip_emergency_check_without_bypass"
+    namespace: "location"
+    description: "When registration, only the caller with bypass permission needs to check emergency mode"
+    bug: "426562854"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "gnss_qzss_svid_range_extension"
     namespace: "location"
     description: "Extend QZSS SVID range from [183, 206] to [183, 212]"
@@ -235,4 +248,22 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "use_settings_main_switch_for_scanning"
+    namespace: "location"
+    description: "Use SettingsMainSwitchPreference for Wi-Fi/Bluetooth scanning to fix b/467021844."
+    bug: "467021844"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_public_satellite_pvt_api"
+    namespace: "location"
+    description: "Make SatPvt API from SystemApi to public API."
+    bug: "493351958"
+    is_exported: true
 }

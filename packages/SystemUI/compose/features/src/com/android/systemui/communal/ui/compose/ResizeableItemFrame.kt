@@ -85,7 +85,6 @@ import androidx.compose.ui.util.fastIsFinite
 import androidx.compose.ui.zIndex
 import com.android.compose.modifiers.thenIf
 import com.android.internal.R.dimen.system_app_widget_background_radius
-import com.android.systemui.Flags.communalAccessibilityResize
 import com.android.systemui.communal.ui.compose.extensions.observeTaps
 import com.android.systemui.communal.ui.model.AccessibilityResizeAction
 import com.android.systemui.communal.ui.viewmodel.ResizeHandle
@@ -449,92 +448,81 @@ private fun BoxScope.UnifiedResizeHandle(
                 }
                 .anchoredDraggable(state = draggableState, orientation = Orientation.Vertical)
     ) {
-        if (communalAccessibilityResize()) {
-            if (!state.canExpand && !state.canShrink) return@Box
+        if (!state.canExpand && !state.canShrink) return@Box
 
-            val transition =
-                updateTransition(
-                    targetState = state.isAccessibilityControlsVisible,
-                    label = "ResizeHandleMode",
-                )
+        val transition =
+            updateTransition(
+                targetState = state.isAccessibilityControlsVisible,
+                label = "ResizeHandleMode",
+            )
 
-            val transformOriginY = if (state.orientation == ResizeHandle.TOP) 1f else 0f
-            val dragHandleTransformOrigin = TransformOrigin(0.5f, transformOriginY)
+        val transformOriginY = if (state.orientation == ResizeHandle.TOP) 1f else 0f
+        val dragHandleTransformOrigin = TransformOrigin(0.5f, transformOriginY)
 
-            val dragHandleAlpha by
-                transition.animateFloat(
-                    transitionSpec = { if (targetState) HighStiffnessSpring else HandleFadeSpring },
-                    label = "dragHandleAlpha",
-                ) { isVisible ->
-                    if (isVisible) 0f else 1f
-                }
+        val dragHandleAlpha by
+            transition.animateFloat(
+                transitionSpec = { if (targetState) HighStiffnessSpring else HandleFadeSpring },
+                label = "dragHandleAlpha",
+            ) { isVisible ->
+                if (isVisible) 0f else 1f
+            }
 
-            val dragHandleScale by
-                transition.animateFloat(
-                    transitionSpec = { if (targetState) NoBounceFastSpring else HandleScaleSpring },
-                    label = "dragHandleScale",
-                ) { isVisible ->
-                    if (isVisible) 0.33f else 1f
-                }
+        val dragHandleScale by
+            transition.animateFloat(
+                transitionSpec = { if (targetState) NoBounceFastSpring else HandleScaleSpring },
+                label = "dragHandleScale",
+            ) { isVisible ->
+                if (isVisible) 0.33f else 1f
+            }
 
-            val accessibilityButtonsAlpha by
-                transition.animateFloat(
-                    transitionSpec = { if (targetState) HandleFadeSpring else HighStiffnessSpring },
-                    label = "accessibilityButtonsAlpha",
-                ) { isVisible ->
-                    if (isVisible) 1f else 0f
-                }
+        val accessibilityButtonsAlpha by
+            transition.animateFloat(
+                transitionSpec = { if (targetState) HandleFadeSpring else HighStiffnessSpring },
+                label = "accessibilityButtonsAlpha",
+            ) { isVisible ->
+                if (isVisible) 1f else 0f
+            }
 
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
-                if (!state.isAccessibilityControlsVisible || !transition.currentState) {
-                    Box(
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+            if (!state.isAccessibilityControlsVisible || !transition.currentState) {
+                Box(
+                    modifier =
+                        Modifier.graphicsLayer {
+                            alpha = dragHandleAlpha
+                            scaleX = dragHandleScale
+                            scaleY = dragHandleScale
+                            transformOrigin = dragHandleTransformOrigin
+                        }
+                ) {
+                    DragHandle(
+                        radius = dragHandleRadius,
+                        alpha = { dragHandleAlpha * contentAlpha() },
                         modifier =
-                            Modifier.graphicsLayer {
-                                alpha = dragHandleAlpha
-                                scaleX = dragHandleScale
-                                scaleY = dragHandleScale
-                                transformOrigin = dragHandleTransformOrigin
-                            }
-                    ) {
-                        DragHandle(
-                            radius = dragHandleRadius,
-                            alpha = { dragHandleAlpha * contentAlpha() },
-                            modifier =
-                                Modifier.fillMaxWidth()
-                                    .height(ResizeFrameDimensions.TouchTargetSize)
-                                    .accessibilityResizeClickable(
-                                        label =
-                                            stringResource(
-                                                R.string.accessibility_action_label_resize_widget
-                                            ),
-                                        onClick = currentOnToggle,
-                                    ),
-                        )
-                    }
-                }
-
-                if (state.isAccessibilityControlsVisible || transition.currentState) {
-                    Box(modifier = Modifier.graphicsLayer { alpha = accessibilityButtonsAlpha }) {
-                        AccessibilityButtons(
-                            handle = state.orientation,
-                            isAccessibilityControlsVisible = state.isAccessibilityControlsVisible,
-                            canExpand = state.canExpand,
-                            canShrink = state.canShrink,
-                            onExpand = onExpand,
-                            onShrink = onShrink,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                            Modifier.fillMaxWidth()
+                                .height(ResizeFrameDimensions.TouchTargetSize)
+                                .accessibilityResizeClickable(
+                                    label =
+                                        stringResource(
+                                            R.string.accessibility_action_label_resize_widget
+                                        ),
+                                    onClick = currentOnToggle,
+                                ),
+                    )
                 }
             }
-        } else {
-            // Replicate the original DragHandle behavior when the flag is off.
-            if (draggableState.anchors.size > 1) {
-                DragHandle(
-                    radius = dragHandleRadius,
-                    alpha = contentAlpha,
-                    modifier = Modifier.fillMaxWidth().height(dragHandleRadius * 2),
-                )
+
+            if (state.isAccessibilityControlsVisible || transition.currentState) {
+                Box(modifier = Modifier.graphicsLayer { alpha = accessibilityButtonsAlpha }) {
+                    AccessibilityButtons(
+                        handle = state.orientation,
+                        isAccessibilityControlsVisible = state.isAccessibilityControlsVisible,
+                        canExpand = state.canExpand,
+                        canShrink = state.canShrink,
+                        onExpand = onExpand,
+                        onShrink = onShrink,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }
@@ -609,7 +597,7 @@ fun ResizableItemFrame(
         }
 
     LaunchedEffect(isDragging) {
-        if (isDragging && communalAccessibilityResize()) {
+        if (isDragging) {
             viewModel.visibleAccessibilityResizeHandle.value?.let {
                 viewModel.toggleAccessibilityResizeHandle(it)
             }
@@ -619,14 +607,9 @@ fun ResizableItemFrame(
     // Draw content surrounded by resize handles at top and bottom. Allow resize handles
     // to overlap content.
     Box(
-        modifier
-            .thenIf(communalAccessibilityResize()) { Modifier.fillMaxSize() }
-            .thenIf(
-                isDragging ||
-                    (communalAccessibilityResize() && accessibilityResizeHandle != null)
-            ) {
-                Modifier.zIndex(1f)
-            }
+        modifier.fillMaxSize().thenIf(isDragging || accessibilityResizeHandle != null) {
+            Modifier.zIndex(1f)
+        }
     ) {
         content()
 
@@ -655,9 +638,7 @@ fun ResizableItemFrame(
                 val uiState =
                     ResizeHandleUiState(
                         orientation = handle,
-                        isAccessibilityControlsVisible =
-                            communalAccessibilityResize() &&
-                                accessibilityResizeHandle == handle,
+                        isAccessibilityControlsVisible = accessibilityResizeHandle == handle,
                         canExpand = viewModel.canExpand(handle),
                         canShrink = viewModel.canShrink(handle),
                     )
@@ -669,9 +650,7 @@ fun ResizableItemFrame(
                     state = uiState,
                     draggableState = draggableState,
                     onToggleAccessibilityControls = {
-                        if (communalAccessibilityResize()) {
-                            viewModel.toggleAccessibilityResizeHandle(handle)
-                        }
+                        viewModel.toggleAccessibilityResizeHandle(handle)
                     },
                     onExpand = { viewModel.expand(handle) },
                     onShrink = { viewModel.shrink(handle) },

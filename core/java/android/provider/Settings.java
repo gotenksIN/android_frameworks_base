@@ -3712,6 +3712,7 @@ public final class Settings {
         private final ArraySet<String> mReadableFields;
         private final ArraySet<String> mAllFields;
         private final ArrayMap<String, Integer> mReadableFieldsWithMaxTargetSdk;
+        private final ArrayMap<String, String> mReadableFieldsWithRedactedValue;
 
         // Mapping of key to generation trackers for queried settings.
         // Key is composed by the setting's name and deviceId, value is the generation tracker.
@@ -3752,8 +3753,9 @@ public final class Settings {
             mReadableFields = new ArraySet<>();
             mAllFields = new ArraySet<>();
             mReadableFieldsWithMaxTargetSdk = new ArrayMap<>();
+            mReadableFieldsWithRedactedValue = new ArrayMap<>();
             getPublicSettingsForClass(callerClass, mAllFields, mReadableFields,
-                    mReadableFieldsWithMaxTargetSdk);
+                    mReadableFieldsWithMaxTargetSdk, mReadableFieldsWithRedactedValue);
         }
 
         public boolean putStringForUser(ContentResolver cr, String name, String value,
@@ -3840,6 +3842,22 @@ public final class Settings {
             final GenerationTracker.Key key = new GenerationTracker.Key(name, deviceId);
             final boolean useCache = isSelf && !isInSystemServer();
             boolean needsGenerationTracker = false;
+
+            // Check if there is a redacted value for this setting
+            if (!mReadableFieldsWithRedactedValue.isEmpty()) {
+                boolean isSystemCaller =
+                        Settings.isInSystemServer()
+                                || UserHandle.getAppId(Binder.getCallingUid())
+                                    < Process.FIRST_APPLICATION_UID;
+                if (!isSystemCaller) {
+                    String redactedValue = mReadableFieldsWithRedactedValue.get(name);
+                    if (redactedValue != null && !redactedValue.isEmpty()
+                            && Flags.enableRedactedValueForReadable()) {
+                        return redactedValue;
+                    }
+                }
+            }
+
             if (useCache) {
                 synchronized (NameValueCache.this) {
                     final GenerationTracker generationTracker = mGenerationTrackers.get(key);
@@ -4290,11 +4308,13 @@ public final class Settings {
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Readable {
         int maxTargetSdk() default 0;
+        String redactedValue() default "";
     }
 
     private static <T extends NameValueTable> void getPublicSettingsForClass(
             Class<T> callerClass, Set<String> allKeys, Set<String> readableKeys,
-            ArrayMap<String, Integer> keysWithMaxTargetSdk) {
+            ArrayMap<String, Integer> keysWithMaxTargetSdk,
+            ArrayMap<String, String> keysWithRedactedValue) {
         final Field[] allFields = callerClass.getDeclaredFields();
         try {
             for (int i = 0; i < allFields.length; i++) {
@@ -4312,9 +4332,13 @@ public final class Settings {
                 if (annotation != null) {
                     final String key = (String) value;
                     final int maxTargetSdk = annotation.maxTargetSdk();
+                    final String redactedValue = annotation.redactedValue();
                     readableKeys.add(key);
                     if (maxTargetSdk != 0) {
                         keysWithMaxTargetSdk.put(key, maxTargetSdk);
+                    }
+                    if (redactedValue != null && !redactedValue.isEmpty()) {
+                        keysWithRedactedValue.put(key, redactedValue);
                     }
                 }
             }
@@ -4539,9 +4563,10 @@ public final class Settings {
 
         /** @hide */
         public static void getPublicSettings(Set<String> allKeys, Set<String> readableKeys,
-                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
+                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk,
+                ArrayMap<String, String> readableKeysWithRedactedValue) {
             getPublicSettingsForClass(System.class, allKeys, readableKeys,
-                    readableKeysWithMaxTargetSdk);
+                    readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
         }
 
         /**
@@ -5638,6 +5663,7 @@ public final class Settings {
          * 3 - Strong vibrations
          * @hide
          */
+        @Readable
         public static final String ALARM_VIBRATION_INTENSITY =
                 "alarm_vibration_intensity";
 
@@ -7530,9 +7556,10 @@ public final class Settings {
 
         /** @hide */
         public static void getPublicSettings(Set<String> allKeys, Set<String> readableKeys,
-                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
+                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk,
+                ArrayMap<String, String> readableKeysWithRedactedValue) {
             getPublicSettingsForClass(Secure.class, allKeys, readableKeys,
-                    readableKeysWithMaxTargetSdk);
+                    readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
         }
 
         /**
@@ -9026,6 +9053,15 @@ public final class Settings {
         @Readable
         public static final String LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS =
                 "lock_screen_allow_private_notifications";
+
+        /**
+         * Whether the user has provided consent to show notes on the lock screen.
+         * Type: int (0 for not consented, 1 for consented)
+         *
+         * @hide
+         */
+        public static final String LOCK_SCREEN_NOTE_TAKING_CONSENT =
+                "lock_screen_note_taking_consent";
 
         /**
          * When set by a user, allows notification remote input atop a securely locked screen
@@ -12183,6 +12219,13 @@ public final class Settings {
                 "mandatory_biometrics_requirements_satisfied";
 
         /**
+         * The current default component to use the Raise Trigger feature.
+         * @hide
+         */
+        public static final String RAISE_TRIGGER_DEFAULT_ASSISTANT =
+                "raise_trigger_default_assistant";
+
+        /**
          * Number of trusted locations added by the user.
          * @hide
          */
@@ -13770,6 +13813,8 @@ public final class Settings {
         public static final int ACTION_CORNER_ACTION_LOCKSCREEN = 5;
         /** @hide */
         public static final int ACTION_CORNER_ACTION_NOTE = 6;
+        /** @hide */
+        public static final int ACTION_CORNER_ACTION_PEEK = 7;
 
         /**
          * The different actions that can be used for action corners
@@ -13783,6 +13828,7 @@ public final class Settings {
                 ACTION_CORNER_ACTION_QUICK_SETTINGS,
                 ACTION_CORNER_ACTION_LOCKSCREEN,
                 ACTION_CORNER_ACTION_NOTE,
+                ACTION_CORNER_ACTION_PEEK,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface ActionCornerActionType {
@@ -14215,6 +14261,19 @@ public final class Settings {
         @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
         public static final String PERSONAL_CONTEXT_ENABLED = "personal_context_enabled";
 
+        /**
+         * Default value for whether or not per-app personal context capture is enabled. This value
+         * is used as the default for any application for which the setting is unset.
+         * 1 = On, 0 = Off
+         *
+         * @see android.service.personalcontext.PersonalContextManager#isPersonalContextModeEnabled
+         * @hide
+         */
+        @Readable
+        @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+        public static final String PERSONAL_CONTEXT_MODE_ENABLED_DEFAULT =
+                "personal_context_mode_enabled_default";
+
        /**
          * Setting to determine if the wallet service is available.
          * 1 = available, 0 = unavailable
@@ -14552,7 +14611,7 @@ public final class Settings {
          *
          * @hide
          */
-        public static final String USER_HOME_TIME_ZONE_ID = "user_home_time_zone_id";
+        public static final String HOME_TIME_ZONE_ID = "home_time_zone_id";
 
         /**
          * URI for the car dock "in" event sound.
@@ -14718,9 +14777,10 @@ public final class Settings {
         public static final String CUSTOM_BUGREPORT_HANDLER_USER = "custom_bugreport_handler_user";
 
         /**
-         * Whether ADB over USB is enabled.
+         * Whether ADB over USB is enabled. (0 = false, 1 = true).
+         * This will always return 0 for all third-party apps.
          */
-        @Readable
+        @Readable(redactedValue = "0")
         public static final String ADB_ENABLED = "adb_enabled";
 
         /**
@@ -14975,17 +15035,6 @@ public final class Settings {
                 "enable_non_resizable_multi_window";
 
         /**
-         * If true, shadows drawn around the window will be rendered by the system compositor. If
-         * false, shadows will be drawn by the client by setting an elevation on the root view and
-         * the contents will be inset by the surface insets.
-         * (0 = false, 1 = true)
-         * @hide
-         */
-        @Readable
-        public static final String DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR =
-                "render_shadows_in_compositor";
-
-        /**
          * Policy to be used for the display shade when connected to an external display.
          * @hide
          */
@@ -15003,9 +15052,10 @@ public final class Settings {
                 "wm_display_settings_path";
 
         /**
-        * Whether user has enabled development settings.
+        * Whether user has enabled development settings. (0 = false, 1 = true).
+        * This will always return 0 for all third-party apps.
         */
-        @Readable
+        @Readable(redactedValue = "0")
         public static final String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
 
         /**
@@ -19614,14 +19664,15 @@ public final class Settings {
 
         /** @hide */
         public static void getPublicSettings(Set<String> allKeys, Set<String> readableKeys,
-                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
+                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk,
+                ArrayMap<String, String> readableKeysWithRedactedValue) {
             getPublicSettingsForClass(Global.class, allKeys, readableKeys,
-                    readableKeysWithMaxTargetSdk);
+                    readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
             // Add Global.Wearable keys on watches.
             if (ActivityThread.currentApplication().getApplicationContext().getPackageManager()
                     .hasSystemFeature(PackageManager.FEATURE_WATCH)) {
                 getPublicSettingsForClass(Global.Wearable.class, allKeys, readableKeys,
-                        readableKeysWithMaxTargetSdk);
+                        readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
             }
         }
 
@@ -22009,6 +22060,125 @@ public final class Settings {
              */
             public static final String WEAR_BUG_REPORT_WARNING_VISIBILITY_STATE =
                     "wear_bug_report_warning_visibility_state";
+
+            /**
+             * Whether Raise-to-Talk is enabled by the user
+             *
+             * @hide
+             */
+            @Readable
+            public static final String RAISE_TO_TALK_ENABLED = "raise_to_talk_enabled";
+
+
+            /**
+             * Whether Raise-to-Talk is actually enabled based on both the user setting and the
+             * device's mode.
+             *
+             * @hide
+             */
+            @Readable
+            public static final String RAISE_TO_TALK_MEDIATED_ENABLED =
+                    "raise_to_talk_mediated_enabled";
+
+            /**
+             * Whether the Raise-to-Talk visual indicator is enabled
+             */
+            @Readable
+            public static final String RAISE_TO_TALK_VISUAL_INDICATOR_ENABLED =
+                    "raise_to_talk_visual_indicator_enabled";
+
+            /**
+             * Raise-to-Talk gesture sensitivity setting, which can be one of the following:
+             * - {@link #RAISE_TO_TALK_GESTURE_SENSITIVITY_LOW}
+             * - {@link #RAISE_TO_TALK_GESTURE_SENSITIVITY_MEDIUM}
+             * - {@link #RAISE_TO_TALK_GESTURE_SENSITIVITY_HIGH}
+             */
+            @Readable
+            public static final String RAISE_TO_TALK_GESTURE_SENSITIVITY =
+                    "raise_to_talk_gesture_sensitivity";
+
+            /**
+             * Indicates that the gesture sensitivity for Raise-to-Talk is set to low.
+             * A more pronounced raise gesture is required to trigger.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_GESTURE_SENSITIVITY_LOW = 0;
+
+            /**
+             * Indicates that the gesture sensitivity for Raise-to-Talk is set to medium.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_GESTURE_SENSITIVITY_MEDIUM = 1;
+
+            /**
+             * Indicates that the gesture sensitivity for Raise-to-Talk is set to high.
+             * A less pronounced raise gesture is sufficient to trigger.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_GESTURE_SENSITIVITY_HIGH = 2;
+
+
+            /**
+             * Raise-to-Talk voice sensitivity setting, which can be one of the following:
+             * - {@link #RAISE_TO_TALK_VOICE_SENSITIVITY_VERY_LOW}
+             * - {@link #RAISE_TO_TALK_VOICE_SENSITIVITY_LOW}
+             * - {@link #RAISE_TO_TALK_VOICE_SENSITIVITY_MEDIUM}
+             * - {@link #RAISE_TO_TALK_VOICE_SENSITIVITY_HIGH}
+             * - {@link #RAISE_TO_TALK_VOICE_SENSITIVITY_VERY_HIGH}
+             */
+            @Readable
+            public static final String RAISE_TO_TALK_VOICE_SENSITIVITY =
+                    "raise_to_talk_voice_sensitivity";
+
+            /**
+             * Indicates that the voice sensitivity for Raise-to-Talk is set to very low.
+             * A higher speaking volume is required to trigger.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_VOICE_SENSITIVITY_VERY_LOW = 0;
+
+            /**
+             * Indicates that the voice sensitivity for Raise-to-Talk is set to low.
+             * A higher speaking volume is required to trigger.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_VOICE_SENSITIVITY_LOW = 1;
+
+            /**
+             * Indicates that the voice sensitivity for Raise-to-Talk is set to medium.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_VOICE_SENSITIVITY_MEDIUM = 2;
+
+            /**
+             * Indicates that the voice sensitivity for Raise-to-Talk is set to high.
+             * A lower speaking volume is sufficient to trigger.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_VOICE_SENSITIVITY_HIGH = 3;
+
+            /**
+             * Indicates that the voice sensitivity for Raise-to-Talk is set to very high.
+             * A lower speaking volume is sufficient to trigger.
+             *
+             * @hide
+             */
+            public static final int RAISE_TO_TALK_VOICE_SENSITIVITY_VERY_HIGH = 4;
+
+            /**
+             * Whether satellite mode is enabled on the watch.
+             *
+             * @hide
+             */
+            @Readable
+            public static final String WEAR_SATELLITE_MODE_ENABLED = "wear_satellite_mode_enabled";
         }
     }
 

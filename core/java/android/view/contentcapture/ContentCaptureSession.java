@@ -237,9 +237,7 @@ public abstract class ContentCaptureSession implements AutoCloseable {
     /**
      * Guard use to ignore events after it's destroyed.
      */
-    @NonNull
-    @GuardedBy("mLock")
-    private boolean mDestroyed;
+    private volatile boolean mDestroyed;
 
     /** @hide */
     @Nullable
@@ -732,9 +730,7 @@ public abstract class ContentCaptureSession implements AutoCloseable {
     }
 
     boolean isContentCaptureEnabled() {
-        synchronized (mLock) {
-            return !mDestroyed;
-        }
+        return !mDestroyed;
     }
 
     @CallSuper

@@ -113,6 +113,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.ImpulseO
 import com.android.internal.widget.remotecompose.core.operations.layout.ImpulseProcess;
 import com.android.internal.widget.remotecompose.core.operations.layout.LayoutComponentContent;
 import com.android.internal.widget.remotecompose.core.operations.layout.LoopOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.MultiClickModifier;
 import com.android.internal.widget.remotecompose.core.operations.layout.RootLayoutComponent;
 import com.android.internal.widget.remotecompose.core.operations.layout.TouchCancelModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.TouchDownModifierOperation;
@@ -136,6 +137,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.modifier
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ClipRectModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.CollapsiblePriorityModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ComponentVisibilityOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DimensionConstraintsModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DimensionModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DrawContentOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.GraphicsLayerModifierOperation;
@@ -1579,6 +1581,11 @@ public class RecordingRemoteComposeBuffer extends RemoteComposeBuffer {
     }
 
     @Override
+    public void addDimensionConstraintsModifierOperation(int type, float min, float max) {
+        addOperation(new DimensionConstraintsModifierOperation(type, min, max));
+    }
+
+    @Override
     public void addDrawContentOperation() {
         addOperation(new DrawContentOperation());
     }
@@ -1611,6 +1618,15 @@ public class RecordingRemoteComposeBuffer extends RemoteComposeBuffer {
                         mode,
                         enabled,
                         clickable));
+    }
+
+    /**
+     * Add a click modifier operation
+     * @param clickType type of click (0=single, 1=long, 2=double)
+     */
+    @Override
+    public void addClickModifierOperation(int clickType) {
+        addOperation(new MultiClickModifier(clickType));
     }
 
     @Override

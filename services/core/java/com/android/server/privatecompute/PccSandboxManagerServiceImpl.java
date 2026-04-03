@@ -16,6 +16,7 @@
 
 package com.android.server.privatecompute;
 
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_DATA_MIGRATION_STATE_CHANGED__MIGRATION_STATE__NON_PCC_DATA_MIGRATION_SERVICE_STARTED;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_WRITE_TO_AUDIT_LOG__WRITE_TYPE__BATCHED;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_WRITE_TO_AUDIT_LOG__WRITE_TYPE__DIRECT;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_WRITE_TO_AUDIT_LOG__WRITE_TYPE__NATIVE;
@@ -23,7 +24,10 @@ import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_WRITE_TO_
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
+import android.annotation.RequiresPermission;
+import android.app.ActivityManager;
 import android.app.AlarmManager;
+import android.app.KeyguardManager;
 import android.app.privatecompute.DataMigrationToPccService;
 import android.app.privatecompute.IDataMigrationToPccService;
 import android.app.privatecompute.IMigrationRequestResultReceiver;
@@ -33,13 +37,16 @@ import android.app.privatecompute.IPccSandboxManagerNative;
 import android.app.privatecompute.MigrationException;
 import android.app.privatecompute.MigrationRequestResult;
 import android.content.ComponentName;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ResolveInfo;
 import android.os.Binder;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -53,16 +60,23 @@ import android.os.SystemClock;
 import android.os.UserHandle;
 import android.sysprop.PccProperties;
 import android.util.Log;
+import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.BackgroundThread;
 import com.android.server.LocalServices;
+import com.android.server.pm.UserManagerInternal;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,35 +96,62 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
     private final Injector mInjector;
 
     // Only instantiated when audit mode is enabled.
-    @GuardedBy("mAuditLogLock")
-    private @Nullable AuditModeContext mAuditModeContext = null;
+    @GuardedBy("mAuditModeLock")
+    private final SparseArray<AuditModeContext> mAuditModeContexts =
+            new SparseArray<>();
 
     private final Object mAuditModeLock = new Object();
-    private final ExecutorService mExecutorService = Executors.newSingleThreadExecutor();
+    private final ExecutorService mExecutorService;
 
     private PccSandboxManagerInternal mInternal;
     private final PccSandboxManagerNativeImpl mNativeImpl = new PccSandboxManagerNativeImpl();
 
-    private final AlarmManager.OnAlarmListener mAuditLogCleanupListener =
-            () -> mExecutorService.execute(this::runAuditLogCleanupTask);
+    private final AlarmManager.OnAlarmListener mAuditLogCleanupListener;
 
+    private final BroadcastReceiver mUserUnlockedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
+                int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+                if (userId != UserHandle.USER_NULL) {
+                    mExecutorService.execute(() -> {
+                        mInjector.deleteAuditLogFiles(userId);
+                    });
+                }
+            }
+        }
+    };
+
+    @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
     public PccSandboxManagerServiceImpl(Context context) {
         this(context, new Injector());
     }
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
     public PccSandboxManagerServiceImpl(Context context, Injector injector) {
         mContext = context;
         mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
         mInjector = injector;
+        mExecutorService = mInjector.getExecutorService();
+        mAuditLogCleanupListener = () -> mExecutorService.execute(this::runAuditLogCleanupTask);
 
-        // Run the audit log cleanup task upon booting.
-        mExecutorService.execute(this::runAuditLogCleanupTask);
+        // Data retention: Delete audit log files when the user is first unlocked, after boot.
+        mContext.registerReceiverForAllUsers(
+                mUserUnlockedReceiver,
+                new IntentFilter(Intent.ACTION_USER_UNLOCKED),
+                /* broadcastPermission= */ null,
+                mInjector.getHandler(mInjector.getBackgroundLooper()));
     }
 
     private void runAuditLogCleanupTask() {
-        mInjector.deleteAuditLogFiles();
-        rescheduleAuditLogCleanup();
+        final long token = Binder.clearCallingIdentity();
+        try {
+            mInjector.deleteAuditLogFilesAllUsers();
+            rescheduleAuditLogCleanup();
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
     }
 
     private void rescheduleAuditLogCleanup() {
@@ -155,8 +196,30 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
             return SystemClock.elapsedRealtime();
         }
 
-        void deleteAuditLogFiles() {
-            AuditModeContext.deleteAuditLogFiles();
+        ExecutorService getExecutorService() {
+            return Executors.newSingleThreadExecutor();
+        }
+
+        File getAuditLogFilesDirectory(int userId) {
+            return new File(Environment.getDataMiscCeDirectory(userId),
+                    AuditModeContext.AUDIT_LOG_FILES_DIRNAME);
+        }
+
+        void deleteAuditLogFiles(int userId) {
+            AuditModeContext.deleteAuditLogFiles(getAuditLogFilesDirectory(userId));
+        }
+
+        void deleteAuditLogFilesAllUsers() {
+            UserManagerInternal umi = LocalServices.getService(UserManagerInternal.class);
+            if (umi != null) {
+                for (int userId : umi.getUserIds()) {
+                    // This conditions is to avoid deleting audit log files for a locked user,
+                    // and triggering StrictMode violations.
+                    if (umi.isUserUnlockingOrUnlocked(userId)) {
+                        AuditModeContext.deleteAuditLogFiles(getAuditLogFilesDirectory(userId));
+                    }
+                }
+            }
         }
     }
 
@@ -255,29 +318,43 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
             @NonNull List<PersistableBundle> data, @NonNull String packageName)
             throws SecurityException {
         final int callingUid = mInjector.getCallingUid();
-        if (!mPackageManagerInternal.isSameApp(
-                packageName, callingUid, UserHandle.getUserId(callingUid))) {
+        final int userId = UserHandle.getUserId(callingUid);
+        if (!mPackageManagerInternal.isSameApp(packageName, callingUid, userId)) {
             // We don't report the security exception to apps, but we log it.
             throw new SecurityException(
                     "Package name " + packageName + " does not match calling UID " + callingUid);
         }
 
+        if (!Process.isPrivateComputeCoreUid(callingUid)
+                && !isPccTrustedSystemComponent(callingUid, packageName)) {
+            return false;
+        }
+
         synchronized (mAuditModeLock) {
             if (!mInjector.auditModeEnabled()) {
                 // If audit mode was toggled off, clean up, including writing pending data to disk.
-                if (mAuditModeContext != null) {
-                    mAuditModeContext.stopAuditing();
-                    mAuditModeContext = null;
-                    rescheduleAuditLogCleanup();
+                if (mAuditModeContexts.size() > 0) {
+                    for (int i = 0; i < mAuditModeContexts.size(); i++) {
+                        mAuditModeContexts.valueAt(i).stopAuditing();
+                    }
+                    mAuditModeContexts.clear();
+                    runAuditLogCleanupTask();
                 }
                 return false;
             }
-            if (mAuditModeContext == null) {
-                runAuditLogCleanupTask();
-                mAuditModeContext = AuditModeContext.create();
+            AuditModeContext context = mAuditModeContexts.get(userId);
+            if (context == null) {
+                // When we start auditing for the first user, clean up any old audit log files.
+                if (mAuditModeContexts.size() == 0) {
+                    runAuditLogCleanupTask();
+                }
+                context =
+                        AuditModeContext.create(
+                                userId, mInjector.getAuditLogFilesDirectory(userId));
+                mAuditModeContexts.put(userId, context);
             }
             for (PersistableBundle bundle : data) {
-                mAuditModeContext.writeToAuditLog(bundle, packageName);
+                context.writeToAuditLog(bundle, packageName, callingUid);
             }
         }
         return true;
@@ -303,6 +380,7 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
 
     private class Shell extends ShellCommand {
         @Override
+        @RequiresNoPermission
         public int onCommand(String cmd) {
             if (cmd == null) {
                 return handleDefaultCommands(cmd);
@@ -359,18 +437,62 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
                     }
                     return 0;
                 }
+                case "audit-start" -> {
+                    synchronized (mAuditModeLock) {
+                        setAuditModeEnabled(pw, true);
+                    }
+                    return 0;
+                }
+                case "audit-stop" -> {
+                    synchronized (mAuditModeLock) {
+                        setAuditModeEnabled(pw, false);
+                        for (int i = 0; i < mAuditModeContexts.size(); i++) {
+                            mAuditModeContexts.valueAt(i).stopAuditing();
+                        }
+                        mAuditModeContexts.clear();
+                    }
+                    return 0;
+                }
                 case "read-intelligence-audit-log" -> {
-                    final int userId = UserHandle.getUserId(Binder.getCallingUid());
-                    List<AuditLogEntry> entries = AuditModeContext.readAuditLogs(userId);
+                    // We check if the device is locked to force the user to input their LSKF
+                    // when changing users. Otherwise, a user could `am switch-user` to a different
+                    // user and read the audit log without unlocking the device for the target user.
+                    KeyguardManager keyguardManager =
+                            mContext.getSystemService(KeyguardManager.class);
+                    if (keyguardManager == null) {
+                        pw.println("Error: cannot get KeyguardManager.");
+                        return -1;
+                    }
+                    if (keyguardManager.isKeyguardLocked()) {
+                        pw.println("Please unlock your device to read the audit log.");
+                        return -1;
+                    }
+
+                    if (PccProperties.audit_mode_enabled().orElse(true)) {
+                        pw.println(
+                                "Warning: Audit in progress. Results may be incomplete. Call"
+                                    + " 'audit-stop' to save buffers before reading.");
+                    }
+
+                    final int userId = ActivityManager.getCurrentUser();
+                    List<AuditLogEntry> entries = AuditModeContext.readAuditLogs(
+                            mInjector.getAuditLogFilesDirectory(userId), userId);
                     if (entries.isEmpty()) {
                         pw.println("No audit logs found for user " + userId);
                         return 0;
                     }
                     pw.println("Found " + entries.size() + " log entries:");
+                    DateTimeFormatter formatter =
+                            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
+                                    .withZone(ZoneId.systemDefault());
                     for (AuditLogEntry entry : entries) {
+                        Instant instant = Instant.ofEpochMilli(entry.mCurrentTimeMillis);
+                        String humanReadableTime = formatter.format(instant);
                         pw.println(
-                                "  Entry: timestamp="
-                                        + entry.mTimestamp
+                                "  Entry: realtime_nanos="
+                                        + entry.mRealTimeNanos
+                                        + " current_time="
+                                        + humanReadableTime
                                         + " uid="
                                         + entry.mCallingUid
                                         + " package="
@@ -382,6 +504,20 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
                 default -> {
                     return handleDefaultCommands(cmd);
                 }
+            }
+        }
+
+        private void setAuditModeEnabled(PrintWriter pw, boolean enabled) {
+            try {
+                PccProperties.audit_mode_enabled(enabled);
+                Optional<Boolean> value = PccProperties.audit_mode_enabled();
+                if (value.isPresent() && value.get() == enabled) {
+                    pw.println("Audit mode " + (enabled ? "enabled" : "disabled"));
+                } else {
+                    pw.println("Failed to " + (enabled ? "enable" : "disable") + " audit mode");
+                }
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Failed to set audit_mode_enabled sysprop", e);
             }
         }
 
@@ -481,8 +617,10 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
             boolean bound = mContext.bindServiceAsUser(bindIntent,
                     new MigrationServiceConnection(mContext, mInjector, callback),
                     Context.BIND_AUTO_CREATE, UserHandle.getUserHandleForUid(callingUid));
-
-            if (!bound) {
+            if (bound) {
+                PrivateComputeStatsLogUtil.logPccDataMigrationStateChanged(
+                        PCC_DATA_MIGRATION_STATE_CHANGED__MIGRATION_STATE__NON_PCC_DATA_MIGRATION_SERVICE_STARTED);
+            } else {
                 try {
                     callback.onError(MigrationException.ERROR_INVOCATION_FAILED,
                             "Failed to bind to service");
@@ -527,9 +665,16 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
                     @Override
                     @RequiresNoPermission
                     public void sendResult(MigrationRequestResult result) {
-                        // TODO(): Call PccBundleSanitizationUtil.sanitizeBundle once it handles
-                        // PersistableBundle for a depth check.
+                        try {
+                            PccBundleSanitizationUtil.sanitizeBundle(result.getExtras());
+                        } catch (IllegalArgumentException e) {
+                            reportError(MigrationException.ERROR_INVOCATION_FAILED,
+                                    "Failed to sanitize bundle: " + e.getMessage());
+                            return;
+                        }
+
                         reportResult(result);
+
                     }
                 });
             } catch (RemoteException e) {

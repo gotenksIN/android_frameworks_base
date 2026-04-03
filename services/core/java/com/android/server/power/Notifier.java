@@ -376,12 +376,7 @@ public class Notifier {
 
         mFullWakeLockLog = mInjector.getWakeLockLog(context);
         mPartialWakeLockLog = mInjector.getWakeLockLog(context);
-
-        if (mFlags.isAppWakelockDataSourceEnabled()) {
-            mWakelockTracer = mInjector.getWakelockTracer(looper);
-        } else {
-            mWakelockTracer = null;
-        }
+        mWakelockTracer = mInjector.getWakelockTracer(looper);
 
         // Initialize interactive state for battery stats.
         try {
@@ -694,17 +689,6 @@ public class Notifier {
 
             // Start input as soon as we start waking up or going to sleep.
             mInputMethodManagerInternal.setInteractive(interactive);
-            if (mShouldNotifyInputAboutWakefulnessChanges
-                    && !mFlags.isPerDisplayWakeByTouchEnabled()) {
-                // Since wakefulness is a global property in original logic, all displays should
-                // be set to the same interactive state, matching system's global wakefulness
-                SparseBooleanArray displayInteractivities = new SparseBooleanArray();
-                int[] ids = mDisplayManagerInternal.getDisplayIds(/*includeDisabled=*/ false);
-                for (int displayId : ids) {
-                    displayInteractivities.put(displayId, interactive);
-                }
-                mInputManagerInternal.setDisplayInteractivities(displayInteractivities);
-            }
 
             // Notify battery stats.
             try {
@@ -744,7 +728,8 @@ public class Notifier {
         }
     }
 
-    private void handleEarlyInteractiveChange(int groupId) {
+    private void handleEarlyInteractiveChange(
+            int groupId, boolean anyDefaultOrAdjacentGroupInteractive) {
         synchronized (mLock) {
             Interactivity interactivity = mInteractivityByGroupId.get(groupId);
             if (interactivity == null) {
@@ -753,9 +738,19 @@ public class Notifier {
             }
             final int changeReason = interactivity.changeReason;
             if (interactivity.isInteractive) {
-                mHandler.post(() -> mPolicy.startedWakingUp(groupId, changeReason));
+                mHandler.post(
+                        () ->
+                                mPolicy.startedWakingUp(
+                                        groupId,
+                                        changeReason,
+                                        anyDefaultOrAdjacentGroupInteractive));
             } else {
-                mHandler.post(() -> mPolicy.startedGoingToSleep(groupId, changeReason));
+                mHandler.post(
+                        () ->
+                                mPolicy.startedGoingToSleep(
+                                        groupId,
+                                        changeReason,
+                                        anyDefaultOrAdjacentGroupInteractive));
             }
         }
     }
@@ -907,11 +902,13 @@ public class Notifier {
         mDisplayInteractivities = newDisplayInteractivities;
     }
 
-    /**
-     * Called when an individual PowerGroup changes wakefulness.
-     */
+    /** Called when an individual PowerGroup changes wakefulness. */
     @SuppressWarnings("AndroidFrameworkSystemServerLock")
-    public void onGroupWakefulnessChangeStarted(int groupId, int wakefulness, int changeReason,
+    public void onGroupWakefulnessChangeStarted(
+            int groupId,
+            int wakefulness,
+            int changeReason,
+            boolean anyDefaultOrAdjacentGroupInteractive,
             long eventTime) {
         final boolean isInteractive = PowerManagerInternal.isInteractive(wakefulness);
 
@@ -933,16 +930,14 @@ public class Notifier {
             interactivity.changeReason = changeReason;
             interactivity.changeStartTime = eventTime;
             interactivity.isChanging = true;
-            handleEarlyInteractiveChange(groupId);
+            handleEarlyInteractiveChange(groupId, anyDefaultOrAdjacentGroupInteractive);
             mWakefulnessSessionObserver.onWakefulnessChangeStarted(groupId, wakefulness,
                     changeReason, eventTime);
 
             // Update input on which displays are interactive
-            if (mFlags.isPerDisplayWakeByTouchEnabled()) {
-                updateDisplayInteractivities(groupId, isInteractive);
-                if (mShouldNotifyInputAboutWakefulnessChanges) {
-                    mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
-                }
+            updateDisplayInteractivities(groupId, isInteractive);
+            if (mShouldNotifyInputAboutWakefulnessChanges) {
+                mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
             }
         }
     }
@@ -955,20 +950,16 @@ public class Notifier {
     public void onGroupRemoved(int groupId) {
         mInteractivityByGroupId.remove(groupId);
         mWakefulnessSessionObserver.removePowerGroup(groupId);
-        if (mFlags.isPerDisplayWakeByTouchEnabled()) {
-            resetDisplayInteractivities();
-            mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
-        }
+        resetDisplayInteractivities();
+        mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
     }
 
     /**
      * Called when a PowerGroup has been changed.
      */
     public void onGroupChanged() {
-        if (mFlags.isPerDisplayWakeByTouchEnabled()) {
-            resetDisplayInteractivities();
-            mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
-        }
+        resetDisplayInteractivities();
+        mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
     }
 
     /**

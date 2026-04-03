@@ -46,7 +46,6 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -154,7 +153,7 @@ fun BundleHeader(viewModel: BundleHeaderViewModel, modifier: Modifier = Modifier
             // ExpandableNotificationRow. We clear all semantics here so that accessibility focus
             // remains on the same element as handles the clicks and actions.
             modifier = Modifier.clearAndSetSemantics {},
-            debugName = "Bundle Header (${stringResource(viewModel.titleText)})",
+            debugName = "Bundle Header (${viewModel.titleText.getComposableText()})",
         ) {
             scene(BundleHeader.Scenes.Collapsed) {
                 BundleHeaderContent(viewModel, collapsed = true)
@@ -206,7 +205,7 @@ private fun ContentScope.BundleHeaderContent(
         val config = LocalConfiguration.current
         val isBoldTextEnabled = config.fontWeightAdjustment > 0
         Text(
-            text = viewModel.summaryText ?: stringResource(viewModel.titleText),
+            text = viewModel.summaryText ?: viewModel.titleText.getComposableText(),
             style =
                 MaterialTheme.typography.titleMediumEmphasized.copy(
                     fontWeight = if (isBoldTextEnabled) FontWeight.ExtraBold else FontWeight.Bold

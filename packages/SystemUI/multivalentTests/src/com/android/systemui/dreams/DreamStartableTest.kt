@@ -16,7 +16,10 @@
 
 package com.android.systemui.dreams
 
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.service.dream.dreamManager
+import android.service.dreams.Flags.FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
@@ -46,7 +49,6 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
-import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
@@ -103,6 +105,7 @@ class DreamStartableTest : SysuiTestCase() {
      * to the dream scene and the bouncer is hidden.
      */
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchesToDreamAndHidesBouncer_whenDreamingStartsFromBouncer() =
         kosmos.runTest {
@@ -123,6 +126,7 @@ class DreamStartableTest : SysuiTestCase() {
 
     /** This test checks that a dream can start correctly from the notification shade. */
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchesToDream_whenDreamingStartsFromShade() =
         kosmos.runTest {
@@ -142,6 +146,7 @@ class DreamStartableTest : SysuiTestCase() {
      * to the lockscreen.
      */
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchesToLockscreen_whenDreamStopsAndDeviceIsLocked() =
         kosmos.runTest {
@@ -175,6 +180,7 @@ class DreamStartableTest : SysuiTestCase() {
      * and is not replaced by the occluded scene.
      */
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun staysOnDream_whenOccludedWhileDreaming() =
         kosmos.runTest {
@@ -191,7 +197,7 @@ class DreamStartableTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.Dream)
 
             // Occlude the device.
-            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
+            keyguardOcclusionInteractor.setOccludedFromWm(true)
             runCurrent()
 
             // Verify that the dream scene is still showing.
@@ -211,6 +217,7 @@ class DreamStartableTest : SysuiTestCase() {
      * is also dreaming.
      */
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun staysOnLockscreen_whenDozing() =
         kosmos.runTest {
@@ -230,6 +237,7 @@ class DreamStartableTest : SysuiTestCase() {
         }
 
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchFromShadeToDream_whenDreamStarted() =
         kosmos.runTest {
@@ -250,6 +258,7 @@ class DreamStartableTest : SysuiTestCase() {
         }
 
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchFromQuickSettingsToDream_whenDreamStarted() =
         kosmos.runTest {
@@ -271,6 +280,7 @@ class DreamStartableTest : SysuiTestCase() {
         }
 
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun snapsToHomeWhenBouncerShowing() =
         kosmos.runTest {
@@ -299,6 +309,7 @@ class DreamStartableTest : SysuiTestCase() {
         }
 
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchFromOccludedToDream_whenDreamStarted() =
         kosmos.runTest {
@@ -319,6 +330,7 @@ class DreamStartableTest : SysuiTestCase() {
         }
 
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchFromCommunalToDream_whenDreamStarted() =
         kosmos.runTest {
@@ -339,6 +351,7 @@ class DreamStartableTest : SysuiTestCase() {
         }
 
     @EnableSceneContainer
+    @DisableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
     @Test
     fun switchFromDreamToLockscreen_whenDreamStops() =
         kosmos.runTest {
@@ -386,6 +399,24 @@ class DreamStartableTest : SysuiTestCase() {
 
             // THEN the back stack should contain the Lockscreen scene
             assertThat(backStack?.asIterable()?.toList()).containsExactly(Scenes.Lockscreen)
+        }
+
+    @EnableSceneContainer
+    @Test
+    @EnableFlags(FLAG_DRIVE_DREAM_STATE_FROM_OCCLUSION)
+    fun doesNotSwitchToDream_whenDreamingStarts_ifFlagEnabled() =
+        kosmos.runTest {
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            sceneInteractor.changeScene(Scenes.Lockscreen, "starting scene")
+            runCurrent()
+
+            // Start dreaming.
+            keyguardRepository.setDreaming(true)
+            advanceTimeBy(DREAMING_DELAY_MS)
+            runCurrent()
+
+            // Scene should NOT change to Dream because DreamStartable shouldn't be handling it
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
         }
 
     private companion object {

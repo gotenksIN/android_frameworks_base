@@ -18,8 +18,9 @@ package com.android.server.personalcontext.component.client;
 
 import static android.Manifest.permission.RECEIVE_SENSITIVE_NOTIFICATIONS;
 
-import android.Manifest;
 import android.annotation.PermissionManuallyEnforced;
+import android.app.NotificationManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
@@ -38,8 +39,11 @@ import android.util.Slog;
 
 import androidx.annotation.NonNull;
 
+import com.android.server.personalcontext.AccessController;
+import com.android.server.personalcontext.OperatingModeProvider;
 import com.android.server.personalcontext.component.Renderer;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -58,48 +62,76 @@ public class ServiceClientRenderer
 
     private final int mProperties;
 
-    public ServiceClientRenderer(Context context, UUID componentId, ServiceInfo serviceInfo,
-            UserHandle userHandle) {
+    public ServiceClientRenderer(
+            Context context,
+            AccessController accessController,
+            UUID componentId,
+            ServiceInfo serviceInfo,
+            UserHandle userHandle,
+            OperatingModeProvider operatingModeProvider) {
         this(
                 context,
+                accessController,
                 componentId,
                 serviceInfo,
                 userHandle,
                 Executors.newSingleThreadExecutor(),
-                new Handler(Looper.getMainLooper()));
+                new Handler(Looper.getMainLooper()),
+                operatingModeProvider);
     }
 
-    protected ServiceClientRenderer(Context context, UUID componentId, ServiceInfo serviceInfo,
-            UserHandle userHandle, Executor executor, Handler handler) {
-        super(context, componentId, serviceInfo, userHandle, executor, handler);
+    protected ServiceClientRenderer(
+            Context context,
+            AccessController accessController,
+            UUID componentId,
+            ServiceInfo serviceInfo,
+            UserHandle userHandle,
+            Executor executor,
+            Handler handler,
+            OperatingModeProvider operatingModeProvider) {
+        super(context, accessController, componentId, serviceInfo, userHandle, executor, handler,
+                operatingModeProvider);
 
         int properties = 0;
 
         final PackageManager packageManager = context.getPackageManager();
+        final NotificationManager notificationManager =
+                context.getSystemService(NotificationManager.class);
         final boolean hasSensitiveNotificationPermission = packageManager
                 .checkPermission(RECEIVE_SENSITIVE_NOTIFICATIONS, serviceInfo.packageName)
                 == PackageManager.PERMISSION_GRANTED;
+        List<ComponentName> enabledListeners =
+                notificationManager.getEnabledNotificationListeners(userHandle.getIdentifier());
+        final boolean isEnabledNotificationListener =
+                enabledListeners != null
+                        && enabledListeners.contains(serviceInfo.getComponentName());
         if (hasSensitiveNotificationPermission
-                && serviceInfo.metaData != null && serviceInfo.metaData
-                .getBoolean(META_DATA_RECEIVE_NOTIFICATION_INSIGHTS, false)) {
+                && isEnabledNotificationListener
+                && serviceInfo.metaData != null
+                && serviceInfo.metaData.getBoolean(
+                        META_DATA_RECEIVE_NOTIFICATION_INSIGHTS, false)) {
             properties |= Renderer.PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS;
         }
 
         mProperties = properties;
 
-        runWithScopedBinder((binder, callback) -> {
-            try {
-                binder.getFilter(getParcelComponentId(), new IGetFilterCallback.Stub() {
-                    @PermissionManuallyEnforced
-                    @Override
-                    public void updateFilter(InsightFilter filter) {
-                        mFilter = filter;
-                    }
-                }, callback);
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Failed to get renderer filter", e);
-            }
-        });
+        if (isAllowed(AccessController.ACCESS_FILTER_INSIGHTS_ALLOWLIST)) {
+            runWithScopedBinder((binder, callback) -> {
+                try {
+                    binder.getFilter(getParcelComponentId(), new IGetFilterCallback.Stub() {
+                        @PermissionManuallyEnforced
+                        @Override
+                        public void updateFilter(InsightFilter filter) {
+                            mFilter = filter;
+                        }
+                    }, callback);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to get renderer filter", e);
+                }
+            });
+        } else {
+            Slog.d(TAG, getComponentName() + " is not allowed to filter for insights.");
+        }
     }
 
     @Override
@@ -124,16 +156,14 @@ public class ServiceClientRenderer
     @Override
     public void render(@NonNull PublishedContextInsight publishedContextInsight,
             RenderToken renderToken) {
-        if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()
-                && !checkPermission(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS)) {
-            Slog.w(
-                    TAG,
-                    "Service "
-                            + getComponentName()
-                            + " missing permission "
-                            + Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS);
+        if (!isAllowed(
+                AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE
+                | AccessController.ACCESS_RECEIVE_INSIGHTS_PERMISSION
+                | AccessController.ACCESS_RECEIVE_INSIGHTS_ALLOWLIST)) {
+            Slog.w(TAG, getComponentName() + " is not allowed to receive insights.");
             return;
         }
+
         runWithScopedBinder((binder, opCallback) -> {
             try {
                 binder.render(getParcelComponentId(),

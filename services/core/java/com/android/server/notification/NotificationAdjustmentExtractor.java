@@ -62,16 +62,18 @@ public class NotificationAdjustmentExtractor implements NotificationSignalExtrac
         }
 
         if (nmContextualDisplayLaunch()) {
+            record.resetRuleBehaviors();
             Adjustment matchingRules = record.getMatchingRulesAdjustment();
             if (matchingRules != null) {
-                for (Adjustment adjustment : mRuleManager.getAdjustmentsForRules(matchingRules)) {
+                for (Adjustment adjustment : mRuleManager.getAdjustmentsForRules(
+                        matchingRules, record.getBundleType())) {
                     Bundle signals = adjustment.getSignals();
                     NotificationRule.DynamicBundle dynamicBundle =
                             signals.getParcelable(KEY_DYNAMIC_BUNDLE,
                                     NotificationRule.DynamicBundle.class);
                     if (dynamicBundle != null) {
                         final NotificationChannel newChannel =
-                                getDynamicBundleChannelLocked(record, dynamicBundle);
+                                getBundleChannelLocked(record, dynamicBundle);
                         if (newChannel.getId().equals(record.getChannel().getId())) {
                             signals.remove(KEY_DYNAMIC_BUNDLE);
                         } else if (record.getNotification().hasFlag(FLAG_PROMOTED_ONGOING)) {
@@ -85,24 +87,30 @@ public class NotificationAdjustmentExtractor implements NotificationSignalExtrac
                     record.addAdjustment(adjustment);
                 }
             }
-        }
+            final boolean hasAdjustedClassification = record.hasAdjustment(KEY_DYNAMIC_BUNDLE);
 
-        final boolean hasAdjustedClassification = record.hasAdjustment(KEY_TYPE)
-                || (nmContextualDisplayLaunch() && record.hasAdjustment(KEY_DYNAMIC_BUNDLE));
-        final boolean removedClassification = record.hasAdjustment(KEY_UNCLASSIFY);
+            if (hasAdjustedClassification && record.getLastAudiblyAlertedMs() > 0) {
+                record.applyAdjustments(new ArraySet<>(new String[]{KEY_DYNAMIC_BUNDLE}));
+                return getClassificationReconsideration(record);
+            }
+            record.applyAdjustments();
+        } else {
 
-        if (hasAdjustedClassification && record.getLastAudiblyAlertedMs() > 0) {
-            record.applyAdjustments(new ArraySet<>(new String[] {KEY_TYPE, KEY_DYNAMIC_BUNDLE}));
+            final boolean hasAdjustedClassification = record.hasAdjustment(KEY_TYPE);
+            final boolean removedClassification = record.hasAdjustment(KEY_UNCLASSIFY);
 
-            return getClassificationReconsideration(record);
-        }
+            if (hasAdjustedClassification && record.getLastAudiblyAlertedMs() > 0) {
+                record.applyAdjustments(new ArraySet<>(new String[]{KEY_TYPE}));
+                return getClassificationReconsideration(record);
+            }
 
-        record.applyAdjustments();
+            record.applyAdjustments();
 
-        // Classification adjustments trigger regrouping
-        if (mGroupHelper != null && (hasAdjustedClassification || removedClassification)) {
-            return getRegroupReconsideration(
-                    record, hasAdjustedClassification, removedClassification);
+            // Classification adjustments trigger regrouping
+            if (mGroupHelper != null && (hasAdjustedClassification || removedClassification)) {
+                return getRegroupReconsideration(
+                        record, hasAdjustedClassification, removedClassification);
+            }
         }
 
         return null;
@@ -174,7 +182,7 @@ public class NotificationAdjustmentExtractor implements NotificationSignalExtrac
     }
 
     @NonNull
-    private NotificationChannel getDynamicBundleChannelLocked(NotificationRecord r,
+    private NotificationChannel getBundleChannelLocked(NotificationRecord r,
             NotificationRule.DynamicBundle dynamicBundle) {
         NotificationChannel channel = mRankingConfig.getNotificationChannel(
                 r.getSbn().getPackageName(), r.getUid(), dynamicBundle.getChannelId(), false);

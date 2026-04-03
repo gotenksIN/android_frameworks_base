@@ -156,6 +156,17 @@ public class VirtualCameraControllerTest {
     }
 
     @Test
+    public void closeVirtualCameraSession_closesSession() throws Exception {
+        VirtualCameraConfig config = createVirtualCameraConfig(
+                CAMERA_WIDTH_1, CAMERA_HEIGHT_1, CAMERA_FORMAT_1, CAMERA_MAX_FPS_1, CAMERA_NAME_1,
+                CAMERA_SENSOR_ORIENTATION_1, CAMERA_LENS_FACING_1);
+
+        mVirtualCameraController.closeVirtualCameraSession(config);
+
+        verify(mVirtualCameraServiceMock).closeSession(config.getCallback().asBinder());
+    }
+
+    @Test
     public void close_unregistersAllCameras() throws Exception {
         mVirtualCameraController.registerCamera(createVirtualCameraConfig(
                         CAMERA_WIDTH_1, CAMERA_HEIGHT_1, CAMERA_FORMAT_1, CAMERA_MAX_FPS_1,

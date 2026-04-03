@@ -20,6 +20,8 @@ import static com.android.ravenwood.common.RavenwoodInternalUtils.getRavenwoodRu
 
 import android.util.Log;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.ravenwood.RavenwoodRuntimeNative;
 import com.android.ravenwood.common.RavenwoodInternalUtils;
 
@@ -101,8 +103,8 @@ public class RavenwoodSystemProperties {
 
         // TODO(b/450069205): Use of "exists" is a bad recipe for incremental builds... Make sure
         // ravenwood.go empties it if not specified.
-        final var perTestPropFle = RavenwoodEnvironment.getInstance().perTestPropFile();
-        var testProps = Files.exists(Path.of(perTestPropFle)) ? readProperties(perTestPropFle)
+        final var perTestSyspropFle = RavenwoodEnvironment.getInstance().perTestSyspropFile();
+        var testProps = Files.exists(Path.of(perTestSyspropFle)) ? readProperties(perTestSyspropFle)
                 : new HashMap<String, String>();
 
         Log.i(TAG, "Default system properties:");
@@ -239,5 +241,18 @@ public class RavenwoodSystemProperties {
         } else {
             return key;
         }
+    }
+
+    @VisibleForTesting
+    public static void overrideWithJavaProperties(Map<String, String> props, String prefix) {
+        // Look for Java system properties that start with prefix, and set the value to the map.
+        // For example, if the prefix is "xxx.", and properties "xxx.a=1" and "xxx.b=2" are set,
+        // then it'll store "a" -> "1" and "b" -> "2" to the map.
+        System.getProperties().forEach((key, value) -> {
+            var k = key.toString();
+            if (k.startsWith(prefix)) {
+                props.put(k.substring(prefix.length()), value.toString());
+            }
+        });
     }
 }

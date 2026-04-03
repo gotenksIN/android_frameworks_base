@@ -108,14 +108,6 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
      * repositioning.
      */
     static final int CAPTION_LAYER_Z_ORDER = -1;
-    /**
-     * The Z-order of the task input sink in {@link DragPositioningCallback}.
-     * <p>
-     * This task input sink is used to prevent undesired dispatching of motion events out of task
-     * bounds; by layering it behind the caption surface, we allow captions to handle
-     * input events first.
-     */
-    static final int INPUT_SINK_Z_ORDER = -2;
 
     /**
      * Invalid corner radius that signifies that corner radius should not be set.

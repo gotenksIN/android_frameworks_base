@@ -16,9 +16,11 @@
 
 package com.android.server.am;
 
+import android.annotation.NonNull;
 import android.annotation.UptimeMillisLong;
 import android.app.ActivityManagerInternal.FrozenProcessListener;
 import android.app.ActivityManagerInternal.OomAdjReason;
+import android.util.IndentingPrintWriter;
 import android.util.Pair;
 import android.util.TimeUtils;
 
@@ -27,7 +29,6 @@ import com.android.internal.annotations.VisibleForTesting;
 
 import dalvik.annotation.optimization.NeverCompile;
 
-import java.io.PrintWriter;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 
@@ -329,17 +330,13 @@ public final class ProcessCachedOptimizerRecord {
 
     @GuardedBy("mProcLock")
     @NeverCompile
-    void dump(PrintWriter pw, String prefix, long nowUptime) {
-        pw.print(prefix); pw.print("lastCompactTime="); pw.print(mLastCompactTime);
-        pw.print(" lastCompactProfile=");
-        pw.println(mLastCompactProfile);
-        pw.print(prefix);
-        pw.print("hasPendingCompaction=");
-        pw.print(mPendingCompact);
-        pw.print(prefix);
-        pw.print("isPendingFreeze="); pw.print(mPendingFreeze);
-        pw.print(" " + IS_FROZEN + "="); pw.println(mFrozen);
-        pw.print(prefix); pw.print("earliestFreezableTimeMs=");
+    void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
+        pw.print("lastCompactTime", mLastCompactTime);
+        pw.print("lastCompactProfile", mLastCompactProfile).println();
+        pw.print("hasPendingCompaction", mPendingCompact).println();
+        pw.print("isPendingFreeze", mPendingFreeze);
+        pw.print(IS_FROZEN, mFrozen).println();
+        pw.print("earliestFreezableTimeMs=");
         TimeUtils.formatDuration(mEarliestFreezableTimeMillis, nowUptime, pw);
         if (!mFrozenProcessListeners.isEmpty()) {
             pw.print(" mFrozenProcessListeners=");

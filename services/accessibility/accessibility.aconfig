@@ -115,6 +115,17 @@ flag {
     }
 }
 
+
+flag {
+    name: "fix_full_screen_magnification_event_time_corruption"
+    namespace: "accessibility"
+    description: "Fixes a bug where Full Screen Magnification corrupts event time during delegation."
+    bug: "489793123"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
 flag {
     name: "fix_window_magnification_inactive_double_tap"
     namespace: "accessibility"
@@ -207,6 +218,16 @@ flag {
     namespace: "accessibility"
     description: "Sends accessibility events in TouchExplorer#onAccessibilityEvent based on internal state to keep it consistent. This reduces test flakiness."
     bug: "295575684"
+}
+
+flag {
+    name: "send_hover_exit_on_gesture_interruption"
+    namespace: "accessibility"
+    description: "Sends a hover exit event when touch exploration is interrupted by a gesture or double tap."
+    bug: "483234296"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

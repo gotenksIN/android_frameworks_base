@@ -16,9 +16,12 @@
 
 package com.android.server.privatecompute;
 
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BACKUP_AGENT_STARTED;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BACKUP_AGENT_STARTED__BACKUP_AGENT_PROCESS_TYPE__TYPE_PCC_PROCESS;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED__TRANSACTION_STATUS__STATUS_FAILED;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_BINDER_PROXY_TRANSACTION_REPORTED__TRANSACTION_STATUS__STATUS_SUCCESS;
+import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_DATA_MIGRATION_STATE_CHANGED;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_INPUT_SANITIZATION_REPORTED;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_PERMISSION_CHECK_RESULT;
 import static com.android.os.privatecompute.PrivateComputeAtomsLog.PCC_UID_ASSIGNMENT_REPORTED;
@@ -30,11 +33,11 @@ import com.android.os.privatecompute.PrivateComputeAtomsLog;
 public class PrivateComputeStatsLogUtil {
 
     /** Logs the latency for performing bundle sanitization. */
-    public static void logPccBundleInputSanitizationLatency(long elapsedTimeMillis,
+    public static void logPccBundleInputSanitizationLatency(long elapsedTimeNanos,
             int sanitizationResult) {
         PrivateComputeAtomsLog.write(
                 PCC_INPUT_SANITIZATION_REPORTED,
-                elapsedTimeMillis,
+                elapsedTimeNanos,
                 sanitizationResult
         );
     }
@@ -81,5 +84,39 @@ public class PrivateComputeStatsLogUtil {
      */
     public static void logPccUidAssignment(int status) {
         PrivateComputeAtomsLog.write(PCC_UID_ASSIGNMENT_REPORTED, status);
+    }
+
+    /**
+     * Logs a state change in the PCC data migration process.
+     *
+     * @param state  The current state of the data migration process (e.g., COMPLETE, FAILED),
+     *               as defined by PrivateComputeAtomsLog constants.
+     */
+    public static void logPccDataMigrationStateChanged(int state) {
+        PrivateComputeAtomsLog.write(PCC_DATA_MIGRATION_STATE_CHANGED, state);
+    }
+
+    /**
+     * Logs a state change in the PCC data migration process.
+     *
+     * @param state  The current state of the data migration process (e.g., COMPLETE, FAILED),
+     *               as defined by PrivateComputeAtomsLog constants.
+     * @param source The source file type of the data migration (e.g., APP_DATA_FILE_SOURCE),
+     *               as defined by PrivateComputeAtomsLog constants.
+     * @param target The target file type of the data migration (e.g., TARGET_PCC),
+     *               as defined by PrivateComputeAtomsLog constants.
+     */
+    public static void logPccDataMigrationStateChanged(int state, int source, int target) {
+        PrivateComputeAtomsLog.write(PCC_DATA_MIGRATION_STATE_CHANGED, state, source, target);
+    }
+
+    /**
+     * Logs that a PCC backup agent has started.
+     */
+    public static void logPccBackupAgentStarted() {
+        PrivateComputeAtomsLog.write(
+                PCC_BACKUP_AGENT_STARTED,
+                PCC_BACKUP_AGENT_STARTED__BACKUP_AGENT_PROCESS_TYPE__TYPE_PCC_PROCESS
+        );
     }
 }

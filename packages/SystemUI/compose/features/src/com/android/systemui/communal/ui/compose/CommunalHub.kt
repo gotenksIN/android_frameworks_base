@@ -186,7 +186,6 @@ import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.internal.R.dimen.system_app_widget_background_radius
 import com.android.systemui.Flags
-import com.android.systemui.Flags.communalAccessibilityResize
 import com.android.systemui.Flags.communalHubCancelAddWidget
 import com.android.systemui.Flags.communalResponsiveGrid
 import com.android.systemui.Flags.communalWidgetPopulationOptimization
@@ -215,6 +214,8 @@ import com.android.systemui.media.remedia.ui.compose.Media
 import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.delay
@@ -315,8 +316,7 @@ fun CommunalHub(
                                 // allows listening for taps on the grid's background to deselect
                                 // items, while also allowing taps on child composables to pass
                                 // through to them.
-                                if (communalAccessibilityResize()) PointerEventPass.Final
-                                else PointerEventPass.Initial
+                                PointerEventPass.Final
                         ) { offset ->
                             // if RTL, flip offset direction from Left side to Right
                             val adjustedOffset =
@@ -330,24 +330,11 @@ fun CommunalHub(
                             val tappedKey =
                                 index?.let { keyAtIndexIfEditable(contentListState.list, index) }
 
-                            if (communalAccessibilityResize()) {
-                                // If we tap on the background, we should deselect whatever was
-                                // selected. Otherwise, the selection/deselection process is
-                                // managed by the WidgetContent itself.
-                                if (tappedKey == null) {
-                                    viewModel.setSelectedKey(null)
-                                }
-                            } else {
-                                viewModel.setSelectedKey(
-                                    if (
-                                        Flags.hubEditModeTouchAdjustments() &&
-                                            selectedKey.value == tappedKey
-                                    ) {
-                                        null
-                                    } else {
-                                        tappedKey
-                                    }
-                                )
+                            // If we tap on the background, we should deselect whatever was
+                            // selected. Otherwise, the selection/deselection process is
+                            // managed by the WidgetContent itself.
+                            if (tappedKey == null) {
+                                viewModel.setSelectedKey(null)
                             }
                         }
                     }
@@ -1052,19 +1039,36 @@ private fun BoxScope.CommunalHubLazyGrid(
                     false
                 }
 
+            val widgetSizeInfo =
+                calculateWidgetSize(
+                    cellHeight = sizeInfo?.cellSize?.height,
+                    availableHeight = sizeInfo?.availableHeight,
+                    item = item,
+                    isResizable = isResizable,
+                )
+
+            val cellHeightPx =
+                with(LocalDensity.current) { sizeInfo?.cellSize?.height?.toPx() ?: 0f }
+            val spacingPx =
+                with(LocalDensity.current) {
+                    (sizeInfo?.verticalArrangement ?: Dimensions.ItemSpacing).toPx()
+                }
+            val minWidgetConfigSpan = widgetSizeInfo.minConfigSpan(cellHeightPx, spacingPx)
+            val maxWidgetConfigSpan = widgetSizeInfo.maxConfigSpan(cellHeightPx, spacingPx)
+
             // Resizing is only supported for widgets in edit mode.
             val resizeableItemFrameViewModel =
                 if (viewModel is CommunalEditModeViewModel) {
                     rememberViewModel(
-                        key =
-                            if (communalAccessibilityResize()) item.key
-                            else currentItemSpan,
+                        key = item.key,
                         traceName = "ResizeableItemFrame.viewModel.$index",
                     ) {
                         val componentName =
                             (item as? CommunalContentModel.WidgetContent.Widget)?.componentName
                         viewModel.resizeableItemFrameViewModelFactory.create(
-                            if (communalAccessibilityResize()) componentName else null
+                            componentName,
+                            minWidgetConfigSpan,
+                            maxWidgetConfigSpan,
                         )
                     }
                 } else {
@@ -1090,14 +1094,6 @@ private fun BoxScope.CommunalHubLazyGrid(
                         targetValue = if (selected) 1f else 0f,
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         label = "Widget resizing outline alpha",
-                    )
-
-                val widgetSizeInfo =
-                    calculateWidgetSize(
-                        cellHeight = sizeInfo?.cellSize?.height,
-                        availableHeight = sizeInfo?.availableHeight,
-                        item = item,
-                        isResizable = isResizable,
                     )
                 ResizableItemFrameWrapper(
                     key = item.key,
@@ -1712,7 +1708,7 @@ private fun WidgetContent(
                 .focusRequester(focusRequester)
                 .focusable(interactionSource = interactionSource)
                 .then(selectableModifier)
-                .thenIf(communalAccessibilityResize() && viewModel.isEditMode) {
+                .thenIf(viewModel.isEditMode) {
                     Modifier.pointerInput(isSelected, model.key) {
                         observeTaps {
                             if (isSelected && Flags.hubEditModeTouchAdjustments()) {
@@ -2389,7 +2385,32 @@ class Dimensions(val context: Context, val config: Configuration) {
     }
 }
 
-data class WidgetSizeInfo(val minHeightPx: Int, val maxHeightPx: Int)
+data class WidgetSizeInfo(val minHeightPx: Int, val maxHeightPx: Int) {
+    companion object {
+        private const val DEFAULT_MIN_SPAN = 1
+    }
+
+    fun minConfigSpan(cellHeightPx: Float, spacingPx: Float): Int {
+        return if (cellHeightPx > 0f && minHeightPx > 0) {
+            kotlin.math
+                .ceil((minHeightPx + spacingPx) / (cellHeightPx + spacingPx))
+                .toInt()
+                .coerceAtLeast(DEFAULT_MIN_SPAN)
+        } else {
+            DEFAULT_MIN_SPAN
+        }
+    }
+
+    fun maxConfigSpan(cellHeightPx: Float, spacingPx: Float): Int {
+        val calculatedMaxSpan =
+            if (cellHeightPx > 0f && maxHeightPx < Int.MAX_VALUE) {
+                kotlin.math.floor((maxHeightPx + spacingPx) / (cellHeightPx + spacingPx)).toInt()
+            } else {
+                Int.MAX_VALUE
+            }
+        return kotlin.math.max(minConfigSpan(cellHeightPx, spacingPx), calculatedMaxSpan)
+    }
+}
 
 private fun CommunalContentModel.getSpanOrMax(maxSpan: Int?) =
     if (maxSpan != null) {

@@ -31,6 +31,7 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyString;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doThrow;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.eq;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
@@ -38,7 +39,6 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.nullable;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spy;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
@@ -57,11 +57,11 @@ import android.content.Context;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.res.Configuration;
 import android.database.ContentObserver;
 import android.hardware.devicestate.DeviceStateManager;
-import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.DisplayManagerInternal;
 import android.net.Uri;
 import android.os.Handler;
@@ -73,13 +73,11 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.DeviceConfig;
 import android.util.Log;
-import android.view.DisplayInfo;
 import android.view.InputChannel;
 import android.view.SurfaceControl;
 
 import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.internal.os.BackgroundThread;
-import com.android.internal.protolog.PerfettoProtoLogImpl;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.protolog.WmProtoLogGroups;
 import com.android.server.AnimationThread;
@@ -196,7 +194,7 @@ public class SystemServicesTestRule implements TestRule {
     private void setUp() {
         if (ProtoLog.getSingleInstance() == null) {
             ProtoLog.init(WmProtoLogGroups.values());
-            PerfettoProtoLogImpl.waitForInitialization();
+            ProtoLog.waitForInitialization();
         }
 
         if (mOnBeforeServicesCreated != null) {
@@ -253,6 +251,14 @@ public class SystemServicesTestRule implements TestRule {
 
         mContext = getInstrumentation().getTargetContext();
         spyOn(mContext);
+
+        final PackageManager pm = spy(mContext.getPackageManager());
+        try {
+            doThrow(new PackageManager.NameNotFoundException()).when(pm).getPropertyAsUser(
+                    anyString(), nullable(String.class), nullable(String.class), anyInt());
+        } catch (PackageManager.NameNotFoundException e) {
+        }
+        doReturn(pm).when(mContext).getPackageManager();
 
         doReturn(null).when(mContext)
                 .registerReceiver(nullable(BroadcastReceiver.class), any(IntentFilter.class),
@@ -469,8 +475,8 @@ public class SystemServicesTestRule implements TestRule {
                 dc.getDisplayPolicy().release();
                 // Unregister SensorEventListener (foldable device may register for hinge angle).
                 dc.getDisplayRotation().onDisplayRemoved();
-                dc.mAppCompatCameraPolicy.dispose();
             }
+            mWmService.mAppCompatCameraPolicy.dispose();
         }
 
         for (int i = mDeviceConfigListeners.size() - 1; i >= 0; i--) {
@@ -739,6 +745,15 @@ public class SystemServicesTestRule implements TestRule {
             spyOn(uiContext);
             doNothing().when(uiContext).registerComponentCallbacks(any());
             doNothing().when(uiContext).unregisterComponentCallbacks(any());
+
+            spyOn(mSystemThread);
+            doAnswer(invocation -> {
+                Context ctx = (Context) invocation.callRealMethod();
+                spyOn(ctx);
+                doNothing().when(ctx).registerComponentCallbacks(any());
+                doNothing().when(ctx).unregisterComponentCallbacks(any());
+                return ctx;
+            }).when(mSystemThread).getSystemUiContext(anyInt());
         }
 
         @Override

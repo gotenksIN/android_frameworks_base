@@ -267,8 +267,6 @@ public class BubbleController implements ConfigurationChangeListener,
     private final BubbleFeatureConfig mFeatureConfig;
     private Bubbles.SysuiProxy mSysuiProxy;
 
-    @Nullable private Runnable mOnImeHidden;
-
     // Tracks the id of the current (foreground) user.
     private int mCurrentUserId;
     // Current profiles of the user (e.g. user with a workprofile)
@@ -437,8 +435,12 @@ public class BubbleController implements ConfigurationChangeListener,
             public BubbleTaskView create() {
                 TaskViewTaskController taskViewTaskController = new TaskViewTaskController(
                         context, organizer, mTaskViewController, syncQueue);
+                // Enable background layer to show background color to prevent contents behind
+                // transparent bubble are shown.
+                boolean disableBackgroundLayer =
+                        !com.android.window.flags.Flags.addBgColorForTransparentBubbles();
                 TaskView taskView = new TaskView(context, mTaskViewController,
-                        taskViewTaskController, mainHandler);
+                        taskViewTaskController, mainHandler, disableBackgroundLayer);
                 return new BubbleTaskView(taskView, mainExecutor, BubbleController.this);
             }
         };
@@ -784,11 +786,9 @@ public class BubbleController implements ConfigurationChangeListener,
     /**
      * Hides the current input method, wherever it may be focused, via InputMethodManagerInternal.
      */
-    void hideCurrentInputMethod(@Nullable Runnable onImeHidden) {
+    void hideCurrentInputMethod() {
         final boolean isDeviceLocked = isDeviceLocked();
-        BubbleLog.d("BubbleController.hideCurrentInputMethod() runnable=%s, deviceLocked=%b",
-                onImeHidden, isDeviceLocked);
-        mOnImeHidden = onImeHidden;
+        BubbleLog.d("BubbleController.hideCurrentInputMethod() deviceLocked=%b", isDeviceLocked);
         mBubblePositioner.setImeVisible(false /* visible */, 0 /* height */);
         int displayId = mWindowManager.getDefaultDisplay().getDisplayId();
         // if the device is locked we can't use the status bar service to hide the IME because
@@ -804,15 +804,6 @@ public class BubbleController implements ConfigurationChangeListener,
         } catch (RemoteException e) {
             Log.e(TAG, "Failed to hide IME", e);
         }
-    }
-
-    /**
-     * Allows callers to reset runnable scheduled to run after IME is hidden by
-     * {@link #hideCurrentInputMethod(Runnable)}
-     */
-    void clearImeHiddenRunnable() {
-        BubbleLog.d("BubbleController.clearImeHiddenRunnable() runnable=%s", mOnImeHidden);
-        mOnImeHidden = null;
     }
 
     /**
@@ -857,23 +848,10 @@ public class BubbleController implements ConfigurationChangeListener,
         mIsStatusBarShade = isShade;
         if (!mIsStatusBarShade && didChange) {
             if (mBubbleData.isExpanded()) {
-                // If the IME is visible, hide it first and then collapse.
                 if (mBubblePositioner.isImeVisible()) {
-                    if (Flags.fixBubbleSwipeUpGesture()) {
-                        hideCurrentInputMethod(/* onImeHidden= */ null);
-                        collapseStack();
-                    } else {
-                        hideCurrentInputMethod(this::collapseStack);
-                    }
-                } else {
-                    collapseStack();
+                    hideCurrentInputMethod();
                 }
-            } else if (mOnImeHidden != null) {
-                // a request to collapse started before we're notified that the device is locking.
-                // we're currently waiting for the IME to collapse, before mOnImeHidden can be
-                // executed, which may not happen since the screen may already be off. hide the IME
-                // immediately now that we're locked and pass the same runnable so it can complete.
-                hideCurrentInputMethod(mOnImeHidden);
+                collapseStack();
             }
         }
 
@@ -1254,10 +1232,6 @@ public class BubbleController implements ConfigurationChangeListener,
             }
         });
         try {
-            if (mOnImeHidden != null) {
-                Log.w(TAG, "removing bubbles from window manager with non-null onImeHidden");
-            }
-            mOnImeHidden = null;
             if (mStackView != null) {
                 if (mStackView.isExpanded()) {
                     BubbleLog.w(
@@ -1837,7 +1811,7 @@ public class BubbleController implements ConfigurationChangeListener,
             @Nullable BubbleTransitions.DragData dragData) {
         if (!BubbleFlagHelper.enableCreateAnyBubble()) return;
         Bubble b = mBubbleData.getOrCreateBubble(taskInfo); // Removes from overflow
-        BubbleLog.v("BubbleController.expandStackAndSelectBubble() taskId=%s", taskInfo.taskId);
+        BubbleLog.v("BubbleController.expandStackAndSelectBubble() taskId=%d", taskInfo.taskId);
         BubbleBarLocation location = null;
         if (dragData != null) {
             location =
@@ -2029,7 +2003,7 @@ public class BubbleController implements ConfigurationChangeListener,
         Bubble existingNotebubble = mBubbleData.getBubbleInStackWithKey(noteBubbleKey);
         BubbleLog.d(
                 "BubbleController.showOrHideNotesBubble() key=%s existingAppBubble=%s  "
-                        + "stackVisibility=%s statusBarShade=%s",
+                        + "stackVisibility=%s statusBarShade=%b",
                 noteBubbleKey, existingNotebubble,
                 (mStackView != null ? mStackView.getVisibility() : "null"),
                 mIsStatusBarShade);
@@ -2958,7 +2932,7 @@ public class BubbleController implements ConfigurationChangeListener,
         if (mLayerView != null && mLayerView.isExpanded()) {
             if (mBubblePositioner.isImeVisible()) {
                 // If we're collapsing, hide the IME
-                hideCurrentInputMethod(null);
+                hideCurrentInputMethod();
             }
             mLayerView.collapse();
         }
@@ -3045,7 +3019,7 @@ public class BubbleController implements ConfigurationChangeListener,
         if (mStackView == null && mLayerView == null) {
             return;
         }
-        BubbleLog.v("BubbleController.updateBubbleViews() mIsStatusBarShade=%s hasBubbles=%b",
+        BubbleLog.v("BubbleController.updateBubbleViews() mIsStatusBarShade=%b hasBubbles=%b",
                 mIsStatusBarShade, hasBubbles());
         if (!mIsStatusBarShade) {
             // Bubbles don't appear when the device is locked.
@@ -3136,7 +3110,6 @@ public class BubbleController implements ConfigurationChangeListener,
         pw.print(prefix); pw.println("  bubbleStateListenerSet= " + (mBubbleStateListener != null));
         pw.print(prefix); pw.println("  stackViewSet= " + (mStackView != null));
         pw.print(prefix); pw.println("  layerViewSet= " + (mLayerView != null));
-        pw.print(prefix); pw.println("  mOnImeHidden= " + mOnImeHidden);
         final boolean isScrimEnabled = mFeatureConfig.isScrimEnabled(mContext.getDisplayId());
         pw.print(prefix); pw.println("  isScrimEnabled= " + isScrimEnabled);
         pw.print(prefix);
@@ -3223,10 +3196,10 @@ public class BubbleController implements ConfigurationChangeListener,
             if (getDisplayId() != mContext.getDisplayId()) {
                 return;
             }
-            if (mOnImeHidden != null || mStackView != null) {
+            if (mStackView != null) {
                 // Only log if there's something relevant to log
                 BubbleLog.d("BubbleController.BubblesImeListener.onImeVisibilityChanged visible=%b"
-                        + " runnable=%s stackView=%s", imeVisible, mOnImeHidden, mStackView);
+                        + " stackView=%s", imeVisible, mStackView);
             }
             boolean heightChanged = imeHeight != mBubblePositioner.getImeHeight();
             // the imeHeight here is actually the ime inset; it only includes the part of the ime
@@ -3236,10 +3209,6 @@ public class BubbleController implements ConfigurationChangeListener,
             mBubblePositioner.setImeVisible(imeVisible, totalImeHeight);
             if (mStackView != null) {
                 mStackView.setImeVisible(imeVisible, heightChanged);
-                if (!imeVisible && mOnImeHidden != null) {
-                    mOnImeHidden.run();
-                    mOnImeHidden = null;
-                }
             }
         }
 

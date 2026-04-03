@@ -25,9 +25,11 @@ import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY_WITH_RANGE;
 import static android.app.admin.PolicyIdentifier.SIMPLE_LONG_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_LONG_POLICY_WITH_RANGE;
+import static android.app.admin.PolicyIdentifier.SIMPLE_PACKAGE_LIST_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_PACKAGE_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_LIST_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_POLICY;
+import static android.app.admin.PolicyIdentifier.STRING_POLICY_WITH_MAX_LENGTH;
 import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_ALLOWED;
 import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED;
 import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED_DISALLOWED;
@@ -39,6 +41,7 @@ import static android.app.admin.PolicyIdentifier.TEST_PROFILE_OWNER_OF_ORGANIZAT
 import static android.app.admin.PolicyIdentifier.TEST_PROFILE_OWNER_ON_USER0_ALLOWED;
 import static android.app.admin.PolicyIdentifier.TEST_PROFILE_OWNER_ON_USER_ALLOWED;
 
+import android.app.admin.PackageIdentifier;
 import android.app.admin.PolicyIdentifier;
 import java.lang.Integer;
 import java.lang.String;
@@ -117,6 +120,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -129,6 +133,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* minValue= */ -100,
             /* maxValue= */ 100
         ));
@@ -143,6 +148,7 @@ public class Policies {
             /* allowedDpcTypes= */ Set.of(
                 1  // DEVICE_OWNER
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -157,6 +163,7 @@ public class Policies {
             /* allowedDpcTypes= */ Set.of(
                 2  // FINANCED_DEVICE_OWNER
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -171,6 +178,7 @@ public class Policies {
             /* allowedDpcTypes= */ Set.of(
                 3  // MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -185,6 +193,7 @@ public class Policies {
             /* allowedDpcTypes= */ Set.of(
                 4  // PROFILE_OWNER_ON_USER0
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -199,6 +208,7 @@ public class Policies {
             /* allowedDpcTypes= */ Set.of(
                 5  // MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -214,6 +224,7 @@ public class Policies {
                 6, // UNAFFILIATED_FULL_USER_PROFILE_OWNER
                 7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -228,6 +239,7 @@ public class Policies {
             /* allowedDpcTypes= */ Set.of(
                 7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -243,6 +255,7 @@ public class Policies {
                 6, // UNAFFILIATED_FULL_USER_PROFILE_OWNER
                 7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -255,6 +268,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -272,6 +286,7 @@ public class Policies {
                 5, // MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
                 7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             ),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -284,6 +299,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
@@ -296,6 +312,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* minValue= */ Long.MIN_VALUE,
             /* maxValue= */ Long.MAX_VALUE
         ));
@@ -308,6 +325,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* minValue= */ 10L,
             /* maxValue= */ 100L
         ));
@@ -320,8 +338,10 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
             /* emptyStringAllowed= */ false,
-            /* unprintableCharactersAllowed= */ true
+            /* unprintableCharactersAllowed= */ true,
+            /* maxLength= */ Integer.MAX_VALUE
         ));
         policies.add(new ListPolicyMetadata<String>(
             /* id= */ SIMPLE_STRING_LIST_POLICY,
@@ -334,11 +354,27 @@ public class Policies {
                 /* requiredPermission= */ null,
                 /* requiredCrossUserPermission= */ null,
                 /* allowedDpcTypes= */ Set.of(),
+                /* resolutionMechanism= */ null,
                 /* emptyStringAllowed= */ true,
-                /* unprintableCharactersAllowed= */ false
+                /* unprintableCharactersAllowed= */ false,
+                /* maxLength= */ Integer.MAX_VALUE
             ),
             /* resolutionMechanism= */ null,
             /* emptyListAllowed= */ false
+        ));
+        policies.add(new StringPolicyMetadata(
+            /* id= */ STRING_POLICY_WITH_MAX_LENGTH,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null,
+            /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ null,
+            /* emptyStringAllowed= */ false,
+            /* unprintableCharactersAllowed= */ false,
+            /* maxLength= */ 10
         ));
         policies.add(new PackagePolicyMetadata(
             /* id= */ SIMPLE_PACKAGE_POLICY,
@@ -366,6 +402,21 @@ public class Policies {
                 1,
                 2
             )
+        ));
+        policies.add(new ListPolicyMetadata<PackageIdentifier>(
+            /* id= */ SIMPLE_PACKAGE_LIST_POLICY,
+            /* elementMetadata= */ new PackagePolicyMetadata(
+                /* id= */ new PolicyIdentifier<PackageIdentifier>(SIMPLE_PACKAGE_LIST_POLICY.getId() + "#elements"),
+                /* allowedScopes= */ Set.of(
+                    1
+                ),
+                /* affectedResource= */ 1,
+                /* requiredPermission= */ null,
+                /* requiredCrossUserPermission= */ null,
+                /* allowedDpcTypes= */ Set.of()
+            ),
+            /* resolutionMechanism= */ null,
+            /* emptyListAllowed= */ false
         ));
         return policies;
     }

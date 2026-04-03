@@ -20,6 +20,7 @@ import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_EMPTY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_STARTED_SERVICE;
 
+import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.app.IApplicationThread;
 import android.app.ProcessMemoryState.HostingComponentType;
@@ -28,6 +29,7 @@ import android.os.Debug;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.DebugUtils;
+import android.util.IndentingPrintWriter;
 import android.util.TimeUtils;
 
 import com.android.internal.annotations.CompositeRWLock;
@@ -39,7 +41,6 @@ import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.power.stats.BatteryStatsImpl;
 
-import java.io.PrintWriter;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -129,7 +130,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
      * Currently requesting pss for.
      */
     @GuardedBy("mProfilerLock")
-    private int mPssProcState = PROCESS_STATE_NONEXISTENT;
+    private @ActivityManager.ProcessState int mPssProcState = PROCESS_STATE_NONEXISTENT;
 
     /**
      * The type of stat collection that we are currently requesting.
@@ -196,13 +197,13 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     private IApplicationThread mThread;
 
     @GuardedBy("mProfilerLock")
-    private int mSetProcState;
+    private @ActivityManager.ProcessState  int mSetProcState;
 
     @GuardedBy("mProfilerLock")
     private @OomAdjust int mSetAdj;
 
     @GuardedBy("mProfilerLock")
-    private int mCurRawAdj;
+    private @OomAdjust int mCurRawAdj;
 
     @GuardedBy("mProfilerLock")
     private long mLastStateTime;
@@ -432,12 +433,13 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
+    @ActivityManager.ProcessState
     int getPssProcState() {
         return mPssProcState;
     }
 
     @GuardedBy("mProfilerLock")
-    void setPssProcState(int pssProcState) {
+    void setPssProcState(@ActivityManager.ProcessState int pssProcState) {
         mPssProcState = pssProcState;
     }
 
@@ -535,7 +537,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
         }
     }
 
-    void setProcessTrackerState(int procState, int memFactor) {
+    void setProcessTrackerState(@ActivityManager.ProcessState int procState, int memFactor) {
         synchronized (mService.mProcessStats.mLock) {
             final ProcessState tracker = mBaseProcessTracker;
             if (tracker != null) {
@@ -562,12 +564,13 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
-    long computeNextPssTime(int procState, boolean test, boolean sleeping, long now) {
+    long computeNextPssTime(@ActivityManager.ProcessState int procState, boolean test,
+            boolean sleeping, long now) {
         return ProcessList.computeNextPssTime(procState, mProcStateMemTracker, test, sleeping, now,
                 // Cap the Pss time to make sure no Pss is collected during the very few
                 // minutes after the system is boot, given the system is already busy.
                 Math.max(mService.mBootCompletedTimestamp, mService.mLastIdleTime)
-                + mService.mConstants.FULL_PSS_MIN_INTERVAL);
+                        + mService.mConstants.FULL_PSS_MIN_INTERVAL);
     }
 
     private static void commitNextPssTime(ProcStateMemTracker tracker) {
@@ -614,6 +617,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
+    @ActivityManager.ProcessState
     int getSetProcState() {
         return mSetProcState;
     }
@@ -624,7 +628,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mProfilerLock")
-    int getCurRawAdj() {
+    @OomAdjust int getCurRawAdj() {
         return mCurRawAdj;
     }
 
@@ -668,11 +672,10 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mService")
-    void dumpPss(PrintWriter pw, String prefix, long nowUptime) {
+    void dumpPss(@NonNull IndentingPrintWriter pw, long nowUptime) {
         synchronized (mProfilerLock) {
             // TODO(b/297542292): Remove this case once PSS profiling is replaced
             if (mService.mAppProfiler.isProfilingPss()) {
-                pw.print(prefix);
                 pw.print("lastPssTime=");
                 TimeUtils.formatDuration(mLastPssTime, nowUptime, pw);
                 pw.print(" pssProcState=");
@@ -682,7 +685,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
                 pw.print(" nextPssTime=");
                 TimeUtils.formatDuration(mNextPssTime, nowUptime, pw);
                 pw.println();
-                pw.print(prefix);
+
                 pw.print("lastPss=");
                 DebugUtils.printSizeValue(pw, mLastPss * 1024);
                 pw.print(" lastSwapPss=");
@@ -694,7 +697,6 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
                 pw.print(" lastRss=");
                 DebugUtils.printSizeValue(pw, mLastRss * 1024);
             } else {
-                pw.print(prefix);
                 pw.print("lastRssTime=");
                 TimeUtils.formatDuration(mLastPssTime, nowUptime, pw);
                 pw.print(" rssProcState=");
@@ -704,19 +706,20 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
                 pw.print(" nextRssTime=");
                 TimeUtils.formatDuration(mNextPssTime, nowUptime, pw);
                 pw.println();
-                pw.print(prefix);
+
                 pw.print("lastRss=");
                 DebugUtils.printSizeValue(pw, mLastRss * 1024);
                 pw.print(" lastCachedRss=");
                 DebugUtils.printSizeValue(pw, mLastCachedRss * 1024);
             }
             pw.println();
-            pw.print(prefix);
+
             pw.print("trimMemoryLevel=");
             pw.println(mTrimMemoryLevel);
-            pw.print(prefix); pw.print("procStateMemTracker: ");
+
+            pw.print("procStateMemTracker: ");
             mProcStateMemTracker.dumpLine(pw);
-            pw.print(prefix);
+
             pw.print("lastRequestedGc=");
             TimeUtils.formatDuration(mLastRequestedGc, nowUptime, pw);
             pw.print(" lastLowMemory=");
@@ -724,20 +727,18 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
             pw.print(" reportLowMemory=");
             pw.println(mReportLowMemory);
         }
-        pw.print(prefix);
+
         pw.print("currentHostingComponentTypes=0x");
         pw.print(Integer.toHexString(getCurrentHostingComponentTypes()));
         pw.print(" historicalHostingComponentTypes=0x");
         pw.println(Integer.toHexString(getHistoricalHostingComponentTypes()));
     }
 
-    void dumpCputime(PrintWriter pw, String prefix) {
+    void dumpCputime(@NonNull IndentingPrintWriter pw) {
         final long lastCpuTime = mLastCpuTime.get();
-        pw.print(prefix);
-        pw.print("lastCpuTime=");
-        pw.print(lastCpuTime);
+        pw.print("lastCpuTime", lastCpuTime);
         if (lastCpuTime > 0) {
-            pw.print(" timeUsed=");
+            pw.print("timeUsed=");
             TimeUtils.formatDuration(mCurCpuTime.get() - lastCpuTime, pw);
         }
         pw.println();

@@ -101,6 +101,7 @@ import com.android.internal.R;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
 import com.android.server.location.fudger.LocationFudgerCache;
+import com.android.server.location.injector.FakeEmergencyHelper;
 import com.android.server.location.injector.FakeUserInfoHelper;
 import com.android.server.location.injector.TestInjector;
 import com.android.server.location.provider.proxy.ProxyPopulationDensityProvider;
@@ -170,6 +171,7 @@ public class LocationProviderManagerTest {
     private PowerManager mPowerManager;
     @Mock
     private PowerManager.WakeLock mWakeLock;
+    private FakeEmergencyHelper mEmergencyHelper;
 
     private TestInjector mInjector;
     private PassiveLocationProviderManager mPassive;
@@ -199,10 +201,13 @@ public class LocationProviderManagerTest {
                 .when(mContext)
                 .checkCallingOrSelfPermission(MISSING_PERMISSION);
 
-        mInjector = new TestInjector(mContext);
+        mInjector = spy(new TestInjector(mContext));
         mInjector.getUserInfoHelper().setUserVisible(CURRENT_USER, true);
         mInjector.getUserInfoHelper().startUser(OTHER_USER);
         mInjector.getUserInfoHelper().setUserVisible(OTHER_USER, true);
+
+        mEmergencyHelper = spy(new FakeEmergencyHelper());
+        doReturn(mEmergencyHelper).when(mInjector).getEmergencyHelper();
 
         mPassive = new PassiveLocationProviderManager(mContext, mInjector);
         mPassive.startManager(null);
@@ -1178,8 +1183,6 @@ public class LocationProviderManagerTest {
 
     @Test
     public void testProviderRequest_IgnoreLocationSettings_LocationBypass() {
-        mSetFlagsRule.enableFlags(Flags.FLAG_ENABLE_LOCATION_BYPASS);
-
         doReturn(PackageManager.PERMISSION_GRANTED)
                 .when(mContext)
                 .checkPermission(LOCATION_BYPASS, IDENTITY.getPid(), IDENTITY.getUid());
@@ -1205,8 +1208,6 @@ public class LocationProviderManagerTest {
 
     @Test
     public void testProviderRequest_IgnoreLocationSettings_LocationBypass_EmergencyCall() {
-        mSetFlagsRule.enableFlags(Flags.FLAG_ENABLE_LOCATION_BYPASS);
-
         doReturn(PackageManager.PERMISSION_GRANTED)
                 .when(mContext)
                 .checkPermission(LOCATION_BYPASS, IDENTITY.getPid(), IDENTITY.getUid());
@@ -1215,6 +1216,7 @@ public class LocationProviderManagerTest {
         mInjector.getLocationPermissionsHelper()
                 .revokePermission(IDENTITY.getPackageName(), ACCESS_COARSE_LOCATION);
         mInjector.getEmergencyHelper().setInEmergency(true);
+
         mInjector
                 .getSettingsHelper()
                 .setIgnoreSettingsAllowlist(
@@ -1231,6 +1233,46 @@ public class LocationProviderManagerTest {
         assertThat(mProvider.getRequest().isActive()).isTrue();
         assertThat(mProvider.getRequest().getIntervalMillis()).isEqualTo(1);
         assertThat(mProvider.getRequest().isLocationSettingsIgnored()).isTrue();
+    }
+
+    @Test
+    public void testRegisterLocationRequest_WithBypass_isInEmergencyCalled() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_SKIP_EMERGENCY_CHECK_WITHOUT_BYPASS);
+
+        // With Bypass
+        doReturn(PackageManager.PERMISSION_GRANTED)
+                .when(mContext)
+                .checkPermission(LOCATION_BYPASS, IDENTITY.getPid(), IDENTITY.getUid());
+
+        ILocationListener listener = createMockLocationListener();
+        LocationRequest request =
+                new LocationRequest.Builder(1)
+                        .setWorkSource(WORK_SOURCE)
+                        .build();
+        mManager.registerLocationRequest(request, IDENTITY, PERMISSION_FINE, listener);
+
+        // isInEmergency called
+        verify(mEmergencyHelper).isInEmergency(anyLong());
+    }
+
+    @Test
+    public void testRegisterLocationRequest_RegistrationWithoutBypass_isInEmergencyNotCalled() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_SKIP_EMERGENCY_CHECK_WITHOUT_BYPASS);
+
+        // Without Bypass
+        doReturn(PackageManager.PERMISSION_DENIED)
+                .when(mContext)
+                .checkPermission(LOCATION_BYPASS, IDENTITY.getPid(), IDENTITY.getUid());
+
+        ILocationListener listener = createMockLocationListener();
+        LocationRequest request =
+                new LocationRequest.Builder(1)
+                        .setWorkSource(WORK_SOURCE)
+                        .build();
+        mManager.registerLocationRequest(request, IDENTITY, PERMISSION_FINE, listener);
+
+        // isInEmergency not called
+        verify(mEmergencyHelper, never()).isInEmergency(anyLong());
     }
 
     @Test

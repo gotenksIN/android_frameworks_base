@@ -28,8 +28,11 @@ import javax.inject.Inject
 class NotificationRulesInteractorImpl
 @Inject
 constructor(private val repository: NotificationRulesRepository) : NotificationRulesInteractor {
-    override val rules: List<RuleModel>
-        get() = repository.rules
+    override val customRules: List<RuleModel>
+        get() = repository.rules.filter { !it.isSystemRule }
+
+    override val bundleRules: List<RuleModel>
+        get() = customRules.filter { it.action is ActionModel.Bundle }
 
     override suspend fun createDraftRuleFromFreeformText(
         action: ActionModel,
@@ -38,7 +41,11 @@ constructor(private val repository: NotificationRulesRepository) : NotificationR
         return repository.createDraftRuleFromFreeformText(action, text)
     }
 
-    override fun createRule(newRule: RuleModel) {
-        repository.createRule(newRule)
+    override suspend fun saveRule(rule: DraftRuleModel): Boolean {
+        return repository.saveRule(rule)
+    }
+
+    override suspend fun deleteRule(ruleId: Int): Boolean {
+        return repository.deleteRule(ruleId)
     }
 }

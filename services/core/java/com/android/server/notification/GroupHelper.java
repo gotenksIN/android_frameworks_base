@@ -175,10 +175,10 @@ public class GroupHelper {
                                 && record.getImportance() < NotificationManager.IMPORTANCE_DEFAULT)
         ));
 
-        if (android.app.Flags.nmHighlights()) {
+        if (android.app.Flags.nmContextualDisplayLaunch()) {
             sectionsList.add(new NotificationSectioner("HighlightsSection", 0,
                     autogroupBundlesAtCount, (record) ->
-                    record.getProposedImportance() == IMPORTANCE_MAX));
+                    record.getImportance() == IMPORTANCE_MAX));
         }
 
         NOTIFICATION_NAS_SECTIONS = new ArrayList<>(sectionsList);
@@ -839,7 +839,6 @@ public class GroupHelper {
         final StatusBarNotification sbn = record.getSbn();
         final String pkgName = sbn.getPackageName();
         final int userId = record.getUserId();
-
         final FullyQualifiedGroupKey fullAggregateGroupKey = getSectionGroupKeyWithFallback(record);
         if (fullAggregateGroupKey == null) {
             if (DEBUG) {

@@ -49,6 +49,12 @@
       ]
     },
     {
+      "name": "FunctionalTestsDesktopMode-desktopfirst-DesktopFirstPolicyTest",
+      "keywords": [
+        "desktop"
+      ]
+    },
+    {
       "name": "FunctionalTestsDesktopMode-drag-DragAppWindowMultiWindowAndPipTest",
       "keywords": [
         "desktop"
@@ -83,6 +89,10 @@
       "keywords": [
         "desktop"
       ]
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-externaldisplay-ProjectedModeStayOnDeviceTest",
+      "keywords": []
     },
     {
       "name": "FunctionalTestsDesktopMode-externaldisplay-MoveToNextDisplayTest",

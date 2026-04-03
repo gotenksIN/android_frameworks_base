@@ -18,6 +18,7 @@
 package com.android.systemui.notifications.ui.composable
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -218,6 +219,7 @@ fun ContentScope.ScrollingNotificationPanel(
     stackTopPadding: Dp,
     stackBottomPadding: () -> Dp,
     modifier: Modifier = Modifier,
+    aboveNotifications: @Composable (modifier: Modifier) -> Unit = {},
     shouldFillMaxHeight: Boolean = false,
     shouldIncludeHeadsUpSpace: Boolean = true,
     shouldDrawScrimBackground: Boolean = true,
@@ -277,6 +279,7 @@ fun ContentScope.ScrollingNotificationPanel(
         isTransparencyEnabled = isTransparencyEnabled,
         stackTopPadding = stackTopPadding,
         stackBottomPadding = stackBottomPadding,
+        aboveNotifications = aboveNotifications,
         shouldContentFillMaxSize = shouldFillMaxHeight,
         shouldScrimBackgroundFillMaxHeight = false,
         shouldDrawScrimBackground = shouldDrawScrimBackground,
@@ -307,6 +310,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
     scrollingContentOverscrollEffect: OffsetOverscrollEffect,
     shortContentOverscrollEffect: OffsetOverscrollEffect,
     modifier: Modifier = Modifier,
+    aboveNotifications: @Composable (modifier: Modifier) -> Unit = {},
     shouldContentFillMaxSize: Boolean,
     shouldScrimBackgroundFillMaxHeight: Boolean,
     shouldIncludeHeadsUpSpace: Boolean = true,
@@ -357,7 +361,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                             imeTopValue > 0f &&
                             remoteInputRowBottom > imeTopValue
                     ) {
-                        scrollStackWithNestedScroll(
+                        scrollStackBy(
                             delta = Offset(x = 0f, y = remoteInputRowBottom - imeTopValue),
                             nestedScrollDispatcher = nestedScrollDispatcher,
                             scrollState = contentScrollState,
@@ -367,8 +371,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
         }
 
         // TalkBack sends a scroll event, when it wants to navigate to an item that is not displayed
-        // in
-        // the current viewport.
+        // in the current viewport.
         LaunchedEffect(viewModel) {
             viewModel.setAccessibilityScrollEventConsumer { event ->
                 // scroll up, or down by the height of the visible portion of the notification stack
@@ -384,7 +387,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                 val targetScroll =
                     (scrollPosition + direction * scrollStep).coerceIn(0f, scrollRange)
                 coroutineScope.launch {
-                    scrollStackWithNestedScroll(
+                    scrollStackBy(
                         delta = Offset(x = 0f, y = targetScroll - scrollPosition),
                         nestedScrollDispatcher = nestedScrollDispatcher,
                         scrollState = contentScrollState,
@@ -416,8 +419,8 @@ fun ContentScope.NestedScrollingNotificationPanel(
     val expansionFraction by viewModel.expandFraction.collectAsStateWithLifecycle(0f)
     val screenHeight = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
 
-    /** Total horizontal stack padding in pixels. */
-    val stackHorizontalPaddingPx = {
+    /** Total vertical stack padding in pixels. */
+    val stackVerticalPaddingPx = {
         with(density) { (stackTopPadding + stackBottomPadding()).toPx() }.roundToInt()
     }
 
@@ -568,13 +571,15 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                 stackBoundsOnScreen.value = coordinates.boundsInWindow()
                             }
                 ) {
+                    // This is Media in disguise.
+                    aboveNotifications(Modifier.padding(bottom = 16.dp))
                     StackPlaceholder(
                         tag = "NestedScroll",
                         viewModel = viewModel,
                         modifier =
                             Modifier.notificationStackHeight(view = stackScrollView)
                                 .onSizeChanged { size ->
-                                    onStackHeightChanged(size.height + stackHorizontalPaddingPx())
+                                    onStackHeightChanged(size.height + stackVerticalPaddingPx())
                                 },
                     )
                     Spacer(
@@ -696,23 +701,46 @@ private fun NotificationRulesEntryPoint(
     }
 }
 
-private suspend fun scrollStackWithNestedScroll(
+/**
+ * Scrolls the Stack by a given [delta] while properly dispatching nested scroll events.
+ *
+ * Note: [delta] represents **"scroll deltas"** (where positive means scrolling DOWN the list,
+ * simulating a finger dragging UP).
+ */
+@VisibleForTesting
+suspend fun scrollStackBy(
     delta: Offset,
     nestedScrollDispatcher: NestedScrollDispatcher,
     scrollState: ScrollState,
 ): Offset {
+    // Invert because ScrollState expects scroll space (positive = up), and delta is pointer space.
+    val invertedConsumed =
+        performNestedScroll(delta = -delta, nestedScrollDispatcher = nestedScrollDispatcher) {
+            available ->
+            val consumedByScroll = scrollState.scrollBy(-available.y)
+            Offset(x = 0f, y = -consumedByScroll)
+        }
+    return -invertedConsumed
+}
+
+/** A utility for wrapping a scroll operation with the Compose Nested Scroll protocol. */
+private inline fun performNestedScroll(
+    delta: Offset,
+    nestedScrollDispatcher: NestedScrollDispatcher,
+    performScroll: (Offset) -> Offset,
+): Offset {
     val preConsumed =
         nestedScrollDispatcher.dispatchPreScroll(
-            available = -delta, // need a negative delta here to move the scrim up
+            available = delta,
             source = NestedScrollSource.UserInput,
         )
     val available = delta - preConsumed
-    val consumed = Offset(x = 0f, y = scrollState.scrollBy(available.y))
+    val consumed = performScroll(available)
     val left = available - consumed
     val postConsumed =
         nestedScrollDispatcher.dispatchPostScroll(
             consumed = consumed,
-            available = -left, // need to invert it here, just like on preScroll
+            available = left,
             source = NestedScrollSource.UserInput,
         )
     return consumed + preConsumed + postConsumed

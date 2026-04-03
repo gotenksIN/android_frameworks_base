@@ -73,7 +73,14 @@ public final class Adjustment implements Parcelable {
             KEY_NOT_CONVERSATION,
             KEY_TYPE,
             KEY_UNCLASSIFY,
-            KEY_SUMMARIZATION
+            KEY_SUMMARIZATION,
+            KEY_NOTIFICATION_RULES,
+            KEY_HIGHLIGHT,
+            KEY_LIGHT,
+            KEY_SOUND,
+            KEY_MODE_BREAKTHROUGH_LIST,
+            KEY_BREAKTHROUGH_ALL_MODES,
+            KEY_DYNAMIC_BUNDLE
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Keys {}
@@ -313,7 +320,7 @@ public final class Adjustment implements Parcelable {
     public Adjustment(String pkg, String key, Bundle signals, CharSequence explanation, int user) {
         mPackage = pkg;
         mKey = key;
-        mSignals = signals;
+        mSignals = signals != null ? signals : new Bundle();
         mExplanation = explanation;
         mUser = user;
     }
@@ -333,7 +340,7 @@ public final class Adjustment implements Parcelable {
             @NonNull UserHandle userHandle) {
         mPackage = pkg;
         mKey = key;
-        mSignals = signals;
+        mSignals = signals != null ? signals : new Bundle();
         mExplanation = explanation;
         mUser = userHandle.getIdentifier();
     }
@@ -449,7 +456,7 @@ public final class Adjustment implements Parcelable {
     @Override
     public String toString() {
         return "Adjustment{"
-                + "mSignals=" + mSignals
+                + "mSignals=" + mSignals.keySet()
                 + ", mUser=" + mUser
                 + ", mRuleId=" + mRuleId
                 + ", mRuleOrder=" + mRuleOrder

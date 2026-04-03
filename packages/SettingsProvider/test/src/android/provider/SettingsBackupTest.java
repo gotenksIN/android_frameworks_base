@@ -180,7 +180,6 @@ public class SettingsBackupTest {
                     Settings.Global.DEVELOPMENT_FORCE_RESIZABLE_ACTIVITIES,
                     Settings.Global.DEVELOPMENT_FORCE_RTL,
                     Settings.Global.DEVELOPMENT_ENABLE_NON_RESIZABLE_MULTI_WINDOW,
-                    Settings.Global.DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR,
                     Settings.Global.DEVELOPMENT_SHADE_DISPLAY_AWARENESS,
                     Settings.Global.DEVELOPMENT_WM_DISPLAY_SETTINGS_PATH,
                     Settings.Global.DEVICE_DEMO_MODE,
@@ -635,7 +634,9 @@ public class SettingsBackupTest {
                     Settings.Global.Wearable.WEAR_POWER_ANOMALY_SERVICE_ENABLED,
                     Settings.Global.Wearable.CONNECTIVITY_KEEP_DATA_ON,
                     Settings.Global.Wearable.PHONE_SWITCHING_REQUEST_SOURCE,
-                    Settings.Global.Wearable.WEAR_SYSTEM_STATUS_TRAY_CONFIGURATION);
+                    Settings.Global.Wearable.WEAR_SYSTEM_STATUS_TRAY_CONFIGURATION,
+                    Settings.Global.Wearable.RAISE_TO_TALK_MEDIATED_ENABLED
+                );
 
     private static final Set<String> BACKUP_DENY_LIST_SECURE_SETTINGS =
              newHashSet(

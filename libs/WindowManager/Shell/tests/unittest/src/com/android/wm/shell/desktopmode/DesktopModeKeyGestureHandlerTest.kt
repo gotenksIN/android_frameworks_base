@@ -37,7 +37,6 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer
 import com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession
 import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import com.android.testing.wm.util.MockToken
-import com.android.window.flags.Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
@@ -104,6 +103,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
     private val desktopState = FakeDesktopState()
     private val shellController = mock<ShellController>()
     private val accessibilityManager = mock<AccessibilityManager>()
+    private val keyguardManager = mock<android.app.KeyguardManager>()
 
     private lateinit var desktopModeKeyGestureHandler: DesktopModeKeyGestureHandler
     private lateinit var keyGestureEventHandler: KeyGestureEventHandler
@@ -176,6 +176,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
                 desktopState,
                 accessibilityManager,
                 shellController,
+                keyguardManager,
             )
     }
 
@@ -418,7 +419,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
     fun keyGestureQuitFocusedDesktopTask_shouldQuitFullscreenTask() {
         // Setup a focused fullscreen task
         val task = setUpFullscreenTask()
@@ -443,7 +443,6 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
     fun keyGestureQuitFocusedDesktopTask_shouldQuitSplitScreenTask() {
         // Setup a focused split screen task
         val task = setUpSplitScreenTask()
@@ -526,6 +525,27 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
         val displayId = 2
         whenever(focusTransitionObserver.globallyFocusedDisplayId).thenReturn(displayId)
         whenever(shellController.isOverviewVisible(displayId)).thenReturn(true)
+        val event =
+            KeyGestureEvent.Builder()
+                .setKeyGestureType(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_FULLSCREEN)
+                .build()
+
+        keyGestureEventHandler.handleKeyGestureEvent(event, null)
+        testExecutor.flushAll()
+
+        verify(desktopTasksController, never())
+            .toggleFocusedTaskFullscreenState(
+                displayId = any(),
+                userId = any(),
+                transitionSource = any(),
+            )
+    }
+
+    @Test
+    fun keyGesture_keyguardLocked_doesNotHandleGesture() {
+        val displayId = 2
+        whenever(focusTransitionObserver.globallyFocusedDisplayId).thenReturn(displayId)
+        whenever(keyguardManager.isKeyguardLocked).thenReturn(true)
         val event =
             KeyGestureEvent.Builder()
                 .setKeyGestureType(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_FULLSCREEN)

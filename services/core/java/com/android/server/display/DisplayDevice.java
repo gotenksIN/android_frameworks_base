@@ -46,7 +46,7 @@ import java.util.Arrays;
  * Display devices are guarded by the {@link DisplayManagerService.SyncRoot} lock.
  * </p>
  */
-abstract class DisplayDevice {
+public abstract class DisplayDevice {
     /**
      * Maximum acceptable anisotropy for the output image.
      *
@@ -82,7 +82,7 @@ abstract class DisplayDevice {
     // DEBUG STATE: Last device info which was written to the log, or null if none.
     // Do not use for any other purpose.
     DisplayDeviceInfo mDebugLastLoggedDeviceInfo;
-    DisplayDevice(DisplayAdapter displayAdapter, IBinder displayToken, String uniqueId,
+    public DisplayDevice(DisplayAdapter displayAdapter, IBinder displayToken, String uniqueId,
             Context context) {
         mDisplayAdapter = displayAdapter;
         mDisplayToken = displayToken;
@@ -255,21 +255,6 @@ abstract class DisplayDevice {
      */
     public void setDesiredDisplayModeSpecsLocked(
             DisplayModeDirector.DesiredDisplayModeSpecs displayModeSpecs) {}
-
-    /**
-     * Sets the display mode specs.
-     * If the method is called with isInBatch set to true, applyBatchDisplayModeUpdatesLocked must
-     * be called to apply the changes.
-     *
-     * @param isInBatch - true if the display in question is a part of a batched request and the
-     *                  message on the spec setting should be delayed until the batch is complete,
-     *                  false if the message should be sent immediately
-     */
-    public void setDesiredDisplayModeSpecsLocked(
-            DisplayModeDirector.DesiredDisplayModeSpecs displayModeSpecs, boolean isInBatch) {
-        setDesiredDisplayModeSpecsLocked(displayModeSpecs);
-    }
-
 
     /**
      * Sets the user preferred display mode. Removes the user preferred display mode and sets

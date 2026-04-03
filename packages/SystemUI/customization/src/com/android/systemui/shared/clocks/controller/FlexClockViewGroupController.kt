@@ -38,24 +38,39 @@ import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceEvents
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockPositionAnimationArgs
 import com.android.systemui.plugins.keyguard.ui.clocks.ThemeConfig
 import com.android.systemui.plugins.keyguard.ui.clocks.TimeFormatKind
+import com.android.systemui.shared.Flags.enableAiClocks
 import com.android.systemui.shared.clocks.FlexClockContext
+import com.android.systemui.shared.clocks.view.BitmapClockViewGroup
 import com.android.systemui.shared.clocks.view.FlexClockViewGroup
 import java.util.Locale
 
-class FlexClockViewGroupController(private val clockCtx: FlexClockContext) :
-    FlexClockViewController {
+class FlexClockViewGroupController(
+    private val clockCtx: FlexClockContext,
+    private val layerCfg: LayerConfig,
+    private val isLargeClock: Boolean,
+) : FlexClockViewController {
     val layerControllers = mutableListOf<FlexClockViewController>()
     val dozeState = AnimationState(1F)
-
-    override val view = FlexClockViewGroup(clockCtx)
+    override val view =
+        if (enableAiClocks()) {
+            BitmapClockViewGroup(clockCtx, isLargeClock)
+        } else {
+            FlexClockViewGroup(clockCtx)
+        }
     override var onViewBoundsChanged by view::onViewBoundsChanged
     override var onViewMaxSizeChanged by view::onViewMaxSizeChanged
 
     init {
         fun createController(cfg: LayerConfig) {
-            val controller = FlexClockTextViewController(clockCtx, cfg, isLargeClock = true)
-            view.addView(controller.view)
-            layerControllers.add(controller)
+            if (enableAiClocks()) {
+                val controller = BitmapClockViewController(clockCtx, cfg, isLargeClock)
+                view.addView(controller.view)
+                layerControllers.add(controller)
+            } else {
+                val controller = FlexClockTextViewController(clockCtx, cfg, isLargeClock = true)
+                view.addView(controller.view)
+                layerControllers.add(controller)
+            }
         }
 
         val layerCfg =

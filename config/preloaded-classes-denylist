@@ -1,6 +1,5 @@
 android.content.AsyncTaskLoader$LoadTask
 android.icu.text.SpoofChecker
-android.net.ConnectivityThread$Singleton
 android.os.FileObserver
 android.os.NullVibrator
 android.provider.MediaStore
@@ -9,4 +8,8 @@ android.widget.Magnifier
 com.android.internal.jank.InteractionJankMonitor$InstanceHolder
 com.android.internal.util.LatencyTracker$SLatencyTrackerHolder
 gov.nist.core.net.DefaultNetworkLayer
+
+# Classes that have moved to module-specific denylists (kept here in case
+# a new platform is built against an old module that doesn't have a denylist).
+android.net.ConnectivityThread$Singleton
 java.util.concurrent.ThreadLocalRandom

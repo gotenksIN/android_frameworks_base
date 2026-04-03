@@ -18,6 +18,7 @@ package com.android.systemui.display.dagger
 
 import com.android.systemui.SysUICutoutProvider
 import com.android.systemui.common.ui.ConfigurationState
+import com.android.systemui.decor.dagger.PerDisplaySystemDecorationsModule
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.PerDisplaySingleton
 import com.android.systemui.display.data.repository.DisplayStateRepository
 import com.android.systemui.display.domain.interactor.DisplayStateInteractor
@@ -32,7 +33,7 @@ import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEvent
 import com.android.systemui.statusbar.gesture.SwipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.StatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarVisibilityInteractor
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.AvControlsChipInteractor
 import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
@@ -52,7 +53,7 @@ import kotlinx.coroutines.CoroutineScope
  * thread is not feasible as it would cause jank.
  */
 @PerDisplaySingleton
-@Subcomponent(modules = [PerDisplaySystemUIModule::class])
+@Subcomponent(modules = [PerDisplaySystemUIModule::class, PerDisplaySystemDecorationsModule::class])
 interface SystemUIDisplaySubcomponent {
 
     @get:DisplayAware val avControlsChipInteractor: AvControlsChipInteractor
@@ -71,7 +72,7 @@ interface SystemUIDisplaySubcomponent {
 
     @get:DisplayAware val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel
 
-    @get:DisplayAware val statusBarVisibilityInteractor: StatusBarVisibilityInteractor
+    @get:DisplayAware val homeStatusBarVisibilityInteractor: HomeStatusBarVisibilityInteractor
 
     @get:DisplayAware val statusBarContentInsetsProvider: StatusBarContentInsetsProvider
 

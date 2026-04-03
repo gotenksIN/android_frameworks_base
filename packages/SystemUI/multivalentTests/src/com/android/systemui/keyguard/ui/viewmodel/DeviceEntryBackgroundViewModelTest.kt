@@ -35,7 +35,10 @@ import com.android.systemui.keyguard.shared.model.TransitionState.RUNNING
 import com.android.systemui.keyguard.shared.model.TransitionState.STARTED
 import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.kosmos.testScope
+import com.android.systemui.scene.domain.interactor.sceneInteractor
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.testKosmos
+import com.android.systemui.window.data.repository.fakeWindowRootViewBlurRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -105,9 +108,26 @@ class DeviceEntryBackgroundViewModelTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_LOCKSCREEN_BLUR)
-    fun enableLockscreenBlur_colorIsCorrect() =
+    fun useBackgroundAndBlurIsSupported_colorIsCorrect() =
         testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.fakeWindowRootViewBlurRepository.isBlurSupported.value = true
+
             val expected = SurfaceEffectColors.surfaceEffect1(mContext)
+            val color by collectLastValue(underTest.color)
+
+            assertThat(color).isEqualTo(expected)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_LOCKSCREEN_BLUR)
+    fun useBackgroundAndBlurIsNotSupported_colorIsCorrect() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.fakeWindowRootViewBlurRepository.isBlurSupported.value = false
+
+            val expected =
+                getColorAttrDefaultColor(mContext, com.android.internal.R.attr.colorSurface)
             val color by collectLastValue(underTest.color)
 
             assertThat(color).isEqualTo(expected)
@@ -159,6 +179,45 @@ class DeviceEntryBackgroundViewModelTest : SysuiTestCase() {
             )
             runCurrent()
             assertThat(alpha).isEqualTo(0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsOneWhenOnCommunalScene() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.sceneInteractor.changeScene(toScene = Scenes.Communal, loggingReason = "test")
+            runCurrent()
+
+            val alpha by collectLastValue(underTest.alpha)
+            assertThat(alpha).isEqualTo(1.0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsOneWhenOnShadeScene() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.sceneInteractor.changeScene(toScene = Scenes.Shade, loggingReason = "test")
+            runCurrent()
+
+            val alpha by collectLastValue(underTest.alpha)
+            assertThat(alpha).isEqualTo(1.0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsOneWhenOnQuickSettingsScene() =
+        testScope.runTest {
+            kosmos.fingerprintPropertyRepository.supportsUdfps()
+            kosmos.sceneInteractor.changeScene(
+                toScene = Scenes.QuickSettings,
+                loggingReason = "test",
+            )
+            runCurrent()
+
+            val alpha by collectLastValue(underTest.alpha)
+            assertThat(alpha).isEqualTo(1.0f)
         }
 
     private fun lockscreenToDozing(value: Float, state: TransitionState = RUNNING): TransitionStep {

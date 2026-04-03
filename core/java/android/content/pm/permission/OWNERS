@@ -2,6 +2,5 @@
 
 include platform/frameworks/base:/core/java/android/permission/OWNERS
 
-toddke@android.com
 patb@google.com
 

@@ -17,9 +17,11 @@
 package com.android.systemui.user.domain.interactor
 
 import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.testScope
 import com.android.systemui.user.data.repository.userRepository
 import org.mockito.kotlin.mock
 
-val Kosmos.selectedUserInteractor by Kosmos.Fixture { SelectedUserInteractor(userRepository) }
+val Kosmos.selectedUserInteractor by
+    Kosmos.Fixture { SelectedUserInteractor(userRepository, testScope.backgroundScope) }
 
 val Kosmos.fakeSelectedUserInteractor: SelectedUserInteractor by Kosmos.Fixture { mock() }

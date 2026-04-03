@@ -118,7 +118,7 @@ private fun ExternalDisplayConnectionIcon() {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.stat_sys_connected_display),
+            painter = painterResource(id = R.drawable.ic_connected_display),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSecondary,
             modifier = Modifier.fillMaxSize().padding(6.dp),

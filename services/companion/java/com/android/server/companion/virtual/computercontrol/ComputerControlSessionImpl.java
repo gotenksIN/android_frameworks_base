@@ -16,6 +16,7 @@
 
 package com.android.server.companion.virtual.computercontrol;
 
+import static android.app.Notification.FLAG_COMPUTER_CONTROL;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_BLOCKED_ACTIVITY;
@@ -33,12 +34,14 @@ import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
 import android.app.AppOpsManager;
 import android.app.KeyguardManager;
+import android.app.Notification;
 import android.app.PendingIntent;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.audio.VirtualAudioDevice;
 import android.companion.virtual.computercontrol.ComputerControlSession;
+import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlLifecycleCallback;
 import android.companion.virtual.computercontrol.IComputerControlSession;
 import android.companion.virtual.computercontrol.IInteractiveMirror;
@@ -85,12 +88,14 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.internal.inputmethod.InputConnectionCommandHeader;
+import com.android.internal.os.IResultReceiver;
 import com.android.server.FgThread;
 import com.android.server.LocalServices;
 import com.android.server.UiThread;
 import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal;
+import com.android.server.notification.NotificationManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.ActivityAssistInfo;
 import com.android.server.wm.ActivityTaskManagerInternal;
@@ -128,7 +133,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private static final int TRACE_COOKIE_WINDOW_DRAW = 1;
 
     private static final long DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS =
-            TimeUnit.MILLISECONDS.convert(360, TimeUnit.MINUTES);
+            TimeUnit.MILLISECONDS.convert(60, TimeUnit.MINUTES);
 
     // Timeout for waiting for all windows on the display to be drawn before taking a screenshot.
     private static final int WINDOW_DRAW_TIMEOUT_MS = 1000;
@@ -210,7 +215,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     /** Executor for the shared FgThread. */
     private final Executor mFgThreadExecutor;
     private final AppOpsManager mOwnerAppOpsManager;
-
     private final WindowManagerInternal mWindowManagerInternal;
     private final InputMethodManagerInternal mInputMethodManagerInternal;
     private final UserManagerInternal mUserManagerInternal;
@@ -218,7 +222,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final InputManagerInternal mInputManagerInternal;
     private final DisplayManagerGlobal mDisplayManagerGlobal;
     private final ViewConfiguration mViewConfiguration;
-    private final long mGlobalSessionTimeoutDurationMs;
     private final Supplier<SurfaceControl.Transaction> mTransactionSupplier;
     private final ComputerControlAllowlistController mAllowlistController;
     private final ComputerControlStatsController mStatsController;
@@ -231,9 +234,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @GuardedBy("mAllowedTaskIds")
     private final Set<Integer> mAllowedTaskIds = new ArraySet<>();
 
-    /** Whether screenshot is allowed depending on if the top activity is allowlisted. */
+    /**
+     * Whether screenshot is allowed depending on if the top activity is allowlisted.
+     * Null indicates display is empty.
+     */
     @GuardedBy("mAllowedTaskIds")
-    private boolean mIsTopActivityScreenshotAllowed = false;
+    @Nullable
+    private Boolean mIsTopActivityScreenshotAllowed = null;
 
     // Handle state transitions for the session lifecycle.
     private final ComputerControlSession.LifecycleCallback mStateTransitions =
@@ -242,6 +249,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 public void onActive() {
                     handleStateTransition();
                     mStatsController.onSessionActive();
+                    mSessionTimeoutTimer.resume();
                 }
 
                 @Override
@@ -250,6 +258,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     cancelOngoingInteractions();
                     handleStateTransition();
                     mStatsController.onSessionBlocked(reason);
+                    mSessionTimeoutTimer.pause();
                 }
 
                 // Shared configuration updates when transitioning between non-closed states.
@@ -290,11 +299,11 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @Nullable
     private ScheduledFuture<?> mInsertTextFuture;
     @Nullable
-    private ScheduledFuture<?> mCloseSessionFuture;
-    @Nullable
     private ScheduledFuture<?> mDisplayEmptyScheduledAction;
     @Nullable
     private Surface mClientSurface;
+
+    private final PausableTimer mSessionTimeoutTimer;
 
     // Whether this is a session only intended for testing ComputerControl functionality.
     private final boolean mIsTestSession;
@@ -307,27 +316,43 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private boolean mIsWaitingForScreenshotResult = false;
 
     private final Context mDisplayUiContext;
-    @GuardedBy("mInsetsProviderView")
-    private final View mInsetsProviderView;
-    @GuardedBy("mInsetsProviderView")
+    // Access on the UI thread only.
+    @Nullable
+    private View mInsetsProviderView;
+    // Access on the UI thread only.
     @NonNull
     private Insets mAppliedInsets = Insets.NONE;
+    private final WindowManager.LayoutParams mInsetsProviderLayoutParams =
+            createInsetsProviderLayoutParams();
 
     private final InteractiveMirrorImpl.InteractiveMirrorImplCallback mInteractiveMirrorCallback =
             new InteractiveMirrorImpl.InteractiveMirrorImplCallback() {
                 @Override
                 public void onInteractiveChanged(boolean isInteractive) {
                     synchronized (mInteractiveMirrors) {
-                        if (areAnyMirrorsInteractive()) {
+                        var firstMirror = getFirstMirrorThatIsInteractiveLocked();
+                        if (firstMirror != null) {
                             // If any mirror is interactive, allow it to steal top focus to allow
                             // key event and IME interactions from the user.
                             mWindowManagerInternal.setCanStealTopFocusForDisplay(
                                     mVirtualDisplayId, /* canStealTopFocus= */ true);
+                            mWindowManagerInternal
+                                    .setFocusedA11yEmbeddedConnectionReceiverOnDisplay(
+                                            mVirtualDisplayId,
+                                            firstMirror.getA11yEmbeddedConnectionReceiver());
+                            mVirtualDevice.setDisplayImePolicy(mVirtualDisplayId,
+                                    WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY);
+
                         } else {
                             // If all mirrors are non-interactive, disable top focus stealing for
                             // the virtual display by clearing the override.
                             mWindowManagerInternal.setCanStealTopFocusForDisplay(
                                     mVirtualDisplayId, /* canStealTopFocus= */ false);
+                            mWindowManagerInternal
+                                    .setFocusedA11yEmbeddedConnectionReceiverOnDisplay(
+                                            mVirtualDisplayId, null);
+                            mVirtualDevice.setDisplayImePolicy(mVirtualDisplayId,
+                                    WindowManager.DISPLAY_IME_POLICY_HIDE);
                         }
                     }
                     mStatsController.onMirrorViewInteractive(isInteractive);
@@ -369,7 +394,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         Trace.asyncTraceForTrackBegin(mTraceTrack, "Session", TRACE_COOKIE_SESSION);
         mFgThreadExecutor = fgThreadExecutor;
         mViewConfiguration = viewConfiguration;
-        mGlobalSessionTimeoutDurationMs = globalSessionTimeoutDurationMs;
         mTransactionSupplier = transactionSupplier;
         mAllowlistController = allowlistController;
         mRequest = request;
@@ -443,7 +467,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     mVirtualDisplayId, /* enable = */true);
             mWindowManagerInternal.setCanStealTopFocusForDisplay(
                     mVirtualDisplayId, /* canStealTopFocus= */ false);
-            mInsetsProviderView = new View(mDisplayUiContext);
 
             mVirtualDevice.setDisplayImePolicy(
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
@@ -480,13 +503,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mAudioCapture.startAudioCapture();
 
             request.appToken().linkToDeath(this, 0);
-            startSessionCloseGlobalTimeout();
+            mSessionTimeoutTimer = new PausableTimer(mScheduler, globalSessionTimeoutDurationMs,
+                    () -> close(CLOSE_REASON_SESSION_TIMED_OUT));
         } catch (RemoteException e) {
             if (virtualDevice != null) {
                 virtualDevice.close();
             }
             throw e.rethrowFromSystemServer();
         }
+
+        postSessionNotification();
 
         mOwnerAppOpsManager = request.ownerContext().getSystemService(AppOpsManager.class);
         mOwnerAppOpsManager.startWatchingMode(AppOpsManager.OP_COMPUTER_CONTROL,
@@ -603,6 +629,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
         mLifecycle.monitor();
         mStatsController.monitor();
+        mSessionTimeoutTimer.monitor();
     }
 
     @Override
@@ -641,7 +668,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         // TODO(b/444600407): Remove this once the consent model is per-target app. While the
         // consent is general, the caller can extend the list of target packages dynamically.
-        if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
+        if (!isSessionActive()) {
             Slog.e(TAG, "Cannot launch application: Agent interaction is not available");
             return;
         }
@@ -728,8 +755,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @Override
     @Nullable
-    public IInteractiveMirror createInteractiveMirror(SurfaceControl outMirrorSurface) {
-        final var mirror = createInteractiveMirrorImpl();
+    public IInteractiveMirror createInteractiveMirror(
+            IResultReceiver a11yEmbeddedConnectionReceiver, SurfaceControl outMirrorSurface) {
+        final var mirror = createInteractiveMirrorImpl(a11yEmbeddedConnectionReceiver);
         if (mirror == null) {
             return null;
         }
@@ -788,16 +816,17 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     @Nullable
-    private InteractiveMirrorImpl createInteractiveMirrorImpl() {
+    private InteractiveMirrorImpl createInteractiveMirrorImpl(
+            IResultReceiver a11yEmbeddedConnectionReceiver) {
         final var mirror =
                 mWindowManagerInternal.createMirrorForDisplayContent(mVirtualDisplayId);
         if (mirror == null) {
             Slog.w(TAG, "Failed to create DisplayMirror from WM for display: " + mVirtualDisplayId);
             return null;
         }
-        return new InteractiveMirrorImpl(mirror, mTransactionSupplier,
-                mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal,
-                isMirrorInteractionAllowed(), mInteractiveMirrorCallback);
+        return new InteractiveMirrorImpl(mirror, a11yEmbeddedConnectionReceiver,
+                mTransactionSupplier, mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId),
+                mInputManagerInternal, isMirrorInteractionAllowed(), mInteractiveMirrorCallback);
     }
 
     private void removeInteractiveMirror(InteractiveMirrorImpl interactiveMirror) {
@@ -895,15 +924,25 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         return mLifecycle.getCurrentState() instanceof LifecycleState.Blocked;
     }
 
-    private boolean areAnyMirrorsInteractive() {
-        synchronized (mInteractiveMirrors) {
-            for (int i = 0; i < mInteractiveMirrors.size(); i++) {
-                if (mInteractiveMirrors.get(i).isInteractive()) {
-                    return true;
-                }
+    /**
+     * Returns {@code true} if the agent is actively automating the session.
+     * This is the basis for various policies, such as whether autofill or
+     * camera, audio etc. is enabled for a session.
+     */
+    public boolean isSessionActive() {
+        return mLifecycle.getCurrentState() instanceof LifecycleState.Active;
+    }
+
+    @GuardedBy("mInteractiveMirrors")
+    @Nullable
+    private InteractiveMirrorImpl getFirstMirrorThatIsInteractiveLocked() {
+        for (int i = 0; i < mInteractiveMirrors.size(); i++) {
+            var mirror = mInteractiveMirrors.get(i);
+            if (mirror.isInteractive()) {
+                return mirror;
             }
         }
-        return false;
+        return null;
     }
 
     @SuppressLint("WrongConstant")
@@ -997,7 +1036,11 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         // Limit screenshots to the task of allowlisted packages of the automated apps.
         // In the Blocked state, this check ensures the agent only sees authorized content.
         synchronized (mAllowedTaskIds) {
-            if (!mIsTopActivityScreenshotAllowed) {
+            if (mIsTopActivityScreenshotAllowed == null) {
+                Slog.w(TAG, "Screenshot blocked: There is no top activity on the display.");
+                return false;
+            }
+            if (Boolean.FALSE.equals(mIsTopActivityScreenshotAllowed)) {
                 Slog.w(TAG, "Screenshot blocked: Top task not part of the initial automated set.");
                 return false;
             }
@@ -1110,14 +1153,38 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     private void releaseResources() {
         cancelOngoingInteractions();
-        cancelPendingCloseSession();
+        mSessionTimeoutTimer.close();
         mAudioInjector.stopAudioInjection();
         mAudioCapture.stopAudioCapture();
         mVirtualDevice.close(); // closes also the VirtualAudioDevice
         mRequest.appToken().unlinkToDeath(this, 0);
+        makeSessionNotificationCancellable();
         removeAllInteractiveMirrorsOnSessionClose();
         mOnClosedListener.accept(this);
         mOwnerAppOpsManager.stopWatchingMode(this);
+    }
+
+    private void postSessionNotification() {
+        ComputerControlSessionParams.NotificationParams notificationParams =
+                mRequest.params().getNotificationParams();
+        if (notificationParams != null) {
+            Notification notification = notificationParams.getNotification();
+            notification.flags |= FLAG_COMPUTER_CONTROL;
+            mRequest.ownerNotificationManager().notifyAsPackage(mRequest.ownerPackageName(),
+                    notificationParams.getNotificationTag(),
+                    notificationParams.getNotificationId(),
+                    notification);
+        }
+    }
+
+    private void makeSessionNotificationCancellable() {
+        ComputerControlSessionParams.NotificationParams notificationParams =
+                mRequest.params().getNotificationParams();
+        if (notificationParams != null) {
+            LocalServices.getService(NotificationManagerInternal.class)
+                    .removeComputerControlFlagFromNotification(mRequest.ownerPackageName(),
+                            notificationParams.getNotificationId(), mRequest.ownerUserId());
+        }
     }
 
     private void performSwipeStep(int fromX, int fromY, int toX, int toY, int step, int stepCount) {
@@ -1143,11 +1210,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 TOUCH_EVENT_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
-    private void startSessionCloseGlobalTimeout() {
-        mCloseSessionFuture = mScheduler.schedule(() -> close(CLOSE_REASON_SESSION_TIMED_OUT),
-                mGlobalSessionTimeoutDurationMs, TimeUnit.MILLISECONDS);
-    }
-
     private boolean performDefaultEditorAction(@Nullable EditorInfo editorInfo,
             @NonNull IRemoteComputerControlInputConnection ic) throws RemoteException {
         // Check if currently active input connection on CC display has a valid editor action
@@ -1170,13 +1232,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (mSwipeFuture != null && mSwipeFuture.cancel(false)) {
             mVirtualTouchscreen.sendTouchEvent(
                     createTouchEvent(0, 0, VirtualTouchEvent.ACTION_CANCEL));
-        }
-    }
-
-    private void cancelPendingCloseSession() {
-        if (mCloseSessionFuture != null) {
-            mCloseSessionFuture.cancel(false);
-            mCloseSessionFuture = null;
         }
     }
 
@@ -1248,7 +1303,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     private boolean shouldDisallowInteractions(String callSite) {
         // TODO: b/452428736 - Find a long term solution for blocking agent interactions.
-        if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
+        if (!isSessionActive()) {
             Slog.w(TAG, "Computer control interaction blocked since session is not active: "
                     + callSite);
             return true;
@@ -1302,50 +1357,60 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     // to the virtual display as systemOverlays().
     @android.annotation.UiThread
     private void handleInsetsUpdate(@NonNull Insets insets) {
-        synchronized (mInsetsProviderView) {
-            if (Objects.equals(mAppliedInsets, insets)) {
-                return;
-            }
-
-            Slog.d(TAG,
-                    "handleInsetsUpdate: Updating insets from old: " + mAppliedInsets + ", to new: "
-                            + insets);
-
-            final var wm = mDisplayUiContext.getSystemService(WindowManager.class);
-            if (!Insets.NONE.equals(mAppliedInsets)) {
-                wm.removeView(mInsetsProviderView);
-            }
-            mAppliedInsets = insets;
-            if (!Insets.NONE.equals(mAppliedInsets)) {
-                final var lp = new WindowManager.LayoutParams(
-                        WindowManager.LayoutParams.MATCH_PARENT,
-                        WindowManager.LayoutParams.MATCH_PARENT,
-                        WindowManager.LayoutParams.TYPE_STATUS_BAR,
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                                | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS,
-                        PixelFormat.TRANSPARENT);
-                lp.setTitle("InsetsProviderView");
-                lp.layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-                lp.setInsetsParams(
-                        List.of(new WindowManager.InsetsParams(
-                                        WindowInsets.Type.systemOverlays())
-                                        .setInsetsSize(Insets.of(insets.left, 0, 0, 0)),
-                                new WindowManager.InsetsParams(
-                                        WindowInsets.Type.systemOverlays())
-                                        .setInsetsSize(Insets.of(0, insets.top, 0, 0)),
-                                new WindowManager.InsetsParams(
-                                        WindowInsets.Type.systemOverlays())
-                                        .setInsetsSize(Insets.of(0, 0, insets.right, 0)),
-                                new WindowManager.InsetsParams(
-                                        WindowInsets.Type.systemOverlays())
-                                        .setInsetsSize(Insets.of(0, 0, 0, insets.bottom))
-                        ));
-                wm.addView(mInsetsProviderView, lp);
-            }
+        if (Objects.equals(mAppliedInsets, insets)) {
+            return;
         }
+
+        Slog.d(TAG,
+                "handleInsetsUpdate: Updating insets from old: " + mAppliedInsets + ", to new: "
+                        + insets);
+        mAppliedInsets = insets;
+
+        final var wm = mDisplayUiContext.getSystemService(WindowManager.class);
+        if (Insets.NONE.equals(mAppliedInsets)) {
+            if (mInsetsProviderView != null) {
+                wm.removeView(mInsetsProviderView);
+                mInsetsProviderView = null;
+            }
+            return;
+        }
+
+        mInsetsProviderLayoutParams.setInsetsParams(
+                List.of(new WindowManager.InsetsParams(
+                                WindowInsets.Type.systemOverlays())
+                                .setInsetsSize(Insets.of(insets.left, 0, 0, 0)),
+                        new WindowManager.InsetsParams(
+                                WindowInsets.Type.systemOverlays())
+                                .setInsetsSize(Insets.of(0, insets.top, 0, 0)),
+                        new WindowManager.InsetsParams(
+                                WindowInsets.Type.systemOverlays())
+                                .setInsetsSize(Insets.of(0, 0, insets.right, 0)),
+                        new WindowManager.InsetsParams(
+                                WindowInsets.Type.systemOverlays())
+                                .setInsetsSize(Insets.of(0, 0, 0, insets.bottom))
+                ));
+        if (mInsetsProviderView == null) {
+            mInsetsProviderView = new View(mDisplayUiContext);
+            wm.addView(mInsetsProviderView, mInsetsProviderLayoutParams);
+        } else {
+            wm.updateViewLayout(mInsetsProviderView, mInsetsProviderLayoutParams);
+        }
+    }
+
+    private static WindowManager.LayoutParams createInsetsProviderLayoutParams() {
+        final var lp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_STATUS_BAR,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                        | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS,
+                PixelFormat.TRANSPARENT);
+        lp.setTitle("InsetsProviderView");
+        lp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        return lp;
     }
 
     private class ComputerControlActivityListener implements VirtualDeviceManager.ActivityListener {
@@ -1396,7 +1461,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     TimeUnit.MILLISECONDS);
             synchronized (mAllowedTaskIds) {
                 mAllowedTaskIds.clear();
-                mIsTopActivityScreenshotAllowed = false;
+                mIsTopActivityScreenshotAllowed = null;
             }
         }
 

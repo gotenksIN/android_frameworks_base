@@ -74,6 +74,7 @@ import com.google.android.msdl.domain.MSDLPlayer;
 
 import java.util.List;
 
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Named;
 
@@ -124,6 +125,9 @@ public class ExpandableNotificationRowController implements NotifViewController 
     private final EntryAdapterFactory mEntryAdapterFactory;
     private final WindowRootViewBlurInteractor mWindowRootViewBlurInteractor;
     private final NotificationActivityStarter mNotificationActivityStarter;
+    private final NotificationUiEligibilityChecker mNotificationUiEligibilityChecker;
+    private final Optional<AutomationNotificationBackgroundProvider>
+            mAutomationNotificationBackgroundProvider;
     private final Context mContext;
 
     @VisibleForTesting
@@ -289,7 +293,10 @@ public class ExpandableNotificationRowController implements NotifViewController 
             EntryAdapterFactory entryAdapterFactory,
             WindowRootViewBlurInteractor windowRootViewBlurInteractor,
             BundleInteractionLogger bundleInteractionLogger,
-            NotificationActivityStarter notificationActivityStarter) {
+            NotificationActivityStarter notificationActivityStarter,
+            NotificationUiEligibilityChecker notificationUiEligibilityChecker,
+            Optional<AutomationNotificationBackgroundProvider>
+                    automationNotificationBackgroundProvider) {
         mView = view;
         mContext = context;
         mListContainer = listContainer;
@@ -328,6 +335,8 @@ public class ExpandableNotificationRowController implements NotifViewController 
         mWindowRootViewBlurInteractor = windowRootViewBlurInteractor;
         mBundleInteractionLogger = bundleInteractionLogger;
         mNotificationActivityStarter = notificationActivityStarter;
+        mNotificationUiEligibilityChecker = notificationUiEligibilityChecker;
+        mAutomationNotificationBackgroundProvider = automationNotificationBackgroundProvider;
     }
 
     String loadsGutsAppName(Context context, PipelineEntry pipelineEntry) {
@@ -391,8 +400,9 @@ public class ExpandableNotificationRowController implements NotifViewController 
                 mUiEventLogger,
                 mNotificationRebindingTracker,
                 mBundleInteractionLogger,
-                mNotificationActivityStarter
-        );
+                mNotificationActivityStarter,
+                mNotificationUiEligibilityChecker,
+                mAutomationNotificationBackgroundProvider);
         mView.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         if (mAllowLongPress) {
             if (mFeatureFlags.isEnabled(

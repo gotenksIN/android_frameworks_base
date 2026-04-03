@@ -24,6 +24,7 @@ import android.annotation.Nullable;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.PendingIntent;
+import android.companion.virtual.computercontrol.ComputerControlSessionParams.NotificationParams;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -51,6 +52,7 @@ import android.view.inputmethod.InputConnection;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.os.IResultReceiver;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -63,6 +65,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -233,6 +236,27 @@ public final class ComputerControlSession implements AutoCloseable {
     public @interface Action {
     }
 
+    /**
+     * Unknown unstable reason.
+     */
+    public static final int UNSTABLE_REASON_UNKNOWN = 0;
+
+    /**
+     * Reason indicating that the session became unstable due to an interaction performed by the
+     * caller, such as {@link #tap(int, int)}.
+     */
+    public static final int UNSTABLE_REASON_CALLER_INTERACTION = 1;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "UNSTABLE_REASON_", value = {
+            UNSTABLE_REASON_UNKNOWN,
+            UNSTABLE_REASON_CALLER_INTERACTION,
+    })
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface UnstableReason {
+    }
+
     private final String mTraceTrack = "ComputerControlSession#" + System.identityHashCode(this);
 
     /** Auxiliary thread for any client-side work related to the computer control session. */
@@ -264,6 +288,7 @@ public final class ComputerControlSession implements AutoCloseable {
     @NonNull
     private final Runnable mOnClosedRunnable;
 
+    private final InjectedA11yManager mA11yManager;
     private final ComputerControlAccessibilityProxy mAccessibilityProxy;
 
     private final IComputerControlLifecycleCallback mRemoteLifecycleCallback =
@@ -272,6 +297,7 @@ public final class ComputerControlSession implements AutoCloseable {
                 public void onActive() {
                     synchronized (mLifecycle) {
                         mLifecycle.onActive();
+                        mA11yManager.registerDisplayProxy(mAccessibilityProxy);
                     }
                 }
 
@@ -280,6 +306,7 @@ public final class ComputerControlSession implements AutoCloseable {
                         @Nullable String blockingPackage) {
                     synchronized (mLifecycle) {
                         mLifecycle.onBlocked(reason, blockingPackage);
+                        mA11yManager.unregisterDisplayProxy(mAccessibilityProxy);
                     }
                 }
 
@@ -297,9 +324,9 @@ public final class ComputerControlSession implements AutoCloseable {
     /** @hide */
     public ComputerControlSession(int displayId,
             @NonNull IComputerControlSession session,
-            @NonNull Consumer<AccessibilityDisplayProxy> registerA11yDisplayProxy,
+            @NonNull InjectedA11yManager a11yManager,
             @NonNull Runnable onClosedRunnable) {
-        this(displayId, session, registerA11yDisplayProxy, onClosedRunnable,
+        this(displayId, session, a11yManager, onClosedRunnable,
                 DisplayManagerGlobal.getInstance());
     }
 
@@ -307,7 +334,7 @@ public final class ComputerControlSession implements AutoCloseable {
     @VisibleForTesting
     public ComputerControlSession(int displayId,
             @NonNull IComputerControlSession session,
-            @NonNull Consumer<AccessibilityDisplayProxy> registerA11yDisplayProxy,
+            @NonNull InjectedA11yManager a11yManager,
             @NonNull Runnable onClosedRunnable,
             @NonNull DisplayManagerGlobal displayManagerGlobal) {
         mHandlerThread = new HandlerThread("ComputerControlSession");
@@ -315,6 +342,7 @@ public final class ComputerControlSession implements AutoCloseable {
         mHandler = new Handler(mHandlerThread.getLooper());
         mSession = Objects.requireNonNull(session);
         mOnClosedRunnable = onClosedRunnable;
+        mA11yManager = a11yManager;
 
         final Display display = displayManagerGlobal.getRealDisplay(displayId);
         Objects.requireNonNull(display);
@@ -334,7 +362,6 @@ public final class ComputerControlSession implements AutoCloseable {
         }
 
         mAccessibilityProxy = new ComputerControlAccessibilityProxy(displayId, mHandler);
-        registerA11yDisplayProxy.accept(mAccessibilityProxy);
     }
 
     /**
@@ -349,7 +376,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /**
@@ -364,7 +391,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /**
@@ -557,6 +584,7 @@ public final class ComputerControlSession implements AutoCloseable {
                     e.rethrowFromSystemServer();
                 }
             }
+            fireScreenshotCallbackIfReady(callback);
         }
     }
 
@@ -600,7 +628,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /**
@@ -623,7 +651,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /**
@@ -639,7 +667,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /**
@@ -660,7 +688,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /** Perform provided action on the trusted virtual display. */
@@ -670,15 +698,17 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        mAccessibilityProxy.resetStabilityState();
+        mAccessibilityProxy.resetStabilityState(UNSTABLE_REASON_CALLER_INTERACTION);
     }
 
     /** Creates an interactive virtual display, mirroring the trusted one. */
     @Nullable
-    public InteractiveMirror createInteractiveMirror() {
+    public InteractiveMirror createInteractiveMirror(
+            IResultReceiver a11yEmbeddedConnectionReceiver) {
         try {
             SurfaceControl mirrorSurface = new SurfaceControl();
-            IInteractiveMirror mirror = mSession.createInteractiveMirror(mirrorSurface);
+            IInteractiveMirror mirror = mSession.createInteractiveMirror(
+                    a11yEmbeddedConnectionReceiver, mirrorSurface);
             if (mirror == null) {
                 return null;
             }
@@ -789,7 +819,12 @@ public final class ComputerControlSession implements AutoCloseable {
      * {@link android.app.NotificationManager#notify(String, int, Notification)}
      *
      * @throws IllegalStateException if a notification was already attached.
+     *
+     * @deprecated with ComputerControl v5, use
+     * {@link ComputerControlSessionParams.Builder#setNotificationParams(NotificationParams)}
+     * instead.
      */
+    @Deprecated
     public void attachNotificationInfo(int notificationId, @Nullable String notificationTag) {
         try {
             mSession.attachNotificationInfo(notificationId, notificationTag);
@@ -864,14 +899,16 @@ public final class ComputerControlSession implements AutoCloseable {
             @CallbackExecutor Executor executor,
             OutcomeReceiver<Image, ScreenshotException> receiver,
             @Nullable CancellationSignal cancellationSignal,
-            AtomicBoolean isRequestSuccess) {
+            AtomicBoolean isRequestSuccess,
+            AtomicReference<Image> pendingImage) {
 
         ScreenshotCallbackRecord(
                 String traceTrack,
                 @CallbackExecutor Executor executor,
                 OutcomeReceiver<Image, ScreenshotException> receiver,
                 @Nullable CancellationSignal cancellationSignal) {
-            this(traceTrack, executor, receiver, cancellationSignal, new AtomicBoolean());
+            this(traceTrack, executor, receiver, cancellationSignal, new AtomicBoolean(),
+                    new AtomicReference<>());
         }
 
         ScreenshotCallbackRecord {
@@ -901,7 +938,12 @@ public final class ComputerControlSession implements AutoCloseable {
                 // The image was already consumed by an earlier callback.
                 return;
             }
-            fireScreenshotCallback(it -> it.onResult(image));
+            final var oldImage = mOneShotPendingScreenshotCallback.pendingImage.getAndSet(image);
+            if (oldImage != null) {
+                Log.d(TAG, "Replacing old image with new one for screenshot callback");
+                oldImage.close();
+            }
+            fireScreenshotCallbackIfReady(mOneShotPendingScreenshotCallback);
         }
     }
 
@@ -909,6 +951,13 @@ public final class ComputerControlSession implements AutoCloseable {
             @ScreenshotException.ErrorCode int error, String message) {
         synchronized (mImageReaderLock) {
             if (mOneShotPendingScreenshotCallback != callback) {
+                return;
+            }
+            final var pendingImage = callback.pendingImage.getAndSet(null);
+            if (pendingImage != null) {
+                // There is a pending image that is waiting for the request success result.
+                // Use that image and ignore the error.
+                fireScreenshotCallback(it -> it.onResult(pendingImage));
                 return;
             }
             Log.d(TAG, "onScreenshotError: code=" + error + ": " + message);
@@ -924,6 +973,20 @@ public final class ComputerControlSession implements AutoCloseable {
             throw new IllegalArgumentException(
                     "Touch coordinates must be within the display bounds");
         }
+    }
+
+    @GuardedBy("mImageReaderLock")
+    private void fireScreenshotCallbackIfReady(ScreenshotCallbackRecord callback) {
+        if (mOneShotPendingScreenshotCallback != callback) {
+            return;
+        }
+        if (!callback.isRequestSuccess.get()) {
+            return;
+        }
+        if (callback.pendingImage.get() == null) {
+            return;
+        }
+        fireScreenshotCallback(it -> it.onResult(callback.pendingImage.get()));
     }
 
     @GuardedBy("mImageReaderLock")
@@ -992,10 +1055,16 @@ public final class ComputerControlSession implements AutoCloseable {
      * app under automation being idle and no UI animations being under progress. These are useful
      * for tasks that should only run on a static UI, such as taking screenshots to determine the
      * next step.
+     *
+     * When a stability listener is first added, the caller can assume the session is in a stable
+     * state, and it will be notified otherwise.
      */
     public interface StabilityListener {
         /** Called when the computer control session is considered stable. */
         void onSessionStable();
+
+        /** Called when the computer control session is considered unstable. */
+        default void onSessionUnstable(@UnstableReason int reason) {}
     }
 
     /**
@@ -1081,7 +1150,17 @@ public final class ComputerControlSession implements AutoCloseable {
             final var a11yManager = Objects.requireNonNull(
                     mContext.getSystemService(AccessibilityManager.class));
             mSession = new ComputerControlSession(displayId, session,
-                    a11yManager::registerDisplayProxy, this::onSessionClosed);
+                    new InjectedA11yManager() {
+                        @Override
+                        public void registerDisplayProxy(AccessibilityDisplayProxy proxy) {
+                            a11yManager.registerDisplayProxy(proxy);
+                        }
+
+                        @Override
+                        public void unregisterDisplayProxy(AccessibilityDisplayProxy proxy) {
+                            a11yManager.unregisterDisplayProxy(proxy);
+                        }
+                    }, this::onSessionClosed);
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mCallback.onSessionCreated(mSession)));
         }
@@ -1096,5 +1175,15 @@ public final class ComputerControlSession implements AutoCloseable {
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(mCallback::onSessionClosed));
         }
+    }
+
+    /** @hide */
+    @VisibleForTesting
+    public interface InjectedA11yManager {
+        /** Register a proxy with the accessibility manager. */
+        void registerDisplayProxy(AccessibilityDisplayProxy proxy);
+
+        /** Unregister a proxy with the accessibility manager. */
+        void unregisterDisplayProxy(AccessibilityDisplayProxy proxy);
     }
 }

@@ -19,6 +19,7 @@ package android.app;
 import static android.Manifest.permission.MANAGE_EXTERNAL_STORAGE;
 import static android.Manifest.permission.READ_WALLPAPER_INTERNAL;
 import static android.Manifest.permission.SET_WALLPAPER_DIM_AMOUNT;
+import static android.app.Flags.FLAG_POSTPONE_WALLPAPER_CHANGE_NOTIFICATION_ON_UNLOCK_USER;
 import static android.app.Flags.optimizeDefaultWallpaper;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.ParcelFileDescriptor.MODE_READ_ONLY;
@@ -2798,6 +2799,25 @@ public class WallpaperManager {
         }
     }
 
+    /**
+     * Returns whether any wallpaper has been set yet. Will be false until the first wallpaper is
+     * set during boot.
+     *
+     * @hide
+     */
+    @FlaggedApi(FLAG_POSTPONE_WALLPAPER_CHANGE_NOTIFICATION_ON_UNLOCK_USER)
+    public boolean hasSetWallpaper() {
+        if (sGlobals.mService == null) {
+            Log.w(TAG, "WallpaperManagerService not running");
+            throw new RuntimeException(new DeadSystemException());
+        }
+        try {
+            return sGlobals.mService.hasSetWallpaper();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     // TODO(b/181083333): add multiple root display area support on this API.
     /**
      * Returns the desired minimum width for the wallpaper. Callers of
@@ -3401,9 +3421,20 @@ public class WallpaperManager {
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public static InputStream openDefaultWallpaper(Context context, @SetWallpaperFlags int which) {
-        if (optimizeDefaultWallpaper() &&  context.getResources().getBoolean(
+        if (optimizeDefaultWallpaper() && context.getResources().getBoolean(
                 R.bool.config_optimizeDefaultWallpaper)) {
-            return openRawDefaultWallpaper(context, which);
+            if (sGlobals.mService != null) {
+                try {
+                    int displayId = context.getDisplayId();
+                    ParcelFileDescriptor pfd = sGlobals.mService.getCroppedDefaultWallpaper(
+                            context.getOpPackageName(), which, displayId);
+                    if (pfd != null) {
+                        return new ParcelFileDescriptor.AutoCloseInputStream(pfd);
+                    }
+                } catch (RemoteException e) {
+                    throw e.rethrowFromSystemServer();
+                }
+            }
         }
         return openRawDefaultWallpaper(context, which);
     }

@@ -1,0 +1,10 @@
+{
+  "presubmit": [
+    {
+      "name": "FrameworksServicesTests_cross_device_sync"
+    },
+    {
+      "name": "crossdevicesync-testlib-tests"
+    }
+  ]
+}

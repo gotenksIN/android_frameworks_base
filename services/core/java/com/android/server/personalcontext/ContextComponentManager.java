@@ -18,11 +18,11 @@ package com.android.server.personalcontext;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.os.UserHandle;
-import android.service.personalcontext.Flags;
 import android.service.personalcontext.renderer.InsightRendererService;
 import android.text.TextUtils;
 import android.util.Log;
@@ -71,13 +71,16 @@ class ContextComponentManager
     private final Map<String, Set<Renderer>> mRenderersByPackage = new HashMap<>();
     private final Map<UUID, Refiner> mRefiners = new HashMap<>();
     private final Map<UUID, Renderer> mRenderers = new HashMap<>();
+    private final OperatingModeProvider mOperatingModeProvider;
 
     private final AccessController mAccessController;
 
     ContextComponentManager(Context context, UserHandle userHandle,
+            OperatingModeProvider operatingModeProvider,
             AccessController accessController) {
         mContext = context;
         mUserHandle = userHandle;
+        mOperatingModeProvider = operatingModeProvider;
         mAccessController = accessController;
     }
 
@@ -104,35 +107,38 @@ class ContextComponentManager
         registerComponentsForPackage(null);
     }
 
+    private boolean isOperatingPropertiesPresent(
+            @OperatingModeProvider.OperatingPropertyFlag int properties) {
+        return mOperatingModeProvider.hasProperties(properties);
+    }
+
     /** Looks for all components in a single package installed on the device and registers each. */
     public void registerComponentsForPackage(String packageName) {
         for (ServiceInfo serviceInfo : getServiceInfo(ACTION_REFINER_SERVICE, packageName)) {
-            if (Flags.enforcePersonalContextAllowlistAccessControl()
-                    && !mAccessController.hasAccess(serviceInfo.packageName,
-                    AccessController.ACCESS_RECEIVE_HINTS
-                            | AccessController.ACCESS_PUBLISH_HINTS)) {
-                continue;
-            }
-
             registerComponent(
-                    new ServiceClientRefiner(mContext, UUID.randomUUID(), serviceInfo,
-                            mUserHandle),
+                    serviceInfo,
+                                AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE
+                                        | AccessController.ACCESS_RECEIVE_HINTS_ALLOWLIST
+                                        | AccessController.ACCESS_RECEIVE_HINTS_PERMISSION
+                                        | AccessController.ACCESS_BIND_CONTEXT_PERMISSION,
+                    new ServiceClientRefiner(mContext, mAccessController, UUID.randomUUID(),
+                            serviceInfo, mUserHandle, mOperatingModeProvider),
                     mRefiners,
                     serviceInfo.packageName,
                     mRefinersByPackage);
         }
 
         for (ServiceInfo serviceInfo : getServiceInfo(ACTION_UNDERSTANDER_SERVICE, packageName)) {
-            if (Flags.enforcePersonalContextAllowlistAccessControl()
-                    && !mAccessController.hasAccess(serviceInfo.packageName,
-                    AccessController.ACCESS_RECEIVE_HINTS
-                            | AccessController.ACCESS_PUBLISH_INSIGHTS)) {
-                continue;
-            }
-
             registerComponent(
-                    new ServiceClientUnderstander(mContext, UUID.randomUUID(), serviceInfo,
-                            mUserHandle),
+                    serviceInfo,
+                    AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE
+                            | AccessController.ACCESS_RECEIVE_HINTS_ALLOWLIST
+                            | AccessController.ACCESS_RECEIVE_HINTS_PERMISSION
+                            | AccessController.ACCESS_PUBLISH_INSIGHTS_ALLOWLIST
+                            | AccessController.ACCESS_PUBLISH_INSIGHTS_PERMISSION
+                            | AccessController.ACCESS_BIND_CONTEXT_PERMISSION,
+                    new ServiceClientUnderstander(mContext, mAccessController, UUID.randomUUID(),
+                            serviceInfo, mUserHandle, mOperatingModeProvider),
                     mRefiners,
                     serviceInfo.packageName,
                     mRefinersByPackage);
@@ -140,15 +146,13 @@ class ContextComponentManager
 
         for (ServiceInfo serviceInfo :
                 getServiceInfo(InsightRendererService.SERVICE_INTERFACE, packageName)) {
-            if (Flags.enforcePersonalContextAllowlistAccessControl()
-                    && !mAccessController.hasAccess(serviceInfo.packageName,
-                    AccessController.ACCESS_RECEIVE_INSIGHTS)) {
-                continue;
-            }
-
             registerComponent(
-                    new ServiceClientRenderer(mContext, UUID.randomUUID(), serviceInfo,
-                            mUserHandle),
+                    serviceInfo,
+                    AccessController.ACCESS_RECEIVE_INSIGHTS_PERMISSION
+                            | AccessController.ACCESS_BIND_CONTEXT_PERMISSION,
+                    new ServiceClientRenderer(mContext, mAccessController,
+                            UUID.randomUUID(), serviceInfo, mUserHandle,
+                            mOperatingModeProvider),
                     mRenderers,
                     serviceInfo.packageName,
                     mRenderersByPackage);
@@ -237,6 +241,36 @@ class ContextComponentManager
             }
 
             componentsByPackage.remove(packageName);
+        }
+    }
+
+    private <T extends Component> void registerComponent(
+            ServiceInfo serviceInfo,
+            @AccessController.Access int accessFlags,
+            @NonNull T component,
+            @NonNull Map<UUID, T> components,
+            @Nullable String packageName,
+            @Nullable Map<String, Set<T>> componentsByPackage) {
+        if (isOperatingPropertiesPresent(
+                OperatingModeProvider.OPERATING_PROPERTY_FLAG_TEST_PACKAGES_ONLY)
+                && ((serviceInfo.applicationInfo.flags & ApplicationInfo.FLAG_TEST_ONLY)
+                != ApplicationInfo.FLAG_TEST_ONLY)) {
+            if (Log.isLoggable(TAG, Log.DEBUG)) {
+                Slog.d(TAG,
+                        "Cannot register component (not test only component while in test mode): "
+                                + component);
+            }
+            return;
+        }
+
+        if (mAccessController.isServiceAllowed(serviceInfo,
+                mOperatingModeProvider.filterAccessFlags(accessFlags))) {
+            registerComponent(
+                    component,
+                    components,
+                    packageName,
+                    componentsByPackage
+            );
         }
     }
 

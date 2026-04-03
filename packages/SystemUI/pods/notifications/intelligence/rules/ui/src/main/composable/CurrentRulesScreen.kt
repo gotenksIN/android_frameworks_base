@@ -109,9 +109,9 @@ private fun CurrentRule(
             buildInlineContentMap(
                 ruleDisplay.textChunks,
                 appIcon = { AppIcon(it) },
-                contactIcon = {
+                personIcon = {
                     val iconSizeDp = with(LocalDensity.current) { textSize.toDp() }
-                    ContactIcon(it, iconSizeDp, screenViewModel::loadContactBitmapFromUri)
+                    PersonIcon(it, iconSizeDp, screenViewModel::loadContactBitmapFromUri)
                 },
                 textSize = textSize,
             )
@@ -133,14 +133,42 @@ private fun CurrentRule(
             inlineContent = inlineTextContent,
             color = MaterialTheme.colorScheme.onSurface,
             style = textStyles.defaultStyle,
+            modifier = Modifier.padding(top = 8.dp),
         )
 
         if (isExpanded) {
-            Button(onClick = { onNavigateToEditScreen(rule.toDraft()) }) {
-                Text(stringResource(R.string.notification_rules_edit))
+            Column {
+                Button(onClick = { onNavigateToEditScreen(rule.toDraft()) }) {
+                    Text(stringResource(R.string.notification_rules_edit))
+                }
+                Button(
+                    // TODO: b/478225883 - Include a confirmation dialog before deleting the rule.
+                    onClick = { screenViewModel.deleteRule(rule.id) }
+                ) {
+                    Text(stringResource(R.string.notification_rules_delete))
+                }
+                if (screenViewModel.ruleWithDeletionError == rule.id) {
+                    DeletionErrorMessage()
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DeletionErrorMessage(modifier: Modifier = Modifier) {
+    Text(
+        stringResource(R.string.notification_rules_deletion_error),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onErrorContainer,
+        modifier =
+            modifier
+                .background(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
+                )
+                .padding(8.dp),
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

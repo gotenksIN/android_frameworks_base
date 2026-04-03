@@ -65,7 +65,6 @@ import android.util.Pair;
 import android.util.Slog;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
-import android.window.DesktopExperienceFlags;
 import android.window.PictureInPictureSurfaceTransaction;
 import android.window.TaskSnapshot;
 import android.window.TaskSnapshotManager;
@@ -92,6 +91,7 @@ import com.android.wm.shell.shared.pip.PipFlags;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.HomeTransitionObserver;
 import com.android.wm.shell.transition.Transitions;
+import com.android.window.flags.Flags;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -307,8 +307,16 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             // Ignore if there is no running recents transition
             return null;
         }
-        final RecentsController controller = mControllers.get(mControllers.size() - 1);
-        controller.handleMidTransitionRequest(request);
+        if (Flags.syncedDisplayModeUpdates()) {
+            // Notify all active controllers about an incoming transition request
+            for (int i = 0; i < mControllers.size(); i++) {
+                final RecentsController controller = mControllers.get(i);
+                controller.handleMidTransitionRequest(request);
+            }
+        } else {
+            final RecentsController controller = mControllers.get(mControllers.size() - 1);
+            controller.handleMidTransitionRequest(request);
+        }
         return null;
     }
 
@@ -658,12 +666,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
             mListener = null;
             mFinishCB = null;
             // clean-up leash surfacecontrols and anything that might reference them.
-            if (mLeashMap != null) {
-                for (int i = 0; i < mLeashMap.size(); ++i) {
-                    mLeashMap.valueAt(i).release();
-                }
-                mLeashMap = null;
-            }
+            TransitionUtil.releaseLeashMap(mLeashMap);
+            mLeashMap = null;
             mFinishTransaction = null;
             mAwaitingCancelCompletion = false;
             mTaskStates.clear();
@@ -1069,11 +1073,16 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
          * Updates this controller when a new transition is requested mid-recents transition.
          */
         void handleMidTransitionRequest(TransitionRequestInfo request) {
-            // TODO: b/448471638 - support multiple display changes
             if (request.getType() == TRANSIT_CHANGE && request.getDisplayChanges() != null
                             && !request.getDisplayChanges().isEmpty()) {
-                final TransitionRequestInfo.DisplayChange dispChange = request.getDisplayChanges()
-                        .getFirst();
+                TransitionRequestInfo.DisplayChange dispChange;
+                if (Flags.syncedDisplayModeUpdates()) {
+                    dispChange = request.getDisplayChangeForDisplay(mDisplayId);
+                    if (dispChange == null) return;
+                } else {
+                    dispChange = request.getDisplayChanges().getFirst();
+                }
+
                 if (dispChange.getStartRotation() != dispChange.getEndRotation()) {
                     ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                             "[%d] RecentsController.prepareForMerge: "
@@ -1649,6 +1658,24 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
         }
 
         /**
+         * Common cleanup of opening/pausing/closing tasks when finishing the recents transition.
+         */
+        private void cleanUpTasksOnFinish(WindowContainerTransaction wct,
+                SurfaceControl.Transaction t, boolean sendUserLeaveHint) {
+            for (int i = 0; i < mOpeningTasks.size(); ++i) {
+                t.show(mOpeningTasks.get(i).mTaskSurface);
+            }
+            setCornerRadiusForFreeformTasks(
+                    mRecentTasksController.getContext(), t, mOpeningTasks);
+            for (int i = 0; i < mPausingTasks.size(); ++i) {
+                cleanUpPausingOrClosingTask(mPausingTasks.get(i), wct, t, sendUserLeaveHint);
+            }
+            for (int i = 0; i < mClosingTasks.size(); ++i) {
+                cleanUpPausingOrClosingTask(mClosingTasks.get(i), wct, t, sendUserLeaveHint);
+            }
+        }
+
+        /**
          * @param runnerFinishCb The remote finish callback to run after finish is complete, this is
          *                       not the same as mFinishCb which reports the transition is finished
          *                       to WM.
@@ -1665,10 +1692,13 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
 
             if (mAwaitingCancelCompletion) {
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
-                        "[%d] RecentsController.finishInner: completing cancel", mInstanceId);
+                        "[%d] RecentsController.finishInner: completing cancel, userLeave=%b",
+                        mInstanceId, sendUserLeaveHint);
+
+                final WindowContainerTransaction wct = new WindowContainerTransaction();
+                cleanUpTasksOnFinish(wct, t, sendUserLeaveHint);
 
                 // Notify the mixers of the pending finish
-                final WindowContainerTransaction wct = new WindowContainerTransaction();
                 for (int i = 0; i < mMixers.size(); ++i) {
                     mMixers.get(i).handleFinishRecents(false, wct, t);
                 }
@@ -1784,17 +1814,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                 }
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION, "  normal finish");
                 // The general case: committing to recents, going home, or switching tasks.
-                for (int i = 0; i < mOpeningTasks.size(); ++i) {
-                    t.show(mOpeningTasks.get(i).mTaskSurface);
-                }
-                setCornerRadiusForFreeformTasks(
-                        mRecentTasksController.getContext(), t, mOpeningTasks);
-                for (int i = 0; i < mPausingTasks.size(); ++i) {
-                    cleanUpPausingOrClosingTask(mPausingTasks.get(i), wct, t, sendUserLeaveHint);
-                }
-                for (int i = 0; i < mClosingTasks.size(); ++i) {
-                    cleanUpPausingOrClosingTask(mClosingTasks.get(i), wct, t, sendUserLeaveHint);
-                }
+                cleanUpTasksOnFinish(wct, t, sendUserLeaveHint);
 
                 if (mPipTransaction != null && sendUserLeaveHint) {
                     SurfaceControl pipLeash = null;

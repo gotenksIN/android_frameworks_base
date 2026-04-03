@@ -185,7 +185,7 @@ public final class NotificationAttentionHelper {
     private LogicalLight mPriorityNotificationLight;
 
     private final boolean mUseAttentionLight;
-    boolean mHasLight;
+    boolean mHasNotificationLight;
     private final boolean mEnableNotificationAccessibilityEvents;
 
     private final SettingsObserver mSettingsObserver;
@@ -250,7 +250,7 @@ public final class NotificationAttentionHelper {
 
         Resources resources = context.getResources();
         mUseAttentionLight = resources.getBoolean(R.bool.config_useAttentionLight);
-        mHasLight =
+        mHasNotificationLight =
                 resources.getBoolean(com.android.internal.R.bool.config_intrusiveNotificationLed);
         mEnableNotificationAccessibilityEvents =
                 resources.getBoolean(
@@ -603,7 +603,7 @@ public final class NotificationAttentionHelper {
             if (mUseAttentionLight && mAttentionLight != null) {
                 mAttentionLight.pulse();
             }
-            if (favoritesIncomingCallLights() && isCallLight(record) && !wasShowLights) {
+            if (favoritesIncomingCallLights() && usesPriorityLight(record) && !wasShowLights) {
                 startPriorityNotificationLight();
             }
             blink = true;
@@ -1037,7 +1037,7 @@ public final class NotificationAttentionHelper {
             return;
         }
 
-        boolean isCallLight = isCallLight(record);
+        boolean isCallLight = usesPriorityLight(record);
 
 
         if (isCallLight) {
@@ -1062,7 +1062,7 @@ public final class NotificationAttentionHelper {
         }
 
         if (favoritesIncomingCallLights()) {
-            if (!isCallLight(ledNotification) || mUserPresent || isInCall()) {
+            if (!usesPriorityLight(ledNotification) || mUserPresent || isInCall()) {
                 stopPriorityNotificationLight();
             }
         }
@@ -1117,17 +1117,18 @@ public final class NotificationAttentionHelper {
             return false;
         }
 
-        // device lacks light
-        if (!mHasLight && mPriorityNotificationLight == null) {
+        // no light available on device
+        if (!mHasNotificationLight && mPriorityNotificationLight == null) {
             return false;
         }
+
         // user turned lights off globally
         if (!mNotificationPulseEnabled) {
             return false;
         }
-        // the notification/channel has no light
-        // TODO (b/491071211): Investigate why light is sometimes null.
-        if (record.getLight() == null && !isCallLight(record)) {
+
+        // no light available for this notification
+        if (!hasRequiredLight(record)) {
             return false;
         }
         // unimportant notification
@@ -1159,7 +1160,15 @@ public final class NotificationAttentionHelper {
         return true;
     }
 
-   private boolean isCallLight(NotificationRecord record) {
+    /** Checks weather device has any light that should be used for the notification. */
+    private boolean hasRequiredLight(final NotificationRecord record) {
+        boolean couldUsePriorityNotificationLight = usesPriorityLight(record);
+        boolean couldUseNotificationLight = mHasNotificationLight && record.getLight() != null;
+
+        return couldUsePriorityNotificationLight || couldUseNotificationLight;
+    }
+
+   private boolean usesPriorityLight(NotificationRecord record) {
         if (!favoritesIncomingCallLights() || mPriorityNotificationLight == null) return false;
 
         if (record == null
@@ -1572,12 +1581,7 @@ public final class NotificationAttentionHelper {
 
             final String key = getChannelKey(record);
             @PolitenessState final int currState = getPolitenessState(record);
-            @PolitenessState int nextState;
-            if (Flags.politeNotificationsAttnUpdate()) {
-                nextState = getNextState(currState, timeSinceLastNotif, record);
-            } else {
-                nextState = getNextState(currState, timeSinceLastNotif);
-            }
+            @PolitenessState int nextState = getNextState(currState, timeSinceLastNotif, record);
 
             // Reset to default state if number of posted notifications exceed this value when muted
             int numPosted = mNumPosted.getOrDefault(key, 0) + 1;
@@ -1644,12 +1648,8 @@ public final class NotificationAttentionHelper {
 
                 final String key = getChannelKey(record);
                 @PolitenessState final int currState = getPolitenessState(record);
-                @PolitenessState int nextState;
-                if (Flags.politeNotificationsAttnUpdate()) {
-                    nextState = getNextState(currState, timeSinceLastNotif, record);
-                } else {
-                    nextState = getNextState(currState, timeSinceLastNotif);
-                }
+                @PolitenessState int nextState = getNextState(currState, timeSinceLastNotif,
+                        record);
 
                 if (DEBUG) {
                     Log.i(TAG,
@@ -1702,23 +1702,12 @@ public final class NotificationAttentionHelper {
         @Override
         String getChannelKey(final NotificationRecord record) {
             if (isAvalancheActive()) {
-                if (Flags.politeNotificationsAttnUpdate()) {
-                    // Treat high importance conversations independently
-                    if (isAvalancheExempted(record)) {
-                        return super.getChannelKey(record);
-                    } else {
-                        // Use one global key per user
-                        return record.getSbn().getNormalizedUserId() + ":" + COMMON_KEY;
-                    }
+                // Treat high importance conversations independently
+                if (isAvalancheExempted(record)) {
+                    return super.getChannelKey(record);
                 } else {
-                    // If the user explicitly changed the channel notification sound:
-                    // handle as a separate channel
-                    if (record.getChannel().hasUserSetSound()) {
-                        return super.getChannelKey(record);
-                    } else {
-                        // Use one global key per user
-                        return record.getSbn().getNormalizedUserId() + ":" + COMMON_KEY;
-                    }
+                    // Use one global key per user
+                    return record.getSbn().getNormalizedUserId() + ":" + COMMON_KEY;
                 }
             } else {
                 return mAppStrategy.getChannelKey(record);
@@ -1728,12 +1717,8 @@ public final class NotificationAttentionHelper {
         @Override
         public void setLastNotificationUpdateTimeMs(NotificationRecord record,
                 long timestampMillis) {
-            if (Flags.politeNotificationsAttnUpdate()) {
-                // Set last update per package/channel only for exempt notifications
-                if (isAvalancheExempted(record)) {
-                    super.setLastNotificationUpdateTimeMs(record, timestampMillis);
-                }
-            } else {
+            // Set last update per package/channel only for exempt notifications
+            if (isAvalancheExempted(record)) {
                 super.setLastNotificationUpdateTimeMs(record, timestampMillis);
             }
             mLastNotificationTimestamp = timestampMillis;
@@ -1741,19 +1726,11 @@ public final class NotificationAttentionHelper {
         }
 
         long getLastNotificationUpdateTimeMs(final NotificationRecord record) {
-            if (Flags.politeNotificationsAttnUpdate()) {
-                // Mute all except priority conversations
-                if (isAvalancheExempted(record)) {
-                    return super.getLastNotificationUpdateTimeMs(record);
-                } else {
-                    return mLastNotificationTimestamp;
-                }
+            // Mute all except priority conversations
+            if (isAvalancheExempted(record)) {
+                return super.getLastNotificationUpdateTimeMs(record);
             } else {
-                if (record.getChannel().hasUserSetSound()) {
-                    return super.getLastNotificationUpdateTimeMs(record);
-                } else {
-                    return mLastNotificationTimestamp;
-                }
+                return mLastNotificationTimestamp;
             }
         }
 
@@ -2058,6 +2035,11 @@ public final class NotificationAttentionHelper {
         if (favoritesIncomingCallLights()) {
             mPriorityNotificationLight = light;
         }
+    }
+
+    @VisibleForTesting
+    void setPriorityNotificationLight(LogicalLight priorityNotificationLight) {
+        mPriorityNotificationLight = priorityNotificationLight;
     }
 
     @VisibleForTesting

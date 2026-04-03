@@ -49,6 +49,28 @@ public final class NotificationRecordExtractorData {
     private final boolean mSensitiveContent;
     private final String mSummarization;
 
+    NotificationRecordExtractorData(int position, NotificationRecord r) {
+        this(position,
+                r.getPackageVisibilityOverride(),
+                r.canShowBadge(),
+                r.canBubble(),
+                r.getNotification().isBubbleNotification(),
+                r.getChannel(),
+                r.getGroupKey(),
+                r.getPeopleOverride(),
+                r.getSnoozeCriteria(),
+                r.getUserSentiment(),
+                r.getSuppressedVisualEffects(),
+                r.getSystemGeneratedSmartActions(),
+                r.getSmartReplies(),
+                r.getImportance(),
+                r.getRankingScore(),
+                r.isConversation(),
+                r.getProposedImportance(),
+                r.hasSensitiveContent(),
+                r.getSummarization());
+    }
+
     NotificationRecordExtractorData(int position, int visibility, boolean showBadge,
             boolean allowBubble, boolean isBubble, NotificationChannel channel, String groupKey,
             ArrayList<String> overridePeople, ArrayList<SnoozeCriterion> snoozeCriteria,
@@ -123,5 +145,14 @@ public final class NotificationRecordExtractorData {
                 || mProposedImportance != r.getProposedImportance()
                 || mSensitiveContent != r.hasSensitiveContent()
                 || !Objects.equals(mSummarization, r.getSummarization());
+    }
+
+    boolean hasBeenUnbundled(NotificationRecord r) {
+        return mChannel.isBundleChannel() && !r.getChannel().isBundleChannel();
+    }
+
+    boolean hasBeenBundled(NotificationRecord r) {
+        return r.getChannel().isBundleChannel()
+                && !Objects.equals(mChannel.getId(), r.getChannel().getId());
     }
 }

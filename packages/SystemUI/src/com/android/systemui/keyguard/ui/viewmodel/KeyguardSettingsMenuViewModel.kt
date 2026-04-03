@@ -41,7 +41,7 @@ constructor(
 
     val text: Text = Text.Resource(res = R.string.lock_screen_settings)
 
-    val shouldAddClickListenerForA11y = accessibilityInteractor.isEnabledFiltered
+    val shouldAddClickListenerForA11y = accessibilityInteractor.isEnabled
 
     val textSize =
         configurationInteractor.dimensionPixelSize(
@@ -58,6 +58,10 @@ constructor(
 
     fun clickKeyguardSettingsPopupMenu() {
         interactor.onMenuTouchGestureEnded(isClick = true)
+    }
+
+    fun openKeyguardSettingsPopupMenu() {
+        interactor.onLongPress()
     }
 
     fun onSettingsShown() {

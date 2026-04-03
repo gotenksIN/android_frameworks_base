@@ -568,10 +568,10 @@ static jboolean android_hardware_HubEndpoint_activateDataFlow(JNIEnv* env, jobje
 
 static jintArray android_hardware_HubEndpoint_enableHostSink(
         JNIEnv* env, jobject /* thiz */, jlong handle, jint regionId, jlong regionSize,
-        jint regionFd, jlong dataFlowHubId, jint dataFlowId, jlong sourceId,
-        jint notifyHostFdsWaking, jint notifyHostFdsNonWaking, jint notifyHostFdsHalAck,
-        jint notifyOffloadFdsWaking, jint notifyOffloadFdsNonWaking, jlong queueOffset,
-        jlong metadataOffset) {
+        jint regionFd, jint metadataRegionId, jlong metadataRegionSize, jint metadataRegionFd,
+        jlong dataFlowHubId, jint dataFlowId, jlong sourceId, jint notifyHostFdsWaking,
+        jint notifyHostFdsNonWaking, jint notifyHostFdsHalAck, jint notifyOffloadFdsWaking,
+        jint notifyOffloadFdsNonWaking, jlong queueOffset, jlong metadataOffset) {
     HubEndpointResource* resource = reinterpret_cast<HubEndpointResource*>(handle);
     RETURN_ON_FALSE(resource != nullptr, nullptr, "Invalid handle");
     RegionManager::RegionToMap regionToMap = {
@@ -580,14 +580,25 @@ static jintArray android_hardware_HubEndpoint_enableHostSink(
             .size = static_cast<size_t>(regionSize),
     };
 
+    std::optional<RegionManager::RegionToMap> metadataRegionToMap = std::nullopt;
+    if (metadataRegionId != -1) {
+        metadataRegionToMap = {
+                .id = metadataRegionId,
+                .fd = ndk::ScopedFileDescriptor(dup(metadataRegionFd)),
+                .size = static_cast<size_t>(metadataRegionSize),
+        };
+    }
+
     DataFlowId id = {};
     id.hubId = dataFlowHubId;
     id.id = dataFlowId;
-    auto result = resource->getRegionManager()->mapHostConsumerRegions(std::move(regionToMap),
-                                                                       std::nullopt, id);
+    auto result =
+            resource->getRegionManager()->mapHostConsumerRegions(std::move(regionToMap),
+                                                                 std::move(metadataRegionToMap),
+                                                                 id);
     RETURN_ON_FALSE(result.ok(), nullptr,
                     (std::string("Failed to map sink region: ") + result.status().str()).c_str());
-    auto [region, _] = std::move(result.value());
+    auto [region, descRegion] = std::move(result.value());
 
     DataFlowAlertFds notifyHostFds = {.waking = ndk::ScopedFileDescriptor(dup(notifyHostFdsWaking)),
                                       .nonWaking = ndk::ScopedFileDescriptor(
@@ -614,8 +625,8 @@ static jintArray android_hardware_HubEndpoint_enableHostSink(
     std::vector<jint> out;
     if (fmcq_support_variable_sized_data_flow_fix()) {
         pw::Result<std::variant<UntypedConsumer, VariableDataConsumer>> consumerRes =
-                createRemoteConsumer(region, /* descRegion= */ std::nullopt, queueOffset,
-                                     metadataOffset, std::move(args));
+                createRemoteConsumer(region, descRegion, queueOffset, metadataOffset,
+                                     std::move(args));
         RETURN_ON_FALSE(consumerRes.ok(), nullptr,
                         (std::string("Failed to create sink: ") + consumerRes.status().str())
                                 .c_str());
@@ -629,7 +640,7 @@ static jintArray android_hardware_HubEndpoint_enableHostSink(
             out.push_back(1);  // element alignment
         }
     } else {
-        auto consumerRes = UntypedConsumer::createRemote(region, std::nullopt, queueOffset,
+        auto consumerRes = UntypedConsumer::createRemote(region, descRegion, queueOffset,
                                                          metadataOffset, std::move(args));
         RETURN_ON_FALSE(consumerRes.ok(), nullptr,
                         (std::string("Failed to create sink: ") + consumerRes.status().str())
@@ -976,6 +987,40 @@ static jint android_hardware_HubEndpoint_mapOffloadSinkRegion(
     return consDescOffsetRes.value();
 }
 
+static jint android_hardware_HubEndpoint_addOffloadSinkInPrimaryRegion(
+        JNIEnv* env, jobject /*thiz*/, jlong handle, jint sourceRegionId, jlong sinkHubId,
+        jlong sinkEndpointId, jint notificationPolicy, jint notificationPolicyData,
+        jboolean canOverwrite) {
+    HubEndpointResource* resource = reinterpret_cast<HubEndpointResource*>(handle);
+    RETURN_ON_FALSE(resource != nullptr, 0, "Invalid handle");
+
+    SourceWrapper* sourceWrapper = resource->getSourceWrapper(sourceRegionId);
+    RETURN_ON_FALSE(sourceWrapper != nullptr, 0, "Source not found for regionId");
+
+    RemoteEndpointId sinkId = {.aidlId = {.hubId = sinkHubId, .endpointId = sinkEndpointId}};
+    ConsumerPolicyBuilder policy =
+            createConsumerPolicyBuilder(notificationPolicy, notificationPolicyData, canOverwrite);
+
+    std::variant<UntypedProducer, VariableDataProducer>& producer = sourceWrapper->getProducer();
+    pw::Result<uint32_t> consDescOffsetRes;
+    if (producer.index() == 0) {
+        ConsumerManager consumerManager = std::get<UntypedProducer>(producer).getConsumerManager();
+        consDescOffsetRes = consumerManager.addConsumer(sinkId, policy);
+    } else if (fmcq_support_variable_sized_data_flow_fix()) {
+        ConsumerManager consumerManager =
+                std::get<VariableDataProducer>(producer).getConsumerManager();
+        consDescOffsetRes = consumerManager.addConsumer(sinkId, policy);
+    } else {
+        return 0;
+    }
+
+    RETURN_ON_FALSE(consDescOffsetRes.ok(), 0,
+                    (std::string("Failed to add sink: ") + consDescOffsetRes.status().str())
+                            .c_str());
+
+    return consDescOffsetRes.value();
+}
+
 static void android_hardware_HubEndpoint_updateSinkPolicy(JNIEnv* env, jobject /*thiz*/,
                                                           jlong handle, jint regionId,
                                                           jlong sinkHubId, jlong sinkEndpointId,
@@ -1070,7 +1115,7 @@ static const JNINativeMethod method_table[] = {
         {"native_createDataFlowInfo", "(JIJIIIII)[I",
          (void*)android_hardware_HubEndpoint_createDataFlowInfo},
         {"native_activateDataFlow", "(JII)Z", (void*)android_hardware_HubEndpoint_activateDataFlow},
-        {"native_enableHostSink", "(JIJIJIJIIIIIJJ)[I",
+        {"native_enableHostSink", "(JIJIIJIJIJIIIIIJJ)[I",
          (void*)android_hardware_HubEndpoint_enableHostSink},
         {"native_sourcePush", "(JI[BZ)I", (void*)android_hardware_HubEndpoint_sourcePush},
         {"native_sourceFull", "(JI)Z", (void*)android_hardware_HubEndpoint_sourceFull},
@@ -1085,6 +1130,8 @@ static const JNINativeMethod method_table[] = {
         {"native_addOffloadSink", "(JIJJ)[I", (void*)android_hardware_HubEndpoint_addOffloadSink},
         {"native_mapOffloadSinkRegion", "(JIIJJIJIIIZ)I",
          (void*)android_hardware_HubEndpoint_mapOffloadSinkRegion},
+        {"native_addOffloadSinkInPrimaryRegion", "(JIJJIIZ)I",
+         (void*)android_hardware_HubEndpoint_addOffloadSinkInPrimaryRegion},
         {"native_updateSinkPolicy", "(JIJJIIZ)V",
          (void*)android_hardware_HubEndpoint_updateSinkPolicy},
         {"native_removeOffloadSink", "(JIJJ)V",

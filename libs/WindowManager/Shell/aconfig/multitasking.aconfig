@@ -124,16 +124,6 @@ flag {
 }
 
 flag {
-    name: "enable_focus_reset_on_display_removal"
-    namespace: "multitasking"
-    description: "Resets focused display to default when it is removed"
-    bug: "450179124"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_bubble_bar_on_phones"
     namespace: "multitasking"
     description: "Try out bubble bar on phones"
@@ -190,16 +180,6 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where tasks are being destroyed when a bubble is overflowed."
     bug: "427302529"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_bubble_swipe_up_gesture"
-    namespace: "multitasking"
-    description: "Fixes the swipe up gesture getting broken due to bubbles."
-    bug: "444859270"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -284,30 +264,17 @@ flag {
 }
 
 flag {
+    name: "enable_bubble_pinning"
+    namespace: "multitasking"
+    description: "Enables pinning bubbles on laptops and tablets"
+    bug: "493912543"
+}
+
+flag {
     name: "consolidate_split_keyboard_shortcut_controllers"
     namespace: "multitasking"
     description: "Consolidate split desktop keyboard shortcuts handling on shell and launcher side"
     bug: "438790317"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "retry_ime_animation_on_leash_ready"
-    namespace: "multitasking"
-    description: "Fix a bug where the ime animation wasn't being started on leash ready, which was occuring for Bubbles."
-    bug: "457615714"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "use_bubble_icon_from_activity_info"
-    namespace: "multitasking"
-    description: "Load Bubble app icon from specific ActivityInfo rather than just the ApplicationInfo."
-    bug: "462281202"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -433,15 +400,6 @@ flag {
     }
 }
 
-flag {
-    name: "fix_verify_bubble_task_id_on_removal"
-    namespace: "multitasking"
-    description: "Fixes a bug where we remove a bubble based on package name after the bubble task has changed"
-    bug: "482877474"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "fix_taskbar_scrim_view_on_home"
@@ -464,6 +422,16 @@ flag {
 }
 
 flag {
+    name: "fix_bubbled_task_height"
+    namespace: "multitasking"
+    description: "Fixes bubbled task being short after device is folded"
+    bug: "487855787"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "bubbles_fix_issues_with_repeated_fold_unfold"
     namespace: "multitasking"
     description: "Fixes bubble issues when transitioning between modes due to repeated folding and unfolding"
@@ -478,6 +446,66 @@ flag {
     namespace: "multitasking"
     description: "Fixes an issue where user education didn't dismiss"
     bug: "490187640"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_dismiss_flyout_persistent_taskbar"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubble bar flyout is not hidden on persistent taskbars"
+    bug: "493963961"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubbles_stack_visible_in_immersive"
+    namespace: "multitasking"
+    description: "Fixes a bug where the floating stack is visible in immersive mode"
+    bug: "494514819"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubbles_stash_incorrect_progress"
+    namespace: "multitasking"
+    description: "Fixes a bug where persistent bubble stash progress is incorrect after transition from home."
+    bug: "487826634"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_insets_when_invisible"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubbles would still be in the insets even when invisible"
+    bug: "494114931"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_bar_visibility_update_dropped"
+    namespace: "multitasking"
+    description: "Fixes bubble bar visibility update being dropped when animations are interrupted"
+    bug: "474032293"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_pip_to_bubble_relaunch"
+    namespace: "multitasking"
+    description: "Fixes a bug where relaunching an app that was bubble'd after being PIP'd didn't work"
+    bug: "496911676"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

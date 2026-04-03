@@ -2656,13 +2656,26 @@ class PermissionService(private val service: AccessCheckingService) :
         if (isRootOrSystemAppId(appId)) {
             return getAllGrantedPermissionsBits(permissionNames)
         }
-        val hasAnyPackage = state.externalState.appIdPackageNames[appId]?.isNotEmpty() ?: false
+        val packageNames = state.externalState.appIdPackageNames[appId]
+        val hasAnyPackage = packageNames?.isNotEmpty() ?: false
+        // Note that instant apps can't have shared UIDs, so we only need to check the
+        // first package state.
+        val isInstantApp =
+            if (hasAnyPackage) {
+                state.externalState.packageStates[packageNames.first()]
+                    ?.getUserStateOrDefault(userId)
+                    ?.isInstantApp ?: false
+            } else {
+                false
+            }
         var permissionBits = 0
         permissionNames.forEachIndexed { index, permissionName ->
             val isGranted =
                 if (hasAnyPackage) {
-                    val flags = with(policy) { getPermissionFlags(appId, userId, permissionName) }
-                    PermissionFlags.isAppOpGranted(flags)
+                    isBpfMapPermissionGranted(appId, userId, isInstantApp, permissionName) ||
+                        getFullerPermission(permissionName).let {
+                            it != null && isBpfMapPermissionGranted(appId, userId, isInstantApp, it)
+                        }
                 } else {
                     isSystemUidPermissionGranted(appId, permissionName)
                 }
@@ -2671,6 +2684,22 @@ class PermissionService(private val service: AccessCheckingService) :
             }
         }
         return permissionBits
+    }
+
+    private fun GetStateScope.isBpfMapPermissionGranted(
+        appId: Int,
+        userId: Int,
+        isInstantApp: Boolean,
+        permissionName: String,
+    ): Boolean {
+        if (isInstantApp) {
+            val permission = state.systemState.permissions[permissionName] ?: return false
+            if (!permission.isInstant) {
+                return false
+            }
+        }
+        val flags = with(policy) { getPermissionFlags(appId, userId, permissionName) }
+        return PermissionFlags.isAppOpGranted(flags)
     }
 
     /** Generate a bitmap representing all permissions being granted. */
@@ -3102,6 +3131,7 @@ class PermissionService(private val service: AccessCheckingService) :
                 this += Manifest.permission.INTERACT_ACROSS_PROFILES
                 this += Manifest.permission.INTERACT_ACROSS_USERS
                 this += Manifest.permission.INTERACT_ACROSS_USERS_FULL
+                this += android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK
             }
 
         private const val MAX_ALLOWED_BPF_PERMISSIONS = Int.SIZE_BITS

@@ -82,7 +82,7 @@
     <string name="kg_prompt_password_auth_timeout" msgid="5809110458491920871">"Mere sikkerhed er påkrævet. Adgangskoden er ikke blevet brugt i et stykke tid."</string>
     <string name="kg_prompt_pattern_auth_timeout" msgid="1860605401869262178">"Mere sikkerhed er påkrævet. Mønsteret er ikke blevet brugt i et stykke tid."</string>
     <string name="kg_prompt_auth_timeout" msgid="6620679830980315048">"Mere sikkerhed er påkrævet. Enheden er ikke blevet låst op i et stykke tid."</string>
-    <string name="kg_face_locked_out" msgid="2751559491287575">"Oplåsning med ansigt mislykkedes. For mange forsøg."</string>
+    <string name="kg_face_locked_out" msgid="2751559491287575">"Ansigtigsoplåsning mislykkedes. For mange forsøg."</string>
     <string name="kg_fp_locked_out" msgid="6228277682396768830">"Oplåsning med finger mislykkedes. For mange forsøg."</string>
     <string name="kg_trust_agent_disabled" msgid="5400691179958727891">"Trust agent er ikke tilgængelig"</string>
     <string name="kg_primary_auth_locked_out_pin" msgid="5492230176361601475">"For mange forsøg med forkert pinkode"</string>
@@ -124,6 +124,9 @@
     <string name="kg_prompt_reason_restart_pattern" msgid="3321211830602827742">"Mønster er påkrævet efter genstart af enheden"</string>
     <string name="kg_prompt_reason_restart_pin" msgid="2672166323886110512">"Pinkode er påkrævet efter genstart af enheden"</string>
     <string name="kg_prompt_reason_restart_password" msgid="3967993994418885887">"Adgangskode er påkrævet efter genstart af enheden"</string>
+    <string name="kg_prompt_reason_signin_pattern" msgid="1650886553162854395">"Du skal angive et mønster for at logge ind"</string>
+    <string name="kg_prompt_reason_signin_pin" msgid="636031498838532631">"Du skal angive en pinkode for at logge ind"</string>
+    <string name="kg_prompt_reason_signin_password" msgid="1020939174735616114">"Du skal angive en adgangskode for at logge ind"</string>
     <string name="kg_prompt_reason_timeout_pattern" msgid="5514969660010197363">"Øg sikkerheden ved at bruge dit oplåsningsmønter i stedet"</string>
     <string name="kg_prompt_reason_timeout_pin" msgid="4227962059353859376">"Øg sikkerheden ved at bruge din pinkode i stedet"</string>
     <string name="kg_prompt_reason_timeout_password" msgid="8810879144143933690">"Øg sikkerheden ved at bruge din adgangskode i stedet"</string>

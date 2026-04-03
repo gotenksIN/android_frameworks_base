@@ -38,12 +38,12 @@ android_test {
         "com.android.server.flags.services-aconfig-java",
         "frameworks-base-testutils",
         "flag-junit",
+        "mockito-target-extended-minus-junit4",
         "services.core",
     ],
     data: [
         ":MemoryLimiterTestApp",
-        "data/config-default.xml",
-        "data/config-error.xml",
+        "data/*",
     ],
     test_suites: ["device-tests"],
 }

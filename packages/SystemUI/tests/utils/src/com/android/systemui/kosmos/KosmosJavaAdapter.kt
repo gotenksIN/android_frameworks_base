@@ -44,6 +44,7 @@ import com.android.systemui.communal.domain.interactor.communalSettingsInteracto
 import com.android.systemui.communal.ui.viewmodel.communalTransitionViewModel
 import com.android.systemui.concurrency.fakeExecutor
 import com.android.systemui.data.repository.brightnessMirrorShowingRepository
+import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryFingerprintAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryUdfpsInteractor
@@ -115,7 +116,9 @@ import com.android.systemui.statusbar.notification.domain.interactor.activeNotif
 import com.android.systemui.statusbar.notification.domain.interactor.seenNotificationsInteractor
 import com.android.systemui.statusbar.notification.headsup.mockHeadsUpManager
 import com.android.systemui.statusbar.notification.people.PeopleNotificationIdentifier.Companion.TYPE_FULL_PERSON
+import com.android.systemui.statusbar.notification.row.AutomationNotificationBackgroundProvider
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
+import com.android.systemui.statusbar.notification.row.automationNotificationBackgroundProvider
 import com.android.systemui.statusbar.notification.row.createPromotedOngoingRow
 import com.android.systemui.statusbar.notification.row.createRow
 import com.android.systemui.statusbar.notification.row.createRowBundle
@@ -151,6 +154,7 @@ import com.android.systemui.volume.domain.interactor.volumeDialogInteractor
 import com.android.systemui.wallpapers.domain.interactor.fakeWallpaperRepository
 import com.android.systemui.wallpapers.domain.interactor.wallpaperInteractorFaked
 import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
+import java.util.Optional
 
 /**
  * Helper for using [Kosmos] from Java.
@@ -209,6 +213,7 @@ class KosmosJavaAdapter() {
     val powerInteractor by lazy { kosmos.powerInteractor }
     val pulseExpansionInteractor by lazy { kosmos.pulseExpansionInteractor }
     val deviceEntryInteractor by lazy { kosmos.deviceEntryInteractor }
+    val fakeDeviceEntryRepository by lazy { kosmos.fakeDeviceEntryRepository }
     val deviceEntryUdfpsInteractor by lazy { kosmos.deviceEntryUdfpsInteractor }
     val deviceUnlockedInteractor by lazy { kosmos.deviceUnlockedInteractor }
     val deviceEntryFingerprintAuthInteractor by lazy { kosmos.deviceEntryFingerprintAuthInteractor }
@@ -300,6 +305,9 @@ class KosmosJavaAdapter() {
     val dialogTransitionAnimator by lazy { kosmos.dialogTransitionAnimator }
     val systemUIDialogDotFactory by lazy { kosmos.systemUIDialogDotFactory }
     val dumpManager by lazy { kosmos.realDumpManager }
+    val automationNotificationBackgroundProvider by lazy {
+        kosmos.automationNotificationBackgroundProvider
+    }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {
@@ -370,6 +378,13 @@ class KosmosJavaAdapter() {
         block: NotificationEntryBuilder.() -> Unit = {},
     ): NotificationEntry {
         return kosmos.buildNotificationEntry(context = context, block = block)
+    }
+
+    fun setAutomationNotificationBackgroundProvider(
+        automationNotificationBackgroundProvider: AutomationNotificationBackgroundProvider
+    ) {
+        kosmos.automationNotificationBackgroundProvider =
+            Optional.of(automationNotificationBackgroundProvider)
     }
 
     val javaAdapter by lazy { kosmos.javaAdapter }

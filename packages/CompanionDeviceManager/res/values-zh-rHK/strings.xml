@@ -33,9 +33,9 @@
     <string name="profile_name_glasses" msgid="3506504967216601277">"裝置"</string>
     <string name="summary_glasses" msgid="5469208629679579157">"此應用程式將可在<xliff:g id="DEVICE_TYPE">%1$s</xliff:g>上取得以下權限"</string>
     <string name="profile_name_medical" msgid="5617160509499466400">"醫療裝置"</string>
-    <string name="title_app_streaming" msgid="237666000400427614">"要允許「<xliff:g id="APP_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;在你的<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>和「<xliff:g id="DEVICE_NAME">%3$s</xliff:g>」之間串流應用程式和系統功能嗎&lt;strong&gt;&lt;/strong&gt;？"</string>
+    <string name="title_app_streaming" msgid="237666000400427614">"要允許「<xliff:g id="APP_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;在你的<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>和「<xliff:g id="DEVICE_NAME">%3$s</xliff:g>」間串流應用程式和系統功能嗎&lt;strong&gt;&lt;/strong&gt;？"</string>
     <string name="summary_app_streaming" msgid="8346968726357732862">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」將獲授予以下權限："</string>
-    <string name="helper_summary_app_streaming" msgid="160149899100957545">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」正在代表「<xliff:g id="DEVICE_NAME">%2$s</xliff:g>」要求權限，以便在裝置之間串流應用程式和系統功能"</string>
+    <string name="helper_summary_app_streaming" msgid="160149899100957545">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」正在代表<xliff:g id="DEVICE_NAME">%2$s</xliff:g>要求權限，以便在裝置間串流應用程式和系統功能"</string>
     <string name="title_automotive_projection" msgid="3296005598978412847"></string>
     <string name="summary_automotive_projection" msgid="8683801274662496164"></string>
     <string name="title_computer" msgid="5040395223341777259">"允許 <xliff:g id="DISPLAY_NAME">%3$s</xliff:g> 在<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>上存取這項資料"</string>
@@ -47,8 +47,8 @@
     <string name="summary_virtual_device" msgid="1062189396947962635">"「<xliff:g id="APP_NAME">%2$s</xliff:g>」將獲授予以下權限："</string>
     <string name="profile_name_generic" msgid="6851028682723034988">"裝置"</string>
     <string name="summary_generic" msgid="1761976003668044801">"此應用程式將可同步手機和所選裝置的資訊，例如來電者的名稱"</string>
-    <!-- no translation found for summary_generic_with_remote_ai_capability (5053633566439056634) -->
-    <skip />
+    <string name="summary_generic_with_remote_ai_capability" msgid="5053633566439056634">"允許「<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;同步處理來電者資料等資訊，並透過<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>執行智能操作"</string>
+    <string name="summary_with_permissions_and_remote_ai_capability" msgid="5240771314596527096">"授予「<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;權限同步處理來電者資料等資訊，並透過<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>執行智能操作"</string>
     <string name="consent_yes" msgid="8344487259618762872">"允許"</string>
     <string name="consent_no" msgid="2640796915611404382">"不允許"</string>
     <string name="consent_cancel" msgid="5655005528379285841">"取消"</string>
@@ -92,8 +92,8 @@
     <string name="permission_add_mirror_display_summary" msgid="1385423940454941534">"錄影、投放或分享<xliff:g id="DEVICE_TYPE_0">%2$s</xliff:g>的螢幕畫面至「<xliff:g id="DEVICE_NAME">%3$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;.&lt;br/&gt;&lt;br/&gt;「<xliff:g id="APP_NAME">%1$s</xliff:g>」將可存取<xliff:g id="DEVICE_TYPE_1">%2$s</xliff:g>顯示或播放的所有內容，包括音訊、相片、付款資料、密碼和訊息。"</string>
     <string name="permission_add_trusted_display_summary" msgid="7399955172055281447">"將<xliff:g id="DEVICE_TYPE_0">%2$s</xliff:g>的應用程式串流至「<xliff:g id="DEVICE_NAME_1">%3$s</xliff:g>」&lt;strong&gt;&lt;/strong&gt;.&lt;br/&gt;&lt;br/&gt;「<xliff:g id="APP_NAME">%1$s</xliff:g>」將可存取「<xliff:g id="DEVICE_NAME_2">%3$s</xliff:g>」顯示或播放的所有內容，包括音訊、相片、付款資料、密碼和訊息，即使<xliff:g id="DEVICE_TYPE_3">%2$s</xliff:g>鎖定亦可以。"</string>
     <string name="permission_media_routing_control_summary" msgid="2714631092321412250">"存取可用裝置清單，並控制哪一部裝置可串流播放或投放其他應用程式的音訊或影片"</string>
-    <string name="permission_schedule_exact_alarm_summary" msgid="5938321911309800377"></string>
-    <string name="permission_bypass_dnd_summary" msgid="6221709271927387626"></string>
+    <string name="permission_schedule_exact_alarm_summary" msgid="4263728689361283271">"向你傳送警示"</string>
+    <string name="permission_bypass_dnd_summary" msgid="3649231048838415756">"即使在「請勿騷擾」模式下，仍向你傳送警示"</string>
     <string name="device_type" product="default" msgid="8268703872070046263">"手機"</string>
     <string name="device_type" product="tablet" msgid="5038791954983067774">"平板電腦"</string>
     <string name="device_type" product="tv" msgid="5355611506659405636">"電視"</string>

@@ -4685,6 +4685,7 @@ public abstract class Context {
                 TASK_CONTINUITY_SERVICE,
                 NPU_SERVICE,
                 WEB_APP_SERVICE,
+                D2D_CONNECTIVITY_SERVICE,
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ServiceName {}
@@ -7091,16 +7092,6 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
-     * {@link android.companion.datatransfer.continuity.UniversalClipboardManager}.
-     *
-     * @see #getSystemService(String)
-     * @see UniversalClipboardManager
-     * @hide
-     */
-    public static final String UNIVERSAL_CLIPBOARD_SERVICE = "universal_clipboard";
-
-    /**
-     * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.app.ondeviceintelligence.OnDeviceIntelligenceManager}.
      *
      * @see #getSystemService(String)
@@ -7366,7 +7357,7 @@ public abstract class Context {
      * @hide
      */
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
-    @FlaggedApi(android.os.profiling.anomaly.flags.Flags.FLAG_ANOMALY_DETECTOR_CORE)
+    @FlaggedApi(android.os.profiling.anomaly.flags.Flags.FLAG_ANOMALY_DETECTOR_CORE_C)
     public static final String ANOMALY_DETECTOR_SERVICE = "anomaly_detector";
 
     /**

@@ -177,12 +177,14 @@ import android.security.metrics.KeyCreationWithAuthInfo;
 import android.security.metrics.KeyCreationWithGeneralInfo;
 import android.security.metrics.KeyCreationWithPurposeAndModesInfo;
 import android.security.metrics.KeyOperationPerUid;
+import android.security.metrics.KeyOperationStreamingStats;
 import android.security.metrics.KeyOperationWithGeneralInfo;
 import android.security.metrics.KeyOperationWithPurposeAndModesInfo;
 import android.security.metrics.KeysPerUid;
 import android.security.metrics.Keystore2AtomWithOverflow;
 import android.security.metrics.KeystoreAtom;
 import android.security.metrics.KeystoreAtomPayload;
+import android.security.metrics.OperationLatency;
 import android.security.metrics.RkpErrorStats;
 import android.security.metrics.StorageStats;
 import android.stats.storage.StorageEnums;
@@ -864,6 +866,8 @@ public class StatsPullAtomService extends SystemService {
                     case FrameworkStatsLog.KEYSTORE2_KEYS_PER_UID:
                     case FrameworkStatsLog.KEYSTORE2_KEY_CREATION_PER_UID:
                     case FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_PER_UID:
+                    case FrameworkStatsLog.KEYSTORE2_OPERATION_LATENCY:
+                    case FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_STREAMING_STATS:
                         return pullKeystoreAtoms(atomTag, data);
                     case FrameworkStatsLog.ACCESSIBILITY_SHORTCUT_STATS:
                         return pullAccessibilityShortcutStatsLocked(data);
@@ -893,6 +897,8 @@ public class StatsPullAtomService extends SystemService {
                         synchronized (mSuspendControlServiceInternalLock) {
                             return pullAdaptiveSuspendStats(atomTag, data);
                         }
+                    case FrameworkStatsLog.SLAB_INFO:
+                        return pullSlabInfoStats(atomTag, data);
                     default:
                         throw new UnsupportedOperationException("Unknown tagId=" + atomTag);
                 }
@@ -1106,6 +1112,7 @@ public class StatsPullAtomService extends SystemService {
         if (ENABLE_ADAPTIVE_SUSPEND_STATS_PULLER) {
             registerAdaptiveSuspendStats();
         }
+        registerSlabInfoStats();
     }
 
     private void initMobileDataStatsPuller() {
@@ -2813,6 +2820,35 @@ public class StatsPullAtomService extends SystemService {
                         dmaBufTotalExportedKb,
                         dmaBufUserspaceKb,
                         dmaBufTotalExportedKb - dmaBufUserspaceKb));
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    private void registerSlabInfoStats() {
+        int tagId = FrameworkStatsLog.SLAB_INFO;
+        mStatsManager.setPullAtomCallback(
+            tagId,
+            null, // use default PullAtomMetadata values,
+            DIRECT_EXECUTOR,
+            mStatsCallbackImpl
+        );
+    }
+
+    int pullSlabInfoStats(int atomTag, List<StatsEvent> pulledData) {
+        KernelAllocationStats.SlabCacheStats[] slabCacheStats =
+            KernelAllocationStats.getSlabInfoStats();
+
+        if (slabCacheStats == null) {
+            return StatsManager.PULL_SKIP;
+        }
+
+        for (KernelAllocationStats.SlabCacheStats slabCache : slabCacheStats) {
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                atomTag,
+                slabCache.name,
+                slabCache.totalMemUsageKb
+                )
+            );
+        }
         return StatsManager.PULL_SUCCESS;
     }
 
@@ -4846,7 +4882,9 @@ public class StatsPullAtomService extends SystemService {
         if (ENABLE_KEYSTORE_PER_UID_PULLER) {
             for (int tag : new int[] {
                     FrameworkStatsLog.KEYSTORE2_KEY_CREATION_PER_UID,
-                    FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_PER_UID
+                    FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_PER_UID,
+                    FrameworkStatsLog.KEYSTORE2_OPERATION_LATENCY,
+                    FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_STREAMING_STATS
             }) {
                 mStatsManager.setPullAtomCallback(
                         tag,
@@ -4988,7 +5026,8 @@ public class StatsPullAtomService extends SystemService {
             KeyOperationWithGeneralInfo atom = atomWrapper.payload.getKeyOperationWithGeneralInfo();
             pulledData.add(FrameworkStatsLog.buildStatsEvent(
                     FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_WITH_GENERAL_INFO, atom.outcome,
-                    atom.error_code, atom.key_upgraded, atom.security_level, atomWrapper.count));
+                    atom.error_code, atom.key_upgraded, atom.security_level, atomWrapper.count,
+                    atom.is_attested));
         }
         return StatsManager.PULL_SUCCESS;
     }
@@ -5064,6 +5103,38 @@ public class StatsPullAtomService extends SystemService {
         return StatsManager.PULL_SUCCESS;
     }
 
+    int parseKeystoreOperationLatency(KeystoreAtom[] atoms,
+            List<StatsEvent> pulledData) {
+        if (Arrays.stream(atoms).anyMatch(
+                atom -> atom.payload.getTag() != KeystoreAtomPayload.operationLatency)) {
+            return StatsManager.PULL_SKIP;
+        }
+        for (KeystoreAtom atomWrapper : atoms) {
+            OperationLatency atom = atomWrapper.payload.getOperationLatency();
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                    FrameworkStatsLog.KEYSTORE2_OPERATION_LATENCY, atom.operation_type,
+                    atom.algorithm, atom.key_size, atom.ec_curve, atom.security_level,
+                    atom.is_success, atom.latency_ms, atomWrapper.count));
+        }
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    int parseKeystoreKeyOperationStreamingStats(KeystoreAtom[] atoms,
+            List<StatsEvent> pulledData) {
+        if (Arrays.stream(atoms).anyMatch(
+                atom -> atom.payload.getTag() != KeystoreAtomPayload.keyOperationStreamingStats)) {
+            return StatsManager.PULL_SKIP;
+        }
+        for (KeystoreAtom atomWrapper : atoms) {
+            KeyOperationStreamingStats atom = atomWrapper.payload.getKeyOperationStreamingStats();
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                    FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_STREAMING_STATS, atom.algorithm,
+                    atom.is_success, atom.call_count, atom.total_input_bytes,
+                    atomWrapper.count));
+        }
+        return StatsManager.PULL_SUCCESS;
+    }
+
     int pullKeystoreAtoms(int atomTag, List<StatsEvent> pulledData) {
         IKeystoreMetrics keystoreMetricsService = getIKeystoreMetricsService();
         if (keystoreMetricsService == null) {
@@ -5098,6 +5169,10 @@ public class StatsPullAtomService extends SystemService {
                     return parseKeystoreKeyCreationPerUid(atoms, pulledData);
                 case FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_PER_UID:
                     return parseKeystoreKeyOperationPerUid(atoms, pulledData);
+                case FrameworkStatsLog.KEYSTORE2_OPERATION_LATENCY:
+                    return parseKeystoreOperationLatency(atoms, pulledData);
+                case FrameworkStatsLog.KEYSTORE2_KEY_OPERATION_STREAMING_STATS:
+                    return parseKeystoreKeyOperationStreamingStats(atoms, pulledData);
                 default:
                     Slog.w(TAG, "Unsupported keystore atom: " + atomTag);
                     return StatsManager.PULL_SKIP;

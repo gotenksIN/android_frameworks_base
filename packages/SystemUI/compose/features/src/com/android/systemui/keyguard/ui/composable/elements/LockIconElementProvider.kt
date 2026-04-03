@@ -22,6 +22,7 @@ import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,11 +61,13 @@ import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shared.customization.data.SensorLocation
 import com.android.systemui.statusbar.VibratorHelper
+import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import com.google.android.msdl.domain.MSDLPlayer
 import dagger.Lazy
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DisposableHandle
 
 @SysUISingleton
 class LockIconElementProvider
@@ -74,6 +77,7 @@ constructor(
     @Application private val applicationScope: CoroutineScope,
     @Main private val mainDispatcher: CoroutineDispatcher,
     private val windowManager: WindowManager,
+    private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     private val featureFlags: FeatureFlagsClassic,
     private val deviceEntryIconViewModel: Lazy<DeviceEntryIconViewModel>,
     private val deviceEntryForegroundViewModel: Lazy<DeviceEntryForegroundViewModel>,
@@ -99,6 +103,7 @@ constructor(
     @Composable
     fun LockIcon(modifier: Modifier = Modifier, overrideColor: Color? = null) {
         val lockIconBounds = rememberLockIconBounds()
+        val (disposable, setDisposable) = remember { mutableStateOf<DisposableHandle?>(null) }
 
         AndroidView(
             factory = { context ->
@@ -109,17 +114,19 @@ constructor(
                     )
                     .apply {
                         id = R.id.device_entry_icon_view
-                        DeviceEntryIconViewBinder.bind(
-                            applicationScope,
-                            mainDispatcher,
-                            this,
-                            deviceEntryIconViewModel.get(),
-                            deviceEntryForegroundViewModel.get(),
-                            deviceEntryBackgroundViewModel.get(),
-                            falsingManager.get(),
-                            vibratorHelper.get(),
-                            msdlPlayer.get(),
-                            overrideColor,
+                        setDisposable(
+                            DeviceEntryIconViewBinder.bind(
+                                applicationScope,
+                                mainDispatcher,
+                                windowRootViewBlurInteractor,this,
+                                deviceEntryIconViewModel.get(),
+                                deviceEntryForegroundViewModel.get(),
+                                deviceEntryBackgroundViewModel.get(),
+                                falsingManager.get(),
+                                vibratorHelper.get(),
+                                msdlPlayer.get(),
+                                overrideColor,
+                            )
                         )
                     }
             },
@@ -146,6 +153,7 @@ constructor(
                         placeable.place(0, 0)
                     }
                 },
+            onRelease = { disposable?.dispose() },
         )
     }
 

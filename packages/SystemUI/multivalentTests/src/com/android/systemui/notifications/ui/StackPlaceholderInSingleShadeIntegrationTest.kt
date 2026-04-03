@@ -33,8 +33,10 @@ import androidx.test.filters.LargeTest
 import com.android.compose.animation.scene.isElement
 import com.android.compose.snapshot.ObserveReadsRoot
 import com.android.compose.theme.PlatformTheme
+import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.EnableSceneContainer
+import com.android.systemui.flags.fakeFeatureFlagsClassic
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.lifecycle.rememberViewModel
@@ -119,6 +121,10 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
+        kosmos.fakeFeatureFlagsClassic.set(
+            com.android.systemui.flags.Flags.FILTER_PROVISIONING_NETWORK_SUBSCRIPTIONS,
+            true,
+        )
         with(kosmos) {
             enableSingleShade()
             usingMediaInComposeFragment = true

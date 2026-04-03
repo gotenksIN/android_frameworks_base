@@ -15,10 +15,12 @@
  */
 package com.android.server.am.psc;
 
+import static android.app.ActivityManager.MIN_PROCESS_STATE;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL;
 
 import android.annotation.NonNull;
 import android.app.ActivityManager.ProcessCapability;
+import android.app.ActivityManager.ProcessState;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 
 import java.util.List;
@@ -29,7 +31,7 @@ import java.util.function.Consumer;
  * Represents the system node in the process graph, acting as the root source of importance.
  */
 @RavenwoodKeepWholeClass
-final class SystemNode implements GraphNode {
+final class SystemNode extends GraphNode {
     private static SystemNode sInstance;
 
     /**
@@ -69,5 +71,14 @@ final class SystemNode implements GraphNode {
     @Override
     public @ProcessCapability int getCapability() {
         return PROCESS_CAPABILITY_ALL;
+    }
+
+    /**
+     * Returns the cached process state of the system node, which is always
+     * {@link ActivityManager#MIN_PROCESS_STATE}.
+     */
+    @Override
+    public @ProcessState int getProcState() {
+        return MIN_PROCESS_STATE;
     }
 }

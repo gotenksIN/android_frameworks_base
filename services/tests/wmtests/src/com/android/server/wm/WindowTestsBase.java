@@ -1833,6 +1833,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             if (mCreateActivity) {
                 ActivityRecord activity = new ActivityBuilder(mSupervisor.mService)
                         .setTask(task)
+                        .setUid(task.mUserId * UserHandle.PER_USER_RANGE)
                         .setComponent(mComponent)
                         .build();
                 if (mOnTop) {
@@ -2296,6 +2297,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             doReturn(this).when(atms).getTransitionController();
             mSnapshotController = mock(SnapshotController.class);
             mTransitionTracer = mock(TransitionTracer.class);
+            setWindowManager(atms.mWindowManager);
         }
     }
 

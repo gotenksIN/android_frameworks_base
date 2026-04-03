@@ -23,6 +23,7 @@ package com.android.server.pm;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.Flags.allowUpdatedVersionBetterThanApkInApex;
 import static android.content.pm.Flags.disallowSdkLibsToBeApps;
+import static android.content.pm.Flags.scanApksInUpdatedApexAsNewInstalls;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_APK;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_INSTALLER;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_UNKNOWN;
@@ -102,6 +103,7 @@ import static com.android.server.pm.PackageManagerServiceUtils.isInstalledByAdb;
 import static com.android.server.pm.PackageManagerServiceUtils.logCriticalInfo;
 import static com.android.server.pm.PackageManagerServiceUtils.makeDirRecursive;
 import static com.android.server.pm.ParallelPackageParser.OrderedResult;
+import static com.android.server.pm.ScanPackageUtils.isApkInUpdatedApex;
 import static com.android.server.pm.SharedUidMigration.BEST_EFFORT;
 
 import android.annotation.NonNull;
@@ -184,6 +186,7 @@ import com.android.internal.pm.pkg.parsing.ParsingPackageUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.server.EventLogTags;
+import com.android.server.IoThread;
 import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.pm.parsing.PackageCacher;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
@@ -481,9 +484,15 @@ final class InstallPackageHelper {
                             + " is no longer a PCC package. Cleaning up.");
             mPm.mSettings.removePccIdLPw(oldPkgSetting.getPccId());
             pkgSetting.setPccId(Process.INVALID_UID);
-
-            mAppDataHelper.destroyPccData(
-                    oldPkgSetting, FLAG_STORAGE_CE | FLAG_STORAGE_DE, allUsers);
+            final int[] safeAllUsers = (allUsers != null) ? allUsers.clone() : new int[0];
+            final PackageSetting safeOldPkgSetting = new PackageSetting(oldPkgSetting);
+            IoThread.getHandler().post(() -> {
+                try (PackageManagerTracedLock installLock = mPm.mInstallLock.acquireLock()) {
+                    mAppDataHelper.destroyPccData(
+                            safeOldPkgSetting,
+                            FLAG_STORAGE_CE | FLAG_STORAGE_DE, safeAllUsers);
+                }
+            });
         }
 
       if(android.content.pm.Flags.verifiedDexopt()){
@@ -4517,26 +4526,38 @@ final class InstallPackageHelper {
                 parsedPackage, parseFlags, scanFlags, user);
         final ScanResult scanResult = scanResultPair.first;
         boolean shouldHideSystemApp = scanResultPair.second;
-        final InstallRequest installRequest = new InstallRequest(
-                parsedPackage, parseFlags, scanFlags, user, scanResult, disabledPkgSetting);
 
-        String existingApexModuleName = null;
+        final PackageSetting existingPkgSetting;
         synchronized (mPm.mLock) {
-            var existingPkgSetting = mPm.mSettings.getPackageLPr(parsedPackage.getPackageName());
-            if (existingPkgSetting != null) {
-                existingApexModuleName = existingPkgSetting.getApexModuleName();
-            }
+            existingPkgSetting = mPm.mSettings.getPackageLPr(parsedPackage.getPackageName());
         }
 
+        final String apexModuleName;
         if (activeApexInfo != null) {
-            installRequest.setApexModuleName(activeApexInfo.apexModuleName);
+            apexModuleName = activeApexInfo.apexModuleName;
+        } else if (disabledPkgSetting != null) {
+            apexModuleName = disabledPkgSetting.getApexModuleName();
+        } else if (existingPkgSetting != null) {
+            apexModuleName = existingPkgSetting.getApexModuleName();
         } else {
-            if (disabledPkgSetting != null) {
-                installRequest.setApexModuleName(disabledPkgSetting.getApexModuleName());
-            } else if (existingApexModuleName != null) {
-                installRequest.setApexModuleName(existingApexModuleName);
-            }
+            apexModuleName = null;
         }
+
+        // An updated APEX can include a package that is already present in the system
+        // image; treat this as a replacement of the existing system image package.
+        final boolean replace =
+                (scanApksInUpdatedApexAsNewInstalls()
+                        && isApkInUpdatedApex(scanFlags)
+                        && scanResult.mRequest.mOldPkg != null
+                        && existingPkgSetting != null
+                        && existingPkgSetting.isSystem()
+                        && !existingPkgSetting.isUpdatedSystemApp()
+                        && existingPkgSetting.getApexModuleName() == null
+                        && apexModuleName != null);
+
+        final InstallRequest installRequest = new InstallRequest(
+                parsedPackage, parseFlags, scanFlags, user, scanResult, disabledPkgSetting,
+                apexModuleName, replace);
 
         synchronized (mPm.mLock) {
             boolean appIdCreated = false;
@@ -4553,6 +4574,20 @@ final class InstallPackageHelper {
                     appIdCreated = optimisticallyRegisterAppIds(installRequest);
                 } else {
                     installRequest.setScannedPackageSettingAppId(Process.INVALID_UID);
+                }
+                if (installRequest.isInstallReplace()) {
+                    // Per the comment above, remove the existing system image package
+                    // to make way for the new APK-in-APEX. This effectively makes the
+                    // APK-in-APEX the system version of the package, which will allow
+                    // it to influence which privileged permissions the package can hold,
+                    // among other things; as such, don't mark the existing PackageSetting
+                    // as being a disabled system package (the APK-in-APEX will become the
+                    // disabled system package, if a newer version of the package is
+                    // installed on /data).
+                    AndroidPackage oldPackage = mPm.mPackages.get(pkgName);
+                    if (oldPackage != null) {
+                        mRemovePackageHelper.removePackage(oldPackage, true);
+                    }
                 }
                 commitReconciledScanResultLocked(reconcileResult.get(0),
                         mPm.mUserManager.getUserIds());
@@ -5252,8 +5287,15 @@ final class InstallPackageHelper {
                 }
             }
 
+            // An updated APEX can include a package that is already present in the system
+            // image; addForInitLI() will treat it as a replacement of the existing system
+            // image package.
+            final boolean allowDuplicatePackageName =
+                    scanApksInUpdatedApexAsNewInstalls() && isApkInUpdatedApex(scanFlags);
+
             // A package name must be unique; don't allow duplicates
             if ((scanFlags & SCAN_NEW_INSTALL) == 0
+                    && !allowDuplicatePackageName
                     && mPm.mPackages.containsKey(pkg.getPackageName())) {
                 throw new PackageManagerException(INSTALL_FAILED_DUPLICATE_PACKAGE,
                         "Application package " + pkg.getPackageName()
@@ -5264,6 +5306,7 @@ final class InstallPackageHelper {
                 // Static libs have a synthetic package name containing the version
                 // but we still want the base name to be unique.
                 if ((scanFlags & SCAN_NEW_INSTALL) == 0
+                        && !allowDuplicatePackageName
                         && mPm.mPackages.containsKey(pkg.getManifestPackageName())) {
                     throw PackageManagerException.ofInternalError(
                             "Duplicate static shared lib provider package",

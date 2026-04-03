@@ -61,6 +61,7 @@ import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -83,6 +84,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.launch
 
 /**
  * Encapsulates business-logic related to the keyguard but not to a more specific part within it.
@@ -179,8 +181,24 @@ constructor(
                     keyguardTransitionInteractor.isInTransition(
                         edge = Edge.create(from = AOD, to = Scenes.Occluded)
                     ),
-                ) { dozeAmt, isTransitioningToAod, isTransitioningFromAod ->
-                    if (isTransitioningToAod || isTransitioningFromAod) {
+                    keyguardTransitionInteractor.isInTransition(
+                        edge = Edge.create(from = Scenes.Occluded, to = DOZING)
+                    ),
+                    keyguardTransitionInteractor.isInTransition(
+                        edge = Edge.create(from = DOZING, to = Scenes.Occluded)
+                    ),
+                ) {
+                    dozeAmt,
+                    isTransitioningToAod,
+                    isTransitioningFromAod,
+                    isTransitioningToDozing,
+                    isTransitioningFromDozing ->
+                    if (
+                        isTransitioningToAod ||
+                            isTransitioningFromAod ||
+                            isTransitioningToDozing ||
+                            isTransitioningFromDozing
+                    ) {
                         return@combine 1f
                     } else {
                         return@combine dozeAmt
@@ -281,12 +299,6 @@ constructor(
     /** Whether the keyguard is going away. */
     @Deprecated("Use KeyguardTransitionInteractor + KeyguardState.GONE")
     val isKeyguardGoingAway: SharedFlow<Boolean> = repository.isKeyguardGoingAway.asSharedFlow()
-
-    /**
-     * Whether keyguard is enabled (security is not set to None and no app/adb commands have
-     * disabled it).
-     */
-    val isKeyguardEnabled: StateFlow<Boolean> = repository.isKeyguardEnabled
 
     /** Keyguard can be clipped at the top as the shade is dragged */
     val topClippingBounds: Flow<Int?> by lazy {
@@ -619,20 +631,26 @@ constructor(
     }
 
     suspend fun hydrateTableLogBuffer(tableLogBuffer: TableLogBuffer) {
-        isDozing
-            .logDiffsForTable(
-                tableLogBuffer = tableLogBuffer,
-                columnName = "isDozing",
-                initialValue = isDozing.value,
-            )
-            .collect()
-        isSecureCameraActive
-            .logDiffsForTable(
-                tableLogBuffer = tableLogBuffer,
-                columnName = "isSecureCameraActive",
-                initialValue = false,
-            )
-            .collect()
+        coroutineScope {
+            launch {
+                isDozing
+                    .logDiffsForTable(
+                        tableLogBuffer = tableLogBuffer,
+                        columnName = "isDozing",
+                        initialValue = isDozing.value,
+                    )
+                    .collect()
+            }
+            launch {
+                isSecureCameraActive
+                    .logDiffsForTable(
+                        tableLogBuffer = tableLogBuffer,
+                        columnName = "isSecureCameraActive",
+                        initialValue = false,
+                    )
+                    .collect()
+            }
+        }
     }
 
     companion object {

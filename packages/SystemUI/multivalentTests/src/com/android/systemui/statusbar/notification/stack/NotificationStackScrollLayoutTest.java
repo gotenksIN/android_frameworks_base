@@ -2355,26 +2355,51 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         configuration.orientation = Configuration.ORIENTATION_LANDSCAPE;
         mTestableResources.overrideConfiguration(configuration);
         final int mMinimumPaddings = px(R.dimen.notification_side_paddings_single);
-        mStackScroller.setBaseSidePadding(mMinimumPaddings);
+        mStackScroller.setSidePaddingConfig(mMinimumPaddings, false);
 
         // WHEN: alignToInnerQqsTiles is true
-        mStackScroller.setAlignToInnerQqsTiles(true);
+        mStackScroller.setSidePaddingConfig(mMinimumPaddings, true);
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are greater than minimum
         assertThat(mStackScroller.getSidePaddings()).isGreaterThan(mMinimumPaddings);
 
         // WHEN: alignToInnerQqsTiles is false
-        mStackScroller.setAlignToInnerQqsTiles(false);
+        mStackScroller.setSidePaddingConfig(mMinimumPaddings, false);
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are equal to minimum
         assertThat(mStackScroller.getSidePaddings()).isEqualTo(mMinimumPaddings);
 
         // WHEN: baseSidePadding is custom
         int customPadding = 123;
-        mStackScroller.setBaseSidePadding(customPadding);
+        mStackScroller.setSidePaddingConfig(customPadding, false);
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are equal to custom
         assertThat(mStackScroller.getSidePaddings()).isEqualTo(customPadding);
+    }
+
+    @Test
+    @EnableSceneContainer
+    public void testSetSidePaddingConfig_callsRequestLayoutWhenChanged() {
+        // GIVEN: initial padding config
+        mStackScroller.setSidePaddingConfig(10, true);
+        clearInvocations(mStackScroller);
+
+        // WHEN: padding config changes
+        mStackScroller.setSidePaddingConfig(20, true);
+        // THEN: requestLayout is called
+        verify(mStackScroller).requestLayout();
+
+        // WHEN: padding config doesn't change
+        clearInvocations(mStackScroller);
+        mStackScroller.setSidePaddingConfig(20, true);
+        // THEN: requestLayout is NOT called
+        verify(mStackScroller, never()).requestLayout();
+
+        // WHEN: alignToInnerQqsTiles changes
+        clearInvocations(mStackScroller);
+        mStackScroller.setSidePaddingConfig(20, false);
+        // THEN: requestLayout is called
+        verify(mStackScroller).requestLayout();
     }
 
     @Test
@@ -2397,6 +2422,24 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         mStackScroller.updateSidePadding(1000);
         // THEN: side paddings are equal to minimum
         assertThat(mStackScroller.getSidePaddings()).isEqualTo(mMinimumPaddings);
+    }
+
+    @Test
+    @EnableSceneContainer
+    public void testAlphaForLockscreenFadeIn_callsRequestChildrenUpdate() {
+        // Check that for 0f, requestChildrenUpdate is called
+        mStackScroller.setAlphaForLockscreenFadeIn(0f);
+        verify(mStackScroller).requestChildrenUpdate();
+
+        // Check that for 1f, requestChildrenUpdate is called
+        clearInvocations(mStackScroller);
+        mStackScroller.setAlphaForLockscreenFadeIn(1f);
+        verify(mStackScroller).requestChildrenUpdate();
+
+        // Check that for other values, requestChildrenUpdate is not called
+        clearInvocations(mStackScroller);
+        mStackScroller.setAlphaForLockscreenFadeIn(0.5f);
+        verify(mStackScroller, never()).requestChildrenUpdate();
     }
 
     @Test

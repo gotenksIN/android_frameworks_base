@@ -64,6 +64,7 @@ import com.android.systemui.statusbar.notification.collection.NotificationEntryB
 import com.android.systemui.statusbar.notification.collection.PipelineEntry
 import com.android.systemui.statusbar.notification.collection.buildNotificationEntry
 import com.android.systemui.statusbar.notification.collection.buildSummaryNotificationEntry
+import com.android.systemui.statusbar.notification.collection.coordinator.SummarizationDecorator
 import com.android.systemui.statusbar.notification.collection.mockNotifCollection
 import com.android.systemui.statusbar.notification.collection.notifcollection.CommonNotifCollection
 import com.android.systemui.statusbar.notification.collection.notifcollection.NotifCollectionListener
@@ -204,6 +205,7 @@ class ExpandableNotificationRowBuilder(
                 context,
                 Mockito.mock(LauncherApps::class.java, STUB_ONLY),
                 Mockito.mock(ConversationNotificationManager::class.java, STUB_ONLY),
+                decorator = Mockito.mock(SummarizationDecorator::class.java, STUB_ONLY),
             )
 
         mContentBinder =
@@ -434,6 +436,8 @@ class ExpandableNotificationRowBuilder(
             Mockito.mock(NotificationRebindingTracker::class.java, STUB_ONLY),
             Mockito.mock(BundleInteractionLogger::class.java, STUB_ONLY),
             Mockito.mock(NotificationActivityStarter::class.java, STUB_ONLY),
+            kosmos.notificationUiEligibilityChecker,
+            kosmos.automationNotificationBackgroundProvider,
         )
         row.setAboveShelfChangedListener {}
         return row

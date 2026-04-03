@@ -17,16 +17,20 @@ package com.android.systemui.media.dialog
 
 import android.content.Context
 import android.graphics.drawable.Icon
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.testing.TestableLooper.RunWithLooper
 import android.text.BidiFormatter
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.widget.LinearLayout
 import androidx.appcompat.view.ContextThemeWrapper
+import androidx.compose.ui.test.performClick
 import androidx.core.graphics.drawable.IconCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.widget.RecyclerView
+import com.android.media.flags.Flags
 import com.android.settingslib.media.InputMediaDevice
 import com.android.settingslib.media.LocalMediaManager.MediaDeviceState.STATE_CONNECTED
 import com.android.settingslib.media.LocalMediaManager.MediaDeviceState.STATE_CONNECTING
@@ -92,8 +96,9 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             on { getSessionName() } doReturn TEST_SESSION_NAME
             on { getColorScheme() } doReturn mock<MediaOutputColorScheme>()
         }
-
         mIconCompat.stub { on { toIcon(mContext) } doReturn mIcon }
+
+        // TODO(b/12345678) For Output Switcher jetpack compose, we want to refactor the following code to use real MediaDevices instead of mocks.
 
         mMediaDevice1
             .stub {
@@ -237,7 +242,33 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             assertThat(mSlider.value).isEqualTo(TEST_CURRENT_VOLUME)
             assertThat(mSlider.valueFrom).isEqualTo(0)
             assertThat(mSlider.valueTo).isEqualTo(TEST_MAX_VOLUME)
-            assertThat(mSlider.stateDescription).isEqualTo("50%")
+            assertThat(mSlider.stateDescription)
+                .isEqualTo(mContext.getString(R.string.media_output_dialog_volume_percentage, 50))
+        }
+    }
+
+    @Test
+    fun onBindViewHolder_initSeekbarWithIncorrectVolumeValues_noop() {
+        mMediaDevice1.stub {
+            on { state } doReturn STATE_CONNECTED
+            on { maxVolume } doReturn TEST_MAX_VOLUME
+        }
+
+        // volume < 0
+        mMediaDevice1.stub { on { currentVolume } doReturn -2 }
+        updateAdapterWithDevices(listOf(mMediaDevice1))
+        createAndBindDeviceViewHolder(position = 0).apply { assertThat(mSlider.value).isEqualTo(0) }
+
+        // volume > max volume
+        mMediaDevice1.stub { on { currentVolume } doReturn TEST_MAX_VOLUME + 2 }
+        updateAdapterWithDevices(listOf(mMediaDevice1))
+        createAndBindDeviceViewHolder(position = 0).apply { assertThat(mSlider.value).isEqualTo(0) }
+
+        // valid volume
+        mMediaDevice1.stub { on { currentVolume } doReturn TEST_CURRENT_VOLUME }
+        updateAdapterWithDevices(listOf(mMediaDevice1))
+        createAndBindDeviceViewHolder(position = 0).apply {
+            assertThat(mSlider.value).isEqualTo(TEST_CURRENT_VOLUME)
         }
     }
 
@@ -495,6 +526,84 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         verify(mMediaSwitchingController, never()).connectDevice(any())
     }
 
+    @EnableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
+    @Test
+    fun onItemClick_withoutRouteListingPreferenceItem_notTransferable_isNotClickable() {
+        mMediaDevice2.stub {
+            on { state } doReturn STATE_DISCONNECTED
+            on { isTransferable() } doReturn false
+            on { selectionBehavior }.thenCallRealMethod()
+        }
+        updateAdapterWithDevices(listOf(mMediaDevice2))
+
+        createAndBindDeviceViewHolder(position = 0).apply { mMainContent.performClick() }
+
+        verify(mMediaSwitchingController, never()).tryToLaunchInAppRoutingIntent(any(), any())
+        verify(mMediaSwitchingController, never()).connectDevice(any())
+    }
+
+    @EnableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
+    @Test
+    fun onItemClick_withoutRouteListingPreferenceItem_Transferable_deviceConnected() {
+        mMediaDevice2.stub {
+            on { state } doReturn STATE_DISCONNECTED
+            on { isTransferable() } doReturn true
+            on { selectionBehavior }.thenCallRealMethod()
+        }
+        updateAdapterWithDevices(listOf(mMediaDevice2))
+
+        createAndBindDeviceViewHolder(position = 0).apply { mMainContent.performClick() }
+
+        verify(mMediaSwitchingController).connectDevice(mMediaDevice2)
+    }
+
+    @EnableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
+    @Test
+    fun onItemClick_stateConnectingFailed_selectionBehaviorNone_isNotClickable() {
+        mMediaDevice2.stub {
+            on { state } doReturn STATE_CONNECTING_FAILED
+            on { selectionBehavior } doReturn SELECTION_BEHAVIOR_NONE
+        }
+        updateAdapterWithDevices(listOf(mMediaDevice2))
+
+        createAndBindDeviceViewHolder(position = 0).apply { mMainContent.performClick() }
+
+        verify(mMediaSwitchingController, never()).tryToLaunchInAppRoutingIntent(any(), any())
+        verify(mMediaSwitchingController, never()).connectDevice(any())
+    }
+
+    @EnableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
+    @Test
+    fun onItemClick_stateConnectingFailed_selectionBehaviorTransfer_isClickable() {
+        mMediaDevice2.stub {
+            on { state } doReturn STATE_CONNECTING_FAILED
+            on { selectionBehavior } doReturn SELECTION_BEHAVIOR_TRANSFER
+        }
+        updateAdapterWithDevices(listOf(mMediaDevice2))
+
+        createAndBindDeviceViewHolder(position = 0).apply { mMainContent.performClick() }
+
+        verify(mMediaSwitchingController).connectDevice(mMediaDevice2)
+    }
+
+    @EnableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
+    @Test
+    fun onItemClick_selectionBehaviorGoToApp_launchesApp() {
+        mMediaDevice2.stub {
+            on { id } doReturn TEST_DEVICE_ID_2
+            on { state } doReturn STATE_DISCONNECTED
+            on { selectionBehavior } doReturn SELECTION_BEHAVIOR_GO_TO_APP
+        }
+        updateAdapterWithDevices(listOf(mMediaDevice2))
+
+        val viewHolder =
+            createAndBindDeviceViewHolder(position = 0).apply { mMainContent.performClick() }
+
+        verify(mMediaSwitchingController)
+            .tryToLaunchInAppRoutingIntent(TEST_DEVICE_ID_2, viewHolder.mMainContent)
+    }
+
+    @DisableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
     @Test
     fun clickFullItemOfSelectableDevice_hasListingPreference_verifyConnectDevice() {
         mMediaDevice2.stub {
@@ -510,6 +619,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         verify(mMediaSwitchingController).connectDevice(mMediaDevice2)
     }
 
+    @DisableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
     @Test
     fun clickFullItemOfSelectableDevice_isTransferable_verifyConnectDevice() {
         mMediaDevice2.stub {
@@ -525,6 +635,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         verify(mMediaSwitchingController).connectDevice(mMediaDevice2)
     }
 
+    @DisableFlags(Flags.FLAG_MAKE_DEVICE_SELECTION_BEHAVIOUR_RESPECT_ROUTE_LISTING_PREFERENCE)
     @Test
     fun clickFullItemOfSelectableDevice_notTransferable_verifyNotConnectDevice() {
         mMediaDevice2.stub {

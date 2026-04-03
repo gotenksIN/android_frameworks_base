@@ -39,6 +39,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewStub
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -50,6 +51,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.Lifecycle
@@ -60,6 +64,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.android.internal.logging.UiEvent
 import com.android.internal.logging.UiEventLogger
+import com.android.internal.telephony.flags.Flags as telephonyFlags
 import com.android.settingslib.satellite.SatelliteDialogUtils.TYPE_IS_WIFI
 import com.android.settingslib.satellite.SatelliteDialogUtils.mayStartSatelliteWarningDialog
 import com.android.settingslib.wifi.WifiEnterpriseRestrictionUtils
@@ -69,11 +74,13 @@ import com.android.systemui.Prefs
 import com.android.systemui.accessibility.floatingmenu.AnnotationLinkSpan
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.dynamiccolors.R as DynamicColorsR
 import com.android.systemui.qs.flags.QsWifiConfig
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.user.data.repository.UserRepository
+import com.android.systemui.util.ListenerSet
 import com.android.wifitrackerlib.WifiEntry
 import com.google.common.annotations.VisibleForTesting
 import dagger.assisted.Assisted
@@ -108,7 +115,7 @@ constructor(
     @VisibleForTesting internal val internetContentData = MutableLiveData<InternetContent>()
     @VisibleForTesting internal var connectedWifiEntry: WifiEntry? = null
     private var dialog: SystemUIDialog? = null
-    @VisibleForTesting internal var isProgressBarVisible = false
+    @VisibleForTesting internal var isProgressBarAnimating = false
 
     // UI Components
     private lateinit var contentView: View
@@ -228,6 +235,21 @@ constructor(
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
 
+    interface Listener {
+        /** Called when the Internet details UI content is updated. */
+        fun onContentDataUpdated()
+    }
+
+    private val listeners = ListenerSet<Listener>()
+
+    fun addListener(listener: Listener) {
+        listeners.addIfAbsent(listener)
+    }
+
+    fun removeListener(listener: Listener) {
+        listeners.remove(listener)
+    }
+
     private fun initializeViews() {
         // Set accessibility properties
         contentView.accessibilityPaneTitle =
@@ -239,11 +261,15 @@ constructor(
 
         // Initialize LiveData observer
         internetContentData.observe(lifecycleOwner!!) { internetContent ->
-            updateDetailsUI(internetContent)
+            internetContent?.let { updateDetailsUI(it) }
+            listeners.forEach { it.onContentDataUpdated() }
         }
 
         // Network layouts
-        progressBar = contentView.requireViewById(R.id.wifi_searching_progress)
+        progressBar =
+            contentView.requireViewById<ProgressBar>(R.id.wifi_searching_progress).apply {
+                visibility = View.VISIBLE
+            }
 
         // Background drawables
         entryBackgroundActive =
@@ -282,17 +308,21 @@ constructor(
                 uiEventLogger.log(InternetDetailsEvent.SHARE_WIFI_QS_BUTTON_CLICKED)
             }
         }
+        setButtonAccessibilityRole(shareWifiButton)
 
         // Add network
         addNetworkButton = contentView.findViewById(R.id.add_network_button)
         if (QsWifiConfig.isEnabled) {
-            addNetworkButton?.setOnClickListener {
-                val intent =
-                    WifiUtils.getWifiDialogIntent(null, true /* connectForCaller */).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    }
-                internetDetailsContentController.startActivityForDialog(intent)
+            addNetworkButton?.let { button ->
+                button.setOnClickListener {
+                    val intent =
+                        WifiUtils.getWifiDialogIntent(null, true /* connectForCaller */).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                        }
+                    internetDetailsContentController.startActivityForDialog(intent)
+                }
+                setButtonAccessibilityRole(button)
             }
         }
 
@@ -301,6 +331,7 @@ constructor(
         airplaneModeButton.setOnClickListener {
             internetDetailsContentController.setAirplaneModeDisabled()
         }
+        setButtonAccessibilityRole(airplaneModeButton)
         if (isFlagEnabledAndInDialog) {
             internetDialogTitle = contentView.requireViewById(R.id.internet_dialog_title)
             internetDialogSubTitle = contentView.requireViewById(R.id.internet_dialog_subtitle)
@@ -412,6 +443,8 @@ constructor(
                 setEntryMargins()
                 layoutParams = layoutParams.apply { height = entryHeight }
             }
+        seeAllLayout.setOnClickListener(this::onClickSeeMoreButton)
+        setButtonAccessibilityRole(seeAllLayout)
 
         // Set click listeners for Wi-Fi related views
         turnWifiOnLayout.setOnClickListener {
@@ -429,7 +462,6 @@ constructor(
             connectedWifiListLayout.background =
                 context.getDrawable(R.drawable.settingslib_entry_bg_on)
         }
-        seeAllLayout.setOnClickListener(this::onClickSeeMoreButton)
     }
 
     private fun setMobileLayout() {
@@ -514,7 +546,23 @@ constructor(
     }
 
     private fun getSubtitleText(): String {
-        return internetDetailsContentController.getSubtitleText(isProgressBarVisible).toString()
+        return internetDetailsContentController.getSubtitleText(isProgressBarAnimating).toString()
+    }
+
+    // Add Accessibility Role for layout view so that they can be announced as "Button"
+    private fun setButtonAccessibilityRole(view: View) {
+        ViewCompat.setAccessibilityDelegate(
+            view,
+            object : AccessibilityDelegateCompat() {
+                override fun onInitializeAccessibilityNodeInfo(
+                    host: View,
+                    info: AccessibilityNodeInfoCompat,
+                ) {
+                    super.onInitializeAccessibilityNodeInfo(host, info)
+                    info.className = Button::class.java.name
+                }
+            },
+        )
     }
 
     private fun updateDetailsUI(internetContent: InternetContent) {
@@ -535,7 +583,7 @@ constructor(
         }
 
         if (!internetContent.isWifiEnabled) {
-            setProgressBarVisible(false)
+            setProgressBarAnimating(false)
         }
 
         updateEthernetUI(internetContent)
@@ -554,7 +602,7 @@ constructor(
 
     @VisibleForTesting
     internal fun hideWifiViews() {
-        setProgressBarVisible(false)
+        setProgressBarAnimating(false)
         turnWifiOnLayout.visibility = View.GONE
         connectedWifiListLayout.visibility = View.GONE
         wifiRecyclerView.visibility = View.GONE
@@ -563,16 +611,24 @@ constructor(
         addNetworkButton?.visibility = View.GONE
     }
 
-    private fun setProgressBarVisible(visible: Boolean) {
-        if (isProgressBarVisible == visible) {
+    private fun setProgressBarAnimating(isAnimating: Boolean) {
+        if (isProgressBarAnimating == isAnimating) {
             return
         }
+        isProgressBarAnimating = isAnimating
 
-        // Set the indeterminate value from false to true each time to ensure that the progress bar
-        // resets its animation and starts at the leftmost starting point each time it is displayed.
-        isProgressBarVisible = visible
-        progressBar.visibility = if (visible) View.VISIBLE else View.GONE
-        progressBar.isIndeterminate = visible
+        // The progress bar when not animating,
+        // changes color and fills to maximum to act as a static background.
+        if (isAnimating) {
+            progressBar.isIndeterminate = true
+            progressBar.progressTintList = null
+        } else {
+            progressBar.isIndeterminate = false
+            progressBar.progress = progressBar.max
+
+            progressBar.progressTintList =
+                context.getColorStateList(DynamicColorsR.color.materialColorSurfaceContainerHigh)
+        }
     }
 
     private fun showTurnOffAutoDataSwitchDialog(subId: Int) {
@@ -736,7 +792,13 @@ constructor(
                 internetContent.currentSatelliteState ==
                     InternetDetailsContentController.SATELLITE_CONNECTED
             ) {
-                mobileSummaryTextView.setText(R.string.mobile_data_connection_active)
+                val strConnected = context.getString(R.string.mobile_data_connection_active)
+                mobileSummaryTextView.text =
+                    if (telephonyFlags.newSatelliteIcon()) {
+                        satelliteSummary(strConnected)
+                    } else {
+                        strConnected
+                    }
                 mobileSummaryTextView.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
                 mobileSummaryTextView.visibility = View.VISIBLE
             } else {
@@ -828,10 +890,14 @@ constructor(
     }
 
     private fun setNonDDSActive(autoSwitchNonDdsSubId: Int) {
-        val stub: ViewStub = contentView.findViewById(R.id.secondary_mobile_network_stub)
-        stub.inflate()
-        secondaryMobileNetworkLayout =
-            contentView.findViewById(R.id.secondary_mobile_network_layout)
+        if (secondaryMobileNetworkLayout == null) {
+            secondaryMobileNetworkLayout =
+                contentView.findViewById(R.id.secondary_mobile_network_layout)
+                    ?: (contentView
+                        .findViewById<ViewStub>(R.id.secondary_mobile_network_stub)
+                        ?.inflate() as? LinearLayout)
+        }
+
         if (canConfigMobileData || !Flags.internetDialogDelegateLegacyDeprecation()) {
             secondaryMobileNetworkLayout?.setOnClickListener { view: View? ->
                 this.onClickConnectedSecondarySub(view)
@@ -983,7 +1049,8 @@ constructor(
 
     @MainThread
     private fun updateWifiListAndSeeAll(internetContent: InternetContent) {
-        if (!internetContent.isWifiEnabled ||
+        if (
+            !internetContent.isWifiEnabled ||
                 internetContent.isDeviceLocked ||
                 internetContent.isHeadlessSystemUser
         ) {
@@ -1098,6 +1165,14 @@ constructor(
         if (DEBUG) {
             Log.d(TAG, "unBind")
         }
+
+        // Android view inside of the composable view can call onRelease (triggering unBind) before
+        // bind() has ever been executed, so we must check if the lifecycle is initialized.
+        if (!::lifecycleRegistry.isInitialized) {
+            return
+        }
+
+        listeners.forEach { listeners.remove(it) }
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         connectedMobileLayout?.setOnClickListener(null)
         mobileNetworkLayout.setOnClickListener(null)
@@ -1110,6 +1185,16 @@ constructor(
         shareWifiButton.setOnClickListener(null)
         addNetworkButton?.setOnClickListener(null)
         airplaneModeButton.setOnClickListener(null)
+
+        connectedMobileLayout = null
+        secondaryMobileNetworkLayout = null
+        turnMobileOnLayout = null
+        addNetworkButton = null
+        doneButton = null
+        mobileToggleDivider = null
+        internetDialogTitle = null
+        internetDialogSubTitle = null
+
         internetDetailsContentController.onStop()
     }
 
@@ -1156,6 +1241,15 @@ constructor(
 
     private fun getDefaultCarrierName(): String? {
         return context.getString(R.string.mobile_data_disable_message_default_carrier)
+    }
+
+    private fun satelliteSummary(strConnected: String): String {
+        val strSat: String = context.getString(com.android.internal.R.string.satellite_indicator)
+        return context.getString(
+            com.android.settingslib.R.string.preference_summary_default_combination,
+            strConnected,
+            strSat,
+        )
     }
 
     @VisibleForTesting
@@ -1253,7 +1347,7 @@ constructor(
             }
 
             override fun onWifiScan(isScan: Boolean) {
-                setProgressBarVisible(isScan)
+                setProgressBarAnimating(isScan)
             }
 
             override fun onSatelliteModemStateChanged(state: Int) {

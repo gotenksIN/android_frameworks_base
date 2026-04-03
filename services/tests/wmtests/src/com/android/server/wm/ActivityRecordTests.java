@@ -27,11 +27,11 @@ import static android.content.pm.ActivityInfo.CONFIG_COLOR_MODE;
 import static android.content.pm.ActivityInfo.CONFIG_KEYBOARD;
 import static android.content.pm.ActivityInfo.CONFIG_KEYBOARD_HIDDEN;
 import static android.content.pm.ActivityInfo.CONFIG_NAVIGATION;
-import static android.content.pm.ActivityInfo.CONFIG_TOUCHSCREEN;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_LAYOUT;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE;
+import static android.content.pm.ActivityInfo.CONFIG_TOUCHSCREEN;
 import static android.content.pm.ActivityInfo.FLAG_SUPPORTS_PICTURE_IN_PICTURE;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_ALWAYS;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_DEFAULT;
@@ -163,6 +163,7 @@ import com.android.internal.R;
 import com.android.server.LocalServices;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.wm.ActivityRecord.State;
+import com.android.server.wm.utils.StubOrganizer;
 import com.android.window.flags.Flags;
 
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
@@ -179,7 +180,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-
 
 /**
  * Tests for the {@link ActivityRecord} class.
@@ -1504,6 +1504,27 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     /**
+     * Verify that an activity is not finished if it is blocked by LockTask mode.
+     */
+    @Test
+    public void testFinishIfSameAffinity_blockedByLockTask() {
+        final ActivityRecord rootActivity = createActivityWithTask();
+        final ActivityRecord topActivity =
+                new ActivityBuilder(mAtm).setTask(rootActivity.getTask()).build();
+        assertEquals(rootActivity.taskAffinity, topActivity.taskAffinity);
+
+        final LockTaskController lockTaskController = mAtm.getLockTaskController();
+        spyOn(lockTaskController);
+        doReturn(true).when(lockTaskController).activityBlockedFromFinish(rootActivity);
+        spyOn(topActivity);
+        doReturn(false).when(lockTaskController).activityBlockedFromFinish(topActivity);
+
+        assertFalse(rootActivity.finishIfSameAffinity(topActivity));
+        verify(topActivity).finishIfPossible(anyString(), anyBoolean());
+        verify(rootActivity, never()).finishIfPossible(anyString(), anyBoolean());
+    }
+
+    /**
      * Verify that complete finish request for non-finishing activity is invalid.
      */
     @Test(expected = IllegalArgumentException.class)
@@ -1732,6 +1753,8 @@ public class ActivityRecordTests extends WindowTestsBase {
      */
     @Test
     public void testCompleteFinishing_showWhenLocked() {
+        final StubOrganizer stubOrganizer = new StubOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(stubOrganizer);
         final ActivityRecord activity = createActivityWithTask();
         final Task task = activity.getTask();
         // Make keyguard locked and set the top activity show-when-locked.
@@ -1750,6 +1773,8 @@ public class ActivityRecordTests extends WindowTestsBase {
         // Verify the stack-top activity is occluded keyguard.
         assertEquals(topActivity, task.topRunningActivity());
         assertTrue(keyguardController.isKeyguardOccluded(displayId));
+        assertThat(stubOrganizer.mLastOccludingTaskInfo).isNotNull();
+        assertThat(stubOrganizer.mLastOccludingTaskInfo.taskId).isEqualTo(task.mTaskId);
 
         // Finish the top activity
         topActivity.setState(PAUSED, "true");
@@ -1759,6 +1784,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         // Verify new top activity does not occlude keyguard.
         assertEquals(activity, task.topRunningActivity());
         assertFalse(keyguardController.isKeyguardOccluded(displayId));
+        assertThat(stubOrganizer.mLastOccludingTaskInfo).isNull();
     }
 
     /**
@@ -2605,6 +2631,18 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
+    public void testTransferOverrideTaskTransitionFlagWhenFinishing() {
+        final ActivityRecord activity1 = createActivityWithTask();
+        activity1.mOverrideTaskTransition = true;
+        final ActivityRecord activity2 = createActivityRecord(activity1.getTask());
+        activity2.mOverrideTaskTransition = false;
+        activity1.setState(PAUSED, "test");
+        activity1.makeFinishingLocked();
+
+        assertTrue(activity2.mOverrideTaskTransition);
+    }
+
+    @Test
     public void testMakeFinishingLocked_clearsLockTask() {
         final ActivityRecord activity = createActivityWithTask();
         final Task task = activity.getTask();
@@ -2767,7 +2805,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         spyOn(appWindow);
 
         // Set initial orientation and update.
-        performRotation(displayRotation, Surface.ROTATION_90);
+        performRotation(displayRotation, Surface.ROTATION_0);
         appWindow.mResizeReported = false;
 
         // Update the rotation to perform 180 degree rotation and check that resize was reported.
@@ -2785,8 +2823,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         spyOn(displayRotation);
         // Set initial rotation.
         performRotation(displayRotation, Surface.ROTATION_0);
-        final AppCompatCameraPolicy cameraPolicy = AppCompatCameraPolicy
-                .getAppCompatCameraPolicy(activity);
+        final AppCompatCameraPolicy cameraPolicy = activity.mWmService.mAppCompatCameraPolicy;
         spyOn(cameraPolicy.mSimReqOrientationPolicy);
 
         final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(
@@ -2800,6 +2837,22 @@ public class ActivityRecordTests extends WindowTestsBase {
         performRotation(displayRotation, Surface.ROTATION_90);
         verify(cameraPolicy.mSimReqOrientationPolicy).onDisplayRotationChanged(activity,
                 Surface.ROTATION_90);
+    }
+
+    @SetupWindows(addWindows = W_ACTIVITY)
+    @Test
+    @EnableFlags({Flags.FLAG_CAMERA_COMPAT_UPDATE_TREATMENT_ON_ROTATION})
+    public void testWindowingModeChanged_notifiesCameraCompat() {
+        final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
+                /* isCameraRunning */ true, WINDOWING_MODE_FULLSCREEN);
+        final AppCompatCameraPolicy cameraPolicy = activity.mWmService.mAppCompatCameraPolicy;
+        spyOn(cameraPolicy.mSimReqOrientationPolicy);
+
+        activity.getTask().setWindowingMode(WINDOWING_MODE_FREEFORM);
+        ensureActivityConfiguration(activity);
+
+        verify(cameraPolicy.mSimReqOrientationPolicy).onWindowingModeChanged(activity,
+                WINDOWING_MODE_FREEFORM);
     }
 
     private void performRotation(DisplayRotation spiedRotation, int rotationToReport) {
@@ -3709,12 +3762,48 @@ public class ActivityRecordTests extends WindowTestsBase {
         assertTrue(activity.isRelaunching());
     }
 
+    @Test
+    public void testDensityConfigChange_inPip_doesNotRelaunch() {
+        final ActivityRecord activity = createActivityWithTask();
+        // The activity will already be relaunching out of the gate, finish the relaunch so we can
+        // test properly.
+        activity.finishRelaunching();
+
+        final Task task = activity.getTask();
+        task.setWindowingMode(WINDOWING_MODE_PINNED);
+        activity.setState(RESUMED, "Testing");
+
+        final Configuration newConfig = new Configuration(task.getConfiguration());
+        newConfig.densityDpi += 100;
+        task.onRequestedOverrideConfigurationChanged(newConfig);
+        ensureActivityConfiguration(activity);
+
+        assertFalse(activity.isRelaunching());
+    }
+
+    @Test
+    public void testDensityConfigChange_notInPip_relaunches() {
+        final ActivityRecord activity = createActivityWithTask();
+        // The activity will already be relaunching out of the gate, finish the relaunch so we can
+        // test properly.
+        activity.finishRelaunching();
+
+        final Task task = activity.getTask();
+        task.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+        activity.setState(RESUMED, "Testing");
+
+        final Configuration newConfig = new Configuration(task.getConfiguration());
+        newConfig.densityDpi += 100;
+        task.onRequestedOverrideConfigurationChanged(newConfig);
+        ensureActivityConfiguration(activity);
+
+        assertTrue(activity.isRelaunching());
+    }
+
     private ActivityRecord setupDisplayAndActivityForCameraCompat(boolean isCameraRunning,
             int windowingMode) {
         doReturn(true).when(() -> DesktopModeHelper.canEnterDesktopMode(any()));
-        // Create a new DisplayContent so that the flag values create the camera freeform policy.
-        mDisplayContent = new TestDisplayContent.Builder(mAtm, mDisplayContent.getSurfaceWidth(),
-                mDisplayContent.getSurfaceHeight()).build();
+        mWm.mAppCompatCameraPolicy.reInit();
         mDisplayContent.setIgnoreOrientationRequest(true);
         setupCameraRunning(isCameraRunning);
         final TaskDisplayArea tda = mDisplayContent.getDefaultTaskDisplayArea();
@@ -3740,12 +3829,12 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     private void setupCameraRunning(boolean isCameraRunning) {
-        final CameraStateMonitor cameraStateMonitor = mDisplayContent.mAppCompatCameraPolicy
+        final CameraStateMonitor cameraStateMonitor = mWm.mAppCompatCameraPolicy
                 .mCameraStateMonitor;
         spyOn(cameraStateMonitor);
         doReturn(isCameraRunning).when(cameraStateMonitor).isCameraRunningForActivity(any());
-        final AppCompatCameraSimReqOrientationPolicy cameraPolicy = mDisplayContent
-                .mAppCompatCameraPolicy.mSimReqOrientationPolicy;
+        final AppCompatCameraSimReqOrientationPolicy cameraPolicy = mWm.mAppCompatCameraPolicy
+                .mSimReqOrientationPolicy;
         if (cameraPolicy == null) {
             return;
         }

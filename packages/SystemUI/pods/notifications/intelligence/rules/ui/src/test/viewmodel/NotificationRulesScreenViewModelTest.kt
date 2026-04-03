@@ -18,7 +18,9 @@ package com.android.systemui.notifications.intelligence.rules.ui.viewmodel
 
 import android.content.applicationContext
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.Icon
 import androidx.compose.runtime.mutableStateListOf
+import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -27,11 +29,13 @@ import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.DraftFilterModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.FilterModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.IncludedAppsModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.KeywordsModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.PeopleModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.PersonModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 import com.android.systemui.testKosmosNew
 import com.google.common.truth.Truth.assertThat
@@ -54,16 +58,18 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
             assertThat(underTest.currentScreen).isEqualTo(RulesScreenViewState.CurrentRules)
 
             val draftRule =
-                DraftRuleModel(
-                    isNew = false,
+                DraftRuleModel.PreExisting(
+                    id = 9,
                     action = ActionModel.Highlight,
-                    contacts = null,
-                    includedApps = null,
+                    filter = DraftFilterModel(people = null, includedApps = null),
                 )
 
             backStack.add(
                 RulesScreenViewState.EditRule(
-                    notificationRuleEditViewModelFactory.create(draftRule)
+                    notificationRuleEditViewModelFactory.create(
+                        draftRule,
+                        onNavigateToCurrentRulesScreen = {},
+                    )
                 )
             )
 
@@ -76,12 +82,7 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
     @Test
     fun buildRuleText_onlyAction() =
         kosmos.runTest {
-            val rule =
-                RuleModel(
-                    id = ID,
-                    action = ActionModel.Highlight,
-                    filter = FilterModel(includedApps = null, contacts = null),
-                )
+            val rule = RuleModel(id = ID, action = ActionModel.Highlight, filter = FilterModel())
 
             val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
 
@@ -93,7 +94,7 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
     fun buildRuleText_singleContact() =
         kosmos.runTest {
             val contact =
-                ContactModel(
+                PersonModel.Contact(
                     lookupUri = "cat-uri".toUri(),
                     name = "Meowth",
                     photoUri = "cat-photo".toUri(),
@@ -102,8 +103,7 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
                 RuleModel(
                     id = ID,
                     action = ActionModel.Highlight,
-                    filter =
-                        FilterModel(includedApps = null, contacts = ContactsModel(listOf(contact))),
+                    filter = FilterModel(people = PeopleModel(listOf(contact))),
                 )
 
             val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
@@ -120,6 +120,37 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    fun buildRuleText_singleConversationPartner() =
+        kosmos.runTest {
+            val conversationPartner =
+                PersonModel.ConversationPartner(
+                    id = "skitty",
+                    displayLabel = "Conversation with Skitty",
+                    avatarIcon = Icon.createWithBitmap(createBitmap(10, 10)),
+                    appBadgeIcon = null,
+                )
+            val rule =
+                RuleModel(
+                    id = ID,
+                    action = ActionModel.Highlight,
+                    filter = FilterModel(people = PeopleModel(listOf(conversationPartner))),
+                )
+
+            val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
+
+            assertThat(ruleDisplay.textChunks).hasSize(4)
+
+            assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
+            assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" from "))
+            assertThat(ruleDisplay.textChunks[2])
+                .isEqualTo(TextChunk.Icon(conversationPartner, "skitty"))
+
+            assertThat(ruleDisplay.textChunks[3]).isInstanceOf(TextChunk.FieldValueText::class.java)
+            val valueChunk = ruleDisplay.textChunks[3] as TextChunk.FieldValueText
+            assertThat(valueChunk.text).isEqualTo("Conversation with Skitty")
+        }
+
+    @Test
     fun buildRuleText_singleApp() =
         kosmos.runTest {
             val app =
@@ -133,8 +164,7 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
                 RuleModel(
                     id = ID,
                     action = ActionModel.Highlight,
-                    filter =
-                        FilterModel(includedApps = IncludedAppsModel(listOf(app)), contacts = null),
+                    filter = FilterModel(includedApps = IncludedAppsModel(listOf(app))),
                 )
 
             val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
@@ -155,7 +185,71 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
     fun buildRuleText_twoContacts() =
         kosmos.runTest {
             val contact =
-                ContactModel(
+                PersonModel.Contact(
+                    lookupUri = "mom-uri".toUri(),
+                    name = "Mom Cell",
+                    photoUri = "mom-photo".toUri(),
+                )
+            val rule =
+                RuleModel(
+                    id = ID,
+                    action = ActionModel.Highlight,
+                    filter = FilterModel(people = PeopleModel(listOf(contact, CONTACT_CAT))),
+                )
+
+            val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
+
+            assertThat(ruleDisplay.textChunks).hasSize(4)
+            assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
+            assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" from "))
+            assertThat(ruleDisplay.textChunks[2]).isEqualTo(TextChunk.Icon(contact, "mom-uri"))
+
+            assertThat(ruleDisplay.textChunks[3]).isInstanceOf(TextChunk.FieldValueText::class.java)
+            val fieldValueChunk = ruleDisplay.textChunks[3] as TextChunk.FieldValueText
+            assertThat(fieldValueChunk.text).isEqualTo("Mom Cell +1 more")
+        }
+
+    @Test
+    fun buildRuleText_twoConversationPartners() =
+        kosmos.runTest {
+            val conversationPartner =
+                PersonModel.ConversationPartner(
+                    id = "persian",
+                    displayLabel = "Conversation with Persian",
+                    avatarIcon = Icon.createWithBitmap(createBitmap(10, 10)),
+                    appBadgeIcon = null,
+                )
+            val rule =
+                RuleModel(
+                    id = ID,
+                    action = ActionModel.Highlight,
+                    filter =
+                        FilterModel(
+                            people =
+                                PeopleModel(
+                                    listOf(conversationPartner, CONVERSATION_PARTNER_SKITTY)
+                                )
+                        ),
+                )
+
+            val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
+
+            assertThat(ruleDisplay.textChunks).hasSize(4)
+            assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
+            assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" from "))
+            assertThat(ruleDisplay.textChunks[2])
+                .isEqualTo(TextChunk.Icon(conversationPartner, "persian"))
+
+            assertThat(ruleDisplay.textChunks[3]).isInstanceOf(TextChunk.FieldValueText::class.java)
+            val fieldValueChunk = ruleDisplay.textChunks[3] as TextChunk.FieldValueText
+            assertThat(fieldValueChunk.text).isEqualTo("Conversation with Persian +1 more")
+        }
+
+    @Test
+    fun buildRuleText_contactAndConversationPartner() =
+        kosmos.runTest {
+            val contact =
+                PersonModel.Contact(
                     lookupUri = "mom-uri".toUri(),
                     name = "Mom Cell",
                     photoUri = "mom-photo".toUri(),
@@ -166,8 +260,7 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
                     action = ActionModel.Highlight,
                     filter =
                         FilterModel(
-                            includedApps = null,
-                            contacts = ContactsModel(listOf(contact, CONTACT_CAT)),
+                            people = PeopleModel(listOf(contact, CONVERSATION_PARTNER_SKITTY))
                         ),
                 )
 
@@ -200,8 +293,7 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
                     filter =
                         FilterModel(
                             includedApps =
-                                IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT)),
-                            contacts = null,
+                                IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT))
                         ),
                 )
 
@@ -220,10 +312,71 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun buildRuleText_contactsAndApps() =
+    fun buildRuleText_singleKeyword() =
+        kosmos.runTest {
+            val rule =
+                RuleModel(
+                    id = ID,
+                    action = ActionModel.Block,
+                    filter = FilterModel(keywords = KeywordsModel(listOf("cat"))),
+                )
+
+            val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
+
+            assertThat(ruleDisplay.textChunks).hasSize(3)
+            assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
+            assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" that contain "))
+            assertThat(ruleDisplay.textChunks[2]).isEqualTo(TextChunk.FieldValueText("“cat”"))
+        }
+
+    @Test
+    fun buildRuleText_multipleKeywords() =
+        kosmos.runTest {
+            val rule =
+                RuleModel(
+                    id = ID,
+                    action = ActionModel.Highlight,
+                    filter =
+                        FilterModel(keywords = KeywordsModel(listOf("cat", "dog", "pet", "animal"))),
+                )
+
+            val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
+
+            assertThat(ruleDisplay.textChunks).hasSize(3)
+            assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
+            assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" that contain "))
+            assertThat(ruleDisplay.textChunks[2])
+                .isEqualTo(TextChunk.FieldValueText("“cat” +3 more"))
+        }
+
+    @Test
+    fun buildRuleText_bundleAction() =
+        kosmos.runTest {
+            val rule =
+                RuleModel(
+                    id = ID,
+                    action = ActionModel.Bundle(name = "Demo Notifs", emojiIcon = "\uD83C\uDF81"),
+                    filter = null,
+                )
+
+            val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
+
+            assertThat(ruleDisplay.textChunks).hasSize(6)
+            assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
+            assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" into "))
+            assertThat(ruleDisplay.textChunks[2])
+                .isEqualTo(TextChunk.FieldValueText("“Demo Notifs”"))
+            assertThat(ruleDisplay.textChunks[3]).isEqualTo(TextChunk.BasicText(" bundle with "))
+            assertThat(ruleDisplay.textChunks[4])
+                .isEqualTo(TextChunk.FieldValueText("\uD83C\uDF81"))
+            assertThat(ruleDisplay.textChunks[5]).isEqualTo(TextChunk.BasicText(" emoji"))
+        }
+
+    @Test
+    fun buildRuleText_allFields() =
         kosmos.runTest {
             val contact =
-                ContactModel(
+                PersonModel.Contact(
                     lookupUri = "mom-uri".toUri(),
                     name = "Mom Cell",
                     photoUri = "mom-photo".toUri(),
@@ -238,18 +391,19 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
             val rule =
                 RuleModel(
                     id = ID,
-                    action = ActionModel.Highlight,
+                    action = ActionModel.Bundle(name = "Demo Notifs", emojiIcon = "\uD83C\uDF81"),
                     filter =
                         FilterModel(
                             includedApps =
                                 IncludedAppsModel(listOf(app, APP_CHAT_CAT, APP_POST_CAT)),
-                            contacts = ContactsModel(listOf(contact)),
+                            people = PeopleModel(listOf(contact)),
+                            keywords = KeywordsModel(listOf("cat", "dog", "pet", "animal")),
                         ),
                 )
 
             val ruleDisplay = underTest.buildRuleText(rule, applicationContext.resources)
 
-            assertThat(ruleDisplay.textChunks).hasSize(7)
+            assertThat(ruleDisplay.textChunks).hasSize(14)
 
             assertThat(ruleDisplay.textChunks[0]).isEqualTo(TextChunk.BasicText("Notifications"))
             assertThat(ruleDisplay.textChunks[1]).isEqualTo(TextChunk.BasicText(" from "))
@@ -266,16 +420,36 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
             assertThat(ruleDisplay.textChunks[6]).isInstanceOf(TextChunk.FieldValueText::class.java)
             val fieldValueChunkContacts = ruleDisplay.textChunks[6] as TextChunk.FieldValueText
             assertThat(fieldValueChunkContacts.text).isEqualTo("Mom Cell")
+
+            assertThat(ruleDisplay.textChunks[7]).isEqualTo(TextChunk.BasicText(" that contain "))
+            assertThat(ruleDisplay.textChunks[8])
+                .isEqualTo(TextChunk.FieldValueText("“cat” +3 more"))
+
+            assertThat(ruleDisplay.textChunks[9]).isEqualTo(TextChunk.BasicText(" into "))
+            assertThat(ruleDisplay.textChunks[10])
+                .isEqualTo(TextChunk.FieldValueText("“Demo Notifs”"))
+            assertThat(ruleDisplay.textChunks[11]).isEqualTo(TextChunk.BasicText(" bundle with "))
+            assertThat(ruleDisplay.textChunks[12])
+                .isEqualTo(TextChunk.FieldValueText("\uD83C\uDF81"))
+            assertThat(ruleDisplay.textChunks[13]).isEqualTo(TextChunk.BasicText(" emoji"))
         }
 
     companion object {
         private const val ID = 10
 
         private val CONTACT_CAT =
-            ContactModel(
+            PersonModel.Contact(
                 lookupUri = "cat-uri".toUri(),
                 name = "Meowth",
                 photoUri = "cat-photo".toUri(),
+            )
+
+        private val CONVERSATION_PARTNER_SKITTY =
+            PersonModel.ConversationPartner(
+                id = "skitty",
+                displayLabel = "Conversation with Skitty",
+                avatarIcon = Icon.createWithBitmap(createBitmap(1, 1)),
+                appBadgeIcon = null,
             )
 
         private val APP_CHAT_CAT =

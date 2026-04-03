@@ -21,6 +21,7 @@ import android.app.ActivityOptions
 import android.app.PendingIntent
 import android.app.WindowConfiguration.ACTIVITY_TYPE_HOME
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.UserHandle
 import android.view.WindowManager.TRANSIT_CHANGE
@@ -53,6 +54,7 @@ class PackageUpdateController(
     private val taskResourceLoader: WindowDecorTaskResourceLoader,
     private val desktopModeWindowDecorViewModel: Optional<DesktopModeWindowDecorViewModel>,
     private val packageUpdateTransitionHandler: PackageUpdateTransitionHandler,
+    private val packageManager: PackageManager,
     @ShellMainThreadImmediate private val mainImmediateScope: CoroutineScope,
 ) : ShellTaskOrganizer.PackageUpdateListener {
     init {
@@ -152,8 +154,36 @@ class PackageUpdateController(
         val userId = task.userId
         val userHandle = UserHandle.of(userId)
         val userContext = userProfileContexts[userId]
+        val originalIntent = task.baseIntent
+        val freshIntent = Intent()
 
-        task.baseIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        freshIntent.component = originalIntent.component
+        freshIntent.action = originalIntent.action
+        freshIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+
+        originalIntent.categories?.forEach { category -> freshIntent.addCategory(category) }
+        originalIntent.extras?.let { freshIntent.putExtras(it) }
+
+        val data = originalIntent.data
+        val type = originalIntent.type
+        when {
+            (data != null && type != null) -> freshIntent.setDataAndType(data, type)
+            data != null -> freshIntent.data = data
+            type != null -> freshIntent.type = type
+        }
+
+        // The intent might not resolve due to activity being removed after an update from the
+        // package. In that case, just remove the task.
+        if (packageManager.resolveActivityAsUser(freshIntent, /* flags */ 0, task.userId) == null) {
+            ProtoLog.w(
+                WM_SHELL_PACKAGE_UPDATE,
+                "PackageUpdateController: Intent %s did not resolve, removing the task %d instead. ",
+                freshIntent,
+                task.taskId,
+            )
+            wct.removeTask(task.token)
+            return
+        }
 
         val options =
             ActivityOptions.makeBasic().apply {
@@ -166,7 +196,7 @@ class PackageUpdateController(
             PendingIntent.getActivityAsUser(
                 userContext,
                 /* requestCode= */ 0,
-                task.baseIntent,
+                freshIntent,
                 PendingIntent.FLAG_IMMUTABLE,
                 /* options= */ null,
                 userHandle,

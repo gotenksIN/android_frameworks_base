@@ -145,6 +145,7 @@ import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer
 import com.android.wm.shell.desktopmode.data.persistence.DesktopTaskTilingState
 import com.android.wm.shell.desktopmode.desktopfirst.isDisplayDesktopFirst
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider
+import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityUtils
 import com.android.wm.shell.desktopmode.multidesks.DeskSwitchTransitionHandler
 import com.android.wm.shell.desktopmode.multidesks.DeskTransition
 import com.android.wm.shell.desktopmode.multidesks.DesksController
@@ -282,6 +283,7 @@ class DesktopTasksController(
     private val desktopTasksTransitionObserver: DesktopTasksTransitionObserver,
     private val snapController: SnapController,
     private val desktopRemoteListener: DesktopRemoteListener,
+    private val desktopWallpaperActivityUtils: DesktopWallpaperActivityUtils,
 ) :
     RemoteCallable<DesktopTasksController>,
     DragAndDropController.DragAndDropListener,
@@ -2081,38 +2083,7 @@ class DesktopTasksController(
             return CloseTaskResult.NOT_CLOSED_TASK_LOCKED
         }
         if (splitScreenController.isTaskInSplitScreen(taskId)) {
-            if (Flags.closeSplitTaskInsteadOfMovingToBack()) {
-                splitScreenController.closeTask(taskId)
-                logI(
-                    "closeTask(taskId=%d): %s",
-                    taskId,
-                    CloseTaskResult.CLOSE_REQUESTED_SPLIT_SCREEN,
-                )
-                return CloseTaskResult.CLOSE_REQUESTED_SPLIT_SCREEN
-            }
-            if (
-                DesktopExperienceFlags.CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT
-                    .isTrue() && splitScreenController.isDividerFlinging()
-            ) {
-                logW(
-                    "closeTask(taskId=%d): %s",
-                    taskId,
-                    CloseTaskResult.NOT_CLOSED_DIVIDER_FLINGING,
-                )
-                return CloseTaskResult.NOT_CLOSED_DIVIDER_FLINGING
-            }
-            val otherTaskPosition =
-                when (splitScreenController.getSplitPosition(taskId)) {
-                    SPLIT_POSITION_TOP_OR_LEFT -> SPLIT_POSITION_BOTTOM_OR_RIGHT
-                    SPLIT_POSITION_BOTTOM_OR_RIGHT -> SPLIT_POSITION_TOP_OR_LEFT
-                    else -> error("Unexpected task position")
-                }
-            val otherTask = splitScreenController.getTaskInfo(otherTaskPosition)
-            if (otherTask == null) {
-                logW("closeTask(taskId=%d): %s", taskId, CloseTaskResult.NOT_CLOSED_NO_OTHER_TASK)
-                return CloseTaskResult.NOT_CLOSED_NO_OTHER_TASK
-            }
-            splitScreenController.moveTaskToFullscreen(otherTask.taskId, EXIT_REASON_DESKTOP_MODE)
+            splitScreenController.closeTask(taskId)
             logI("closeTask(taskId=%d): %s", taskId, CloseTaskResult.CLOSE_REQUESTED_SPLIT_SCREEN)
             return CloseTaskResult.CLOSE_REQUESTED_SPLIT_SCREEN
         }
@@ -2353,7 +2324,9 @@ class DesktopTasksController(
         } else {
             moveTaskToFront(task, remoteTransition, unminimizeReason)
         }
-        if (!Flags.updateDesktopScrimWhenMoveTaskToFrontBugfix() || task == null) {
+        if (!Flags.updateDesktopScrimWhenMoveTaskToFrontBugfix()
+            || Flags.updateDesktopScrimOnDesktopTaskLaunch()
+            || task == null ) {
             return
         }
         desktopScrimController.updateDesktopScrimIfNeeded(task.displayId, userId)
@@ -2412,12 +2385,21 @@ class DesktopTasksController(
     }
 
     /**
+     * Move a task to the front.
+     *
+     * Note: beyond moving a task to the front, this method will minimize a task if we reach the
+     * Desktop task limit.
+     */
+    fun moveTaskToFront(taskInfo: RunningTaskInfo) {
+        moveTaskToFront(taskInfo = taskInfo, remoteTransition = null)
+    }
+
+    /**
      * Move a task to the front, using [remoteTransition].
      *
      * Note: beyond moving a task to the front, this method will minimize a task if we reach the
      * Desktop task limit, so [remoteTransition] should also handle any such minimize change.
      */
-    @JvmOverloads
     fun moveTaskToFront(
         taskInfo: RunningTaskInfo,
         remoteTransition: RemoteTransition? = null,
@@ -3532,17 +3514,9 @@ class DesktopTasksController(
             desktopState.shouldShowHomeBehindDesktop,
         )
         // Move home to front, ensures that we go back home when all desktop windows are closed
-        moveHomeTaskToTop(
-            displayId = displayId,
-            wct = wct,
-        )
+        moveHomeTaskToTop(displayId = displayId, wct = wct)
         // Currently, we only handle the desktop on the default display really.
-        if (
-            (displayId == DEFAULT_DISPLAY ||
-                ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY.isTrue) &&
-                ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue &&
-                !desktopState.shouldShowHomeBehindDesktop
-        ) {
+        if (desktopWallpaperActivityUtils.hasDesktopWallpaperActivityEnabled(displayId)) {
             // Add translucent wallpaper activity to show the wallpaper underneath.
             addWallpaperActivity(displayId, wct)
         }
@@ -3804,8 +3778,7 @@ class DesktopTasksController(
         }
         desktopScrimController.handleExitCleanUp(displayId, shouldEndUpAtHome, exitReason)
         val shouldHandleWallpaperAndHome =
-            !skipWallpaperAndHomeOrdering &&
-                !desktopState.shouldShowHomeBehindDesktop
+            !skipWallpaperAndHomeOrdering && !desktopState.shouldShowHomeBehindDesktop
         if (shouldHandleWallpaperAndHome) {
             if (ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER.isTrue) {
                 moveWallpaperActivityToBack(wct, displayId)
@@ -6306,9 +6279,7 @@ class DesktopTasksController(
         when (indicatorType) {
             IndicatorType.TO_FULLSCREEN_INDICATOR -> {
                 val shouldMaximizeWhenDragToTopEdge =
-                    if (DesktopExperienceFlags.ENABLE_DESKTOP_FIRST_BASED_DRAG_TO_MAXIMIZE.isTrue)
-                        rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(motionEvent.displayId)
-                    else desktopConfig.shouldMaximizeWhenDragToTopEdge
+                    rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(motionEvent.displayId)
                 if (shouldMaximizeWhenDragToTopEdge) {
                     dragToMaximizeDesktopTask(taskInfo, taskSurface, currentDragBounds, motionEvent)
                 } else {

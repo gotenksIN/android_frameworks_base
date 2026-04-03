@@ -2151,6 +2151,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         if (parent == rootTask || task == rootTask) {
             // Nothing else to do since it is already restored in the right root task.
+            EventLogTags.writeWmTaskRestored(task.mTaskId, rootTask.mTaskId);
             return true;
         }
 
@@ -2163,6 +2164,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         rootTask.addChild(task, onTop, true /* showForAllUsers */);
         if (DEBUG_RECENTS) Slog.v(TAG_RECENTS,
                 "Added restored task=" + task + " to root task=" + rootTask);
+        EventLogTags.writeWmTaskRestored(task.mTaskId, rootTask.mTaskId);
         return true;
     }
 
@@ -2698,7 +2700,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         final TransitionController transitionController =
                 mLastReportedTopResumedActivity.mTransitionController;
-        if (transitionController.isTransientVisible(mLastReportedTopResumedActivity.getTask())) {
+        final Task task = mLastReportedTopResumedActivity.getTask();
+        if (task != null && transitionController.isTransientVisible(task)) {
             // Do not schedule top-resume-loss if the activity is currently transient visible
             // (e.g. running recents-animation)
             return;
@@ -2722,6 +2725,14 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 && readyToResume()) {
             mTopResumedActivity.scheduleTopResumedActivityChanged(true /* onTop */);
             mLastReportedTopResumedActivity = mTopResumedActivity;
+        }
+    }
+
+    void onActivityRemovedFromDisplay(@NonNull ActivityRecord activity) {
+        mActivityMetricsLogger.notifyActivityRemoved(activity);
+        mStoppingActivities.remove(activity);
+        if (mLastReportedTopResumedActivity == activity) {
+            mLastReportedTopResumedActivity = null;
         }
     }
 

@@ -19,6 +19,7 @@ package android.app.admin;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_BLUETOOTH;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_FACTORY_RESET;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_FUN;
@@ -36,9 +37,11 @@ import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_APP_INSTALL
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_APP_UNINSTALL;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_AUTO_TIME_ZONE;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_BLUETOOTH_SHARING;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_DISALLOW_FACTORY_RESET;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_EASTER_EGGS;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_LOCKSCREEN_MESSAGE;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API;
 import static android.processor.devicepolicy.AllowedDpcTypes.ALLOWED;
 import static android.processor.devicepolicy.AllowedDpcTypes.DISALLOWED;
 
@@ -46,7 +49,6 @@ import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.app.admin.flags.Flags;
-import android.app.admin.DevicePolicyManager;
 import android.processor.devicepolicy.AllowedDpcTypes;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.EnumResolutionMechanism;
@@ -54,7 +56,6 @@ import android.processor.devicepolicy.ListOfStringPolicyDefinition;
 import android.processor.devicepolicy.ListResolutionMechanism;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
-
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
@@ -127,11 +128,11 @@ public final class PolicyIdentifier<T> {
      * Screen capture is disallowed. See {@link android.view.Display#FLAG_SECURE} for more details
      * on how blocking works.
      */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API)
     public static final int SCREEN_CAPTURE_DISALLOWED = 1;
 
     /** Screen capture is allowed. */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API)
     public static final int SCREEN_CAPTURE_ALLOWED = 2;
 
     /**
@@ -157,7 +158,7 @@ public final class PolicyIdentifier<T> {
      * DevicePolicyManager#POLICY_SCOPE_DEVICE} and the caller is not a profile owner of an
      * organization-owned managed profile or a device owner, a security exception will be thrown.
      */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @FlaggedApi(FLAG_POLICY_STREAMLINING_SCREEN_CAPTURE_API)
     @NonNull
     @EnumPolicyDefinition(
             base =
@@ -342,29 +343,22 @@ public final class PolicyIdentifier<T> {
      * <p>If the value is {@code null}, any previously set role holder set through this policy will
      * be removed.
      */
-    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @FlaggedApi(android.app.contentrestriction.flags.Flags.FLAG_CONTENT_RESTRICTION_API)
     @NonNull
     @ListOfStringPolicyDefinition(
             base =
-                    @StringPolicyDefinition(
-                            base =
-                                    @PolicyDefinition(
-                                            allowedScopes = {POLICY_SCOPE_USER},
-                                            affectedResource = RESOURCE_PER_USER,
-                                            requiredPermission =
-                                                    MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS,
-                                            requiredCrossUserPermission =
-                                                    MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL,
-                                            allowedDpcTypes =
-                                            @AllowedDpcTypes(
-                                                    deviceOwner = ALLOWED,
-                                                    managedProfileOwnerOfOrganizationOwnedDevice =
-                                                            ALLOWED,
-                                                    managedProfileOwnerOfPersonalOwnedDevice =
-                                                            DISALLOWED,
-                                                    unaffiliatedFullUserProfileOwner =
-                                                            DISALLOWED))),
-            resolutionMechanism = @ListResolutionMechanism(custom = true))
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_USER},
+                            affectedResource = RESOURCE_PER_USER,
+                            requiredPermission = MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS,
+                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @ListResolutionMechanism(union = true))
     public static final PolicyIdentifier<List<String>> CONTENT_RESTRICTION_APPS =
             new PolicyIdentifier<>("CONTENT_RESTRICTION_APPS");
 
@@ -628,14 +622,61 @@ public final class PolicyIdentifier<T> {
                                             deviceOwner = ALLOWED,
                                             profileOwnerOnUser0 = ALLOWED,
                                             managedProfileOwnerOfOrganizationOwnedDevice =
-                                                    DISALLOWED,
-                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                                    ALLOWED,
+                                            financedDeviceOwner = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
             intDef = FactoryResetValue.class,
             defaultValue = FACTORY_RESET_ALLOWED,
             resolutionMechanism = @EnumResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> FACTORY_RESET =
             new PolicyIdentifier<>("FACTORY_RESET");
+
+    /** Bluetooth sharing is disallowed. */
+    @FlaggedApi(Flags.FLAG_POLICY_STREAMLINING_BLUETOOTH_SHARING)
+    public static final int BLUETOOTH_SHARING_DISALLOWED = 1;
+
+    /** Bluetooth sharing is allowed. */
+    @FlaggedApi(Flags.FLAG_POLICY_STREAMLINING_BLUETOOTH_SHARING)
+    public static final int BLUETOOTH_SHARING_ALLOWED = 2;
+
+    /**
+     * Possible values {@link BLUETOOTH_SHARING}
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            prefix = {"BLUETOOTH_SHARING_"},
+            value = {
+                BLUETOOTH_SHARING_DISALLOWED,
+                BLUETOOTH_SHARING_ALLOWED,
+            })
+    public @interface BluetoothSharingValue {}
+
+    /** Policy that controls whether Bluetooth sharing is allowed or disallowed. */
+    @FlaggedApi(Flags.FLAG_POLICY_STREAMLINING_BLUETOOTH_SHARING)
+    @NonNull
+    @EnumPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {POLICY_SCOPE_USER, POLICY_SCOPE_DEVICE},
+                            affectedResource = RESOURCE_PER_USER,
+                            requiredPermission = MANAGE_DEVICE_POLICY_BLUETOOTH,
+                            requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS,
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
+                                            unaffiliatedFullUserProfileOwner = ALLOWED,
+                                            profileOwnerOnUser0 = ALLOWED,
+                                            affiliatedFullUserProfileOwner = ALLOWED)),
+            intDef = BluetoothSharingValue.class,
+            defaultValue = BLUETOOTH_SHARING_ALLOWED,
+            resolutionMechanism = @EnumResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<Integer> BLUETOOTH_SHARING =
+            new PolicyIdentifier<>("BLUETOOTH_SHARING");
 
     // Make sure to update the policy metadata file when updating the definitions above by running
     // the following commands:

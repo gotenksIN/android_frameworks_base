@@ -119,7 +119,7 @@ public final class ScanConstants {
     @Retention(RetentionPolicy.SOURCE)
     public @interface OpResult{}
     public static final int RESULT_SUCCEEDED = 0;
-    public static final int RESULT_FAILED = 2;
+    public static final int RESULT_FAILED = 1;
 
     /*******************************Scan Session Setting*******************************************/
     @StringDef({

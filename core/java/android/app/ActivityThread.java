@@ -430,6 +430,7 @@ public final class ActivityThread extends ClientTransactionHandler
     @UnsupportedAppUsage
     static volatile IPackageManager sPackageManager;
     private static volatile IPermissionManager sPermissionManager;
+    private ConnectivityManager mConnectivityManager;
 
     @UnsupportedAppUsage
     final ApplicationThread mAppThread = new ApplicationThread();
@@ -1817,6 +1818,18 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         @NeverCompile
+        private void dumpMemInfoMappedBitmaps(PrintWriter pw, Debug.MemoryInfo memInfo) {
+            pw.println(" ");
+            pw.println(" Mapped Bitmaps");
+            printRow(pw, TWO_COUNT_COLUMN_HEADER, "", "Count", "", "Size(KB)");
+            printRow(pw, TWO_COUNT_COLUMN_HEADER, "", "------", "", "------");
+            printRow(pw, TWO_COUNT_COLUMNS,
+                    "Mapped:", memInfo.totalBitmapCount, "", memInfo.totalBitmapSize);
+            printRow(pw, TWO_COUNT_COLUMNS,
+                    "Unique:", memInfo.uniqueBitmapCount, "", memInfo.uniqueBitmapSize);
+        }
+
+        @NeverCompile
         private void dumpMemInfoNativeAllocations(PrintWriter pw) {
             pw.println(" ");
             pw.println(" Native Allocations");
@@ -1943,6 +1956,7 @@ public final class ActivityThread extends ClientTransactionHandler
             if (com.android.libcore.readonly.Flags.nativeMetrics()) {
                 dumpMemInfoNativeAllocations(pw);
             }
+            dumpMemInfoMappedBitmaps(pw, memInfo);
 
             // SQLite mem info
             pw.println(" ");
@@ -4141,6 +4155,16 @@ public final class ActivityThread extends ClientTransactionHandler
                 memInfo.getSummaryGraphicsRss());
         proto.write(MemInfoDumpProto.ProcessMemory.AppSummary.UNKNOWN_RSS_KB,
                 memInfo.getSummaryUnknownRss());
+
+        // Mapped Bitmaps
+        proto.write(MemInfoDumpProto.ProcessMemory.AppSummary.TOTAL_BITMAP_COUNT,
+                memInfo.totalBitmapCount);
+        proto.write(MemInfoDumpProto.ProcessMemory.AppSummary.TOTAL_BITMAP_SIZE_KB,
+                memInfo.totalBitmapSize);
+        proto.write(MemInfoDumpProto.ProcessMemory.AppSummary.UNIQUE_BITMAP_COUNT,
+                memInfo.uniqueBitmapCount);
+        proto.write(MemInfoDumpProto.ProcessMemory.AppSummary.UNIQUE_BITMAP_SIZE_KB,
+                memInfo.uniqueBitmapSize);
 
         proto.end(asToken);
     }
@@ -6701,7 +6725,6 @@ public final class ActivityThread extends ClientTransactionHandler
             ((ContextImpl) c).scheduleFinalCleanup(r.activity.getClass().getName(), "Activity");
         }
         if (finishing) {
-            ActivityClient.getInstance().activityDestroyed(r.token);
             mNewActivities.remove(r);
         }
         mSomeActivitiesChanged = true;
@@ -7804,8 +7827,6 @@ public final class ActivityThread extends ClientTransactionHandler
                             }
                         } else {
                             // No package, perhaps it was removed?
-                            Slog.d(TAG, "Package [" + packages[i] + "] reported as REPLACED,"
-                                    + " but missing application info. Assuming REMOVED.");
                             mPackages.remove(packages[i]);
                             mResourcePackages.remove(packages[i]);
                         }
@@ -8168,15 +8189,24 @@ public final class ActivityThread extends ClientTransactionHandler
         // Initialize the default http proxy in this process.
         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "Setup proxies");
         try {
-            // In pre-boot mode (doing initial launch to collect password), not all system is up.
-            // This includes the connectivity service, so trying to obtain ConnectivityManager at
-            // that point would return null. Check whether the ConnectivityService is available, and
-            // avoid crashing with a NullPointerException if it is not.
             final IBinder b = ServiceManager.getService(Context.CONNECTIVITY_SERVICE);
-            if (b != null) {
-                final ConnectivityManager cm =
-                        appContext.getSystemService(ConnectivityManager.class);
-                Proxy.setHttpProxyConfiguration(cm.getDefaultProxy());
+            // Defensive check - unlikely to be null on modern (FBE) devices even in Direct Boot
+            // mode, but was possible on older FDE systems.
+            // Slog.wtf will report if this unexpectedly occurs.
+            // TODO(b/463367733): Remove if proven unnecessary by WTF data.
+            if (b == null) {
+                Slog.wtf("ActivityThread", "ConnectivityService is null in handleBindApplication!");
+                Proxy.setHttpProxyConfiguration(null);
+            } else {
+                if (android.net.platform.flags.Flags.enableMultiProxySystemPlatform()) {
+                    // Delegate to ConnectivityManager
+                    mConnectivityManager = appContext.getSystemService(ConnectivityManager.class);
+                    mConnectivityManager.onEarlyInit();
+                } else {
+                    final ConnectivityManager cm =
+                            appContext.getSystemService(ConnectivityManager.class);
+                    Proxy.setHttpProxyConfiguration(cm.getDefaultProxy());
+                }
             }
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);

@@ -79,6 +79,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -109,6 +110,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.AllowComponentAccessPolicyInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ServiceInfo;
 import android.content.pm.SignedPackage;
@@ -164,6 +166,7 @@ import com.android.server.job.JobSchedulerInternal;
 import com.android.server.notification.NotificationManagerInternal;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.privatecompute.PccSandboxManagerInternal;
+import com.android.server.privatecompute.PrivateComputeStatsLogUtil;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService;
 
@@ -268,6 +271,10 @@ public class ActivityManagerServiceTest {
     private static final String CERT_A = "CERT_A"; // For Caller
     private static final String CERT_B = "CERT_B"; // For Target
 
+    // A different package name from TEST_PACKAGE for testing
+    private static final String TEST_OTHER_PACKAGE = "com.other.package";
+    private static final String TEST_CALLER_NAME = "test";
+
     private static ProcessList.ProcessListSettingsListener sProcessListSettingsListener;
 
     @Rule
@@ -305,6 +312,7 @@ public class ActivityManagerServiceTest {
                 .initMocks(this)
                 .mockStatic(AppGlobals.class)
                 .spyStatic(ServiceManager.class)
+                .spyStatic(PrivateComputeStatsLogUtil.class)
                 .strictness(Strictness.LENIENT)
                 .startMocking();
         MockitoAnnotations.initMocks(this);
@@ -361,6 +369,63 @@ public class ActivityManagerServiceTest {
                 mAms.mConstants.USAGE_STATS_INTERACTION_INTERVAL_POST_S);
         assertEquals(SERVICE_USAGE_INTERACTION,
                 mAms.mConstants.SERVICE_USAGE_INTERACTION_TIME_POST_S);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void bindPccBackupAgent_logsPccBackupAgentStarted() throws Exception {
+        runBindBackupAgentAndVerifyLogging(BACKUP_AGENT_PROCESS_PCC, PCC_UID_1, true, times(1));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void bindPccBackupAgent_processStartFailed_doesNotLogPccBackupAgentStarted()
+            throws Exception {
+        runBindBackupAgentAndVerifyLogging(BACKUP_AGENT_PROCESS_PCC, PCC_UID_1, false, never());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void bindPccBackupAgent_nonPccProcess_doesNotLogPccBackupAgentStarted()
+            throws Exception {
+        runBindBackupAgentAndVerifyLogging(BACKUP_AGENT_PROCESS_MAIN, -1, true, never());
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void bindPccBackupAgent_pccFlagDisabled_doesNotLogPccBackupAgentStarted()
+            throws Exception {
+        runBindBackupAgentAndVerifyLogging(BACKUP_AGENT_PROCESS_PCC, PCC_UID_1, true, never());
+    }
+
+    private void runBindBackupAgentAndVerifyLogging(int backupAgentProcess, int expectedPccUid,
+            boolean startSucceeds, VerificationMode mode) throws Exception {
+        ActivityManagerService spyAms = spy(mAms);
+
+        ApplicationInfo applicationInfo = new ApplicationInfo();
+        applicationInfo.packageName = TEST_PACKAGE;
+        applicationInfo.processName = TEST_PACKAGE;
+        applicationInfo.uid = TEST_UID;
+        applicationInfo.pccUid = expectedPccUid;
+        applicationInfo.backupAgentProcess = backupAgentProcess;
+
+        doReturn(applicationInfo).when(mPackageManager).getApplicationInfo(eq(TEST_PACKAGE),
+                anyLong(), anyInt());
+
+        doReturn(null).when(spyAms).getProcessRecordLocked(eq(TEST_PACKAGE), anyInt());
+
+        ProcessRecord appRec = startSucceeds
+                ? new ProcessRecord(mAms, applicationInfo, TAG, expectedPccUid)
+                : null;
+
+        doReturn(appRec).when(spyAms).startProcessLocked(anyString(), any(), anyBoolean(),
+                anyInt(), any(), anyInt(), anyBoolean(), anyBoolean());
+
+        spyAms.bindBackupAgent(TEST_PACKAGE, ApplicationThreadConstants.BACKUP_MODE_FULL,
+                UserHandle.USER_SYSTEM, BackupAnnotations.BackupDestination.CLOUD,
+                /* shouldUseRestrictedMode= */ true);
+
+        ExtendedMockito.verify(() -> PrivateComputeStatsLogUtil.logPccBackupAgentStarted(), mode);
     }
 
     @Test
@@ -2622,6 +2687,93 @@ public class ActivityManagerServiceTest {
                 mAms.mProcessList.mAppZygotes.get(processName + "_zygote", appUid));
         assertEquals(nativeZygote,
                 mAms.mProcessList.mAppZygotes.get(processName + "_zygote_native", appUid));
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testisOutgoingTransactionsAuditable_flagDisabled() {
+        assertFalse(mAms.mProcessList.isOutgoingTransactionsAuditable(PCC_UID_1));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testisOutgoingTransactionsAuditable_flagEnabled_pccUid() {
+        assertTrue(mAms.mProcessList.isOutgoingTransactionsAuditable(PCC_UID_1));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testisOutgoingTransactionsAuditable_flagEnabled_pcsUid() {
+        when(mMockPccSandboxManagerInternal.isPrivateComputeServicesUid(REGULAR_UID))
+                .thenReturn(true);
+        assertTrue(mAms.mProcessList.isOutgoingTransactionsAuditable(REGULAR_UID));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testisOutgoingTransactionsAuditable_flagEnabled_regularUid() {
+        when(mMockPccSandboxManagerInternal.isPrivateComputeServicesUid(REGULAR_UID))
+                .thenReturn(false);
+        assertFalse(mAms.mProcessList.isOutgoingTransactionsAuditable(REGULAR_UID));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testisOutgoingTransactionsAuditable_flagEnabled_noManager() {
+        LocalServices.removeServiceForTest(PccSandboxManagerInternal.class);
+        assertFalse(mAms.mProcessList.isOutgoingTransactionsAuditable(REGULAR_UID));
+    }
+
+    @Test
+    public void testEnforceDumpPermissionForPackage_hasPermission() {
+        ActivityManagerService spyAms = spy(mAms);
+        spyAms.mPackageManagerInt = mPackageManagerInternal;
+        doReturn(PackageManager.PERMISSION_GRANTED)
+                .when(spyAms)
+                .checkCallingPermission(anyString());
+        final int testPackageUid = 12345;
+        doReturn(testPackageUid)
+                .when(mPackageManagerInternal)
+                .getPackageUid(eq(TEST_PACKAGE), anyLong(), anyInt());
+
+        int uid =
+                spyAms.enforceDumpPermissionForPackage(
+                        TEST_PACKAGE, TEST_USER_ID, TEST_UID, TEST_CALLER_NAME);
+        assertEquals(testPackageUid, uid);
+    }
+
+    @Test
+    public void testEnforceDumpPermissionForPackage_noPermission_ownPackage() {
+        ActivityManagerService spyAms = spy(mAms);
+        spyAms.mPackageManagerInt = mPackageManagerInternal;
+        doReturn(PackageManager.PERMISSION_DENIED).when(spyAms).checkCallingPermission(anyString());
+        spyOn(spyAms.mContext);
+        PackageManager pm = mock(PackageManager.class);
+        doReturn(pm).when(spyAms.mContext).getPackageManager();
+        doReturn(new String[] {TEST_PACKAGE}).when(pm).getPackagesForUid(TEST_UID);
+
+        int uid =
+                spyAms.enforceDumpPermissionForPackage(
+                        TEST_PACKAGE, TEST_USER_ID, TEST_UID, TEST_CALLER_NAME);
+        assertEquals(UserHandle.getUid(TEST_USER_ID, UserHandle.getAppId(TEST_UID)), uid);
+    }
+
+    @Test
+    public void testEnforceDumpPermissionForPackage_noPermission_otherPackage() {
+        ActivityManagerService spyAms = spy(mAms);
+        spyAms.mPackageManagerInt = mPackageManagerInternal;
+        doReturn(PackageManager.PERMISSION_DENIED).when(spyAms).checkCallingPermission(anyString());
+        spyOn(spyAms.mContext);
+        PackageManager pm = mock(PackageManager.class);
+        doReturn(pm).when(spyAms.mContext).getPackageManager();
+        doReturn(new String[] {TEST_OTHER_PACKAGE}).when(pm).getPackagesForUid(TEST_UID);
+
+        assertThrows(
+                SecurityException.class,
+                () -> {
+                    spyAms.enforceDumpPermissionForPackage(
+                            TEST_PACKAGE, TEST_USER_ID, TEST_UID, TEST_CALLER_NAME);
+                });
     }
 
     private static class TestHandler extends Handler {

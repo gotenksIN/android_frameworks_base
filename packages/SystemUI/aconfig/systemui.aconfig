@@ -78,10 +78,17 @@ flag {
 }
 
 flag {
+    name: "black_screen_on_scene_container_start_fix"
+    namespace: "systemui"
+    description: "Fix a brief black screen on scene container startup"
+    bug: "452871017"
+}
+
+flag {
     name: "blur_on_more_surfaces"
     namespace: "systemui"
-    description: "Enable blur on more systemui surfaces"
-    bug: "444141641"
+    description: "Enable blur on more systemui surfaces (volume and power)"
+    bug: "496223564"
 }
 
 flag {
@@ -328,16 +335,6 @@ flag {
 }
 
 flag {
-    name: "dream_input_session_pilfer_once"
-    namespace: "systemui"
-    description: "Pilfer at most once per input session"
-    bug: "333596426"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "dream_overlay_bouncer_swipe_direction_filtering"
   namespace: "systemui"
   description: "do not initiate bouncer swipe when the direction is opposite of the expansion"
@@ -438,10 +435,11 @@ flag {
 }
 
 flag {
-    name: "enable_inset_focus_rings_in_suw"
+    name: "enable_inset_focus_rings"
     namespace: "systemui"
-    description: "Decides whether to enable inset focus rings in the global actions dialog during the SuW."
+    description: "Decides whether to enable inset focus rings in the global actions dialog."
     bug: "484084632"
+    is_fixed_read_only: true
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -458,7 +456,7 @@ flag {
     name: "enable_lockscreen_blur"
     namespace: "systemui"
     description: "Enable blur on more lockscreen surfaces"
-    bug: "444141641"
+    bug: "496224024"
 }
 
 flag {
@@ -487,6 +485,16 @@ flag {
   namespace: "note"
   description: "Enables note qs tile which opens default notes role app"
   bug: "451901620"
+}
+
+flag {
+    name: "enable_qs_tile_tooltips"
+    namespace: "systemui"
+    description: "Enables tooltips for QuickSettings tiles"
+    bug: "459961514"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -599,13 +607,6 @@ flag {
 }
 
 flag {
-   name: "face_auth_low_light_animation"
-   namespace: "systemui"
-   description: "When a user is authenticating with face in low light scenarios, play an animation to illuminate the face."
-   bug: "487797673"
-}
-
-flag {
    namespace: "systemui"
    name: "fetch_bookmarks_xml_keyboard_shortcuts"
    description: "Fetches application launch keyboard shortcuts from system server rather than building a hardcoded list."
@@ -633,16 +634,6 @@ flag {
     metadata {
        purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "fix_main_thread_blocking_on_first_unlock"
-   namespace: "systemui"
-   description: "Fixes main thread blocking Binder calls during the first unlock."
-   bug: "491497495"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -712,14 +703,6 @@ flag {
 }
 
 flag {
-  name: "glanceable_hub_v2_resources"
-  namespace: "systemui"
-  description: "Read only flag for rolling out glanceable hub v2 resource values"
-  bug: "375689917"
-  is_fixed_read_only: true
-}
-
-flag {
     name: "global_actions_feedback_action"
     namespace: "systemui"
     description: "When enabled at build-time, the feedback global action will be available on "
@@ -736,6 +719,16 @@ flag {
 }
 
 flag {
+    name: "handle_boot_completed_on_separate_thread"
+    namespace: "systemui"
+    description: "Don't block LOCKED_BOOT_COMPLETED broadcast handling just because SysUI is busy on MT"
+    bug: "482256950"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "hardware_color_styles"
     namespace: "systemui"
     description: "Enables loading initial colors based ion hardware color"
@@ -743,6 +736,13 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+  name: "headline_backend"
+  namespace: "systemui"
+  description: "New alerting backend for headline."
+  bug: "494327226"
 }
 
 flag {
@@ -811,6 +811,13 @@ flag {
 }
 
 flag {
+    name: "issue_recording_use_screen_recording_service"
+    namespace: "systemui"
+    description: "Enables IssueRecordingService to use the new ScreenRecordingService binding."
+    bug: "476328961"
+}
+
+flag {
     name: "keyboard_docking_indicator"
     namespace: "systemui"
     description: "Glow bar indicator reveals upon keyboard docking."
@@ -822,6 +829,16 @@ flag {
     namespace: "systemui"
     description: "Allow showing education for physical keyboard and touchpad"
     bug: "317496783"
+}
+
+flag {
+    name: "keyguard_remove_ime_focus"
+    namespace: "systemui"
+    description: "Keep the window flag FLAG_ALT_FOCUSABLE_IM while on keyguard and only change it when transitioning to bouncer."
+    bug: "422846629"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -916,6 +933,13 @@ flag {
 }
 
 flag {
+    name: "lockscreen_blur_for_notifications"
+    namespace: "systemui"
+    description: "Enable lockscreen blur for notifications"
+    bug: "496207304"
+}
+
+flag {
   name: "low_light_clock_dream"
   namespace: "systemui"
   description: "Enables low light clock dream experience on mobile phones"
@@ -951,6 +975,16 @@ flag {
   namespace: "systemui"
   description: "Runs media controls in compose"
   bug: "397989775"
+}
+
+flag {
+    name: "media_controls_reorder_fix"
+    namespace: "systemui"
+    description: "Use new provider to determine when to reorder media controls"
+    bug: "433331357"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1275,6 +1309,26 @@ flag {
 }
 
 flag {
+    name: "qs_cast_tile_hsum_fix"
+    namespace: "systemui"
+    description: "Fix to make the cast tile work properly in headless system user mode."
+    bug: "455936312"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "qs_cast_tile_skip_wifi_check"
+    namespace: "systemui"
+    description: "Skip the wifi check for the cast tile."
+    bug: "431024325"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "qs_edit_mode_focus_fixes"
     namespace: "systemui"
     description: "Various fixes for the focus states of the quick settings edit mode"
@@ -1375,16 +1429,6 @@ flag {
 }
 
 flag {
-   namespace: "systemui"
-   name: "remove_update_listener_in_qs_icon_view_impl"
-   description: "Remove update listeners in QsIconViewImpl class to avoid memory leak."
-   bug: "327078684"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "rest_to_unlock"
    namespace: "systemui"
    description: "Require prolonged touch for fingerprint authentication"
@@ -1471,6 +1515,16 @@ flag {
     namespace: "systemui"
     description: "Only capture a single display when screenshotting"
     bug: "362720389"
+}
+
+flag {
+    name: "screenshot_remove_nonforced_sound"
+    namespace: "systemui"
+    description: "Only play screenshot shutter sound when forced"
+    bug: "457718566"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1589,6 +1643,13 @@ flag {
 }
 
 flag {
+    name: "start_on_gone_scene_if_no_lockscreen"
+    namespace: "systemui"
+    description: "Start on the Gone scene if the current user has no lockscreen"
+    bug: "495877718"
+}
+
+flag {
     name: "status_bar_always_check_underlying_networks"
     namespace: "systemui"
     description: "For status bar connectivity UI, always check underlying networks for wifi and "
@@ -1624,20 +1685,20 @@ flag {
 }
 
 flag {
+    name: "status_bar_chip_visibility_jank_fix"
+    namespace: "systemui"
+    description: "Fixes the notification icons hopping around when the chip shows/hides"
+    bug: "467677035"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "status_bar_chips_return_animations"
     namespace: "systemui"
     description: "Enables return animations for status bar chips"
     bug: "202516970"
-}
-
-flag {
-    name: "status_bar_chronometer_fixes"
-    namespace: "systemui"
-    description: "Fixes ticking behavior for the chronometer used in status bar chips"
-    bug: "450909625"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1667,6 +1728,13 @@ flag {
     namespace: "systemui"
     description: "Feature flag for the ime chip in desktop status bar"
     bug: "443854916"
+}
+
+flag {
+    name: "status_bar_is_connected_display_chip_controlled_by_config"
+    namespace: "systemui"
+    description: "Enable config to control the connected display chip"
+    bug: "400404040"
 }
 
 flag {
@@ -1855,6 +1923,16 @@ flag {
   namespace: "systemui"
   description: "Use compose's AndroidUiDispatcher as default"
   bug: "460414443"
+}
+
+flag {
+    name: "wakefulness_events_shared_flow"
+    namespace: "systemui"
+    description: "Add/use wakefulnessEvents SharedFlow in PowerInteractor"
+    bug: "489790572"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

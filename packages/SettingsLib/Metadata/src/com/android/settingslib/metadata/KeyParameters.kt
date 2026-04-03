@@ -83,7 +83,7 @@ open class KeyParameters(
  * @property values The validated map of parameter names to their string values.
  */
 @ConsistentCopyVisibility
-data class ValidatedKeyParameters internal constructor(
+data class ValidatedKeyParameters constructor(
     private val schema: KeyParametersSchema,
     override val values: Map<String, String>
 ) : KeyParameters(values) {
@@ -98,9 +98,25 @@ data class ValidatedKeyParameters internal constructor(
      */
     override operator fun get(key: String): String? {
         if (!schema.containsKey(key)) {
-            throw IllegalArgumentException("Parameter '$key' is not defined in the schema.")
+            throw IllegalArgumentException("Parameter '$key' is not defined in the schema (contains ${schema.getParameters().keys}).")
         }
         return values[key]
+    }
+
+    /**
+     * Retrieves the value for a given parameter key in the correct type.
+     *
+     * This will ultimately replace the get<String> method.
+     *
+     * @param key The name of the parameter to retrieve.
+     * @return The value of the parameter, or `null` if the parameter is optional and was not
+     * provided.
+     * @throws IllegalArgumentException if the key is not defined in the schema.
+     */
+    fun <T> getTyped(key: String): T? {
+        val value = get(key) ?: return null
+        val type = schema.getParameters()[key]?.type as ApiType<T, *>? ?: return null
+        return type.convertStringToInternal(value)
     }
 
     /**
@@ -119,7 +135,7 @@ data class ValidatedKeyParameters internal constructor(
      */
     fun getRequired(key: String): String {
         if (!schema.containsKey(key)) {
-            throw IllegalArgumentException("Parameter '$key' is not defined in the schema.")
+            throw IllegalArgumentException("Parameter '$key' is not defined in the schema. (contains ${schema.getParameters().keys})")
         }
 
         if (!schema.isRequiredParameter(key)) {
@@ -455,5 +471,5 @@ fun KeyParametersSchema.prepareForApp(packageName: String): ValidatedKeyParamete
 /**
  * Convenience method to retrieve the package name from a KeyParameters.
  */
-val ValidatedKeyParameters.packageName: String
-    get() = getRequired(KEY_PACKAGE_NAME)
+val ValidatedKeyParameters.packageName: String?
+    get() = get(KEY_PACKAGE_NAME)

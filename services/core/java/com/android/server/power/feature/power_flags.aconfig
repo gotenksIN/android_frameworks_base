@@ -67,13 +67,6 @@ flag {
 }
 
 flag {
-    name: "enable_app_wakelock_data_source"
-    namespace: "power"
-    description: "Feature flag to enable a new Perfetto data source for tracing app wakelocks."
-    bug: "400774865"
-}
-
-flag {
     name: "shutdown_system_api"
     namespace: "power"
     description: "Feature flag to have a system API which shuts down the device."
@@ -132,6 +125,17 @@ flag {
     namespace: "power"
     description: "When enabled, tag database will not churn old values when a non-existent tag wakelock is released"
     bug: "478418224"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_inset_focus_rings_in_suw"
+    namespace: "power"
+    description: "Decides whether to enable inset focus rings in the reboot into safe mode dialog during the SuW."
+    bug: "484084632"
+    is_fixed_read_only: true
     metadata {
       purpose: PURPOSE_BUGFIX
     }

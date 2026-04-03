@@ -49,9 +49,11 @@ class DisplayUpdater {
     private static final String TAG = "DisplayUpdater";
 
     private final RootWindowContainer mRootWindowContainer;
+    private final DisplayUnblocker mDisplayUnblocker;
 
-    DisplayUpdater(RootWindowContainer rootWindowContainer) {
+    DisplayUpdater(RootWindowContainer rootWindowContainer, DisplayUnblocker displayUnblocker) {
         mRootWindowContainer = rootWindowContainer;
+        mDisplayUnblocker = displayUnblocker;
         mRootWindowContainer.mDisplayManager.registerDisplayListener(new DisplayUpdatesListener(),
                 mRootWindowContainer.mService.mUiHandler);
     }
@@ -78,6 +80,7 @@ class DisplayUpdater {
                         + displays.displayInfos());
             }
 
+            mDisplayUnblocker.onCollectionStarted(transition, displays);
             mRootWindowContainer.mWmService.mAtmService.mChainTracker.start("dispChg", transition);
             mRootWindowContainer.mWmService.mAtmService.deferWindowLayout();
 
@@ -89,6 +92,7 @@ class DisplayUpdater {
                 updateContentModeIfNeeded(shouldStartTransition ? transition : null);
 
                 if (shouldStartTransition) {
+                    mDisplayUnblocker.onDisplayChangesApplied(transition);
                     mRootWindowContainer.mTransitionController.requestStartTransition(transition,
                             /* startTask= */ null, /* remoteTransition= */ null, displayChanges);
                 } else {
@@ -282,16 +286,13 @@ class DisplayUpdater {
     private TransitionRequestInfo.DisplayChange createDisplayChange(int fromRotation,
             @NonNull Rect startBounds, @Nullable String fromUniqueId, int disconnectReparentDisplay,
             @NonNull DisplayContent displayContent) {
-        final Rect endBounds = new Rect(displayContent.getBounds());
         final int toRotation = displayContent.getRotation();
         final boolean physicalDisplayChanged = fromUniqueId != null
                 && !fromUniqueId.equals(displayContent.getDisplayInfo().uniqueId);
         final TransitionRequestInfo.DisplayChange displayChange =
-                new TransitionRequestInfo.DisplayChange(displayContent.getDisplayId());
+                new TransitionRequestInfo.DisplayChange(displayContent.getDisplayAreaInfo());
         displayChange.setStartAbsBounds(startBounds);
-        displayChange.setEndAbsBounds(endBounds);
         displayChange.setStartRotation(fromRotation);
-        displayChange.setEndRotation(toRotation);
         displayChange.setDisconnectReparentDisplay(disconnectReparentDisplay);
         displayChange.setPhysicalDisplayChanged(physicalDisplayChanged);
         if (com.android.window.flags.Flags.sendNewInsetsStateWithRotation()) {

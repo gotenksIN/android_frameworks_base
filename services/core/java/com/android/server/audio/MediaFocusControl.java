@@ -100,8 +100,6 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
     private final @NonNull PlayerFocusEnforcer mFocusEnforcer;
     private boolean mMultiAudioFocusEnabled = false;
 
-    private boolean mRingOrCallActive = false;
-
     private final Object mExtFocusChangeLock = new Object();
     @GuardedBy("mExtFocusChangeLock")
     private long mExtFocusChangeCounter;
@@ -327,7 +325,6 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
                             fr.getSdkTarget(),
                             /*forceDuck*/ false,
                             /*testUid*/ 0,
-                            /*permissionOverridesCheck*/ false,
                             /*isForCall*/ false);
                     if (result == AUDIOFOCUS_REQUEST_GRANTED) {
                         return true;
@@ -426,7 +423,7 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
      */
     private static final int MAX_STACK_SIZE = 100;
 
-    private static final EventLogger
+    private final EventLogger
             mEventLogger = new EventLogger(50,
             "focus commands as seen by MediaFocusControl");
 
@@ -725,7 +722,6 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
         }
         pw.println("\n");
         pw.println(" Notify on duck:  " + mNotifyFocusOwnerOnDuck + "\n");
-        pw.println(" In ring or call: " + mRingOrCallActive + "\n");
     }
 
     /**
@@ -863,7 +859,6 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
      */
     private boolean canReassignAudioFocus() {
         // focus requests are rejected during a phone call or when the phone is ringing
-        // this is equivalent to IN_VOICE_COMM_FOCUS_ID having the focus
         if (!mFocusStack.isEmpty() && isLockedFocusOwner(mFocusStack.peek())) {
             return false;
         }
@@ -871,7 +866,7 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
     }
 
     private boolean isLockedFocusOwner(FocusRequester fr) {
-        return (fr.hasSameClient(AudioSystem.IN_VOICE_COMM_FOCUS_ID) || fr.isLockedFocusOwner());
+        return fr.isLockedFocusOwner();
     }
 
     /**
@@ -1415,16 +1410,19 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
      *                  accessibility.
      * @param testUid ignored if flags doesn't contain AudioManager.AUDIOFOCUS_FLAG_TEST
      *                otherwise the UID being injected for testing
-     * @param permissionOverridesCheck true if permission checks guaranteed that the call should
-     *                                 go through, false otherwise (e.g. non-privileged caller)
      * @return
      */
     protected int requestAudioFocus(int callerUid, @NonNull AudioAttributes aa, int focusChangeHint,
             IBinder cb, IAudioFocusDispatcher fd, @NonNull String clientId,
             @NonNull String callingPackageName,
             int flags, int sdk, boolean forceDuck, int testUid,
-            boolean permissionOverridesCheck,
             boolean isForCall) {
+        // Call focus should always be treated as having focus lock (it should already be set
+        // directly, but just in case)
+        if (isForCall) {
+            flags |= AudioManager.AUDIOFOCUS_FLAG_LOCK;
+        }
+
         new MediaMetrics.Item(mMetricsId)
                 .setUid(callerUid)
                 .set(MediaMetrics.Property.CALLING_PACKAGE, callingPackageName)
@@ -1522,10 +1520,6 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
                 return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
             }
 
-            boolean enteringRingOrCall = !mRingOrCallActive
-                    && isForCall;
-            if (enteringRingOrCall) { mRingOrCallActive = true; }
-
             final AudioFocusInfo afiForExtPolicy;
             if (mFocusPolicy != null) {
                 // construct AudioFocusInfo as it will be communicated to audio focus policy
@@ -1603,7 +1597,7 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
 
             if (mMultiAudioFocusEnabled
                     && (focusChangeHint == AudioManager.AUDIOFOCUS_GAIN)) {
-                if (enteringRingOrCall) {
+                if (isForCall) {
                     if (!mMultiAudioFocusList.isEmpty()) {
                         for (FocusRequester multifr : mMultiAudioFocusList) {
                             multifr.handleFocusLossFromGain(focusChangeHint, nfr, forceDuck);
@@ -1648,8 +1642,11 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
             notifyExtPolicyFocusGrant_syncAf(nfr.toAudioFocusInfo(),
                     AudioManager.AUDIOFOCUS_REQUEST_GRANTED);
 
-            if (ENFORCE_MUTING_FOR_RING_OR_CALL & enteringRingOrCall) {
-                runAudioCheckerForRingOrCallAsync(true/*enteringRingOrCall*/);
+            if (ENFORCE_MUTING_FOR_RING_OR_CALL && isForCall) {
+                mFocusHandler.removeMessages(MSG_L_UNMUTE_PLAYERS_FOR_CALL);
+                mFocusHandler.sendMessageDelayed(
+                        mFocusHandler.obtainMessage(MSG_L_MUTE_PLAYERS_FOR_CALL),
+                        RING_CALL_MUTING_ENFORCEMENT_DELAY_MS);
             }
         }//synchronized(mAudioFocusLock)
 
@@ -1697,13 +1694,12 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
                     return AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
                 }
 
-                boolean exitingRingOrCall = mRingOrCallActive && isForCall;
-                if (exitingRingOrCall) { mRingOrCallActive = false; }
-
                 removeFocusStackEntry(clientId, true /*signal*/, true /*notifyFocusFollowers*/);
 
-                if (ENFORCE_MUTING_FOR_RING_OR_CALL & exitingRingOrCall) {
-                    runAudioCheckerForRingOrCallAsync(false/*enteringRingOrCall*/);
+                if (ENFORCE_MUTING_FOR_RING_OR_CALL && isForCall) {
+                    mFocusHandler.removeMessages(MSG_L_MUTE_PLAYERS_FOR_CALL);
+                    mFocusHandler.sendMessage(
+                            mFocusHandler.obtainMessage(MSG_L_UNMUTE_PLAYERS_FOR_CALL));
                 }
             }
         } catch (java.util.ConcurrentModificationException cme) {
@@ -1828,29 +1824,6 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
         }
     }
 
-    private void runAudioCheckerForRingOrCallAsync(final boolean enteringRingOrCall) {
-        new Thread() {
-            public void run() {
-                if (enteringRingOrCall) {
-                    try {
-                        Thread.sleep(RING_CALL_MUTING_ENFORCEMENT_DELAY_MS);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-                synchronized (mAudioFocusLock) {
-                    // since the new thread starting running the state could have changed, so
-                    // we need to check again mRingOrCallActive, not enteringRingOrCall
-                    if (mRingOrCallActive) {
-                        mFocusEnforcer.mutePlayersForCall(USAGES_TO_MUTE_IN_RING_OR_CALL);
-                    } else {
-                        mFocusEnforcer.unmutePlayersForCall();
-                    }
-                }
-            }
-        }.start();
-    }
-
     public void updateMultiAudioFocus(boolean enabled) {
         Log.d(TAG, "updateMultiAudioFocus( " + enabled + " )");
         synchronized (mAudioFocusLock) {
@@ -1955,6 +1928,10 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
 
     private static final int MSL_L_FORGET_UID = 2;
 
+    private static final int MSG_L_MUTE_PLAYERS_FOR_CALL = 3;
+
+    private static final int MSG_L_UNMUTE_PLAYERS_FOR_CALL = 4;
+
     private void initFocusThreading() {
         mFocusThread = new HandlerThread(TAG);
         mFocusThread.start();
@@ -1962,6 +1939,16 @@ public class MediaFocusControl implements PlayerFocusEnforcer {
             @Override
             public void handleMessage(Message msg) {
                 switch (msg.what) {
+                    case MSG_L_MUTE_PLAYERS_FOR_CALL:
+                        synchronized (mAudioFocusLock) {
+                            mFocusEnforcer.mutePlayersForCall(USAGES_TO_MUTE_IN_RING_OR_CALL);
+                        }
+                        break;
+                    case MSG_L_UNMUTE_PLAYERS_FOR_CALL:
+                        synchronized (mAudioFocusLock) {
+                            mFocusEnforcer.unmutePlayersForCall();
+                        }
+                        break;
                     case MSG_L_FOCUS_LOSS_AFTER_FADE:
                         if (DEBUG) {
                             Log.d(TAG, "MSG_L_FOCUS_LOSS_AFTER_FADE loser="

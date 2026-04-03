@@ -19,7 +19,6 @@ package com.android.systemui.screencapture.record.camera.domain.interactor
 import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.Region
-import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.annotation.ColorInt
@@ -35,6 +34,8 @@ import com.android.systemui.screencapture.record.camera.data.model.StreamConfigu
 import com.android.systemui.screencapture.record.camera.data.model.isValid
 import com.android.systemui.screencapture.record.camera.data.repository.ScreenRecordCameraRepository
 import com.android.systemui.screencapture.record.camera.shared.model.CameraState
+import com.android.systemui.screencapture.record.shared.ScreenRecordingLogger
+import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -52,8 +53,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-private const val TAG = "ScreenRecordCameraInteractor"
-
 @ScreenCaptureScope
 class ScreenRecordCameraInteractor
 @Inject
@@ -61,6 +60,8 @@ constructor(
     @Main resources: Resources,
     @ScreenCapture private val coroutineScope: CoroutineScope,
     private val repository: ScreenRecordCameraRepository,
+    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
+    private val logger: ScreenRecordingLogger,
 ) : ScreenCaptureStartable {
 
     val cameraBackgroundColors: List<Int> =
@@ -80,7 +81,14 @@ constructor(
 
     val isCameraSupported: Flow<Boolean> =
         repository.isConnected
-            .map { it && repository.isCameraSupported() }
+            .map { isConnected ->
+                val isCameraSupported = repository.isCameraSupported()
+                logger.cameraConnectedChanged(
+                    isConnected = isConnected,
+                    isSupported = isCameraSupported,
+                )
+                isConnected && isCameraSupported
+            }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isCameraSupported",
                 coroutineScope,
@@ -88,9 +96,12 @@ constructor(
                 null,
             )
             .filterNotNull()
-    val isOnTapSupported: StateFlow<Boolean> =
-        isCameraSupported
-            .map { it && repository.isOnTapSupported() }
+    val canTap: StateFlow<Boolean> =
+        combine(isCameraSupported, screenRecordingServiceInteractor.status) {
+                isCameraSupported,
+                recordingStatus ->
+                !recordingStatus.isRecording && isCameraSupported && repository.isOnTapSupported()
+            }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isOnTapSupported",
                 coroutineScope,
@@ -117,7 +128,11 @@ constructor(
                         displayRotation = displayParameters.rotation,
                     )
                     .also { config ->
-                        Log.d(TAG, "Prepared the stream: dp=$displayParameters config=$config")
+                        logger.prepareCameraStream(
+                            displayUniqueId = displayParameters.uniqueId,
+                            displayRotation = displayParameters.rotation,
+                            resultConfiguration = config,
+                        )
                     }
             }
             .filter {
@@ -139,12 +154,22 @@ constructor(
 
         // Populate current background color when camera is connected
         cameraBackground
-            .onEach { color -> repository.setBackgroundColor(color) }
+            .onEach { color ->
+                repository.setBackgroundColor(color)
+                logger.cameraBackgroundChanged(color)
+            }
             .launchIn(coroutineScope)
 
         repository.isConnected
-            .onEach { if (it) repository.setBackgroundColor(cameraBackground.value) }
+            .onEach {
+                if (it) {
+                    repository.setBackgroundColor(cameraBackground.value)
+                    logger.cameraBackgroundChanged(cameraBackground.value)
+                }
+            }
             .launchIn(coroutineScope)
+
+        state.onEach { logger.cameraStateChanged(it) }.launchIn(coroutineScope)
 
         combine(
                 surfaceParameters.filterNotNull(),
@@ -155,16 +180,18 @@ constructor(
                     params.surface == null ||
                         params.size != optimalCameraStreamSize.cameraStreamSize
                 ) {
-                    Log.d(TAG, "Waiting for a properly sized surface")
                     return@combine
                 }
                 if (state.value == CameraState.Started || state.value == CameraState.Starting) {
                     stopStream()
                 }
-                Log.d(TAG, "Starting the stream: ${params.size}")
                 repository.startStream(
                     surface = params.surface,
                     size = optimalCameraStreamSize.cameraStreamSize,
+                )
+                logger.startCameraStream(
+                    surfaceHash = params.surface.hashCode(),
+                    surfaceSize = optimalCameraStreamSize.cameraStreamSize,
                 )
             }
             .launchIn(coroutineScope)
@@ -177,6 +204,7 @@ constructor(
     }
 
     fun onSurfaceReady(surface: Surface, size: Size) {
+        logger.cameraSurfaceReady(surface.hashCode(), size)
         surfaceParameters.value = CameraSurfaceParameters(surface = surface, size = size)
     }
 
@@ -186,7 +214,7 @@ constructor(
 
     suspend fun stopStream() {
         repository.stopStream()
-        Log.d(TAG, "Stopped the stream")
+        logger.stopCameraStream()
     }
 
     fun setBackgroundColor(@ColorInt color: Int) {
@@ -197,7 +225,10 @@ constructor(
     }
 
     suspend fun onTap() {
-        repository.onTap()
+        if (canTap.value) {
+            repository.onTap()
+        }
+        logger.cameraTapped(canTap.value)
     }
 }
 

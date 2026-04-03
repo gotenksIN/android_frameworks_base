@@ -116,6 +116,7 @@ object StringPolicy {
             /*resolutionMechanism=*/ ResolutionMechanismMetadata.MostRestrictive<String>(),
             /*emptyStringAllowed=*/ false,
             /*unprintableCharactersAllowed=*/ false,
+            /*maxLength=*/ Integer.MAX_VALUE,
         )
     val anyTransportValue: PolicyValueTransport = PolicyValueTransport.stringField("a string value")
 
@@ -137,6 +138,7 @@ fun StringPolicyMetadata.copy(
     allowedDpcTypes: Set<Int>? = null,
     emptyStringAllowed: Boolean? = null,
     unprintableCharactersAllowed: Boolean? = null,
+    maxLength: Int? = null,
 ) =
     StringPolicyMetadata(
         id ?: this.id,
@@ -148,6 +150,7 @@ fun StringPolicyMetadata.copy(
         this.resolutionMechanism,
         emptyStringAllowed ?: this.isEmptyStringAllowed,
         unprintableCharactersAllowed ?: this.isUnprintableCharactersAllowed,
+        maxLength ?: this.maxLength,
     )
 
 object ListOfStringPolicy {
@@ -165,6 +168,7 @@ object ListOfStringPolicy {
                 /* allowedDpcTypes= */ setOf(),
                 /* emptyStringAllowed= */ false,
                 /* unprintableCharactersAllowed= */ false,
+                /* maxLength= */ Integer.MAX_VALUE,
             ),
             /* resolutionMechanism= */ null,
             /* emptyListAllowed= */ false,
@@ -190,7 +194,9 @@ fun ListPolicyMetadata<String>.copy(
     allowedDpcTypes: Set<Int>? = null,
     emptyStringAllowed: Boolean? = null,
     unprintableCharactersAllowed: Boolean? = null,
+    maxLength: Int? = null,
     emptyListAllowed: Boolean? = null,
+    resolutionMechanism: ResolutionMechanismMetadata<List<String>>? = null,
 ) =
     ListPolicyMetadata(
         /* id= */ id ?: this.id,
@@ -207,8 +213,10 @@ fun ListPolicyMetadata<String>.copy(
                 ?: (this.elementMetadata as StringPolicyMetadata).isEmptyStringAllowed,
             /* unprintableCharactersAllowed= */ unprintableCharactersAllowed
                 ?: (this.elementMetadata as StringPolicyMetadata).isUnprintableCharactersAllowed,
+            /* maxLength= */ maxLength
+                ?: (this.elementMetadata as StringPolicyMetadata).maxLength,
         ),
-        /* resolutionMechanism= */ null,
+        /* resolutionMechanism= */ resolutionMechanism ?: this.resolutionMechanism,
         /* emptyListAllowed= */ emptyListAllowed ?: this.isEmptyListAllowed,
     )
 
@@ -227,6 +235,7 @@ object IntegerPolicy {
             /*requiredPermission=*/ "testPermission",
             /*requiredCrossUserPermission=*/ "testCrossUserPermission",
             /*allowedDpcTypes=*/ setOf(),
+            /*resolutionMechanism=*/ null,
             MIN,
             MAX,
         )
@@ -248,6 +257,7 @@ fun IntegerPolicyMetadata.copy(minValue: Int? = null, maxValue: Int? = null) =
         this.requiredPermission,
         this.requiredCrossUserPermission,
         this.allowedDpcTypes,
+        this.resolutionMechanism,
         minValue ?: this.minValue,
         maxValue ?: this.maxValue,
     )
@@ -264,6 +274,7 @@ object LongPolicy {
             /*requiredPermission=*/ "testPermission",
             /*requiredCrossUserPermission=*/ "testCrossUserPermission",
             /*allowedDpcTypes=*/ setOf(),
+            /*resolutionMechanism=*/ null,
             /*minValue=*/ 10L,
             /*maxValue=*/ 20L,
         )
@@ -286,6 +297,7 @@ fun LongPolicyMetadata.copy(minValue: Long? = null, maxValue: Long? = null) =
         this.requiredPermission,
         this.requiredCrossUserPermission,
         this.allowedDpcTypes,
+        this.resolutionMechanism,
         minValue ?: this.minValue,
         maxValue ?: this.maxValue,
     )

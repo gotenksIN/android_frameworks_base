@@ -27,9 +27,12 @@ import android.processor.devicepolicy.BooleanPolicyDefinition;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.EnumResolutionMechanism;
 import android.processor.devicepolicy.IntegerPolicyDefinition;
+import android.processor.devicepolicy.IntegerResolutionMechanism;
+import android.processor.devicepolicy.ListOfPackagePolicyDefinition;
 import android.processor.devicepolicy.ListOfStringPolicyDefinition;
 import android.processor.devicepolicy.ListResolutionMechanism;
 import android.processor.devicepolicy.LongPolicyDefinition;
+import android.processor.devicepolicy.LongResolutionMechanism;
 import android.processor.devicepolicy.PackagePolicyDefinition;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
@@ -137,7 +140,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> SIMPLE_INTEGER_POLICY =
             new PolicyIdentifier<>("SIMPLE_INTEGER_POLICY");
 
@@ -157,7 +161,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @LongResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Long> SIMPLE_LONG_POLICY =
             new PolicyIdentifier<>("SIMPLE_LONG_POLICY");
 
@@ -179,7 +184,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
             minValue = -100,
-            maxValue = 100)
+            maxValue = 100,
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> SIMPLE_INTEGER_POLICY_WITH_RANGE =
             new PolicyIdentifier<>("SIMPLE_INTEGER_POLICY_WITH_RANGE");
 
@@ -201,7 +207,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
             minValue = 10,
-            maxValue = 100)
+            maxValue = 100,
+            resolutionMechanism = @LongResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Long> SIMPLE_LONG_POLICY_WITH_RANGE =
             new PolicyIdentifier<>("SIMPLE_LONG_POLICY_WITH_RANGE");
 
@@ -248,29 +255,46 @@ public final class PolicyIdentifier<T> {
                     new PolicyIdentifier<>(
                             "SIMPLE_STRING_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED");
 
+    /** Test policy verifying a string policy with max length. */
+    @StringPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            // requiredPermission and requiredCrossUserPermission using the default
+                            // values.
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            maxLength = 10)
+    public static final PolicyIdentifier<String> STRING_POLICY_WITH_MAX_LENGTH =
+            new PolicyIdentifier<>("STRING_POLICY_WITH_MAX_LENGTH");
+
     /** Test policy 5 */
     @ListOfStringPolicyDefinition(
             base =
-                    @StringPolicyDefinition(
-                            base =
-                                    @PolicyDefinition(
-                                            allowedScopes = {
-                                                1 // POLICY_SCOPE_USER
-                                            },
-                                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
-                                            // requiredPermission and requiredCrossUserPermission
-                                            // using the default
-                                            // values.
-                                            allowedDpcTypes =
-                                                    @AllowedDpcTypes(
-                                                            deviceOwner = DISALLOWED,
-                                                            managedProfileOwnerOfOrganizationOwnedDevice =
-                                                                    DISALLOWED,
-                                                            managedProfileOwnerOfPersonalOwnedDevice =
-                                                                    DISALLOWED,
-                                                            unaffiliatedFullUserProfileOwner =
-                                                                    DISALLOWED)),
-                            emptyStringAllowed = true),
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            // requiredPermission and requiredCrossUserPermission
+                            // using the default
+                            // values.
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            emptyStringAllowed = true,
             resolutionMechanism = @ListResolutionMechanism(custom = true))
     public static final PolicyIdentifier<List<String>> SIMPLE_STRING_LIST_POLICY =
             new PolicyIdentifier<>("SIMPLE_STRING_LIST_POLICY");
@@ -278,27 +302,23 @@ public final class PolicyIdentifier<T> {
     /** Test policy verifying a string list policy with unprintable characters allowed. */
     @ListOfStringPolicyDefinition(
             base =
-                    @StringPolicyDefinition(
-                            base =
-                                    @PolicyDefinition(
-                                            allowedScopes = {
-                                                1 // POLICY_SCOPE_USER
-                                            },
-                                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
-                                            // requiredPermission and requiredCrossUserPermission
-                                            // using the default
-                                            // values.
-                                            allowedDpcTypes =
-                                                    @AllowedDpcTypes(
-                                                            deviceOwner = DISALLOWED,
-                                                            managedProfileOwnerOfOrganizationOwnedDevice =
-                                                                    DISALLOWED,
-                                                            managedProfileOwnerOfPersonalOwnedDevice =
-                                                                    DISALLOWED,
-                                                            unaffiliatedFullUserProfileOwner =
-                                                                    DISALLOWED)),
-                            emptyStringAllowed = true,
-                            unprintableCharactersAllowed = true),
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            // requiredPermission and requiredCrossUserPermission
+                            // using the default
+                            // values.
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            emptyStringAllowed = true,
+            unprintableCharactersAllowed = true,
             resolutionMechanism = @ListResolutionMechanism(custom = true))
     public static final PolicyIdentifier<List<String>>
             SIMPLE_STRING_LIST_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED =
@@ -325,6 +345,24 @@ public final class PolicyIdentifier<T> {
     public static final PolicyIdentifier<PackageIdentifier> SIMPLE_PACKAGE_POLICY =
             new PolicyIdentifier<>("SIMPLE_PACKAGE_POLICY");
 
+    /** Test policy for Package List */
+    @ListOfPackagePolicyDefinition(
+            base = @PolicyDefinition(
+                    allowedScopes = {
+                             1 // POLICY_SCOPE_USER
+                    },
+                    affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                    // requiredPermission and requiredCrossUserPermission using the default values.
+                    allowedDpcTypes = @AllowedDpcTypes(
+                            deviceOwner = DISALLOWED,
+                            managedProfileOwnerOfOrganizationOwnedDevice = DISALLOWED,
+                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            emptyListAllowed = false,
+            resolutionMechanism = @ListResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<List<PackageIdentifier>> SIMPLE_PACKAGE_LIST_POLICY =
+            new PolicyIdentifier<>("SIMPLE_PACKAGE_LIST_POLICY");
+
     /** Test policy verifying processing of DEFAULT_DEVICE_OWNER allowed. */
     @IntegerPolicyDefinition(
             base =
@@ -341,7 +379,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_DEFAULT_DEVICE_OWNER_ALLOWED =
             new PolicyIdentifier<>("TEST_DEFAULT_DEVICE_OWNER_ALLOWED");
 
@@ -362,7 +401,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_FINANCED_DEVICE_OWNER_ALLOWED =
             new PolicyIdentifier<>("TEST_FINANCED_DEVICE_OWNER_ALLOWED");
 
@@ -381,7 +421,8 @@ public final class PolicyIdentifier<T> {
                                             deviceOwner = DISALLOWED,
                                             managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer>
             TEST_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE_ALLOWED =
                     new PolicyIdentifier<>(
@@ -404,7 +445,8 @@ public final class PolicyIdentifier<T> {
                                                     DISALLOWED,
                                             profileOwnerOnUser0 = ALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_PROFILE_OWNER_ON_USER0_ALLOWED =
             new PolicyIdentifier<>("TEST_PROFILE_OWNER_ON_USER0_ALLOWED");
 
@@ -424,7 +466,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_PROFILE_OWNER_ALLOWED =
             new PolicyIdentifier<>("TEST_PROFILE_OWNER_ALLOWED");
 
@@ -444,7 +487,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = ALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = ALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_PROFILE_OWNER_ON_USER_ALLOWED =
             new PolicyIdentifier<>("TEST_PROFILE_OWNER_ON_USER_ALLOWED");
 
@@ -465,7 +509,8 @@ public final class PolicyIdentifier<T> {
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED,
-                                            affiliatedFullUserProfileOwner = ALLOWED)))
+                                            affiliatedFullUserProfileOwner = ALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_AFFILIATED_PROFILE_OWNER_ON_USER_ALLOWED =
             new PolicyIdentifier<>("TEST_AFFILIATED_PROFILE_OWNER_ON_USER_ALLOWED");
 
@@ -488,7 +533,8 @@ public final class PolicyIdentifier<T> {
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = ALLOWED,
-                                            affiliatedFullUserProfileOwner = SAME_AS_UNAFFILIATED)))
+                                            affiliatedFullUserProfileOwner = SAME_AS_UNAFFILIATED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer>
             TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED =
                     new PolicyIdentifier<>(
@@ -514,7 +560,8 @@ public final class PolicyIdentifier<T> {
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED,
-                                            affiliatedFullUserProfileOwner = SAME_AS_UNAFFILIATED)))
+                                            affiliatedFullUserProfileOwner = SAME_AS_UNAFFILIATED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer>
             TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED_DISALLOWED =
                     new PolicyIdentifier<>(
@@ -536,7 +583,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED,
-                                            affiliatedFullUserProfileOwner = ALLOWED)))
+                                            affiliatedFullUserProfileOwner = ALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> TEST_MULTIPLE_DPC_TYPES_ALLOWED =
             new PolicyIdentifier<>("TEST_MULTIPLE_DPC_TYPES_ALLOWED");
 
@@ -582,7 +630,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @IntegerResolutionMechanism(custom = true))
     public static final PolicyIdentifier<Integer> FLAGGED_POLICY =
             new PolicyIdentifier<>("FLAGGED_POLICY");
 

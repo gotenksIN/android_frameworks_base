@@ -35,7 +35,6 @@ import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.USER_MIN_ASPECT_RATIO_UNSET;
 import static android.content.pm.PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET;
-import static android.crashrecovery.flags.Flags.refactorCrashrecovery;
 import static android.os.Process.INVALID_UID;
 import static android.os.PerfettoCategories.BIG_LOCKS_CATEGORY;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
@@ -231,7 +230,6 @@ import com.android.server.art.DexUseManagerLocal;
 import com.android.server.art.model.DeleteResult;
 import com.android.server.compat.CompatChange;
 import com.android.server.compat.PlatformCompat;
-import com.android.server.crashrecovery.CrashRecoveryAdaptor;
 import com.android.server.pm.Installer.InstallerException;
 import com.android.server.pm.Settings.VersionInfo;
 import com.android.server.pm.dex.ArtManagerService;
@@ -413,6 +411,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     static final int SCAN_AS_STOPPED_SYSTEM_APP = 1 << 27;
 
     private static final int STOP_AND_KILL_APP_TIMEOUT_MS = 15000;
+    private static final int STOP_AND_KILL_APP_SHARED_USER_TIMEOUT_MS = 3000;
 
     @IntDef(flag = true, prefix = { "SCAN_" }, value = {
             SCAN_NO_DEX,
@@ -3167,9 +3166,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     public void shutdown() {
         mDynamicCodeLogger.writeNow();
-        if (!refactorCrashrecovery()) {
-            CrashRecoveryAdaptor.packageWatchdogWriteNow(mContext);
-        }
 
         synchronized (mLock) {
             mPackageUsage.writeNow(mSettings.getPackagesLocked());
@@ -3268,7 +3264,13 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             Slog.e(TAG, "Holds PM's lock, unable kill application synchronized");
             killApplication(pkgName, appId, userId, reason, exitInfoReason);
         } else {
-            KillAppBlocker blocker = new KillAppBlocker(STOP_AND_KILL_APP_TIMEOUT_MS);
+            // We set timeout for shared-uid with running siblings to 3 seconds
+            SharedUidProcessStatus sharedUidStatus = SharedUidProcessStatus.from(snapshotComputer(),
+                    ActivityManager.getService(), appId, pkgName);
+            int timeoutMs = (sharedUidStatus != null && sharedUidStatus.siblingsRunning)
+                    ? STOP_AND_KILL_APP_SHARED_USER_TIMEOUT_MS
+                    : STOP_AND_KILL_APP_TIMEOUT_MS;
+            KillAppBlocker blocker = new KillAppBlocker(timeoutMs);
             try {
                 blocker.register();
                 /* stopAndKillApp is non-blocking. It blocks, but only until it sends stop signal
@@ -3280,10 +3282,85 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                  * to wait for the process itself to be gone to be assured of its death.
                  */
                 atmi.stopAndKillAppForUpdate(pkgName, userId, appId);
-                blocker.waitAppProcessGone(ami, snapshotComputer(), mUserManager, pkgName);
+
+                // Optimization: For shared-uid, we know if it's running or not. We can avoid
+                // waiting if it's not running and save few seconds. This is status-quo to pre-26Q2:
+                // we killed app process and moved on with update.
+                if (sharedUidStatus != null && !sharedUidStatus.targetAppRunning) {
+                    return;
+                }
+
+                if (!blocker.waitAppProcessGone(ami, snapshotComputer(), mUserManager, pkgName)) {
+                    Slog.w(TAG, "Timeout " + timeoutMs + "ms reached waiting for " + pkgName
+                            + " to be gone. Force killing now.");
+                    killApplication(pkgName, appId, userId, reason + " (force-kill)",
+                            exitInfoReason);
+                }
             } finally {
                 blocker.unregister();
             }
+        }
+    }
+
+    private static class SharedUidProcessStatus {
+        /** Whether the target package itself is currently running. */
+        final boolean targetAppRunning;
+        /** Whether any other package sharing the same UID is currently running. */
+        final boolean siblingsRunning;
+
+        private SharedUidProcessStatus(boolean targetAppRunning, boolean siblingsRunning) {
+            this.targetAppRunning = targetAppRunning;
+            this.siblingsRunning = siblingsRunning;
+        }
+
+        /**
+         * Analyzes running processes to determine the status of a shared UID.
+         *
+         * @return A status object, or {@code null} if the UID is not a shared UID.
+         */
+        @Nullable
+        static SharedUidProcessStatus from(Computer snapshot, IActivityManager am,
+                @AppIdInt int appId, String pkgName) {
+
+            // Check if this app is using shared-userId or not
+            Pair<PackageStateInternal, SharedUserApi> sharedUser =
+                    snapshot.getPackageOrSharedUser(appId);
+            if (sharedUser == null || sharedUser.second == null) {
+                return null;
+            }
+
+            boolean targetAppRunning = false;
+            boolean siblingsRunning = false;
+
+            try {
+                List<ActivityManager.RunningAppProcessInfo> runningProcesses =
+                        am.getRunningAppProcesses();
+                if (runningProcesses != null) {
+                    final int size = runningProcesses.size();
+                    for (int i = 0; i < size; i++) {
+                        ActivityManager.RunningAppProcessInfo info = runningProcesses.get(i);
+                        if (UserHandle.getAppId(info.uid) == appId && info.pkgList != null) {
+                            for (String runningPkg : info.pkgList) {
+                                if (pkgName.equals(runningPkg)) {
+                                    targetAppRunning = true;
+                                } else {
+                                    siblingsRunning = true;
+                                }
+
+                                if (targetAppRunning && siblingsRunning) {
+                                    return new SharedUidProcessStatus(true, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Failed to get running processes", e);
+                // Return "worst case" (assume running) to be safe on error
+                return new SharedUidProcessStatus(true, true);
+            }
+
+            return new SharedUidProcessStatus(targetAppRunning, siblingsRunning);
         }
     }
 
@@ -5010,6 +5087,31 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         userId);
     }
 
+    private int getAppUidForPrivateComputeCoreUidInternal(int pccUid) {
+        final int callerUid = Binder.getCallingUid();
+        if (!Process.isPrivateComputeCoreUid(pccUid)) {
+            return Process.INVALID_UID;
+        }
+
+        final int userId = UserHandle.getUserId(pccUid);
+        final PackageSetting setting;
+        synchronized (mLock) {
+            setting = (PackageSetting) mSettings.getPccSettingLPr(
+                    UserHandle.getAppId(pccUid));
+        }
+        if (setting == null) {
+            Slog.w(TAG, "No application found for PCC UID " + pccUid);
+            return Process.INVALID_UID;
+        }
+        final Computer snapshot = snapshotComputer();
+        final PackageStateInternal ps = snapshot.getPackageStateForInstalledAndFiltered(
+                setting.getPackageName(), callerUid, userId);
+        if (ps == null) {
+            return Process.INVALID_UID;
+        }
+        return UserHandle.getUid(userId, setting.getAppId());
+    }
+
     public class IPackageManagerImpl extends IPackageManagerBase {
 
         public IPackageManagerImpl() {
@@ -5708,7 +5810,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId);
+            // Public API implementation, pass in the calling uid
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId,
+                    Binder.getCallingUid());
         }
 
         @Override
@@ -6983,28 +7087,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
         @Override
         public int getAppUidForPrivateComputeCoreUid(int pccUid) {
-            final int callerUid = Binder.getCallingUid();
-            if (!Process.isPrivateComputeCoreUid(pccUid)) {
-                return Process.INVALID_UID;
-            }
-
-            final int userId = UserHandle.getUserId(pccUid);
-            final PackageSetting setting;
-            synchronized (mLock) {
-                setting = (PackageSetting) mSettings.getPccSettingLPr(
-                        UserHandle.getAppId(pccUid));
-            }
-            if (setting == null) {
-                Slog.w(TAG, "No application found for PCC UID " + pccUid);
-                return Process.INVALID_UID;
-            }
-            final Computer snapshot = snapshotComputer();
-            final PackageStateInternal ps = snapshot.getPackageStateForInstalledAndFiltered(
-                    setting.getPackageName(), callerUid, userId);
-            if (ps == null) {
-                return Process.INVALID_UID;
-            }
-            return UserHandle.getUid(userId, setting.getAppId());
+            return getAppUidForPrivateComputeCoreUidInternal(pccUid);
         }
 
         @Override
@@ -7104,6 +7187,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         @Override
         protected ResolveIntentHelper getResolveIntentHelper() {
             return mResolveIntentHelper;
+        }
+
+        @Override
+        public int getAppUidForPrivateComputeCoreUid(int pccUid) {
+            return getAppUidForPrivateComputeCoreUidInternal(pccUid);
         }
 
         @NonNull
@@ -7670,7 +7758,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
+            // Use Process.myUid here because this is the PackageManagerInternal implementation, it
+            // isn't called outside of system_server
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId,
+                    Process.myUid());
         }
 
         @Override

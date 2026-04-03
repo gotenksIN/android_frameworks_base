@@ -80,6 +80,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.IIntentReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.FeatureInfo;
 import android.content.pm.IPackageManager;
@@ -88,6 +89,8 @@ import android.content.pm.ParceledListSlice;
 import android.content.pm.ResolveInfo;
 import android.content.pm.SharedLibraryInfo;
 import android.content.pm.UserInfo;
+import android.content.pm.verify.domain.DomainVerificationInfo;
+import android.content.pm.verify.domain.DomainVerificationManager;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -233,6 +236,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
     private BroadcastOptions mBroadcastOptions;
     private boolean mShowSplashScreen;
     private boolean mDismissKeyguardIfInsecure;
+    private boolean mDebugLink;
 
     final boolean mDumping;
 
@@ -627,6 +631,8 @@ final class ActivityManagerShellCommand extends ShellCommand {
             public boolean handleOption(String opt, ShellCommand cmd) {
                 if (opt.equals("-D")) {
                     mStartFlags |= ActivityManager.START_FLAG_DEBUG;
+                } else if (opt.equals("--debug-link")) {
+                    mDebugLink = true;
                 } else if (opt.equals("--suspend")) {
                     mStartFlags |= ActivityManager.START_FLAG_DEBUG_SUSPEND;
                 } else if (opt.equals("-N")) {
@@ -769,6 +775,12 @@ final class ActivityManagerShellCommand extends ShellCommand {
         }
 
         final String mimeType = intent.resolveType(mInternal.mContext);
+
+        if (mDebugLink && isWebUri(intent)) {
+            pw.println("--- App Link Resolution Debug ---\n");
+            printAppLinkDebugInfo(pw, intent, mimeType);
+            pw.println("---------------------------------\n");
+        }
 
         do {
             if (mStopOption) {
@@ -985,6 +997,146 @@ final class ActivityManagerShellCommand extends ShellCommand {
             }
         } while (mRepeat > 0);
         return 0;
+    }
+
+    private boolean isWebUri(Intent intent) {
+        return (intent != null)
+                && ("http".equalsIgnoreCase(intent.getScheme())
+                    || "https".equalsIgnoreCase(intent.getScheme()));
+    }
+
+    private void printAppLinkDebugInfo(PrintWriter pw, Intent intent, String mimeType) {
+        pw.println("URI: " + intent.getDataString());
+
+        int userIdForQuery = mInternal.mUserController.handleIncomingUser(
+                Binder.getCallingPid(), Binder.getCallingUid(), mUserId, false,
+                ALLOW_NON_FULL, "ActivityManagerShellCommand", null);
+
+        try {
+            ResolveInfo resolveInfo =
+                    mPm.resolveIntent(
+                            intent, mimeType, PackageManager.GET_RESOLVED_FILTER, userIdForQuery);
+            List<ResolveInfo> candidates =
+                    mPm.queryIntentActivities(
+                            intent, mimeType, PackageManager.GET_RESOLVED_FILTER, userIdForQuery)
+                        .getList();
+
+            if (candidates == null || candidates.isEmpty()) {
+                pw.println("Resolution: Failed to resolve to any component.");
+                pw.println("\nReasons for Non-Resolution:");
+                pw.println("  No app found with a matching intent filter.");
+                return;
+            }
+
+            boolean isResolver = resolveInfo != null
+                    && "android".equals(resolveInfo.activityInfo.packageName)
+                    && getResolverActivityName().equals(resolveInfo.activityInfo.name);
+
+            if (isResolver) {
+                pw.println("Resolution: Ambiguous (Multiple apps or Browser fallback)");
+                pw.println("This usually happens when multiple apps can handle the link and no "
+                        + "default is set.");
+            } else if (resolveInfo != null) {
+                pw.println("Resolution: Resolved to " + resolveInfo.activityInfo.packageName
+                        + "/" + resolveInfo.activityInfo.name);
+            }
+
+            pw.println("\nAll Matching Candidates:");
+            for (ResolveInfo candidate : candidates) {
+                printResolveInfoDetail(pw, candidate, intent, userIdForQuery);
+            }
+        } catch (RemoteException e) {
+            pw.println("Error resolving intent: " + e);
+        }
+        pw.println("");
+    }
+
+    private void printResolveInfoDetail(
+            PrintWriter pw, ResolveInfo resolveInfo, Intent intent, int userId) {
+        pw.println("\nTarget:");
+        pw.println("  Package: " + resolveInfo.activityInfo.packageName);
+        pw.println("  Activity: " + resolveInfo.activityInfo.name);
+
+        IntentFilter filter = resolveInfo.filter;
+        if (filter == null) {
+            return;
+        }
+
+        filter.printIntentFilterMatchDetails(pw, intent);
+
+        if (filter.getAutoVerify()) {
+            printAppLinkVerification(
+                    pw, resolveInfo.activityInfo.packageName, intent.getData(), userId);
+        }
+    }
+
+    private void printAppLinkVerification(
+            PrintWriter pw, String packageName, android.net.Uri data, int userId) {
+        pw.println("\nApp Link Verification:");
+        DomainVerificationManager dvm =
+                mInternal.mContext.getSystemService(DomainVerificationManager.class);
+        if (dvm == null) {
+            pw.println("  Error: DomainVerificationManager not available.");
+            return;
+        }
+
+        try {
+            DomainVerificationInfo info = dvm.getDomainVerificationInfo(packageName);
+            if (info == null) {
+                pw.println("  Status: No domain verification info found for package.");
+                return;
+            }
+
+            String host = data.getHost();
+            if (host == null) return;
+
+            Integer state = info.getHostToStateMap().get(host);
+            if (state == null) {
+                pw.println("  Status: Domain '" + host + "' not declared in autoVerify.");
+                return;
+            }
+
+            pw.println("  Verification status: " + DomainVerificationInfo.stateToString(state));
+
+            if (state != DomainVerificationInfo.STATE_SUCCESS) {
+                return;
+            }
+
+            try {
+                List<android.content.UriRelativeFilterGroup> groups =
+                        dvm.getUriRelativeFilterGroups(packageName, java.util.Arrays.asList(host))
+                                .get(host);
+                if (groups == null || groups.isEmpty()) {
+                    pw.println("  Dynamic App Links: None stored for this domain.");
+                    return;
+                }
+
+                pw.println("  Dynamic App Links:");
+                for (int i = 0; i < groups.size(); i++) {
+                    android.content.UriRelativeFilterGroup group = groups.get(i);
+                    if (!group.matchData(data)) {
+                        pw.println("    -> Did not match rule " + i + ": " + group.toString());
+                    } else {
+                        pw.println("    -> Matched Rule " + i + ": " + group.toString());
+                    }
+                }
+            } catch (Exception groupEx) {
+                pw.println("  Error retrieving dynamic rules: " + groupEx);
+            }
+
+        } catch (Exception e) {
+            pw.println("  Error retrieving verification info: " + e);
+        }
+    }
+
+    private String getResolverActivityName() {
+        final int resId = Resources.getSystem().getIdentifier(
+                "config_customResolverActivity", "string", "android");
+        String customResolverActivity = mInternal.mContext.getString(resId);
+        if (TextUtils.isEmpty(customResolverActivity)) {
+            return com.android.internal.app.ResolverActivity.class.getName();
+        }
+        return customResolverActivity;
     }
 
     int runStartService(PrintWriter pw, boolean asForeground) throws RemoteException {
@@ -1447,10 +1599,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
                 managed = false;
                 mallocInfo = true;
             } else if (opt.equals("-b")) {
-                dumpBitmaps = getNextArg();
-                if (dumpBitmaps == null) {
-                    dumpBitmaps = "png"; // default to PNG in dumping bitmaps
-                }
+                dumpBitmaps = getNextArgRequired();
             } else {
                 err.println("Error: Unknown option: " + opt);
                 return -1;

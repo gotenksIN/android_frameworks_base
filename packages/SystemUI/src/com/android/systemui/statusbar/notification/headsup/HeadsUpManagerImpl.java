@@ -292,8 +292,20 @@ public class HeadsUpManagerImpl
     }
 
     @Override
+    public boolean hasMismatchedEntry(@NonNull NotificationEntry notifEntry) {
+        final NotificationEntry existing = getEntry(notifEntry.getKey());
+        // NotificationEntry does not override equals() or hashCode()
+        // so this check defaults to memory address comparison
+        return existing != null && existing != notifEntry;
+    }
+
+    @Override
     public void showNotification(
             @NonNull NotificationEntry entry, boolean isFromUserOpenAction) {
+        if (hasMismatchedEntry(entry)) {
+            mLogger.logNotifEntryMismatch("showNotification", entry);
+        }
+
         HeadsUpEntry headsUpEntry = createHeadsUpEntry(entry);
 
         mLogger.logShowNotificationRequest(entry, isFromUserOpenAction);
@@ -778,8 +790,9 @@ public class HeadsUpManagerImpl
     @Nullable
     @VisibleForTesting
     HeadsUpEntry getHeadsUpEntry(@NonNull String key) {
-        if (mHeadsUpEntryMap.containsKey(key)) {
-            return mHeadsUpEntryMap.get(key);
+        HeadsUpEntry headsUpEntry = mHeadsUpEntryMap.get(key);
+        if (headsUpEntry != null) {
+            return headsUpEntry;
         }
         return mAvalancheController.getWaitingEntry(key);
     }

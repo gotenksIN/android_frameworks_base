@@ -26,6 +26,7 @@ import com.android.settingslib.catalyst.flags.Flags
 import com.android.settingslib.ipc.ApiPermissionChecker
 import com.android.settingslib.metadata.PersistentPreference
 import com.android.settingslib.metadata.PreferenceMetadata
+import com.android.settingslib.metadata.PreferenceScreenMetadata
 import com.android.settingslib.metadata.PreferenceScreenRegistry
 import com.android.settingslib.testutils.GraphTestUtils.PersistentPreferenceConfig
 import com.android.settingslib.testutils.GraphTestUtils.PreferenceConfig
@@ -48,6 +49,8 @@ import org.mockito.kotlin.spy
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.shadows.ShadowBuild
 import com.android.settingslib.robotests.R
+import com.android.settingslib.testutils.GraphTestUtils
+import com.android.settingslib.testutils.GraphTestUtils.createMagicScreen
 
 @RunWith(RobolectricTestRunner::class)
 @EnableFlags(Flags.FLAG_CATALYST_USE_KEY_PARAMETERS)
@@ -71,7 +74,7 @@ class PreferenceSetterApiHandlerTest {
         ApiPermissionChecker.alwaysAllow()
     )
 
-    private fun invokeWithRequest(screenKey: String, preferenceKey: String, value: Any): Int =
+    private fun invokeWithRequest(screenKey: String, preferenceKey: String, value: Any): PreferenceSetterResponse =
         runBlocking {
             val valueProto = when (value) {
                 is Boolean -> preferenceValueProto {
@@ -110,11 +113,6 @@ class PreferenceSetterApiHandlerTest {
         setRegistryFactories()
         PreferenceScreenRegistry.defaultWritePermit = ReadWritePermit.DISALLOW
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
-        Settings.Global.putInt(
-            context.contentResolver,
-            "com.android.settings.UNKNOWN_SENSITIVITY_IS_AVAILABLE",
-            0
-        )
     }
 
     @After
@@ -141,7 +139,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("inexistent_screen", "preference_key", true)
+            invokeWithRequest("inexistent_screen", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
     }
 
@@ -164,7 +162,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "inexistent_preference", true)
+            invokeWithRequest("screen_key", "inexistent_preference", true).errorCode
         ).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
     }
 
@@ -187,7 +185,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
     }
 
@@ -214,7 +212,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.DISABLED)
         assertThat(getPreferenceValue<Boolean>(disabledPreference)).isEqualTo(false)
     }
@@ -241,7 +239,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.RESTRICTED)
         assertThat(getPreferenceValue<Boolean>(restrictedPreference)).isEqualTo(false)
     }
@@ -267,7 +265,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.UNAVAILABLE)
         assertThat(getPreferenceValue<Boolean>(unavailablePreference)).isEqualTo(false)
     }
@@ -294,7 +292,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.INVALID_REQUEST)
         assertThat(getPreferenceValue<Int>(intPreference)).isEqualTo(3)
     }
@@ -322,13 +320,13 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.DISALLOW)
         assertThat(getPreferenceValue<Boolean>(highSensitivityPreference)).isEqualTo(false)
     }
 
     @Test
-    fun invoke_onUnknownSensitivityPreferenceAndNotDebuggable_returnsDisallow() {
+    fun invoke_onDoNotExposeSensitivityPreferenceAndNotDebuggable_returnsNotFound() {
         // makes build non-debuggable
         ShadowBuild.setType("user")
         val unknownSensitivityPreference = createPersistentPreference<Boolean>(
@@ -352,44 +350,9 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
-        ).isEqualTo(PreferenceSetterResult.DISALLOW)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
+        ).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
         assertThat(getPreferenceValue<Boolean>(unknownSensitivityPreference)).isEqualTo(false)
-    }
-
-    @Test
-    fun invoke_onUnknownSensitivityPreferenceAndDebuggable_succeeds() {
-        // makes build debuggable
-        ShadowBuild.setType("userdebug")
-        Settings.Global.putInt(
-            context.contentResolver,
-            "com.android.settings.UNKNOWN_SENSITIVITY_IS_AVAILABLE",
-            1
-        )
-        val unknownSensitivityPreference = createPersistentPreference<Boolean>(
-            PersistentPreferenceConfig(
-                preferenceConfig = PreferenceConfig(
-                    key = "preference_key",
-                    purpose = R.string.preference_purpose,
-                    sensitivityLevel = SensitivityLevel.DO_NOT_EXPOSE
-                ),
-                valueType = Boolean::class.javaObjectType,
-                defaultValue = false,
-            )
-        )
-        setRegistryFactories(
-            createScreen(
-                PreferenceScreenConfig(
-                    screenKey = "screen_key",
-                    purpose = R.string.preference_screen_purpose,
-                    preferences = listOf(unknownSensitivityPreference)
-                )
-            )
-        )
-        assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
-        ).isEqualTo(PreferenceSetterResult.OK)
-        assertThat(getPreferenceValue<Boolean>(unknownSensitivityPreference)).isEqualTo(true)
     }
 
     @Test
@@ -416,7 +379,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, false)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.REQUIRE_APP_PERMISSION)
         assertThat(getPreferenceValue<Boolean>(preference)).isEqualTo(false)
     }
@@ -446,7 +409,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.REQUIRE_USER_AGREEMENT)
         assertThat(getPreferenceValue<Boolean>(preference)).isEqualTo(false)
     }
@@ -475,7 +438,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.REQUIRE_USER_AGREEMENT)
         assertThat(getPreferenceValue<Boolean>(preference)).isEqualTo(false)
     }
@@ -505,7 +468,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.REQUIRE_USER_AGREEMENT)
         assertThat(getPreferenceValue<Boolean>(preference)).isEqualTo(false)
     }
@@ -536,7 +499,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", true)
+            invokeWithRequest("screen_key", "preference_key", true).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Boolean>(preference)).isEqualTo(true)
     }
@@ -567,7 +530,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", false)
+            invokeWithRequest("screen_key", "preference_key", false).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Boolean>(preference)).isEqualTo(false)
     }
@@ -598,7 +561,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 8)
+            invokeWithRequest("screen_key", "preference_key", 8).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Int>(intPreference)).isEqualTo(8)
     }
@@ -629,7 +592,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", "hey")
+            invokeWithRequest("screen_key", "preference_key", "hey").errorCode
         ).isEqualTo(PreferenceSetterResult.INVALID_REQUEST)
         assertThat(getPreferenceValue<Int>(intPreference)).isEqualTo(4)
     }
@@ -661,7 +624,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 2.3f)
+            invokeWithRequest("screen_key", "preference_key", 2.3f).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Float>(stringPreference)).isWithin(0.001f).of(2.3f)
     }
@@ -685,7 +648,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 10)
+            invokeWithRequest("screen_key", "preference_key", 10).errorCode
         ).isEqualTo(PreferenceSetterResult.INVALID_REQUEST)
         assertThat(getPreferenceValue<Int>(intRangePreference)).isEqualTo(4)
     }
@@ -709,7 +672,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 2)
+            invokeWithRequest("screen_key", "preference_key", 2).errorCode
         ).isEqualTo(PreferenceSetterResult.INVALID_REQUEST)
         assertThat(getPreferenceValue<Int>(intRangePreference)).isEqualTo(4)
     }
@@ -733,7 +696,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 5)
+            invokeWithRequest("screen_key", "preference_key", 5).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Int>(intRangePreference)).isEqualTo(5)
     }
@@ -764,7 +727,7 @@ class PreferenceSetterApiHandlerTest {
             )
         )
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 2.3f)
+            invokeWithRequest("screen_key", "preference_key", 2.3f).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Float>(floatPreference)).isWithin(0.001f).of(2.3f)
     }
@@ -795,7 +758,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", "there")
+            invokeWithRequest("screen_key", "preference_key", "there").errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<String>(stringPreference)).isEqualTo("there")
     }
@@ -826,7 +789,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", "there")
+            invokeWithRequest("screen_key", "preference_key", "there").errorCode
         ).isEqualTo(PreferenceSetterResult.REQUIRE_USER_AGREEMENT)
 
         assertThat(getPreferenceValue<String>(stringPreference)).isEqualTo("hello")
@@ -859,7 +822,7 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", 67)
+            invokeWithRequest("screen_key", "preference_key", 67).errorCode
         ).isEqualTo(PreferenceSetterResult.OK)
         assertThat(getPreferenceValue<Int>(stringPreference)).isEqualTo(67)
     }
@@ -892,8 +855,403 @@ class PreferenceSetterApiHandlerTest {
         )
         makePermissionPass(application, INTERACT_ACROSS_PROFILES, true)
         assertThat(
-            invokeWithRequest("screen_key", "preference_key", "there")
+            invokeWithRequest("screen_key", "preference_key", "there").errorCode
         ).isEqualTo(PreferenceSetterResult.INTERNAL_ERROR)
         assertThat(getPreferenceValue<String>(stringPreference)).isEqualTo("hello")
     }
+
+    fun invoke_onScreenWithScreenKeyPreference_returnsUnavailable() {
+        setRegistryFactories(
+            createMagicScreen<Boolean>(
+                PersistentPreferenceConfig(
+                    PreferenceConfig(
+                        key = "magic_screen_key",
+                        purpose = R.string.preference_purpose,
+                        sensitivityLevel = SensitivityLevel.NO_SENSITIVITY
+                    ),
+                    readPermission = null,
+                    writePermission = null,
+                    defaultValue = true
+                ),
+                preferences = listOf()
+            )
+        )
+
+        val response = invokeWithRequest("magic_screen_key", "magic_screen_key", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.UNAVAILABLE)
+    }
+
+    fun invoke_onScreenWithDoNotExposePreference_returnsUnavailable() {
+        setRegistryFactories(
+            createScreen(
+                PreferenceScreenConfig(
+                    screenKey = "screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = PersistentPreferenceConfig(
+                            PreferenceConfig(
+                                key = "dne_preference",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.DO_NOT_EXPOSE
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        )
+                    ))
+                )
+            )
+        )
+
+        val response = invokeWithRequest("screen_key", "dne_preference", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.UNAVAILABLE)
+    }
+
+    @Test
+    fun invoke_onPreferenceWithNoSensitivityPreference_succeeds(){
+        var noSensPref : PreferenceMetadata? = null
+        setRegistryFactories(
+            createScreen(
+               PreferenceScreenConfig(
+                    screenKey = "screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = PersistentPreferenceConfig(
+                            PreferenceConfig(
+                                key = "no_sensitivity_pref",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.NO_SENSITIVITY
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        ),
+                    ).also{
+                        noSensPref = it
+                    })
+                )
+            )
+        )
+
+        val response = invokeWithRequest("screen_key", "no_sensitivity_pref", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.OK)
+        assertThat(getPreferenceValue<Boolean>(noSensPref!!)).isEqualTo(false)
+
+    }
+
+    @Test
+    fun invoke_onPreferenceWithMustProvideUndoSensitivity_succeeds(){
+        var mpuPref : PreferenceMetadata? = null
+        setRegistryFactories(
+            createScreen(
+                PreferenceScreenConfig(
+                    screenKey = "screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = PersistentPreferenceConfig(
+                            PreferenceConfig(
+                                key = "must_provide_undo_pref",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.MUST_PROVIDE_UNDO
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        ),
+                    ).also{
+                        mpuPref = it
+                    })
+                )
+            )
+        )
+
+        val response = invokeWithRequest("screen_key", "must_provide_undo_pref", false).errorCode
+        assertThat(response).isEqualTo(PreferenceSetterResult.OK)
+        assertThat(getPreferenceValue<Boolean>(mpuPref!!)).isEqualTo(false)
+    }
+
+    @Test
+    fun invoke_onScreenWithRequiresConfirmationSensitivity_returnsDisallow(){
+        setRegistryFactories(
+            createScreen(
+                GraphTestUtils.PreferenceScreenConfig(
+                    screenKey = "screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = GraphTestUtils.PersistentPreferenceConfig(
+                            GraphTestUtils.PreferenceConfig(
+                                key = "requires_confirmation_pref",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.REQUIRES_CONFIRMATION
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        ),
+                    ))
+                )
+            )
+        )
+
+        val response = invokeWithRequest("screen_key", "requires_confirmation_pref", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.DISALLOW)
+    }
+
+    @Test
+    fun invoke_onScreenWithDeeplinkOnlySensitivity_returnsDisallow(){
+        setRegistryFactories(
+            createScreen(
+                PreferenceScreenConfig(
+                    screenKey = "screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = PersistentPreferenceConfig(
+                            PreferenceConfig(
+                                key = "deeplink_only_pref",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.DEEP_LINK_ONLY
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        ),
+                    ))
+                )
+            )
+        )
+
+        val response = invokeWithRequest("screen_key", "deeplink_only_pref", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.DISALLOW)
+    }
+
+    @Test
+    fun invoke_onScreenWithUiOnlyPreference_returnsUnsupported(){
+        setRegistryFactories(
+            createScreen(
+                GraphTestUtils.PreferenceScreenConfig(
+                    screenKey = "screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = PersistentPreferenceConfig(
+                            PreferenceConfig(
+                                key = "ui_only_pref",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.NO_SENSITIVITY,
+                                isUiOnly = true
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        ),
+                    ))
+                )
+            )
+        )
+        val response = invokeWithRequest("screen_key", "ui_only_pref", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
+    }
+
+    @Test
+    fun invoke_onScreenWithInnerScreenPreference_returnsUnsupported() {
+        val innerScreen = createMagicScreen<Boolean>(
+            PersistentPreferenceConfig(
+                PreferenceConfig(
+                    key = "inner_screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY
+                ),
+                readPermission = null,
+                writePermission = null,
+                defaultValue = true
+            ),
+            preferences = listOf()
+        )
+        setRegistryFactories(
+            innerScreen,
+            createScreen(
+                PreferenceScreenConfig(
+                    screenKey = "outer_screen_key",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(innerScreen)
+                )
+            )
+        )
+
+        val response = invokeWithRequest("outer_screen_key", "inner_screen_key", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
+    }
+
+    @Test
+    fun invoke_onDoNotExposeScreen_returnsNotFound() {
+        setRegistryFactories(
+            createScreen(
+                PreferenceScreenConfig(
+                    screenKey = "dne_screen",
+                    purpose = R.string.preference_screen_purpose,
+                    preferences = listOf(createPersistentPreference<Boolean>(
+                        persistentPreferenceConfig = GraphTestUtils.PersistentPreferenceConfig(
+                            PreferenceConfig(
+                                key = "no_sensitivity_pref",
+                                purpose = R.string.preference_purpose,
+                                sensitivityLevel = SensitivityLevel.NO_SENSITIVITY
+                            ),
+                            readPermission = null,
+                            writePermission = null,
+                            defaultValue = true
+                        ),
+                    )),
+                    sensitivityLevel = SensitivityLevel.DO_NOT_EXPOSE
+                )
+            )
+        )
+
+        val response = invokeWithRequest("dne_screen", "no_sensitivity_pref", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
+    }
+
+    @Test
+    fun invoke_onNoSensitivityLevelInCategory_returnsValue() {
+        setRegistryFactories(
+            createScreen(
+                PreferenceScreenConfig(
+                    screenKey = "pref_screen",
+                    purpose = R.string.preference_screen_purpose,
+                    preferencesInCategories = listOf(GraphTestUtils.PreferenceCategoryConfig(
+                        key = "preference_category",
+                        preferences = listOf(createPersistentPreference<Boolean>(
+                            persistentPreferenceConfig = PersistentPreferenceConfig(
+                                PreferenceConfig(
+                                    key = "no_sensitivity_pref",
+                                    purpose = R.string.preference_purpose,
+                                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY
+                                ),
+                                readPermission = null,
+                                writePermission = null,
+                                defaultValue = true
+                            ),
+                        ))
+                    )),
+                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY
+                )
+            )
+        )
+
+        val response = invokeWithRequest("pref_screen", "no_sensitivity_pref", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.OK)
+    }
+
+
+    @Test
+    fun invoke_onMagicScreenWithNoSensPreference_succeeds() {
+        val noSensPreference = createPersistentPreference<Boolean>(
+            persistentPreferenceConfig = PersistentPreferenceConfig(
+                PreferenceConfig(
+                    key = "preference_key",
+                    purpose = R.string.preference_purpose,
+                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY,
+                ),
+                readPermission = null,
+                writePermission = null,
+                defaultValue = true
+            ),
+        )
+        val magicScreen = createMagicScreen<Boolean>(
+            persistentPreferenceConfig = PersistentPreferenceConfig(
+                PreferenceConfig(
+                    key = "magic_screen_key",
+                    purpose = R.string.preference_purpose,
+                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY,
+                ),
+                readPermission = null,
+                writePermission = null,
+                defaultValue = true
+            ),
+            preferences = listOf(noSensPreference)
+        )
+        setRegistryFactories(magicScreen)
+
+        val response = invokeWithRequest("magic_screen_key", "preference_key", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.OK)
+        assertThat(getPreferenceValue<Boolean>(noSensPreference)).isEqualTo(false)
+    }
+
+    @Test
+    fun invoke_onNestedScreens_callOnInnerPreferenceFromOuterScreen_returnsUnsupported() {
+        val innerPreference = createPersistentPreference<Boolean>(
+            persistentPreferenceConfig = PersistentPreferenceConfig(
+                PreferenceConfig(
+                    key = "inner_preference",
+                    purpose = R.string.preference_purpose,
+                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY,
+                ),
+                readPermission = null,
+                writePermission = null,
+                defaultValue = true
+            ),
+        )
+        val innerScreen = createScreen(PreferenceScreenConfig(
+                screenKey = "inner_screen",
+                purpose = R.string.preference_screen_purpose,
+                preferences = listOf(innerPreference)
+            )
+        )
+        setRegistryFactories(
+            innerScreen,
+            createScreen(PreferenceScreenConfig(
+                screenKey = "outer_screen",
+                purpose = R.string.preference_screen_purpose,
+                preferences = listOf(innerScreen)
+            ))
+        )
+
+        val response = invokeWithRequest("outer_screen", "inner_preference", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.UNSUPPORTED)
+    }
+
+    @Test
+    fun invoke_onNestedScreens_callOnInnerPreferenceFromInnerScreen_succeeds() {
+        val innerPreference = createPersistentPreference<Boolean>(
+            persistentPreferenceConfig = PersistentPreferenceConfig(
+                PreferenceConfig(
+                    key = "inner_preference",
+                    purpose = R.string.preference_purpose,
+                    sensitivityLevel = SensitivityLevel.NO_SENSITIVITY,
+                ),
+                readPermission = null,
+                writePermission = null,
+                defaultValue = true
+            ),
+        )
+        val innerScreen = createScreen(PreferenceScreenConfig(
+            screenKey = "inner_screen",
+            purpose = R.string.preference_screen_purpose,
+            preferences = listOf(innerPreference)
+        )
+        )
+        setRegistryFactories(
+            innerScreen,
+            createScreen(PreferenceScreenConfig(
+                screenKey = "outer_screen",
+                purpose = R.string.preference_screen_purpose,
+                preferences = listOf(innerScreen)
+            ))
+        )
+
+        val response = invokeWithRequest("inner_screen", "inner_preference", false).errorCode
+
+        assertThat(response).isEqualTo(PreferenceSetterResult.OK)
+        assertThat(getPreferenceValue<Boolean>(innerPreference)).isEqualTo(false)
+    }
+
 }

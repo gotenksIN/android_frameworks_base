@@ -62,11 +62,6 @@
     <!-- The touchable/draggable edge size for PIP resize. -->
     <dimen name="pip_resize_edge_size">48dp</dimen>
 
-    <!-- PIP Resize handle size, margin and padding. -->
-    <dimen name="pip_resize_handle_size">12dp</dimen>
-    <dimen name="pip_resize_handle_margin">4dp</dimen>
-    <dimen name="pip_resize_handle_padding">0dp</dimen>
-
     <!-- PIP stash offset size, which is the width of visible PIP region when stashed. -->
     <dimen name="pip_stash_offset">32dp</dimen>
 
@@ -518,7 +513,7 @@
     <dimen name="desktop_mode_pinned_header_button_corner_radius">16dp</dimen>
 
     <!-- Inset for button ripples -->
-    <dimen name="desktop_mode_pinned_header_button_inset">4dp</dimen>
+    <dimen name="desktop_mode_pinned_header_button_inset">8dp</dimen>
 
     <!-- The default minimum allowed window width when resizing a window in desktop mode. -->
     <dimen name="desktop_mode_minimum_window_width">386dp</dimen>

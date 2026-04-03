@@ -2114,12 +2114,9 @@
     <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>（<xliff:g id="METRIC_UNIT">%2$s</xliff:g>）"</string>
     <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>（<xliff:g id="METRIC_UNIT">%2$s</xliff:g>）："</string>
     <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>："</string>
-    <!-- no translation found for notification_history_metric_subtext (7408216222655116821) -->
-    <skip />
-    <!-- no translation found for notification_metric_running_timer (1096459900744921213) -->
-    <skip />
-    <!-- no translation found for notification_metric_running_stopwatch (8039546029949295377) -->
-    <skip />
+    <string name="notification_history_metric_subtext" msgid="7408216222655116821">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>：<xliff:g id="METRIC_VALUE">%2$s</xliff:g>"</string>
+    <string name="notification_metric_running_timer" msgid="1096459900744921213">"定时器正在计时"</string>
+    <string name="notification_metric_running_stopwatch" msgid="8039546029949295377">"秒表正在计时"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"接听"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"视频通话"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"拒接"</string>
@@ -2205,9 +2202,9 @@
     <string name="app_streaming_blocked_message" product="tv" msgid="4003011766528814377">"目前无法在您的<xliff:g id="DEVICE">%1$s</xliff:g>上访问此内容。您可以尝试在 Android TV 设备上访问。"</string>
     <string name="app_streaming_blocked_message" product="tablet" msgid="4242053045964946062">"目前无法在您的<xliff:g id="DEVICE">%1$s</xliff:g>上访问此内容。您可以尝试在平板电脑上访问。"</string>
     <string name="app_streaming_blocked_message" product="default" msgid="6159168735030739398">"目前无法在您的<xliff:g id="DEVICE">%1$s</xliff:g>上访问此内容。您可以尝试在手机上访问。"</string>
-    <string name="app_streaming_blocked_message_for_permission_request" product="tv" msgid="4706276040125072077">"此应用请求获得额外的权限，但在流式传输会话期间无法授予权限。请先在 Android TV 设备上授予相应权限。"</string>
-    <string name="app_streaming_blocked_message_for_permission_request" product="tablet" msgid="1824604581465771629">"此应用请求获得额外的权限，但在流式传输会话期间无法授予权限。请先在平板电脑上授予相应权限。"</string>
-    <string name="app_streaming_blocked_message_for_permission_request" product="default" msgid="7755223160363292105">"此应用请求获得额外的权限，但在流式传输会话期间无法授予权限。请先在手机上授予相应权限。"</string>
+    <string name="app_streaming_blocked_message_for_permission_request" product="tv" msgid="4706276040125072077">"此应用请求获得额外的权限，但在串流会话期间无法授予权限。请先在 Android TV 设备上授予相应权限。"</string>
+    <string name="app_streaming_blocked_message_for_permission_request" product="tablet" msgid="1824604581465771629">"此应用请求获得额外的权限，但在串流会话期间无法授予权限。请先在平板电脑上授予相应权限。"</string>
+    <string name="app_streaming_blocked_message_for_permission_request" product="default" msgid="7755223160363292105">"此应用请求获得额外的权限，但在串流会话期间无法授予权限。请先在手机上授予相应权限。"</string>
     <string name="app_streaming_blocked_message_for_fingerprint_dialog" product="tv" msgid="3470977315395784567">"此应用要求进行额外的安全性验证，您可以尝试在 Android TV 设备上访问。"</string>
     <string name="app_streaming_blocked_message_for_fingerprint_dialog" product="tablet" msgid="698460091901465092">"此应用要求进行额外的安全性验证，您可以尝试在平板电脑上访问。"</string>
     <string name="app_streaming_blocked_message_for_fingerprint_dialog" product="default" msgid="8552691971910603907">"此应用要求进行额外的安全性验证，您可以尝试在手机上访问。"</string>
@@ -2709,9 +2706,13 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"长按电源按钮即可将电视关机"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"系统资源提醒"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"资源过度使用"</string>
-    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"应用“<xliff:g id="APP_NAME">%1$s</xliff:g>”使用的资源过多。"</string>
+    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"应用“<xliff:g id="APP_NAME">%1$s</xliff:g>”因资源使用量过大而被停用。您可以在“设置”中的“应用”菜单中重新启用它。"</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"家长进行的更新"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"“<xliff:g id="APP_NAME">%1$s</xliff:g>”现已移除"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"“<xliff:g id="APP_NAME">%1$s</xliff:g>”现已可用"</string>
     <string name="media_route_chooser_share_cast_others" msgid="8797886650999355673">"投放到其他设备"</string>
+    <!-- no translation found for activity_embedding_divider_drag_handle_description (4922243158119077780) -->
+    <skip />
+    <!-- no translation found for brightness_unable_adjust_msg (739363986705194491) -->
+    <skip />
 </resources>

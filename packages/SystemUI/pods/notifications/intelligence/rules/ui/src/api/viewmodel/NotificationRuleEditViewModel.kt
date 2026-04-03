@@ -23,13 +23,16 @@ import android.content.res.Resources
 import android.graphics.Bitmap
 import android.net.Uri
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.PersonModel
 
 /** A view model for editing a specific notification rule. Work-in-progress. */
 public interface NotificationRuleEditViewModel {
     /** The rule being edited or created. */
     public var rule: DraftRuleModel
+
+    /** True if there was an error in saving the new/updated rule. */
+    val isErrorVisible: Boolean
 
     /**
      * Creates display text for the [rule]. This text is also interactable: Users can tap individual
@@ -47,18 +50,21 @@ public interface NotificationRuleEditViewModel {
     /** Saves a new set of apps to the draft rule. */
     public fun onAppsSaved(newApps: List<AppModel>, onExitEditField: () -> Unit)
 
-    /** Saves a new set of contacts to the draft rule. */
-    public fun onContactsSaved(newContacts: List<ContactModel>, onExitEditField: () -> Unit)
+    /** Saves a new set of people to the draft rule. */
+    fun onPeopleSaved(newPeople: List<PersonModel>, onExitEditField: () -> Unit)
+
+    /** Saves a new set of keywords to the draft rule. */
+    fun onKeywordsSaved(newKeywords: List<String>, onExitEditField: () -> Unit)
 
     /**
-     * Fetches all contacts whose name matches [searchQuery].
+     * Fetches all people whose name matches [searchQuery].
      *
      * @param contentResolver the content resolver for the current user.
      */
-    public suspend fun fetchContacts(
+    suspend fun fetchPeople(
         searchQuery: String,
         contentResolver: ContentResolver,
-    ): List<ContactModel>
+    ): List<PersonModel>
 
     /**
      * Loads the photo thumbnail for a contact from the given [uri].
@@ -74,7 +80,19 @@ public interface NotificationRuleEditViewModel {
     /** Fetches all apps installed on the device. */
     public suspend fun fetchInstalledApps(context: Context): List<AppModel>
 
-    public interface Factory {
-        public fun create(rule: DraftRuleModel): NotificationRuleEditViewModel
+    /**
+     * Saves the current version of [rule]. [isErrorVisible] will update based on whether the rule
+     * was saved successfully or not.
+     */
+    fun saveRule()
+
+    /** Cleans up any temporary values. Should be invoked when the user leaves the edit page. */
+    fun cleanUp()
+
+    interface Factory {
+        fun create(
+            rule: DraftRuleModel,
+            onNavigateToCurrentRulesScreen: () -> Unit,
+        ): NotificationRuleEditViewModel
     }
 }

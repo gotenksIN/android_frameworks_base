@@ -3644,13 +3644,20 @@ public class Notification implements Parcelable
      */
     public String getHistoryText(@NonNull Context context) {
         Preconditions.checkNotNull(context);
-        final Style style =  Notification.Builder.recoverStyle(this);
         CharSequence text = null;
-        if (style != null) {
-            text = style.getHistoryText(context);
+        if (extras != null) {
+            final boolean hasStyledHistoryText = isStyle(BigTextStyle.class)
+                || isStyle(MetricStyle.class)
+                || isStyle(MessagingStyle.class);
+            if (hasStyledHistoryText) {
+                final Style style = Notification.Builder.recoverStyle(this);
+                if (style != null) {
+                    text = style.getHistoryText(context);
+                }
+            }
         }
 
-        if (TextUtils.isEmpty(text)) {
+        if (TextUtils.isEmpty(text) && extras != null) {
             text = extras.getCharSequence(EXTRA_TEXT);
         }
 
@@ -4666,6 +4673,10 @@ public class Notification implements Parcelable
         if ((flags & FLAG_PROMOTED_ONGOING) != 0) {
             flagStrings.add("PROMOTED_ONGOING");
             flags &= ~FLAG_PROMOTED_ONGOING;
+        }
+        if ((flags & FLAG_COMPUTER_CONTROL) != 0) {
+            flagStrings.add("COMPUTER_CONTROL");
+            flags &= ~FLAG_COMPUTER_CONTROL;
         }
 
         if (android.service.notification.Flags.notificationSilentFlag()) {
@@ -8287,8 +8298,9 @@ public class Notification implements Parcelable
          */
         private void processSmallIconColor(Icon smallIcon, RemoteViews contentView,
                 StandardTemplateParams p) {
-            boolean colorable = !isLegacy() || getColorUtil().isGrayscaleIcon(mContext,
-                    smallIcon);
+            // Colorize any icon that is not either really ancient or an adaptive drawable.
+            boolean colorable = !isLegacy() && !ContrastColorUtil.isAdaptiveIconDrawableIcon(
+                    mContext, smallIcon);
             int color = getSmallIconColor(p);
             contentView.setInt(R.id.icon, "setBackgroundColor",
                     getBackgroundColor(p));
@@ -8802,6 +8814,10 @@ public class Notification implements Parcelable
                 }
             }
         }
+
+        if (publicVersion != null) {
+            publicVersion.reduceImageSizes(context);
+        }
         extras.putBoolean(EXTRA_REDUCED_IMAGES, true);
     }
 
@@ -8829,6 +8845,14 @@ public class Notification implements Parcelable
      */
     public boolean isFgsOrUij() {
         return isForegroundService() || isUserInitiatedJob();
+    }
+
+    /**
+     * @return whether this notification is associated with a computer control session.
+     * @hide
+     */
+    public boolean isComputerControl() {
+        return (flags & FLAG_COMPUTER_CONTROL) != 0;
     }
 
     /**

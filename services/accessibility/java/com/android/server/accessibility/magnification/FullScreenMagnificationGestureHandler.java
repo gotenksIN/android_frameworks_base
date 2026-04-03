@@ -226,7 +226,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
             OneFingerPanningSettingsProvider oneFingerPanningSettingsProvider) {
         super(displayId, detectSingleFingerTripleTap, detectShortcutTrigger, trace, callback);
         if (DEBUG_ALL) {
-            Log.i(mLogTag,
+            Log.i(mTag,
                     "FullScreenMagnificationGestureHandler(detectSingleFingerTripleTap = "
                             + detectSingleFingerTripleTap
                             + ", detectShortcutTrigger = " + detectShortcutTrigger + ")");
@@ -334,7 +334,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
         try {
             stateHandler.onMotionEvent(event, rawEvent, policyFlags);
         } catch (GestureException e) {
-            Slog.e(mLogTag, "Error processing motion event", e);
+            Slog.e(mTag, "Error processing motion event", e);
             clearAndTransitionToStateDetecting();
         }
     }
@@ -351,7 +351,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
     @Override
     public void onDestroy(boolean resetMagnification) {
         if (DEBUG_STATE_TRANSITIONS) {
-            Slog.i(mLogTag, "onDestroy(); delayed = "
+            Slog.i(mTag, "onDestroy(); delayed = "
                     + MotionEventInfo.toString(mDetectingState.mDelayedEventQueue));
         }
         mOneFingerPanningSettingsProvider.unregister();
@@ -403,7 +403,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
     @VisibleForTesting
     void transitionTo(State state) {
         if (DEBUG_STATE_TRANSITIONS) {
-            Slog.i(mLogTag,
+            Slog.i(mTag,
                     (State.nameOf(mCurrentState) + " -> " + State.nameOf(state)
                     + " at " + asList(copyOfRange(new RuntimeException().getStackTrace(), 1, 5)))
                     .replace(getClass().getName(), ""));
@@ -553,7 +553,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 }
             }
 
-            if (DEBUG_PANNING_SCALING) Slog.i(mLogTag, "Scaled content to: " + scale + "x");
+            if (DEBUG_PANNING_SCALING) Slog.i(mTag, "Scaled content to: " + scale + "x");
             mFullScreenMagnificationController.setScale(mDisplayId, scale, pivotX, pivotY,
                     /* isScaleTransient= */ true, /* animate= */ false,
                     AccessibilityManagerService.MAGNIFICATION_GESTURE_HANDLER_ID);
@@ -568,7 +568,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 return true;
             }
             if (DEBUG_PANNING_SCALING) {
-                Slog.i(mLogTag, "Panned content by scrollX: " + distanceX
+                Slog.i(mTag, "Panned content by scrollX: " + distanceX
                         + " scrollY: " + distanceY);
             }
             onPan(second);
@@ -793,8 +793,21 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 // by stale events. After the cached events, which always have a down, are
                 // injected we need to also update the down time of all subsequent non cached
                 // events. All delegated events cached and non-cached are delivered here.
-                event.setDownTime(mLastDelegatedDownEventTime);
-                dispatchTransformedEvent(event, rawEvent, policyFlags);
+                if (Flags.fixFullScreenMagnificationEventTimeCorruption()) {
+                    long eventDownTime = event.getDownTime();
+                    long diff = mLastDelegatedDownEventTime - eventDownTime;
+                    if (diff != 0) {
+                        MotionEvent adjusted = AccessibilityMotionEventBuilder.fromBaseEvent(event)
+                                .setTimeOffset(diff).build();
+                        dispatchTransformedEvent(adjusted, rawEvent, policyFlags);
+                        adjusted.recycle();
+                    } else {
+                        dispatchTransformedEvent(event, rawEvent, policyFlags);
+                    }
+                } else {
+                    event.setDownTime(mLastDelegatedDownEventTime);
+                    dispatchTransformedEvent(event, rawEvent, policyFlags);
+                }
             }
         }
     }
@@ -1187,7 +1200,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
          */
         protected void onTripleTap(MotionEvent up) {
             if (DEBUG_DETECTING) {
-                Slog.i(mLogTag, "onTripleTap(); delayed: "
+                Slog.i(mTag, "onTripleTap(); delayed: "
                         + MotionEventInfo.toString(mDelayedEventQueue));
             }
 
@@ -1211,7 +1224,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
         void transitionToViewportDraggingStateAndClear(MotionEvent down) {
 
-            if (DEBUG_DETECTING) Slog.i(mLogTag, "onTripleTapAndHold()");
+            if (DEBUG_DETECTING) Slog.i(mTag, "onTripleTapAndHold()");
             final boolean shortcutTriggered = mShortcutTriggered;
 
             // Only log the 3tap and hold event
@@ -1244,7 +1257,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
             if (mShortcutTriggered == state) {
                 return;
             }
-            if (DEBUG_DETECTING) Slog.i(mLogTag, "setShortcutTriggered(" + state + ")");
+            if (DEBUG_DETECTING) Slog.i(mTag, "setShortcutTriggered(" + state + ")");
 
             mCallback.onShortcutTriggerChanged(mDisplayId, getMode(), state);
             mShortcutTriggered = state;
@@ -1299,7 +1312,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
     private void zoomOn(float centerX, float centerY) {
         if (DEBUG_DETECTING) {
-            Slog.i(mLogTag, "zoomOn(" + centerX + ", " + centerY + ")");
+            Slog.i(mTag, "zoomOn(" + centerX + ", " + centerY + ")");
         }
 
         final float scale = MathUtils.constrain(
@@ -1318,7 +1331,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
     private void zoomOff() {
         if (DEBUG_DETECTING) {
-            Slog.i(mLogTag, "zoomOff()");
+            Slog.i(mTag, "zoomOff()");
         }
         mFullScreenMagnificationController.reset(mDisplayId, /* animate */ true);
     }
@@ -1512,7 +1525,8 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
      * BroadcastReceiver used to cancel the magnification shortcut when the screen turns off
      */
     private static class ScreenStateReceiver extends BroadcastReceiver {
-        private static final String TAG = ScreenStateReceiver.class.getName();
+        private static final String SCREEN_STATE_RECEIVER_TAG =
+                ScreenStateReceiver.class.getName();
         private final Context mContext;
         private final FullScreenMagnificationGestureHandler mGestureHandler;
 
@@ -1535,7 +1549,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 // will not affect the user experience since it's for the destroyed handler.
                 // Therefore, we use try-catch here, to catch the exception to prevent crash, and
                 // log the exception for future investigations.
-                Slog.e(TAG, "Failed to unregister receiver: " + exception);
+                Slog.e(SCREEN_STATE_RECEIVER_TAG, "Failed to unregister receiver: " + exception);
             }
         }
 
@@ -1577,7 +1591,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
         }
 
         if (mVelocityTracker == null) {
-            Log.e(mLogTag, "onPanningFinished: mVelocityTracker is null");
+            Log.e(mTag, "onPanningFinished: mVelocityTracker is null");
             return;
         }
         mVelocityTracker.addMovement(event);
@@ -1591,7 +1605,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
         if (DEBUG_PANNING_SCALING) {
             Slog.v(
-                    mLogTag,
+                    mTag,
                     "onPanningFinished: pixelsPerSecond: "
                             + xPixelsPerSecond
                             + ", "
@@ -1660,7 +1674,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                     AccessibilityManagerService.MAGNIFICATION_GESTURE_HANDLER_ID);
             if (DEBUG_PANNING_SCALING) {
                 Slog.i(
-                        mLogTag,
+                        mTag,
                         "SinglePanningState Panned content by scrollX: "
                                 + distanceX
                                 + " scrollY: "
@@ -1818,7 +1832,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                     onHorizontalOverscroll(second);
                     break;
                 default:
-                    Slog.d(mLogTag, "Invalid overscroll state");
+                    Slog.d(mTag, "Invalid overscroll state");
                     break;
             }
         }

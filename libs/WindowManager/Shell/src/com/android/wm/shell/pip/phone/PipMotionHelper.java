@@ -133,7 +133,6 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
             return;
         }
 
-        mMenuController.updateMenuLayout(newBounds);
         mPipBoundsState.setBounds(newBounds);
     };
 
@@ -259,10 +258,7 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
                 mPipBoundsState.setBounds(toBounds);
             } else {
                 mPipBoundsState.getMotionBoundsState().setBoundsInMotion(toBounds);
-                mPipTaskOrganizer.scheduleUserResizePip(getBounds(), toBounds,
-                        (Rect newBounds) -> {
-                                mMenuController.updateMenuLayout(newBounds);
-                        });
+                mPipTaskOrganizer.scheduleUserResizePip(getBounds(), toBounds, null);
             }
         } else {
             // If PIP is 'catching up' after being stuck in the dismiss target, update the animation
@@ -340,7 +336,7 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
     private void expandLeavePip(boolean skipAnimation, boolean enterSplit) {
         if (DEBUG) {
             ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
-                    "%s: exitPip: skipAnimation=%s"
+                    "%s: exitPip: skipAnimation=%b"
                             + " callers=\n%s", TAG, skipAnimation, Debug.getCallers(5, "    "));
         }
         cancelPhysicsAnimation();
@@ -561,7 +557,7 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
     void animateToOffset(Rect originalBounds, int offset) {
         if (DEBUG) {
             ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
-                    "%s: animateToOffset: originalBounds=%s offset=%s"
+                    "%s: animateToOffset: originalBounds=%s offset=%d"
                             + " callers=\n%s", TAG, originalBounds, offset,
                     Debug.getCallers(5, "    "));
         }
@@ -696,7 +692,7 @@ public class PipMotionHelper implements PipAppOpsListener.Callback,
         if (DEBUG) {
             ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
                     "%s: resizeAndAnimatePipUnchecked: toBounds=%s"
-                            + " duration=%s callers=\n%s", TAG, toBounds, duration,
+                            + " duration=%d callers=\n%s", TAG, toBounds, duration,
                     Debug.getCallers(5, "    "));
         }
 

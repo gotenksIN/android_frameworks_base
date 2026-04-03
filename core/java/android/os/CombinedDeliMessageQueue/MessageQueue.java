@@ -111,7 +111,7 @@ public final class MessageQueue {
     private final Object mIdleHandlersLock = new Object();
     private final Object mFileDescriptorRecordsLock = new Object();
 
-    MessageStack mStack = new MessageStack();
+    private final MessageStack mStack = new MessageStack();
 
     /*
      * This helps us ensure that messages with the same timestamp are inserted in FIFO order.
@@ -408,6 +408,13 @@ public final class MessageQueue {
             logDeadThread(msg);
             decAndTraceMessageCount();
             return false;
+        }
+
+        if (Flags.messageQueueMonitoringEnabled()) {
+            LooperDoctor d = mLooperDoctor;
+            if (d != null) {
+                d.messageEnqueued(msg);
+            }
         }
 
         if (DEBUG) {
@@ -738,6 +745,15 @@ public final class MessageQueue {
                         continue;
                     }
                     mStack.remove(found);
+                }
+                if (Flags.messageQueueMonitoringEnabled()) {
+                    LooperDoctor d = mLooperDoctor;
+                    if (d != null) {
+                        if (found != null && !peek) {
+                            d.messageDequeuedForDelivery(found, now);
+                        }
+                        d.checkMessageQueueLength(mMessageCount.get());
+                    }
                 }
                 return found;
             }
@@ -2534,5 +2550,14 @@ public final class MessageQueue {
                     .usingThreadCounterTrack(mTid, mThreadName)
                     .emit();
         }
+    }
+
+    private volatile LooperDoctor mLooperDoctor = null;
+
+    /**
+     * @hide
+     */
+    public void setLooperDoctor(LooperDoctor d) {
+        mLooperDoctor = d;
     }
 }

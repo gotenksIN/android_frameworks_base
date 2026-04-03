@@ -1166,7 +1166,11 @@ public class DisplayPolicy {
     }
 
     private void onDisplaySwitchFinished() {
-        mDisplayContent.mDisplayUpdater.onDisplaySwitching(false);
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            mService.mRoot.mDisplayUnblocker.onDefaultDisplaySwitching(false);
+        } else {
+            mDisplayContent.mDisplayUpdater.onDisplaySwitching(false);
+        }
     }
 
     public void setAwake(boolean awake) {
@@ -2162,18 +2166,22 @@ public class DisplayPolicy {
         }
     }
 
-    private boolean shouldBeHiddenByKeyguard(WindowState win,
+    @VisibleForTesting
+    boolean shouldBeHiddenByKeyguard(WindowState win,
             @Nullable WindowState imeLayeringTarget) {
         if (!mDisplayContent.isDefaultDisplay || !isKeyguardShowing()) {
             return false;
         }
 
         // Show IME over the keyguard if the target allows it.
-        final boolean showImeOverKeyguard = imeLayeringTarget != null && win.mIsImWindow
-                && imeLayeringTarget.isDisplayed() && (imeLayeringTarget.canShowWhenLocked()
-                    || !imeLayeringTarget.canBeHiddenByKeyguard());
-        if (showImeOverKeyguard) {
-            return false;
+        if (win.mIsImWindow && imeLayeringTarget != null && imeLayeringTarget.isDisplayed()) {
+            final boolean isActivity = imeLayeringTarget.mActivityRecord != null;
+            final boolean showImeOverKeyguard = imeLayeringTarget.canShowWhenLocked()
+                    || (!isActivity && !imeLayeringTarget.canBeHiddenByKeyguard());
+
+            if (showImeOverKeyguard) {
+                return false;
+            }
         }
 
         // Show SHOW_WHEN_LOCKED windows if keyguard is occluded.
@@ -2719,7 +2727,11 @@ public class DisplayPolicy {
 
     /** If this is called, expect that there will be an onDisplayChanged about unique id. */
     public void onDisplaySwitchStart() {
-        mDisplayContent.mDisplayUpdater.onDisplaySwitching(true);
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            mService.mRoot.mDisplayUnblocker.onDefaultDisplaySwitching(true);
+        } else {
+            mDisplayContent.mDisplayUpdater.onDisplaySwitching(true);
+        }
     }
 
     /**
@@ -2730,7 +2742,11 @@ public class DisplayPolicy {
      * to this display switch from the DisplayManager like onScreenTurningOn or onDisplayChanged.
      */
     public boolean isDisplaySwitching() {
-        return mDisplayContent.mDisplayUpdater.isDisplaySwitching();
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            return mService.mRoot.mDisplayUnblocker.isDefaultDisplaySwitching();
+        } else {
+            return mDisplayContent.mDisplayUpdater.isDisplaySwitching();
+        }
     }
 
     boolean hasBottomNavigationBar() {

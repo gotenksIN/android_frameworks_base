@@ -20,6 +20,7 @@ import static android.app.PendingIntent.FLAG_CANCEL_CURRENT;
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_ONE_SHOT;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_USER_INITIATED;
+import static android.companion.virtual.computercontrol.ComputerControlSessionParams.MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17;
 
 import static com.android.server.companion.virtual.computercontrol.ComputerControlStatsLog.COMPUTER_CONTROL_FAILED_SESSION_REPORTED__REASON__CALLER_NOT_ALLOWED;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlStatsLog.COMPUTER_CONTROL_FAILED_SESSION_REPORTED__REASON__INVALID_TARGET_APPLICATION;
@@ -38,7 +39,6 @@ import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
-import android.companion.virtual.CompanionDeviceId;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSession;
@@ -90,15 +90,12 @@ public final class ComputerControlSessionProcessor {
     // TODO(b/419548594): Make this configurable.
     @VisibleForTesting
     static final int MAXIMUM_CONCURRENT_SESSIONS = 1;
-    @VisibleForTesting
-    static final int MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17 = 5;
 
     @Nullable
     private final String mReferenceDisplayAddress;
 
     private final Context mContext;
     private final KeyguardManager mKeyguardManager;
-    private final AuthenticationPolicyManager mAuthenticationPolicyManager;
     private final AppOpsManager mAppOpsManager;
     private final PackageManager mPackageManager;
     private final UserManager mUserManager;
@@ -109,6 +106,10 @@ public final class ComputerControlSessionProcessor {
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
     private final ComputerControlAllowlistController mAllowlistController;
+
+    // Lazily initialized on-demand by getAuthenticationPolicyManager()
+    @Nullable
+    private AuthenticationPolicyManager mAuthenticationPolicyManager;
 
     /** The binders of all currently active sessions. */
     @GuardedBy("mSessions")
@@ -140,7 +141,6 @@ public final class ComputerControlSessionProcessor {
         mVirtualDeviceFactory = virtualDeviceFactory;
         mPendingIntentFactory = pendingIntentFactory;
         mKeyguardManager = context.getSystemService(KeyguardManager.class);
-        mAuthenticationPolicyManager = context.getSystemService(AuthenticationPolicyManager.class);
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
         mPackageManager = context.getPackageManager();
         mUserManager = context.getSystemService(UserManager.class);
@@ -311,10 +311,6 @@ public final class ComputerControlSessionProcessor {
     }
 
     private boolean isComputerControlAvailableForUser(@UserIdInt int userId) {
-        if (!android.companion.virtualdevice.flags.Flags.computerControlManagedProfiles()) {
-            return !mDevicePolicyManagerInternal.isUserOrganizationManaged(userId);
-        }
-
         // On fully managed devices, follow nearbyAppStreamingPolicy.
         if (mDevicePolicyManagerInternal.getDeviceOwnerComponent(/* callingUser= */ false)
                 != null) {
@@ -395,6 +391,22 @@ public final class ComputerControlSessionProcessor {
      */
     public String[] getAutomatableAppListForAgent(int agentUid, @NonNull String agentPackageName) {
         return mAllowlistController.getAutomatableAppListForAgent(agentUid, agentPackageName);
+    }
+
+    /**
+     * Returns whether the given package is an approved computer control agent.
+     */
+    public boolean isPackageApprovedToRunAutomation(@NonNull String packageName,
+            int userId) {
+        return mAllowlistController.isPackageApprovedToRunAutomation(packageName, userId);
+    }
+
+    /**
+     * Returns whether the given package is an approved computer control session target.
+     */
+    public boolean isPackageTargetableForAutomation(@NonNull String packageName,
+            int userId) {
+        return mAllowlistController.isPackageTargetableForAutomation(packageName, userId);
     }
 
     private void startHandlerThreadIfNeeded() {
@@ -483,19 +495,64 @@ public final class ComputerControlSessionProcessor {
     @GuardedBy("mSessions")
     private boolean checkSessionCreationPreconditionsLocked(
             @NonNull ComputerControlSessionRequest request) {
-        if (isDeviceLocked(request.attributionSource(), request.params().getCompanionDeviceId())) {
-            dispatchSessionCreationFailed(request, ComputerControlSession.ERROR_DEVICE_LOCKED);
-            return false;
-        }
         if (mSessions.size() >= MAXIMUM_CONCURRENT_SESSIONS) {
             dispatchSessionCreationFailed(request,
                     ComputerControlSession.ERROR_SESSION_LIMIT_REACHED);
             return false;
         }
+
+        // If the caller claims to be running on a virtual device, make sure that this is actually
+        // the case and this is not just an explicitly created device context. If the uid is not
+        // seen on the device they claim to be running on, fallback to default.
+        final int deviceId;
+        if (request.attributionSource().getDeviceId() != Context.DEVICE_ID_DEFAULT
+                && mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
+                        request.ownerUid(), request.attributionSource().getDeviceId())) {
+            deviceId = request.attributionSource().getDeviceId();
+        } else {
+            deviceId = Context.DEVICE_ID_DEFAULT;
+        }
+
+        // For cross-device requests rely on AuthenticationPolicyManager
+        var authenticationPolicyManager = getAuthenticationPolicyManager();
+        if (android.companion.virtualdevice.flags.Flags.computerControlCrossDevice()
+                && android.companion.Flags.supportAiAgent()
+                && authenticationPolicyManager != null
+                && request.params().getCompanionDeviceId() != null) {
+            boolean crossDeviceAuthorized =
+                    Binder.withCleanCallingIdentity(
+                            () ->
+                                    authenticationPolicyManager.isAgentAuthorized(
+                                            request.ownerUserId(),
+                                            deviceId,
+                                            request.params().getCompanionDeviceId().getDeviceId()));
+            if (!crossDeviceAuthorized) {
+                Slog.e(
+                        TAG,
+                        "Agent app "
+                                + request.ownerPackageName()
+                                + " is not allowed to start cross-device automation.");
+                dispatchSessionCreationFailed(
+                        request, ComputerControlSession.ERROR_PERMISSION_DENIED);
+            }
+            return crossDeviceAuthorized;
+        }
+
+        boolean isDeviceLocked =
+                Binder.withCleanCallingIdentity(
+                        () -> mKeyguardManager.isDeviceLocked(request.ownerUserId(), deviceId));
+        if (isDeviceLocked) {
+            dispatchSessionCreationFailed(request, ComputerControlSession.ERROR_DEVICE_LOCKED);
+            return false;
+        }
+
+        // Enforce that the caller has a visible non-toast Window on any display AND that the
+        // reported deviceId is valid.
         if (request.params().getTargetComputerControlVersion()
-                >= MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17
+                        >= MIN_COMPUTER_CONTROL_VERSION_FOR_ANDROID_17
                 // This returns true only if the uid has a visible non-toast window on any display.
-                && !mActivityTaskManagerInternal.isUidForeground(request.ownerUid())) {
+                && !isUidForeground(
+                        request.ownerUid(), request.attributionSource().getDeviceId())) {
             Slog.e(TAG, "Agent app " + request.ownerPackageName()
                     + " does not have a non-toast visible window on any display.");
             dispatchSessionCreationFailed(request, ComputerControlSession.ERROR_PERMISSION_DENIED);
@@ -504,31 +561,27 @@ public final class ComputerControlSessionProcessor {
         return true;
     }
 
-    private boolean isDeviceLocked(@NonNull AttributionSource attributionSource,
-            @Nullable CompanionDeviceId companionDeviceId) {
-        // If the caller claims to be running on a virtual device, make sure that this is actually
-        // the case and this is not just an explicitly created device context. If the uid is not
-        // seen on the device they claim to be running on, fallback to default.
-        final int deviceId;
-        if (attributionSource.getDeviceId() != Context.DEVICE_ID_DEFAULT
-                && mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(
-                        attributionSource.getUid(), attributionSource.getDeviceId())) {
-            deviceId = attributionSource.getDeviceId();
-        } else {
-            deviceId = Context.DEVICE_ID_DEFAULT;
+    private boolean isUidForeground(int ownerUid, int deviceId) {
+        // TODO(b/493529664)
+        // 1) If deviceId is a VirtualDevice, enforce display is owned by the device
+        // 2) Enforce that uid is visible on THAT display (make isUidForeground display-aware)
+        // 3) If deviceID is a VirtualDevice and the above 2 failed,
+        //    check service binding from VirtualDevice owner to ownerUid
+
+        if (deviceId != Context.DEVICE_ID_DEFAULT
+                && !mVirtualDeviceManagerInternal.isDeviceIdAssociationValid(ownerUid, deviceId)) {
+            return false;
         }
-        final int userId = UserHandle.getUserId(attributionSource.getUid());
-        return Binder.withCleanCallingIdentity(() -> {
-            if (android.companion.Flags.supportAiAgent() && mAuthenticationPolicyManager != null) {
-                // Note: isAgentAuthorized validates things about the agent AND the device state,
-                //       including the devices keyguard state.
-                return !mAuthenticationPolicyManager.isAgentAuthorized(
-                        userId, deviceId,
-                        companionDeviceId == null ? null : companionDeviceId.getDeviceId());
-            } else {
-                return mKeyguardManager.isDeviceLocked(userId, deviceId);
-            }
-        });
+        return mActivityTaskManagerInternal.isUidForeground(ownerUid);
+    }
+
+    @Nullable
+    private AuthenticationPolicyManager getAuthenticationPolicyManager() {
+        if (mAuthenticationPolicyManager == null) {
+            mAuthenticationPolicyManager =
+                    mContext.getSystemService(AuthenticationPolicyManager.class);
+        }
+        return mAuthenticationPolicyManager;
     }
 
     /** Notifies the client that session creation failed. */
@@ -620,17 +673,46 @@ public final class ComputerControlSessionProcessor {
     }
 
     /**
+     * Returns the session associated with the provided displayId, or {@code null} if not found.
+     */
+    @GuardedBy("mSessions")
+    @Nullable
+    private ComputerControlSessionImpl findSessionByDisplayIdLocked(int displayId) {
+        for (int i = 0; i < mSessions.size(); i++) {
+            ComputerControlSessionImpl session = mSessions.valueAt(i);
+            if (session.getVirtualDisplayId() == displayId) {
+                return session;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns {@code true}, if any of the ongoing computer control sessions are running on the
-     * provided virtual display id, {@code false} otherwise.
+     * provided virtual display ID, {@code false} otherwise.
      */
     public boolean isComputerControlDisplay(int displayId) {
         synchronized (mSessions) {
-            for (int i = 0; i < mSessions.size(); i++) {
-                if (mSessions.valueAt(i).getVirtualDisplayId() == displayId) {
-                    return true;
-                }
-            }
-            return false;
+            return findSessionByDisplayIdLocked(displayId) != null;
+        }
+    }
+
+    /**
+     * Check if the specified virtual display is currently being actively automated by an agent.
+     *
+     * This is used to enforce security and privacy policies (such as Autofill
+     * restrictions or camera blocking) that apply when an automated agent is in
+     * control, but should be relaxed when a user is interacting with the session via
+     * an interactive mirror.
+     *
+     * @param displayId The ID of the virtual display to check.
+     * @return {@code true} if the display is associated with an active computer control
+     *         automation session; {@code false} otherwise.
+     */
+    public boolean isActiveComputerControlDisplay(int displayId) {
+        synchronized (mSessions) {
+            ComputerControlSessionImpl session = findSessionByDisplayIdLocked(displayId);
+            return session != null && session.isSessionActive();
         }
     }
 

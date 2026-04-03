@@ -56,12 +56,14 @@ import android.util.SparseArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
@@ -249,6 +251,42 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
     @GuardedBy("mOpenSessionLock")
     private final SparseArray<Session> mSessionMap = new SparseArray<>();
 
+    private final Object mDataFlowLock = new Object();
+
+    /** Wrapper around DataFlowId that is mappable. */
+    private static final class DataFlowIdWrapper {
+        private final DataFlowId mId;
+
+        DataFlowIdWrapper(DataFlowId id) {
+            mId = id;
+        }
+
+        public DataFlowId getId() {
+            return mId;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof DataFlowIdWrapper)) {
+                return false;
+            }
+            DataFlowIdWrapper that = (DataFlowIdWrapper) o;
+            return mId.hubId == that.mId.hubId && mId.id == that.mId.id;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(mId.hubId, mId.id);
+        }
+    }
+
+    @GuardedBy("mDataFlowLock")
+    private final Map<DataFlowIdWrapper, HubEndpointInfo> mDataFlowAsSinkMap =
+            new LinkedHashMap<>();
+
     /** The package name of the app that created the endpoint */
     private final String mPackageName;
 
@@ -428,6 +466,8 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
                         "sendMessage called on inactive session (id= " + sessionId + ")");
             }
 
+            PccAccessList.getInstance()
+                    .maybeNotePccAccessForEndpoint(mUid, session.getRemoteEndpointInfo());
             Message halMessage = ContextHubServiceUtil.createHalMessage(message);
             if (callback == null) {
                 try {
@@ -580,6 +620,10 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
             throw new IllegalArgumentException(
                     "callback must be provided when registering a data flow offload sink");
         }
+        if (!hasEndpointPermissions(sink)) {
+            throw new SecurityException(
+                    "Insufficient permission to register a data flow offload sink: " + sink);
+        }
 
         if (Flags.fmcqShareDataFlowMessageFix() && msg != null) {
             // The incoming message is forced to be reliable since we utilize the transaction
@@ -595,6 +639,7 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
         params.sourceId = mHalEndpointInfo.id;
         params.msg = halMessage;
         params.sessionId = sessionId;
+        Binder.allowBlocking(callback.asBinder());
         IEndpointCommunication.IRegisterOffloadSinkCallback halCallback =
                 new IEndpointCommunication.IRegisterOffloadSinkCallback.Stub() {
                     @Override
@@ -691,6 +736,10 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
             Log.e(TAG, "HAL exception in unregisterDataFlowHostSink", e);
             throw e;
         }
+
+        synchronized (mDataFlowLock) {
+            mDataFlowAsSinkMap.remove(new DataFlowIdWrapper(dataFlowId));
+        }
     }
 
     /** Invoked when the underlying binder of this broker has died at the client process. */
@@ -720,6 +769,38 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
                         notifySessionClosedToBoth(id, Reason.PERMISSION_DENIED);
                     }
                 }
+            }
+            handleDataFlowPermissionChanges();
+        }
+    }
+
+    private void handleDataFlowPermissionChanges() {
+        List<DataFlowId> inaccessibleFlows = new ArrayList<>();
+        synchronized (mDataFlowLock) {
+            for (Map.Entry<DataFlowIdWrapper, HubEndpointInfo> entry :
+                    mDataFlowAsSinkMap.entrySet()) {
+                if (!hasEndpointPermissions(entry.getValue())) {
+                    Log.w(
+                            TAG,
+                            "Permissions revoked for data flow "
+                                    + entry.getKey().getId()
+                                    + " for "
+                                    + mPackageName
+                                    + ". Source endpoint "
+                                    + entry.getValue()
+                                    + " is no longer accessible.");
+                    inaccessibleFlows.add(entry.getKey().getId());
+                }
+            }
+        }
+
+        if (!inaccessibleFlows.isEmpty()) {
+            invokeCallback(
+                    (consumer) ->
+                            consumer.onDataFlowsInaccessible(
+                                    inaccessibleFlows.toArray(new DataFlowId[0])));
+            for (DataFlowId id : inaccessibleFlows) {
+                unregisterDataFlowHostSink(id);
             }
         }
     }
@@ -847,6 +928,38 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
                     "Received data flow host consumer registration for unknown session: id="
                             + sessionId);
             return;
+        }
+
+        if (!hasEndpointPermissions(source)) {
+            Log.w(
+                    TAG,
+                    "onDataFlowHostSinkRegistered: "
+                            + mEndpointInfo
+                            + " doesn't have permission for "
+                            + source);
+            unregisterDataFlowHostSink(context.id);
+            return;
+        }
+
+        try {
+            Binder.withCleanCallingIdentity(
+                    () -> {
+                        if (!notePermissions(source)) {
+                            throw new RuntimeException(
+                                "onDataFlowHostSinkRegistered: "
+                                        + mEndpointInfo
+                                        + " doesn't have AppOps permission for "
+                                        + source);
+                        }
+                    });
+        } catch (RuntimeException e) {
+            Log.e(TAG, e.getMessage());
+            unregisterDataFlowHostSink(context.id);
+            return;
+        }
+
+        synchronized (mDataFlowLock) {
+            mDataFlowAsSinkMap.put(new DataFlowIdWrapper(context.id), source);
         }
 
         invokeCallback(
@@ -991,6 +1104,17 @@ public class ContextHubEndpointBroker extends IContextHubEndpoint.Stub
             if (mSessionMap.get(sessionId).isInReliableMessageHistory(message)) {
                 Log.e(TAG, "Dropping duplicate message: " + message);
                 return ErrorCode.TRANSIENT_ERROR;
+            }
+
+            if (!PccAccessList.getInstance().checkPccAccessForEndpoint(mUid, remote)) {
+                Log.w(
+                        TAG,
+                        "Dropping message from "
+                                + remote.getIdentifier()
+                                + ". Target client "
+                                + mPackageName
+                                + " is not PCC");
+                return ErrorCode.PERMISSION_DENIED;
             }
 
             try {

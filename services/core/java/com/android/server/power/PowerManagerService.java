@@ -48,6 +48,7 @@ import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
+import android.app.ActivityManager.ProcessState;
 import android.app.SynchronousUserSwitchObserver;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
@@ -785,7 +786,12 @@ public final class PowerManagerService extends SystemService
             }
 
             mDirty |= DIRTY_DISPLAY_GROUP_WAKEFULNESS;
-            mNotifier.onGroupWakefulnessChangeStarted(groupId, wakefulness, reason, eventTime);
+            mNotifier.onGroupWakefulnessChangeStarted(
+                    groupId,
+                    wakefulness,
+                    reason,
+                    isDefaultOrAdjacentGroupInteractiveLocked(),
+                    eventTime);
             updateGlobalWakefulnessLocked(eventTime, reason, uid, opUid, opPackageName, details);
             updatePowerStateLocked();
         }
@@ -1961,13 +1967,15 @@ public final class PowerManagerService extends SystemService
     }
 
     private void addFrozenStateChangeCallbacksLocked(WakeLock wakelock) {
-        if (mFeatureFlags.isDisableFrozenProcessWakelocksEnabled()) {
+        if (mFeatureFlags.isDisableFrozenProcessWakelocksEnabled()
+                && !wakelock.mFrozenStateCallbackRegistered) {
             // The callback is never supported for local binders.
             if (wakelock.mLock instanceof Binder) {
                 return;
             }
             try {
                 wakelock.mLock.addFrozenStateChangeCallback(wakelock);
+                wakelock.mFrozenStateCallbackRegistered = true;
             } catch (UnsupportedOperationException e) {
                 // Ignore the exception.  The callback is not supported on this platform or on
                 // this binder.  There is no error. A log message is provided for debug.
@@ -1982,13 +1990,15 @@ public final class PowerManagerService extends SystemService
     }
 
     private void removeFrozenStateChangeCallbacksLocked(WakeLock wakelock) {
-        if (mFeatureFlags.isDisableFrozenProcessWakelocksEnabled()) {
+        if (mFeatureFlags.isDisableFrozenProcessWakelocksEnabled()
+                && wakelock.mFrozenStateCallbackRegistered) {
             // The callback is never supported for local binders.
             if (wakelock.mLock instanceof Binder) {
                 return;
             }
             try {
                 wakelock.mLock.removeFrozenStateChangeCallback(wakelock);
+                wakelock.mFrozenStateCallbackRegistered = false;
             } catch (UnsupportedOperationException e) {
                 if (DEBUG_SPEW) {
                     Slog.v(TAG, "FrozenStateChangeCallback not supported for this wakelock "
@@ -2693,8 +2703,11 @@ public final class PowerManagerService extends SystemService
             // Kick user activity to prevent newly added group from timing out instantly.
             userActivityNoUpdateLocked(powerGroup, mClock.uptimeMillis(),
                     PowerManager.USER_ACTIVITY_EVENT_OTHER, /* flags= */ 0, Process.SYSTEM_UID);
-            mNotifier.onGroupWakefulnessChangeStarted(groupId,
-                    powerGroup.getWakefulnessLocked(), WAKE_REASON_DISPLAY_GROUP_ADDED,
+            mNotifier.onGroupWakefulnessChangeStarted(
+                    groupId,
+                    powerGroup.getWakefulnessLocked(),
+                    WAKE_REASON_DISPLAY_GROUP_ADDED,
+                    isDefaultOrAdjacentGroupInteractiveLocked(),
                     mClock.uptimeMillis());
         } else if (event == DisplayGroupPowerChangeListener.DISPLAY_GROUP_REMOVED) {
             mNotifier.onGroupRemoved(groupId);
@@ -3553,6 +3566,19 @@ public final class PowerManagerService extends SystemService
         for (int idx = 0; idx < mPowerGroups.size(); idx++) {
             PowerGroup powerGroup = mPowerGroups.valueAt(idx);
             if (powerGroup.isDefaultGroupAdjacent()) {
+                if (PowerManagerInternal.isInteractive(powerGroup.getWakefulnessLocked())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @GuardedBy("mLock")
+    private boolean isDefaultOrAdjacentGroupInteractiveLocked() {
+        for (int idx = 0; idx < mPowerGroups.size(); idx++) {
+            PowerGroup powerGroup = mPowerGroups.valueAt(idx);
+            if (powerGroup.isDefaultOrAdjacentGroup()) {
                 if (PowerManagerInternal.isInteractive(powerGroup.getWakefulnessLocked())) {
                     return true;
                 }
@@ -4645,7 +4671,7 @@ public final class PowerManagerService extends SystemService
         }
     }
 
-    void updateUidProcStateInternal(int uid, int procState) {
+    void updateUidProcStateInternal(int uid, @ProcessState int procState) {
         synchronized (mLock) {
             UidState state = mUidState.get(uid);
             if (state == null) {
@@ -5924,6 +5950,7 @@ public final class PowerManagerService extends SystemService
         public boolean mNotifiedAcquired;
         public boolean mNotifiedLong;
         public boolean mDisabled;
+        public boolean mFrozenStateCallbackRegistered;
         private boolean mIsFrozen;
         public IWakeLockCallback mCallback;
 
@@ -6285,7 +6312,7 @@ public final class PowerManagerService extends SystemService
     static final class UidState {
         final int mUid;
         int mNumWakeLocks;
-        int mProcState;
+        @ProcessState int mProcState;
         boolean mActive;
 
         UidState(int uid) {
@@ -8016,7 +8043,7 @@ public final class PowerManagerService extends SystemService
         }
 
         @Override
-        public void updateUidProcState(int uid, int procState) {
+        public void updateUidProcState(int uid, @ProcessState int procState) {
             updateUidProcStateInternal(uid, procState);
         }
 

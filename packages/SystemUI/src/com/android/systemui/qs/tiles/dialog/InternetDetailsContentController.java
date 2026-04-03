@@ -1085,6 +1085,17 @@ public class InternetDetailsContentController implements AccessPointController.A
 
 // QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     private String getMobileSummary(Context context, String networkTypeDescription, int subId) {
+        // SIM Display Logic for Dual SIM Scenarios
+        // There are three case of two SIMs:
+        // 1. Standard: Displays the Active Data SIM only (DDS SIM is the same as active
+        //    data SIM)
+        // 2. Automatic data switching Enabled & Non-DDS is active data:
+        //    Displays DDS SIM and non-DDS SIM.
+        //    - DDS SIM: Displays "Poor connection."
+        //    - Non-DDS SIM: Displays "Temporarily connected."
+        // 3. CBRS SIMs set (Non-DDS CBRS SIM is active data):
+        //    Displays the Active Data SIM only
+
 // QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (!isMobileDataEnabled(subId)) {
 // QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
@@ -1097,10 +1108,17 @@ public class InternetDetailsContentController implements AccessPointController.A
                 Settings.Global.SMART_DDS_SWITCH, 0) == 1;
 // QTI_END: 2023-05-10: Telephony: Adjust string display for smart DDS switch
         int activeDataSubId = getActiveDataSubId();
-        boolean isForVisibleDds = subId == activeDataSubId;
         int activeAutoSwitchNonDdsSubId = getActiveAutoSwitchNonDdsSubId();
+        boolean isDds = subId == mDefaultDataSubId;
+        boolean isActiveData = subId == activeDataSubId;
         boolean isOnNonDds =
                 activeAutoSwitchNonDdsSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        boolean isForVisibleDds = isDds || (isActiveData && !isOnNonDds);
+        if (DEBUG) {
+            Log.d(TAG, "getMobileSummary: [" + subId + "], isDds:" + isDds + ", isActiveData:"
+                    + isActiveData + ", isOnNonDds:" + isOnNonDds);
+        }
+
         // Set network description for the carrier network when connecting to the carrier network
         // under the airplane mode ON.
         if ((!isDualDataEnabled() || isDataStateInService(subId))

@@ -233,6 +233,11 @@ public abstract class BaseShortcutManagerTest {
         public void startActivityAsUser(Intent intent, UserHandle user) {
             // ignore, use spy to intercept it.
         }
+
+        @Override
+        public IBinder getActivityToken() {
+            return null;
+        }
     }
 
     /** Context used in the client side */
@@ -672,6 +677,10 @@ public abstract class BaseShortcutManagerTest {
         PendingIntent injectCreatePendingIntent(int requestCode, @NonNull Intent[] intents,
                 int flags, Bundle options, String ownerPackage, int ownerUserId) {
             return new PendingIntent(mock(IIntentSender.class));
+        }
+
+        public void unregisterSettingsObserver() {
+            super.unregisterSettingsObserver();
         }
     }
 
@@ -1190,6 +1199,9 @@ public abstract class BaseShortcutManagerTest {
         mService = null;
         mManager = null;
         mInternal = null;
+        if (mLauncherAppImpl != null) {
+            mLauncherAppImpl.unregisterSettingsObserver();
+        }
         mLauncherAppImpl = null;
         mLauncherApps = null;
         mLauncherAppsMap.clear();

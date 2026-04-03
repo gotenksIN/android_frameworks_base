@@ -28,23 +28,33 @@ public data class RuleModel(
     /** The action to apply to the notification. See [android.app.NotificationRule.getAction]. */
     public val action: ActionModel,
     /**
-     * The filter for which notifications this rule applies to.
+     * The filter for which notifications this rule applies to. Null if no filters are included.
      *
      * TODO: b/478225883 - Support a list of filters.
      */
-    public val filter: FilterModel,
+    public val filter: FilterModel?,
 )
 
 /** Represents a specific filter on a rule. See [android.app.NotificationRule.Filter]. */
-public data class FilterModel(
+data class FilterModel(
     /**
      * The contacts that this rule applies to. Null if contacts are not part of the rule filter. See
-     * [android.app.NotificationRule.Filter.getContacts].
+     * [android.app.NotificationRule.Filter.getContacts] and
+     * [android.app.NotificationRule.Filter.getShortcutIds].
      */
-    public val contacts: ContactsModel?,
+    val people: PeopleModel? = null,
     /**
      * The apps that this rule applies to. Null if included apps are not part of the rule filter.
-     * [android.app.NotificationRule.Filter.getIncludedPackageUids].
+     * See [android.app.NotificationRule.Filter.getIncludedPackageUids].
      */
-    public val includedApps: IncludedAppsModel?,
-)
+    val includedApps: IncludedAppsModel? = null,
+    /**
+     * The keywords that this rule applies to. Null if keywords are not part of the rule filter. See
+     * [android.app.NotificationRule.Filter.getKeywords].
+     */
+    val keywords: KeywordsModel? = null,
+) {
+    /** Returns true if at least one field in the filter is filled in with content. */
+    val hasContent: Boolean
+        get() = people != null || includedApps != null || keywords != null
+}

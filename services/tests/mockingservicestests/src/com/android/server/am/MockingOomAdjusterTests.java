@@ -308,6 +308,7 @@ public class MockingOomAdjusterTests {
         setFieldValue(ActivityManagerService.class, mService, "mPhantomProcessList", ppl);
 
         doReturn(mock(AppOpsManager.class)).when(mService).getAppOpsManager();
+        doReturn(HOSTING_TYPE_EMPTY).when(mService).getHostingType(any());
         doCallRealMethod().when(mService).enqueueOomAdjTargetLocked(any(ProcessRecord.class));
         doCallRealMethod().when(mService).updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_ACTIVITY);
         setFieldValue(AppProfiler.class, profiler, "mProfilerLock", new Object());
@@ -4716,6 +4717,45 @@ public class MockingOomAdjusterTests {
         verify(mCallback)
                 .onOomAdjustChanged(eq(TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK), eq(CACHED_APP_MIN_ADJ),
                         eq(app));
+    }
+
+    @Test
+    public void testUpdateOomAdj_TopOrBetter_GrantsCpuCapabilityWithReason() {
+        ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
+                MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, false);
+        setTopProcessState(PROCESS_STATE_TOP);
+        setTopProcess(app);
+
+        updateOomAdj(app);
+
+        assertThatProcess(app).hasCpuTimeCapability().withExactReasons(CPU_TIME_REASON_OTHER);
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_EXPLICIT_CPU_CAPABILITY_FOR_TOP_PROCESSES)
+    public void testUpdateOomAdj_TopOrBetter_HasImplicitCpuTimeWithReason() {
+        ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
+                MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, false);
+        setTopProcessState(PROCESS_STATE_TOP);
+        setTopProcess(app);
+
+        updateOomAdj(app);
+
+        assertThatProcess(app).hasImplicitCpuTimeCapability().withExactReasons(
+                IMPLICIT_CPU_TIME_REASON_OTHER);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_EXPLICIT_CPU_CAPABILITY_FOR_TOP_PROCESSES)
+    public void testUpdateOomAdj_ScoreLessThanFreezerCutOff_HasImplicitCpuTime() {
+        ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
+                MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, false);
+        mProcessStateController.setMaxAdj(app, PERCEPTIBLE_APP_ADJ);
+
+        updateOomAdj(app);
+
+        assertThatProcess(app).hasImplicitCpuTimeCapability().withExactReasons(
+                IMPLICIT_CPU_TIME_REASON_OTHER);
     }
 
     private ProcessRecord makeDefaultProcessRecord(int pid, int uid, String processName,

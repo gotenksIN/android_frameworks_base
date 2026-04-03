@@ -17,6 +17,7 @@ package com.android.server.am.psc;
 
 import android.annotation.NonNull;
 import android.app.ActivityManager.ProcessCapability;
+import android.app.ActivityManager.ProcessState;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 
 import java.util.function.Consumer;
@@ -28,11 +29,26 @@ import java.util.function.Consumer;
  * or the {@link SystemNode}, representing the system itself as a source of importance.
  */
 @RavenwoodKeepWholeClass
-interface GraphNode {
+abstract class GraphNode {
+    /** Whether the node is enqueued for capability propagation. */
+    private boolean mIsEnqueued;
+
     /** Streams the outgoing edges of this node to {@code consumer}. */
-    void forEachOutgoingEdge(@NonNull Consumer<GraphEdge> consumer);
+    abstract void forEachOutgoingEdge(@NonNull Consumer<GraphEdge> consumer);
 
     /** Gets output capabilities from the node. */
     @ProcessCapability
-    int getCapability();
+    abstract int getCapability();
+
+    /** Gets the process state from the node. */
+    @ProcessState
+    abstract int getProcState();
+
+    final boolean isEnqueued() {
+        return mIsEnqueued;
+    }
+
+    final void setEnqueued(boolean isEnqueued) {
+        mIsEnqueued = isEnqueued;
+    }
 }

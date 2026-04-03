@@ -17,7 +17,7 @@ java_defaults {
     ],
 
     srcs: [
-        "test/**/*.java",
+        "src/**/*.java",
     ],
     sdk_version: "test_current",
 }
@@ -33,4 +33,19 @@ android_ravenwood_test {
     name: "RavenwoodMinimumTest-with-module-current",
     defaults: ["RavenwoodMinimumTest-defaults"],
     sdk_version: "module_current",
+}
+
+// Run RavenwoodMinimumTest on robolectric.
+// This is for internal testing. DO NOT run it in presubmit, etc.
+android_robolectric_test {
+    name: "RavenwoodMinimumTest_robo",
+    defaults: ["RavenwoodMinimumTest-defaults"],
+
+    static_libs: [
+        "ravenwood-junit",
+    ],
+
+    instrumentation_for: "RavenwoodEmptyApp",
+    strict_mode: true,
+    java_resource_dirs: ["config"],
 }

@@ -16,6 +16,7 @@
 package com.android.server.pm;
 
 import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.PackageManager.MATCH_ALL;
 import static android.os.Process.INVALID_UID;
 
@@ -97,10 +98,21 @@ final class KillAppBlocker {
         }
     }
 
-    void waitAppProcessGone(ActivityManagerInternal ami, Computer snapshot,
+    /**
+     * Waits for all processes associated with the given package name to terminate.
+     * This method monitors the UIDs (including isolated UIDs if applicable) across all users.
+     *
+     * @param ami The ActivityManagerInternal service.
+     * @param snapshot The current computer snapshot for package metadata.
+     * @param userManager The UserManagerService.
+     * @param packageName The name of the package to wait for.
+     * @return {@code true} if all monitored processes have terminated before the timeout;
+     *         {@code false} if the timeout was reached or the observer is not registered.
+     */
+    boolean waitAppProcessGone(ActivityManagerInternal ami, Computer snapshot,
             UserManagerService userManager, String packageName) {
         if (!mRegistered) {
-            return;
+            return false;
         }
         synchronized (this) {
             if (ami != null) {
@@ -133,18 +145,31 @@ final class KillAppBlocker {
                             }
                         }
                     }
+
+                    if (enablePccFrameworkSupport()) {
+                        final int pccUid = snapshot.getPackageUidInternal(
+                                packageName, MATCH_ALL, userId,
+                                Process.SYSTEM_UID, true /* forPcc */);
+                        if (pccUid != INVALID_UID
+                                && ami.getUidProcessState(pccUid) != PROCESS_STATE_NONEXISTENT) {
+                            Slog.d(TAG, "Adding pcc uid " + pccUid + " for package "
+                                    + packageName);
+                            mActiveUids.add(pccUid);
+                        }
+                    }
                 }
             }
             if (mActiveUids.size() == 0) {
                 // no active uid
-                return;
+                return true;
             }
         }
 
         try {
-            mUidsGoneCountDownLatch.await(mMaxWaitTimeoutMs, TimeUnit.MILLISECONDS);
+            return mUidsGoneCountDownLatch.await(mMaxWaitTimeoutMs, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             // no-op
         }
+        return false;
     }
 }

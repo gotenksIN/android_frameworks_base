@@ -484,20 +484,24 @@ public class SupervisionService extends ISupervisionManager.Stub {
         int type = policy.getType();
         switch (type) {
             case PackageUsagePolicy.TYPE_BLOCKED -> {
+                if (Flags.enableSupervisionPackageUsageApis()) {
+                    setPackageSuspendedForUser(userId, packageName, false);
+                }
                 setApplicationHiddenForUser(userId, packageName, true);
                 enablePendingNotificationStateLocked(userId, policy);
             }
             case PackageUsagePolicy.TYPE_ALLOWED -> {
+                if (Flags.enableSupervisionPackageUsageApis()) {
+                    setPackageSuspendedForUser(userId, packageName, false);
+                }
                 setApplicationHiddenForUser(userId, packageName, false);
                 enablePendingNotificationStateLocked(userId, policy);
             }
             case PackageUsagePolicy.TYPE_TIME_LIMIT -> {
                 if (Flags.enableSupervisionPackageUsageApis()) {
                     setApplicationHiddenForUser(userId, packageName, false);
-                    Slogf.w(
-                            SupervisionLog.TAG,
-                            "Time usage limit policy not implemented yet for package: %s",
-                            packageName);
+                    // TODO(b/482425646): Only suspend the package when limit is reached.
+                    setPackageSuspendedForUser(userId, packageName, true);
                 }
             }
             default ->
@@ -560,6 +564,14 @@ public class SupervisionService extends ISupervisionManager.Stub {
         if (dpmi != null) {
             dpmi.setApplicationHiddenBySystem(
                     SupervisionManager.SUPERVISION_SYSTEM_ENTITY, packageName, userId, hidden);
+        }
+    }
+
+    private void setPackageSuspendedForUser(
+            @UserIdInt int userId, String packageName, boolean suspended) {
+        PackageManagerInternal pmi = mInjector.getPackageManagerInternal();
+        if (pmi != null) {
+            pmi.setPackagesSuspendedByAdmin(userId, new String[] {packageName}, suspended);
         }
     }
 
@@ -836,15 +848,40 @@ public class SupervisionService extends ISupervisionManager.Stub {
     }
 
     private void onSupervisionDisabled(@UserIdInt int userId) {
+        if (!Flags.removeRoleAfterEventDispatch()) {
+            onSupervisionDisabledLegacy(userId);
+            return;
+        }
+
+        Binder.withCleanCallingIdentity(
+                () -> {
+                    updateWebContentFilters(userId, false);
+                    clearAllDevicePoliciesAndSuspendedPackages(userId);
+                    dispatchSupervisionEvent(
+                            userId,
+                            new SupervisionAppEvent(
+                                    listener -> listener.onSetSupervisionEnabled(userId, false),
+                                    packageName -> removeSupervisionRoleHolder(userId, packageName)
+                            ));
+                    AppBindingService abs = mInjector.getAppBindingService();
+                    if (abs != null) {
+                        abs.unbindAndRemoveInvalidConnections(
+                                userId, SupervisionAppServiceFinder.class);
+                    }
+                    clearAllPolicies(userId);
+                });
+    }
+
+    private void onSupervisionDisabledLegacy(@UserIdInt int userId) {
         Binder.withCleanCallingIdentity(
                 () -> {
                     updateWebContentFilters(userId, false);
                     dispatchSupervisionEvent(
                             userId, listener -> listener.onSetSupervisionEnabled(userId, false));
-                    if (Flags.appBindingServiceRework()) {
-                        Objects.requireNonNull(mInjector.getAppBindingService())
-                                .unbindAndRemoveInvalidConnections(
-                                        userId, SupervisionAppServiceFinder.class);
+                    AppBindingService abs = mInjector.getAppBindingService();
+                    if (abs != null) {
+                        abs.unbindAndRemoveInvalidConnections(
+                                userId, SupervisionAppServiceFinder.class);
                     }
                     clearAllDevicePoliciesAndSuspendedPackages(userId);
                     clearAllPolicies(userId);
@@ -858,7 +895,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
     private void dispatchSupervisionEvent(
             @UserIdInt int userId,
             @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> action) {
+        dispatchSupervisionEvent(userId, new SupervisionAppEvent(action, null));
+    }
 
+    private void dispatchSupervisionEvent(@UserIdInt int userId, SupervisionAppEvent action) {
         dispatchSupervisionAppServiceEvent(userId, action);
 
         ArrayList<ISupervisionListener> listeners = new ArrayList<>();
@@ -872,12 +912,11 @@ public class SupervisionService extends ISupervisionManager.Stub {
                     });
         }
 
-        listeners.forEach(action);
+        listeners.forEach(action.event);
     }
 
-    private void dispatchSupervisionAppServiceEvent(
-            @UserIdInt int userId,
-            @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> action) {
+    private void dispatchSupervisionAppServiceEvent(@UserIdInt int userId,
+            SupervisionAppEvent action) {
         AppBindingService abs = mInjector.getAppBindingService();
         if (abs == null) {
             Slogf.e(SupervisionLog.TAG, "AppBindingService is not available.");
@@ -890,17 +929,12 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 connection -> onAppServiceConnection(connection, action));
     }
 
-    private void onAppServiceConnection(
-            @Nullable AppServiceConnection connection,
-            @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> action) {
+    private void onAppServiceConnection(AppServiceConnection connection,
+            SupervisionAppEvent action) {
         if (connection == null) {
             if (DEBUG) {
                 Slogf.i(SupervisionLog.TAG, "AppService connection is null.");
             }
-            return;
-        }
-
-        if (Flags.enableTimeoutInDispatchAppServiceEvent() && !connection.isConnected()) {
             return;
         }
 
@@ -921,7 +955,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
                         "Connected to SupervisionAppService in %s",
                         target);
             }
-            action.accept(binder);
+            action.event.accept(binder);
+        }
+        if (action.onEventComplete != null) {
+            action.onEventComplete.accept(target);
         }
     }
 
@@ -940,7 +977,9 @@ public class SupervisionService extends ISupervisionManager.Stub {
         allSupervisionPackages.addAll(systemSupervisionPackage);
 
         clearSuspendedPackagesFor(userId, allSupervisionPackages);
-        removeSupervisionRoleHolders(user, supervisionPackages);
+        if (!Flags.removeRoleAfterEventDispatch()) {
+            removeSupervisionRoleHolders(user, supervisionPackages);
+        }
 
         DevicePolicyManagerInternal dpmi = mInjector.getDpmInternal();
         if (dpmi != null) {
@@ -963,6 +1002,11 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 pmi.unsuspendForSuspendingPackage(packageName, userId, userId);
             }
         }
+    }
+
+    private void removeSupervisionRoleHolder(@UserIdInt int userId, String packageName) {
+        mInjector.removeRoleHoldersAsUser(ROLE_SUPERVISION, packageName,
+                UserHandle.of(userId));
     }
 
     private void removeSupervisionRoleHolders(UserHandle user, List<String> supervisionPackages) {
@@ -1242,7 +1286,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
             mRoleManager.removeRoleHolderAsUser(
                     roleName,
                     packageName,
-                    0,
+                    RoleManager.MANAGE_HOLDERS_FLAG_DONT_KILL_APP,
                     user,
                     context.getMainExecutor(),
                     success -> {
@@ -1545,4 +1589,9 @@ public class SupervisionService extends ISupervisionManager.Stub {
             unregisterSupervisionListener(listener);
         }
     }
+
+    private record SupervisionAppEvent(
+            @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> event,
+            @Nullable RemoteExceptionIgnoringConsumer<String> onEventComplete
+    ) {}
 }

@@ -27,7 +27,6 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -41,7 +40,11 @@ import android.app.role.RoleManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
+import android.Manifest;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -96,6 +99,7 @@ public class PccSandboxManagerInternalTest {
     private static final int PCC_UID_1 = Process.FIRST_PCC_UID;
     private static final int PCC_UID_2 = Process.LAST_PCC_UID;
     private static final int PCS_UID = 10199;
+    private static final int PCS_UID_2 = 10201;
     private static final int REGULAR_UID = 10200;
 
     private static final String PCC_PACKAGE_1 = "com.pcc.package1";
@@ -225,8 +229,9 @@ public class PccSandboxManagerInternalTest {
     public void createPccProxyIfNeeded_asTrustedPackage_returnsDirectBinder() {
         mPccSandboxManagerInternal.mPccTrustedPackages.add(TRUSTED_PACKAGE);
         AndroidPackage mockAndroidPackage = mock(AndroidPackage.class);
-        doReturn(TRUSTED_PACKAGE).when(mockAndroidPackage).getPackageName();
-        doReturn(mockAndroidPackage).when(mPackageManagerInternal).getPackage(TRUSTED_PACKAGE_UID);
+        when(mockAndroidPackage.getPackageName()).thenReturn(TRUSTED_PACKAGE);
+        when(mPackageManagerInternal.getPackage(TRUSTED_PACKAGE_UID)).thenReturn(
+                mockAndroidPackage);
         // Mock isSameApp for trusted packages used in tests
         when(mPackageManagerInternal.isSameApp(any(), anyInt(), anyInt())).thenReturn(true);
 
@@ -235,6 +240,8 @@ public class PccSandboxManagerInternalTest {
 
         assertEquals("Should return a direct binder for trusted package", mRealBinder,
                 returnedBinder);
+        assertEquals("Connection should be tracked for trusted package", 1,
+                mPccSandboxManagerInternal.mPccServiceConnections.size());
     }
 
     @Test
@@ -243,6 +250,8 @@ public class PccSandboxManagerInternalTest {
                 mIntent, mRealBinder, PCC_CLIENT_UID);
 
         assertEquals("Should return a direct binder", mRealBinder, returnedBinder);
+        assertEquals("Connection should be tracked for pcc client", 1,
+                mPccSandboxManagerInternal.mPccServiceConnections.size());
     }
 
     @Test
@@ -251,6 +260,78 @@ public class PccSandboxManagerInternalTest {
                 mIntent, mRealBinder, Process.SYSTEM_UID);
 
         assertEquals("Should return a direct binder", mRealBinder, returnedBinder);
+        assertEquals("Connection should be tracked for system service", 1,
+                mPccSandboxManagerInternal.mPccServiceConnections.size());
+    }
+
+    @Test
+    public void createPccProxyIfNeeded_asTrustedPackage_noProxyInitialized() {
+        mPccSandboxManagerInternal.mPccTrustedPackages.add(TRUSTED_PACKAGE);
+        AndroidPackage mockAndroidPackage = mock(AndroidPackage.class);
+        when(mockAndroidPackage.getPackageName()).thenReturn(TRUSTED_PACKAGE);
+        when(mPackageManagerInternal.getPackage(TRUSTED_PACKAGE_UID)).thenReturn(
+                mockAndroidPackage);
+        // Mock isSameApp for trusted packages used in tests
+        when(mPackageManagerInternal.isSameApp(any(), anyInt(), anyInt())).thenReturn(true);
+
+        mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName, 0,
+                mIntent, mRealBinder, TRUSTED_PACKAGE_UID);
+
+        PccSandboxManagerInternal.PccServiceInfo serviceInfo =
+                mPccSandboxManagerInternal.mPccServiceConnections.get(mRealBinder);
+        assertNull("Proxy should NOT be initialized for trusted clients",
+                serviceInfo.getPccServiceProxy());
+    }
+
+    @Test
+    public void createPccProxyIfNeeded_asPccClient_noProxyInitialized() {
+        IBinder unusedReturnedBinder = mPccSandboxManagerInternal.createPccProxyIfNeeded(
+                mServiceName, 0, mIntent, mRealBinder, PCC_CLIENT_UID);
+
+        PccSandboxManagerInternal.PccServiceInfo serviceInfo =
+                mPccSandboxManagerInternal.mPccServiceConnections.get(mRealBinder);
+        assertNull("Proxy should NOT be initialized for PCC clients",
+                serviceInfo.getPccServiceProxy());
+    }
+
+    @Test
+    public void createPccProxyIfNeeded_asSystemService_noProxyInitialized() {
+        IBinder unusedReturnedBinder = mPccSandboxManagerInternal.createPccProxyIfNeeded(
+                mServiceName, 0, mIntent, mRealBinder, Process.SYSTEM_UID);
+
+        PccSandboxManagerInternal.PccServiceInfo serviceInfo =
+                mPccSandboxManagerInternal.mPccServiceConnections.get(mRealBinder);
+        assertNull("Proxy should NOT be initialized for system server as client",
+                serviceInfo.getPccServiceProxy());
+    }
+
+    @Test
+    public void fetchPccProxyIfNeeded_afterTrustedClientBinds_returnsProxy() {
+        mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder,
+                PCC_CLIENT_UID);
+
+        IBinder proxy = mPccSandboxManagerInternal.fetchPccProxyIfNeeded(mRealBinder,
+                NON_PCC_CLIENT_UID);
+
+        assertNotNull("Proxy should be found even if only trusted clients are bound", proxy);
+        assertNotEquals("Fetched binder should be a proxy, not the real binder", mRealBinder,
+                proxy);
+    }
+
+    @Test
+    public void fetchPccProxyIfNeeded_triggersLazyInitialization() {
+        mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder,
+                PCC_CLIENT_UID);
+        PccSandboxManagerInternal.PccServiceInfo serviceInfo =
+                mPccSandboxManagerInternal.mPccServiceConnections.get(mRealBinder);
+        assertNull(serviceInfo.getPccServiceProxy());
+
+        IBinder proxy = mPccSandboxManagerInternal.fetchPccProxyIfNeeded(mRealBinder,
+                NON_PCC_CLIENT_UID);
+
+        assertNotNull("Proxy should be created on first untrusted access", proxy);
+        assertNotNull("Internal proxy field should now be populated",
+                serviceInfo.getPccServiceProxy());
     }
 
     @Test
@@ -276,8 +357,7 @@ public class PccSandboxManagerInternalTest {
         assertNotNull(serviceInfo);
         PccSandboxManagerInternal.PccServiceProxy proxy = serviceInfo.getWrappedBinder();
 
-        mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder,
-                NON_PCC_CLIENT_UID);
+        mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder);
 
         assertNull("realBinder should be null after destroy()", proxy.getRealBinder());
         assertEquals(0, mPccSandboxManagerInternal.mPccServiceConnections.size());
@@ -291,8 +371,7 @@ public class PccSandboxManagerInternalTest {
                 NON_PCC_CLIENT_UID);
 
         // Unbind one client
-        mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder,
-                NON_PCC_CLIENT_UID);
+        mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder);
 
         assertEquals("Should still have one service connection info", 1,
                 mPccSandboxManagerInternal.mPccServiceConnections.size());
@@ -306,7 +385,7 @@ public class PccSandboxManagerInternalTest {
         IBinder proxyBinder1 = mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName,
                 USER_ID_1, mIntent, mRealBinder, NON_PCC_CLIENT_UID);
         mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, USER_ID_1, mIntent,
-                mRealBinder, NON_PCC_CLIENT_UID);
+                mRealBinder);
         assertNotNull(proxyBinder1);
 
         IBinder proxyBinder2 = mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName,
@@ -325,12 +404,24 @@ public class PccSandboxManagerInternalTest {
         assertNotNull(proxyBinder1);
 
         mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, USER_ID_1, mIntent,
-                mRealBinder, NON_PCC_CLIENT_UID);
+                mRealBinder);
         IBinder proxyBinder2 = mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName,
                 USER_ID_1, mIntent, mRealBinder, NON_PCC_CLIENT_UID);
         assertNotNull(proxyBinder2);
 
         assertEquals(proxyBinder1, proxyBinder2);
+    }
+
+    @Test
+    public void removePccProxyIfNeeded_asTrustedClient_removesConnection() {
+        mPccSandboxManagerInternal.createPccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder,
+                PCC_CLIENT_UID);
+        assertEquals(1, mPccSandboxManagerInternal.mPccServiceConnections.size());
+
+        mPccSandboxManagerInternal.removePccProxyIfNeeded(mServiceName, 0, mIntent, mRealBinder);
+
+        assertEquals("Connection should be removed for trusted client", 0,
+                mPccSandboxManagerInternal.mPccServiceConnections.size());
     }
 
     @Test
@@ -641,7 +732,7 @@ public class PccSandboxManagerInternalTest {
         // Reset the mock to clear any previous stubs
         reset(mPackageManagerInternal);
         // Mock isSameApp for trusted packages used in tests
-        doReturn(true).when(mPackageManagerInternal).isSameApp(any(), anyInt(), anyInt());
+        when(mPackageManagerInternal.isSameApp(any(), anyInt(), anyInt())).thenReturn(true);
 
         mPccSandboxManagerInternal.populatePccTrustedPackages();
         Bundle bundle = new Bundle();
@@ -666,12 +757,10 @@ public class PccSandboxManagerInternalTest {
         when(mMockRoleManager.getRoleHoldersAsUser(eq(testRole), any(UserHandle.class)))
                 .thenReturn(Collections.singletonList(rolePackage));
 
-        doReturn(android.content.pm.PackageManager.PERMISSION_GRANTED)
-                .when(mPccSandboxManagerInternal)
-                .checkPermission(
-                        eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
-                        eq(rolePackage),
-                        anyInt());
+        when(mPccSandboxManagerInternal.checkPermission(
+                eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
+                eq(rolePackage),
+                anyInt())).thenReturn(android.content.pm.PackageManager.PERMISSION_GRANTED);
 
         // Call populate
         mPccSandboxManagerInternal.populatePccAllowedPackages();
@@ -691,12 +780,10 @@ public class PccSandboxManagerInternalTest {
         when(mMockRoleManager.getRoleHoldersAsUser(eq(testRole), eq(UserHandle.of(USER_ID_1))))
                 .thenReturn(Collections.singletonList(rolePackage));
 
-        doReturn(android.content.pm.PackageManager.PERMISSION_GRANTED)
-                .when(mPccSandboxManagerInternal)
-                .checkPermission(
-                        eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
-                        anyString(),
-                        anyInt());
+        when(mPccSandboxManagerInternal.checkPermission(
+                eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
+                anyString(),
+                anyInt())).thenReturn(android.content.pm.PackageManager.PERMISSION_GRANTED);
 
         // Initial populate
         mPccSandboxManagerInternal.updateAllowedPackagesForUser(USER_ID_1);
@@ -730,6 +817,78 @@ public class PccSandboxManagerInternalTest {
 
     @Test
     @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testPopulatePcsUids_populatesCacheCorrectly() {
+        PackageInfo mockPackageInfo1 = new PackageInfo();
+        mockPackageInfo1.applicationInfo = new ApplicationInfo();
+        mockPackageInfo1.applicationInfo.uid = PCS_UID;
+        PackageInfo mockPackageInfo2 = new PackageInfo();
+        mockPackageInfo2.applicationInfo = new ApplicationInfo();
+        mockPackageInfo2.applicationInfo.uid = PCS_UID_2;
+        Context mockContext = mock(Context.class);
+        PackageManager mockPackageManager = mock(PackageManager.class);
+        when(mockContext.getPackageManager()).thenReturn(mockPackageManager);
+        when(mockPackageManager.getPackagesHoldingPermissions(
+                eq(new String[]{Manifest.permission.PROVIDE_PRIVATE_COMPUTE_SERVICES}),
+                anyInt()))
+                .thenReturn(Arrays.asList(mockPackageInfo1, mockPackageInfo2));
+        PccSandboxManagerInternal pccSandboxManagerInternal = new PccSandboxManagerInternal(
+                mockContext, mMockPccSandboxManagerService);
+
+        pccSandboxManagerInternal.populatePcsUids();
+
+        assertTrue(pccSandboxManagerInternal.isPrivateComputeServicesUid(PCS_UID));
+        assertTrue(pccSandboxManagerInternal.isPrivateComputeServicesUid(PCS_UID_2));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testIsPrivateComputeServicesUid_cachesPcsUidResult() {
+        int testUid = PCS_UID;
+        when(mMockPccSandboxManagerService.isPrivateComputeServicesUid(testUid)).thenReturn(true);
+
+        // First call should trigger a call to the service
+        assertTrue(mPccSandboxManagerInternal.isPrivateComputeServicesUid(testUid));
+        verify(mMockPccSandboxManagerService, times(1)).isPrivateComputeServicesUid(testUid);
+
+        // Second call should use the cache and not call the service again
+        assertTrue(mPccSandboxManagerInternal.isPrivateComputeServicesUid(testUid));
+        verify(mMockPccSandboxManagerService, times(1)).isPrivateComputeServicesUid(testUid);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testIsPrivateComputeServicesUid_cachesNonPcsUidResult() {
+        int testUid = REGULAR_UID;
+        when(mMockPccSandboxManagerService.isPrivateComputeServicesUid(testUid)).thenReturn(false);
+
+        // First call should trigger a call to the service
+        assertFalse(mPccSandboxManagerInternal.isPrivateComputeServicesUid(testUid));
+        verify(mMockPccSandboxManagerService, times(1)).isPrivateComputeServicesUid(testUid);
+
+        // Second call should use the cache and not call the service again
+        assertFalse(mPccSandboxManagerInternal.isPrivateComputeServicesUid(testUid));
+        verify(mMockPccSandboxManagerService, times(1)).isPrivateComputeServicesUid(testUid);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testIsPrivateComputeServicesUid_doesNotCacheShellUidResult() {
+        int shellUid = Process.SHELL_UID;
+        when(mMockPccSandboxManagerService.isPrivateComputeServicesUid(shellUid))
+                .thenReturn(true)
+                .thenReturn(false);
+
+        // First call should trigger a call to the service
+        assertTrue(mPccSandboxManagerInternal.isPrivateComputeServicesUid(shellUid));
+        verify(mMockPccSandboxManagerService, times(1)).isPrivateComputeServicesUid(shellUid);
+
+        // Second call should NOT use the cache and call the service again
+        assertFalse(mPccSandboxManagerInternal.isPrivateComputeServicesUid(shellUid));
+        verify(mMockPccSandboxManagerService, times(2)).isPrivateComputeServicesUid(shellUid);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
     public void testPopulatePccAllowedPackages_AssistantRole_WithPermission_IsAllowed() {
         String assistantPackage = "com.example.assistant";
 
@@ -737,12 +896,10 @@ public class PccSandboxManagerInternalTest {
                 eq(android.app.role.RoleManager.ROLE_ASSISTANT), any(UserHandle.class)))
                 .thenReturn(Collections.singletonList(assistantPackage));
 
-        doReturn(android.content.pm.PackageManager.PERMISSION_GRANTED)
-                .when(mPccSandboxManagerInternal)
-                .checkPermission(
-                        eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
-                        eq(assistantPackage),
-                        eq(USER_ID_1));
+        when(mPccSandboxManagerInternal.checkPermission(
+                eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
+                eq(assistantPackage),
+                eq(USER_ID_1))).thenReturn(android.content.pm.PackageManager.PERMISSION_GRANTED);
 
         mPccSandboxManagerInternal.populatePccAllowedPackages();
 
@@ -760,12 +917,10 @@ public class PccSandboxManagerInternalTest {
                 .thenReturn(Collections.singletonList(assistantPackage));
 
 
-        doReturn(android.content.pm.PackageManager.PERMISSION_DENIED)
-                .when(mPccSandboxManagerInternal)
-                .checkPermission(
-                        eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
-                        eq(assistantPackage),
-                        eq(USER_ID_1));
+        when(mPccSandboxManagerInternal.checkPermission(
+                eq(android.Manifest.permission.MANAGE_HOTWORD_DETECTION),
+                eq(assistantPackage),
+                eq(USER_ID_1))).thenReturn(android.content.pm.PackageManager.PERMISSION_DENIED);
 
         mPccSandboxManagerInternal.populatePccAllowedPackages();
 

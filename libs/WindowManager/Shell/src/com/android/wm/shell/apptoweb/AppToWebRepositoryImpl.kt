@@ -77,6 +77,7 @@ class AppToWebRepositoryImpl(
 
     private var appToWebDataByTask = SparseArray<TaskAppToWebData>()
     private val firstRunPromptShownByTaskId = mutableSetOf<Int>()
+    private val firstRunPromptSuppressedByTaskId = mutableSetOf<Int>()
     private var firstRunPromptAckedPackagesByUserId: MutableMap<Int, MutableSet<String>> =
         mutableMapOf()
 
@@ -147,6 +148,7 @@ class AppToWebRepositoryImpl(
         appToWebDataByTask.remove(taskInfo.taskId)
         if (Flags.enableEnhancedAppToWebTransition()) {
             firstRunPromptShownByTaskId.remove(taskInfo.taskId)
+            firstRunPromptSuppressedByTaskId.remove(taskInfo.taskId)
         }
     }
 
@@ -254,22 +256,41 @@ class AppToWebRepositoryImpl(
             logD("Intent sender prefers non-browser for task %d", taskInfo.taskId)
             return false
         }
-        val topPackageName = taskInfo.topActivity?.packageName ?: return false
-        if (isBrowserApp(context, topPackageName, taskInfo.userId)) {
-            // Browser apps are not the target.
+
+        // 1. Check if the prompt was previously suppressed for this task.
+        // This handles trampoline cases where the base activity briefly switches to a non-browser
+        // after being a browser. We check this first to save work resolving packages.
+        if (firstRunPromptSuppressedByTaskId.contains(taskInfo.taskId)) {
             logD(
-                "Browser app %s is not the target for task %d (top)",
-                topPackageName,
+                "Prompt suppressed for task %d as a browser app has ever been on the base",
                 taskInfo.taskId,
             )
             return false
         }
+
+        // 2. Check if the current base activity is a browser.
+        // If it is, we don't show the prompt, and we record the task ID to suppress future prompts.
         val basePackageName = taskInfo.baseActivity?.packageName ?: return false
         if (isBrowserApp(context, basePackageName, taskInfo.userId)) {
             // Browser apps are not the target.
             logD(
                 "Browser app %s is not the target for task %d (base)",
                 basePackageName,
+                taskInfo.taskId,
+            )
+            firstRunPromptSuppressedByTaskId.add(taskInfo.taskId)
+            return false
+        }
+
+        // 3. Check if the current top activity is a browser.
+        // The base might be a non-browser, but the top could be a browser (e.g., CCT).
+        // We shouldn't show the prompt here either, but we don't permanently suppress the task.
+        val topPackageName = taskInfo.topActivity?.packageName ?: return false
+        if (isBrowserApp(context, topPackageName, taskInfo.userId)) {
+            // Browser apps are not the target.
+            logD(
+                "Browser app %s is not the target for task %d (top)",
+                topPackageName,
                 taskInfo.taskId,
             )
             return false

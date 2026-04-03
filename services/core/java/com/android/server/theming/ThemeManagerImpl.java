@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Core logic implementation for the theming system.
@@ -79,7 +80,7 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
     private final ThemeUserLifecycle mUserLifecycle;
     private final ThemeEventObserver mEventObserver;
 
-    private volatile boolean mIsThemeReady = false;
+    private final AtomicBoolean mIsThemeReady = new AtomicBoolean(false);
 
     private final Object mLock = new Object();
 
@@ -320,16 +321,24 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
     }
 
     /**
-     * Checks if the user's theme relies on the home wallpaper.
+     * Checks if the user's theme relies on the home wallpaper and needs to wait for it.
      *
      * @param userId The ID of the user.
-     * @return true if the current theme requires wallpaper colors.
+     * @return true if the current theme requires wallpaper colors for initialization.
      */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public boolean requiresWallpaperForInitialization(int userId) {
         mThemeSettingsManager.initializeDefaults();
-        ThemeSettings settings = mThemeSettingsManager.getSettingsOrDefault(userId,
+
+        // If we have saved settings, we already have the seed colors from the last boot.
+        // We don't need to wait for wallpaper colors to initialize the theme.
+        ThemeSettings savedSettings = mThemeSettingsManager.getSettings(userId,
                 mContext.getContentResolver());
+        if (savedSettings != null) {
+            return false;
+        }
+
+        ThemeSettings settings = mThemeSettingsManager.createDefaultThemeSettings(userId);
         return FieldColorSource.VALUE_HOME_WALLPAPER.equals(settings.colorSource());
     }
 
@@ -412,8 +421,7 @@ public class ThemeManagerImpl implements ThemeManagerInternal, ThemeEventDispatc
      */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void onThemingSystemReady() {
-        if (mIsThemeReady) return;
-        mIsThemeReady = true;
+        if (!mIsThemeReady.compareAndSet(false, true)) return;
         Slog.i(TAG, "Theming system initialization complete.");
     }
 

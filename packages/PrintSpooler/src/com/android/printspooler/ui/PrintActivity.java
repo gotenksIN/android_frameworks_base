@@ -863,14 +863,12 @@ public class PrintActivity extends Activity implements RemotePrintDocument.Updat
             return;
         }
 
-        if (Flags.printingTelemetry()) {
-            final String serviceName = printer.getId().getServiceName().getPackageName();
-            try {
-                final int serviceUId = getPackageManager().getApplicationInfo(serviceName, 0).uid;
-                StatsAsyncLogger.INSTANCE.AdvancedOptionsUiLaunched(serviceUId);
-            } catch (NameNotFoundException e) {
-                Log.e(LOG_TAG, "Failed to get uid for service");
-            }
+        final String serviceName = printer.getId().getServiceName().getPackageName();
+        try {
+            final int serviceUId = getPackageManager().getApplicationInfo(serviceName, 0).uid;
+            StatsAsyncLogger.INSTANCE.AdvancedOptionsUiLaunched(serviceUId);
+        } catch (NameNotFoundException e) {
+            Log.e(LOG_TAG, "Failed to get uid for service");
         }
 
         // The activity is a component name, therefore it is one or none.
@@ -2344,31 +2342,29 @@ public class PrintActivity extends Activity implements RemotePrintDocument.Updat
             return;
         }
 
-        if (Flags.printingTelemetry()) {
-            // If this runs any earlier we double log when a printjob
-            // is completed. If it gets called any later than it does
-            // not get called when a user launches the printing UI
-            // without printing anything or opening "All printers".
+        // If this runs any earlier we double log when a printjob
+        // is completed. If it gets called any later than it does
+        // not get called when a user launches the printing UI
+        // without printing anything or opening "All printers".
 
-            // We record the MainPrintUilaunched event and recorded
-            // printers/services at the end of the activity lifecycle
-            // so there has been time for printers to be discovered.
-            final List<PrinterInfo> printers = (mPrinterRegistry == null)
-                    ? new ArrayList<>() :
-                      mPrinterRegistry.getPrinters();
-            final Set<Integer> printServiceUIds = new HashSet<>();
-            for (final PrinterInfo printer : printers) {
-                final String serviceName = printer.getId().getServiceName().getPackageName();
-                try {
-                    final int serviceUId =
-                            getPackageManager().getApplicationInfo(serviceName, 0).uid;
-                    printServiceUIds.add(serviceUId);
-                } catch (NameNotFoundException e) {
-                    Log.e(LOG_TAG, "Failed to get uid for service");
-                }
+        // We record the MainPrintUilaunched event and recorded
+        // printers/services at the end of the activity lifecycle
+        // so there has been time for printers to be discovered.
+        final List<PrinterInfo> printers = (mPrinterRegistry == null)
+                ? new ArrayList<>() :
+                  mPrinterRegistry.getPrinters();
+        final Set<Integer> printServiceUIds = new HashSet<>();
+        for (final PrinterInfo printer : printers) {
+            final String serviceName = printer.getId().getServiceName().getPackageName();
+            try {
+                final int serviceUId =
+                        getPackageManager().getApplicationInfo(serviceName, 0).uid;
+                printServiceUIds.add(serviceUId);
+            } catch (NameNotFoundException e) {
+                Log.e(LOG_TAG, "Failed to get uid for service");
             }
-            StatsAsyncLogger.INSTANCE.MainPrintUiLaunched(printServiceUIds, printers.size());
         }
+        StatsAsyncLogger.INSTANCE.MainPrintUiLaunched(printServiceUIds, printers.size());
 
         if (mIsFinishing) {
             return;
@@ -2800,29 +2796,27 @@ public class PrintActivity extends Activity implements RemotePrintDocument.Updat
                 }
             }
 
-            if (Flags.printingTelemetry()) {
-                for (final PrinterInfo printer : newPrintersMap.values()) {
-                    final PrinterCapabilitiesInfo caps = printer.getCapabilities();
-                    int colorModesMask = 0;
-                    int duplexModesMask = 0;
-                    Set<MediaSize> mediaSizes = new HashSet<>();
-                    if (caps != null) {
-                        colorModesMask = caps.getColorModes();
-                        duplexModesMask = caps.getDuplexModes();
-                        mediaSizes = new HashSet<>(caps.getMediaSizes());
-                    }
-                    final String serviceName = printer.getId().getServiceName().getPackageName();
-                    try {
-                        final int serviceUId =
-                                getPackageManager().getApplicationInfo(serviceName, 0).uid;
-                        StatsAsyncLogger.INSTANCE
-                                .PrinterDiscovery(serviceUId,
-                                                  colorModesMask,
-                                                  duplexModesMask,
-                                                  mediaSizes);
-                    } catch (NameNotFoundException e) {
-                        Log.e(LOG_TAG, "Failed to get uid for service");
-                    }
+            for (final PrinterInfo printer : newPrintersMap.values()) {
+                final PrinterCapabilitiesInfo caps = printer.getCapabilities();
+                int colorModesMask = 0;
+                int duplexModesMask = 0;
+                Set<MediaSize> mediaSizes = new HashSet<>();
+                if (caps != null) {
+                    colorModesMask = caps.getColorModes();
+                    duplexModesMask = caps.getDuplexModes();
+                    mediaSizes = new HashSet<>(caps.getMediaSizes());
+                }
+                final String serviceName = printer.getId().getServiceName().getPackageName();
+                try {
+                    final int serviceUId =
+                            getPackageManager().getApplicationInfo(serviceName, 0).uid;
+                    StatsAsyncLogger.INSTANCE
+                            .PrinterDiscovery(serviceUId,
+                                              colorModesMask,
+                                              duplexModesMask,
+                                              mediaSizes);
+                } catch (NameNotFoundException e) {
+                    Log.e(LOG_TAG, "Failed to get uid for service");
                 }
             }
             // Add the rest of the new printers, i.e. what is left.

@@ -19,17 +19,16 @@ package com.android.systemui.statusbar.core
 import android.content.applicationContext
 import android.view.Display
 import com.android.app.displaylib.fakes.FakePerDisplayRepository
-import com.android.systemui.bouncer.domain.interactor.primaryBouncerInteractor
 import com.android.systemui.display.data.repository.displayPhoneSubcomponentPerDisplayRepository
 import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.display.data.repository.displayScopeRepository
 import com.android.systemui.dump.dumpManager
+import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.mockDemoModeController
 import com.android.systemui.plugins.mockPluginDependencyProvider
 import com.android.systemui.power.domain.interactor.powerInteractor
-import com.android.systemui.shade.mockNotificationShadeWindowViewController
 import com.android.systemui.shade.mockShadeSurface
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModePerDisplayRepository
 import com.android.systemui.statusbar.data.repository.lightBarControllerStore
@@ -93,12 +92,11 @@ val Kosmos.statusBarOrchestrator by
             mockDemoModeController,
             mockPluginDependencyProvider,
             mockNotificationRemoteInputManager,
-            { mockNotificationShadeWindowViewController },
             mockShadeSurface,
             bubblesOptional,
             dumpManager,
             powerInteractor,
-            primaryBouncerInteractor,
+            keyguardInteractor,
         )
     }
 

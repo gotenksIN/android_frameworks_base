@@ -385,11 +385,6 @@ public class ZygoteInit {
         } finally {
             IoUtils.closeQuietly(is);
 
-            // Fill in dex caches with classes, fields, and methods brought in by preloading.
-            Trace.traceBegin(Trace.TRACE_TAG_DALVIK, "PreloadDexCaches");
-            runtime.preloadDexCaches();
-            Trace.traceEnd(Trace.TRACE_TAG_DALVIK);
-
             // If we are profiling the boot image, reset the Jit counters after preloading the
             // classes. We want to preload for performance, and we can use method counters to
             // infer what clases are used after calling resetJitCounters, for profile purposes.

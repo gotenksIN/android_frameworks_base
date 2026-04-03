@@ -31,33 +31,49 @@ import com.android.systemui.shared.clocks.FlexClockContext
 import java.util.Locale
 
 @SuppressLint("ViewConstructor")
-class BitmapClockViewGroup(clockCtx: FlexClockContext) :
+class BitmapClockViewGroup(clockCtx: FlexClockContext, private val isLargeClock: Boolean) :
     DigitalClockViewGroup<BitmapClockView>(clockCtx) {
 
     override val children: Sequence<BitmapClockView>
         get() = (this as ViewGroup).children.filterIsInstance<BitmapClockView>()
 
     override fun calculateSize(measureSpec: VMeasurePoint): VPointF {
-        // This is where the parent decides how big the whole clock is.
-        // We assume 2 digits wide, 2 digits tall for the large clock
-        val yBuffer = context.resources.getDimensionPixelSize(R.dimen.clock_vertical_digit_buffer)
-        return maxChildSize * VPointF(2f, 2f) + VPointF(0f, yBuffer.toFloat())
+        if (isLargeClock) {
+            val yBuffer =
+                context.resources.getDimensionPixelSize(R.dimen.clock_vertical_digit_buffer)
+            return maxChildSize * VPointF(2f, 2f) + VPointF(0f, yBuffer.toFloat())
+        } else {
+            return maxChildSize * VPointF(5f, 1f)
+        }
     }
 
     override fun getChildFrame(child: BitmapClockView): VRectF {
         val yBuffer = context.resources.getDimensionPixelSize(R.dimen.clock_vertical_digit_buffer)
 
-        // This math places the 4 bitmaps in a 2x2 grid
         var offset =
-            maxChildSize.run {
-                when (child.id) {
-                    ClockViewIds.HOUR_FIRST_DIGIT -> VPointF.ZERO
-                    ClockViewIds.HOUR_SECOND_DIGIT -> VPointF(x, 0f)
-                    ClockViewIds.MINUTE_FIRST_DIGIT -> VPointF(0f, y + yBuffer)
-                    ClockViewIds.MINUTE_SECOND_DIGIT -> VPointF(x, y + yBuffer)
-                    else -> VPointF.ZERO
+            if (isLargeClock) {
+                maxChildSize.run {
+                    when (child.id) {
+                        ClockViewIds.HOUR_FIRST_DIGIT -> VPointF.ZERO
+                        ClockViewIds.HOUR_SECOND_DIGIT -> VPointF(x, 0f)
+                        ClockViewIds.MINUTE_FIRST_DIGIT -> VPointF(0f, y + yBuffer)
+                        ClockViewIds.MINUTE_SECOND_DIGIT -> VPointF(x, y + yBuffer)
+                        else -> VPointF.ZERO
+                    }
+                }
+            } else {
+                maxChildSize.run {
+                    when (child.id) {
+                        ClockViewIds.HOUR_FIRST_DIGIT -> VPointF.ZERO
+                        ClockViewIds.HOUR_SECOND_DIGIT -> VPointF(x, 0f)
+                        // In Small clock, minutes start after the hours on the same line
+                        ClockViewIds.MINUTE_FIRST_DIGIT -> VPointF(x * 2, 0f)
+                        ClockViewIds.MINUTE_SECOND_DIGIT -> VPointF(x * 3, 0f)
+                        else -> VPointF.ZERO
+                    }
                 }
             }
+
         return VRectF.fromTopLeft(offset, child.measuredSize)
     }
 

@@ -48,8 +48,7 @@
     <string name="profile_name_generic" msgid="6851028682723034988">"อุปกรณ์"</string>
     <string name="summary_generic" msgid="1761976003668044801">"แอปนี้จะสามารถซิงค์ข้อมูล เช่น ชื่อของบุคคลที่โทรเข้ามา ระหว่างโทรศัพท์ของคุณและอุปกรณ์ที่เลือกไว้ได้"</string>
     <string name="summary_generic_with_remote_ai_capability" msgid="5053633566439056634">"อนุญาตให้ &lt;strong&gt;<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>&lt;/strong&gt; ซิงค์ข้อมูล เช่น ข้อมูลผู้โทร และเรียกใช้การทำงานอัจฉริยะจาก<xliff:g id="DEVICE_TYPE">%2$s</xliff:g>"</string>
-    <!-- no translation found for summary_with_permissions_and_remote_ai_capability (5240771314596527096) -->
-    <skip />
+    <string name="summary_with_permissions_and_remote_ai_capability" msgid="5240771314596527096">"อนุญาตให้ &lt;strong&gt;<xliff:g id="COMPANION_DEVICE_NAME">%1$s</xliff:g>&lt;/strong&gt; ซิงค์ข้อมูล เช่น ข้อมูลผู้โทร และเรียกใช้การทำงานอัจฉริยะจาก <xliff:g id="DEVICE_TYPE">%2$s</xliff:g> ของคุณ"</string>
     <string name="consent_yes" msgid="8344487259618762872">"อนุญาต"</string>
     <string name="consent_no" msgid="2640796915611404382">"ไม่อนุญาต"</string>
     <string name="consent_cancel" msgid="5655005528379285841">"ยกเลิก"</string>
@@ -93,10 +92,8 @@
     <string name="permission_add_mirror_display_summary" msgid="1385423940454941534">"บันทึก แคสต์ หรือแชร์หน้าจอของ<xliff:g id="DEVICE_TYPE_0">%2$s</xliff:g>ไปยัง &lt;strong&gt;<xliff:g id="DEVICE_NAME">%3$s</xliff:g>&lt;/strong&gt;&lt;br/&gt;&lt;br/&gt;<xliff:g id="APP_NAME">%1$s</xliff:g> จะมีสิทธิ์เข้าถึงทุกอย่างที่ปรากฏหรือเล่นใน<xliff:g id="DEVICE_TYPE_1">%2$s</xliff:g> ซึ่งรวมถึงเสียง รูปภาพ ข้อมูลการชำระเงิน รหัสผ่าน และข้อความ"</string>
     <string name="permission_add_trusted_display_summary" msgid="7399955172055281447">"สตรีมแอป <xliff:g id="DEVICE_TYPE_0">%2$s</xliff:g> ของคุณไปยัง &lt;strong&gt;<xliff:g id="DEVICE_NAME_1">%3$s</xliff:g>&lt;/strong&gt;.&lt;br/&gt;&lt;br/&gt;<xliff:g id="APP_NAME">%1$s</xliff:g> จะมีสิทธิ์เข้าถึงทุกอย่างที่ปรากฏหรือเล่นใน <xliff:g id="DEVICE_NAME_2">%3$s</xliff:g> ซึ่งรวมถึงเสียง รูปภาพ ข้อมูลการชำระเงิน รหัสผ่าน และข้อความ แม้ในขณะที่ <xliff:g id="DEVICE_TYPE_3">%2$s</xliff:g> ถูกล็อกอยู่ก็ตาม"</string>
     <string name="permission_media_routing_control_summary" msgid="2714631092321412250">"เข้าถึงรายการอุปกรณ์ที่มีและควบคุมอุปกรณ์ที่จะสตรีมหรือแคสต์เสียงหรือวิดีโอจากแอปอื่นๆ"</string>
-    <!-- no translation found for permission_schedule_exact_alarm_summary (4263728689361283271) -->
-    <skip />
-    <!-- no translation found for permission_bypass_dnd_summary (3649231048838415756) -->
-    <skip />
+    <string name="permission_schedule_exact_alarm_summary" msgid="4263728689361283271">"ส่งการแจ้งเตือนให้คุณ"</string>
+    <string name="permission_bypass_dnd_summary" msgid="3649231048838415756">"ส่งการแจ้งเตือนให้คุณแม้ว่าจะเปิดโหมดอย่ารบกวนอยู่"</string>
     <string name="device_type" product="default" msgid="8268703872070046263">"โทรศัพท์"</string>
     <string name="device_type" product="tablet" msgid="5038791954983067774">"แท็บเล็ต"</string>
     <string name="device_type" product="tv" msgid="5355611506659405636">"ทีวี"</string>

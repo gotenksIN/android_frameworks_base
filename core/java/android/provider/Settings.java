@@ -5663,6 +5663,7 @@ public final class Settings {
          * 3 - Strong vibrations
          * @hide
          */
+        @Readable
         public static final String ALARM_VIBRATION_INTENSITY =
                 "alarm_vibration_intensity";
 
@@ -9052,6 +9053,15 @@ public final class Settings {
         @Readable
         public static final String LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS =
                 "lock_screen_allow_private_notifications";
+
+        /**
+         * Whether the user has provided consent to show notes on the lock screen.
+         * Type: int (0 for not consented, 1 for consented)
+         *
+         * @hide
+         */
+        public static final String LOCK_SCREEN_NOTE_TAKING_CONSENT =
+                "lock_screen_note_taking_consent";
 
         /**
          * When set by a user, allows notification remote input atop a securely locked screen
@@ -15023,17 +15033,6 @@ public final class Settings {
         @SuppressLint("NoSettingsProvider")
         public static final String DEVELOPMENT_ENABLE_NON_RESIZABLE_MULTI_WINDOW =
                 "enable_non_resizable_multi_window";
-
-        /**
-         * If true, shadows drawn around the window will be rendered by the system compositor. If
-         * false, shadows will be drawn by the client by setting an elevation on the root view and
-         * the contents will be inset by the surface insets.
-         * (0 = false, 1 = true)
-         * @hide
-         */
-        @Readable
-        public static final String DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR =
-                "render_shadows_in_compositor";
 
         /**
          * Policy to be used for the display shade when connected to an external display.

@@ -20,8 +20,6 @@ import android.content.Context
 import android.content.pm.PackageManager.NameNotFoundException
 import android.graphics.drawable.Drawable
 import android.util.Log
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import androidx.compose.runtime.snapshotFlow
 import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.SceneKey
@@ -29,6 +27,8 @@ import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.notifications.content.icon.AppIconProvider
 import com.android.systemui.notifications.ui.composable.row.BundleHeader
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.notification.collection.BundleIcon
+import com.android.systemui.statusbar.notification.collection.BundleTitle
 import com.android.systemui.statusbar.notification.row.dagger.BundleRowScope
 import com.android.systemui.statusbar.notification.row.data.model.AppData
 import com.android.systemui.statusbar.notification.row.data.repository.BundleRepository
@@ -53,8 +53,7 @@ constructor(
     @Background private val backgroundDispatcher: CoroutineDispatcher,
     private val systemClock: SystemClock,
 ) {
-    @get:StringRes
-    val titleText: Int
+    val titleText: BundleTitle
         get() = repository.titleText
 
     val summaryText: String? = repository.summaryText
@@ -62,8 +61,7 @@ constructor(
     val numberOfChildren: Int?
         get() = repository.numberOfChildren
 
-    @get:DrawableRes
-    val bundleIcon: Int
+    val bundleIcon: BundleIcon
         get() = repository.bundleIcon
 
     val numberOfChildrenContentDescription: String
@@ -78,7 +76,7 @@ constructor(
         get() =
             context.resources.getString(
                 R.string.notification_bundle_header_joined_description,
-                context.resources.getString(titleText),
+                titleText.getText(context),
                 numberOfChildrenContentDescription,
             )
 

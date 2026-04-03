@@ -45,13 +45,13 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.ArrayMap;
+import android.util.IndentingPrintWriter;
 import android.util.IntArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.window.flags.Flags;
 
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -347,22 +347,20 @@ class BackgroundLaunchProcessController {
         }
     }
 
-    void dump(PrintWriter pw, String prefix) {
+    void dump(@NonNull IndentingPrintWriter pw) {
         synchronized (this) {
-            if (mBackgroundStartPrivileges != null
-                    && !mBackgroundStartPrivileges.isEmpty()) {
-                pw.print(prefix);
+            if (mBackgroundStartPrivileges != null && !mBackgroundStartPrivileges.isEmpty()) {
                 pw.println("Background activity start tokens (token: originating token):");
+                pw.increaseIndent();
                 for (int i = mBackgroundStartPrivileges.size() - 1; i >= 0; i--) {
-                    pw.print(prefix);
-                    pw.print("  - ");
+                    pw.print("- ");
                     pw.print(mBackgroundStartPrivileges.keyAt(i));
                     pw.print(": ");
                     pw.println(mBackgroundStartPrivileges.valueAt(i));
                 }
+                pw.decreaseIndent();
             }
             if (mBalOptInBoundClientUids != null && mBalOptInBoundClientUids.size() > 0) {
-                pw.print(prefix);
                 pw.print("BoundClientUids:");
                 pw.println(Arrays.toString(mBalOptInBoundClientUids.toArray()));
             }

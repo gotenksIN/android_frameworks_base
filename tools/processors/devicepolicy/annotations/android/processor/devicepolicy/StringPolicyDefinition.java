@@ -52,4 +52,9 @@ public @interface StringPolicyDefinition {
      * enforced. The length is equal to the number of Unicode code units in the string.
      */
     int maxLength() default Integer.MAX_VALUE;
+
+    /**
+     * Indicates the conflict resolution mechanism used by this policy.
+     */
+    StringResolutionMechanism resolutionMechanism();
 }

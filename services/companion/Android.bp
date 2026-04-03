@@ -17,6 +17,16 @@ filegroup {
     visibility: ["//frameworks/base/services"],
 }
 
+filegroup {
+    name: "crossdevicesync-sources",
+    srcs: [
+        "java/com/android/server/companion/datatransfer/crossdevicesync/**/*.java",
+        "java/com/android/server/companion/datatransfer/crossdevicesync/**/*.proto",
+    ],
+    path: "java",
+    visibility: ["//cts/tests/tests/companion"],
+}
+
 java_library_static {
     name: "services.companion",
     defaults: ["platform_service_defaults"],

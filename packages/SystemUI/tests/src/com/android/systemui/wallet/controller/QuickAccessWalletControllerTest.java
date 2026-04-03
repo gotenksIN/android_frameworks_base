@@ -154,26 +154,6 @@ public class QuickAccessWalletControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void doubleTapPowerButtonToWallet_walletFeatureUnavailable_NotUpdate() {
-        when(mQuickAccessWalletClient.isWalletFeatureAvailable()).thenReturn(false);
-
-        assertFalse(mController.setupDoubleTapPowerButtonToOpenWallet());
-
-        assertEquals(0, Settings.Secure.getInt(mContext.getContentResolver(),
-                Settings.Secure.DOUBLE_TAP_POWER_BUTTON_GESTURE, 0));
-    }
-
-    @Test
-    public void doubleTapPowerButtonToWallet_walletFeatureWhenLockedUnavailable_NotUpdate() {
-        when(mQuickAccessWalletClient.isWalletFeatureAvailableWhenDeviceLocked()).thenReturn(false);
-
-        assertFalse(mController.setupDoubleTapPowerButtonToOpenWallet());
-
-        assertEquals(0, Settings.Secure.getInt(mContext.getContentResolver(),
-                Settings.Secure.DOUBLE_TAP_POWER_BUTTON_GESTURE, 0));
-    }
-
-    @Test
     public void walletRoleAvailable_isAvailable() {
         when(mRoleManager.isRoleAvailable(eq(RoleManager.ROLE_WALLET))).thenReturn(true);
         when(mRoleManager.getRoleHolders(eq(RoleManager.ROLE_WALLET)))

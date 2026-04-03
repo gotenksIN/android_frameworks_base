@@ -55,13 +55,13 @@ import platform.test.runner.parameterized.Parameters
 
 @RunWith(ParameterizedAndroidJunit4::class)
 @SmallTest
-class StatusBarVisibilityInteractorTest(flags: FlagsParameterization) : SysuiTestCase() {
+class HomeStatusBarVisibilityInteractorTest(flags: FlagsParameterization) : SysuiTestCase() {
     init {
         mSetFlagsRule.setFlagsParameterization(flags)
     }
 
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
-    private val Kosmos.underTest by Kosmos.Fixture { statusBarVisibilityInteractor }
+    private val Kosmos.underTest by Kosmos.Fixture { homeStatusBarVisibilityInteractor }
 
     @Test
     @EnableSceneContainer

@@ -31,6 +31,7 @@ import com.android.internal.annotations.VisibleForTesting
 import com.android.launcher3.icons.BaseIconFactory
 import com.android.launcher3.icons.BaseIconFactory.Companion.MODE_DEFAULT
 import com.android.launcher3.icons.IconProvider
+import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.common.UserProfileContexts
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
@@ -197,7 +198,9 @@ class WindowDecorTaskResourceLoaderImpl(
             try {
                 val pm = userProfilesContexts.getOrCreate(taskInfo.userId).packageManager
                 val activityInfo = getActivityInfo(taskInfo, pm)
-                val appName = pm.getApplicationLabel(activityInfo.applicationInfo)
+                val appName =
+                    if (Flags.useBaseIntentLabelForAppHeaderTitle()) activityInfo.loadLabel(pm)
+                    else pm.getApplicationLabel(activityInfo.applicationInfo)
                 val appIconDrawable = iconProvider.getIcon(activityInfo)
                 val badgedAppIconDrawable =
                     pm.getUserBadgedIcon(appIconDrawable, taskInfo.userHandle())

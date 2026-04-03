@@ -101,6 +101,7 @@ class PolicyIdentifierCompiler() {
                 import android.processor.devicepolicy.PackagePolicyDefinition;
                 import android.processor.devicepolicy.PolicyDefinition;
                 import android.processor.devicepolicy.StringPolicyDefinition;
+                import android.processor.devicepolicy.StringResolutionMechanism;
 
                 import java.lang.annotation.Retention;
                 import java.lang.annotation.RetentionPolicy;

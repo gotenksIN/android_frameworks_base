@@ -36,6 +36,7 @@ import android.processor.devicepolicy.LongResolutionMechanism;
 import android.processor.devicepolicy.PackagePolicyDefinition;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
+import android.processor.devicepolicy.StringResolutionMechanism;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -228,7 +229,8 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice =
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
-                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @StringResolutionMechanism(custom = true))
     public static final PolicyIdentifier<String> SIMPLE_STRING_POLICY =
             new PolicyIdentifier<>("SIMPLE_STRING_POLICY");
 
@@ -249,7 +251,8 @@ public final class PolicyIdentifier<T> {
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
-            unprintableCharactersAllowed = true)
+            unprintableCharactersAllowed = true,
+            resolutionMechanism = @StringResolutionMechanism(custom = true))
     public static final PolicyIdentifier<String>
             SIMPLE_STRING_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED =
                     new PolicyIdentifier<>(
@@ -272,6 +275,7 @@ public final class PolicyIdentifier<T> {
                                                     DISALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @StringResolutionMechanism(custom = true),
             maxLength = 10)
     public static final PolicyIdentifier<String> STRING_POLICY_WITH_MAX_LENGTH =
             new PolicyIdentifier<>("STRING_POLICY_WITH_MAX_LENGTH");

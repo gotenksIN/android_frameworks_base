@@ -478,6 +478,9 @@ policy_metadata {
     string_metadata {
       empty_string_allowed: false
       unprintable_characters_allowed: true
+      resolution_mechanism {
+        custom: true
+      }
     }
   }
   allowed_scopes: POLICY_SCOPE_USER
@@ -499,6 +502,9 @@ policy_metadata {
       string_metadata {
         empty_string_allowed: true
         unprintable_characters_allowed: false
+        resolution_mechanism {
+          custom: true
+        }
       }
       resolution_mechanism {
         custom: true

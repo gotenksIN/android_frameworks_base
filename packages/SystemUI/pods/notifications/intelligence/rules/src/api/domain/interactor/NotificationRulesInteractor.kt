@@ -22,12 +22,18 @@ import com.android.systemui.notifications.intelligence.rules.shared.model.Respon
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 
 /** An interactor for a user's current notification rules and methods for updating those rules. */
-public interface NotificationRulesInteractor {
-    /** A list of the user's current rules. Backed by snapshot state. */
-    public val rules: List<RuleModel>
+interface NotificationRulesInteractor {
+    /** The list of custom rules created by the user. */
+    val customRules: List<RuleModel>
+
+    /**
+     * A list of the user's custom rules that have the bundle action. The action is guaranteed to be
+     * of type [ActionModel.Bundle].
+     */
+    val bundleRules: List<RuleModel>
 
     /** Creates a draft rule based on the freeform text inputted by the user. */
-    public suspend fun createDraftRuleFromFreeformText(
+    suspend fun createDraftRuleFromFreeformText(
         action: ActionModel,
         text: String,
     ): ResponseModel<DraftRuleModel>
@@ -37,4 +43,10 @@ public interface NotificationRulesInteractor {
      * was an error when saving.
      */
     suspend fun saveRule(rule: DraftRuleModel): Boolean
+
+    /**
+     * Deletes the rule with the given ID. Returns true if the rule was deleted successfully and
+     * false if there was an error when deleting.
+     */
+    suspend fun deleteRule(ruleId: Int): Boolean
 }

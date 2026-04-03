@@ -202,6 +202,7 @@ public class AudioDeviceInventory {
                 mDeviceBroker.postSynchronizeAdiDevicesInInventory(ads);
                 return;
             }
+
             ads = new AdiDeviceState(AudioDeviceInfo.convertInternalDeviceToDeviceType(deviceType),
                     deviceType, address);
             ads.setAudioDeviceCategory(category);
@@ -2854,6 +2855,7 @@ public class AudioDeviceInventory {
     /**
      * Returns a DeviceInfo for the first connected device matching one of the supplied types
      */
+    @Nullable
     AudioDeviceAttributes getFirstConnectedDeviceAttributesOfTypes(Set<Integer> internalTypes) {
         DeviceInfo di = getFirstConnectedDeviceOfTypes(internalTypes);
         return di == null ? null : new AudioDeviceAttributes(
@@ -2879,6 +2881,41 @@ public class AudioDeviceInventory {
         DeviceInfo di = getFirstConnectedDeviceOfTypes(Sets.newHashSet(type));
         return di == null ? null : new AudioDeviceAttributes(
                     di.mDeviceType, di.mDeviceAddress, di.mDeviceName);
+    }
+
+    /**
+     * Returns the first connected input or output device which address matches with the following
+     * order of preference: address, identity address, peer address.
+     */
+    /* package */ @Nullable AudioDeviceAttributes getConnectedDeviceForAddress(
+            @Nullable String address, boolean isInput) {
+        if (address == null) {
+            return null;
+        }
+        synchronized (mDevicesLock) {
+            for (DeviceInfo di : mConnectedDevices.values()) {
+                if (isInput == AudioSystem.isInputDevice(di.mDeviceType)
+                        && address.equals(di.mDeviceAddress)) {
+                    return di == null ? null : new AudioDeviceAttributes(
+                            di.mDeviceType, di.mDeviceAddress, di.mDeviceName);
+                }
+            }
+            for (DeviceInfo di : mConnectedDevices.values()) {
+                if (isInput == AudioSystem.isInputDevice(di.mDeviceType)
+                        && address.equals(di.mDeviceIdentityAddress)) {
+                    return di == null ? null : new AudioDeviceAttributes(
+                            di.mDeviceType, di.mDeviceAddress, di.mDeviceName);
+                }
+            }
+            for (DeviceInfo di : mConnectedDevices.values()) {
+                if (isInput == AudioSystem.isInputDevice(di.mDeviceType)
+                        && address.equals(di.mPeerDeviceAddress)) {
+                    return di == null ? null : new AudioDeviceAttributes(
+                            di.mDeviceType, di.mDeviceAddress, di.mDeviceName);
+                }
+            }
+        }
+        return null;
     }
 
     @GuardedBy("mDevicesLock")
@@ -2932,10 +2969,11 @@ public class AudioDeviceInventory {
                         device, name, address,
                         btInfo.mDevice.getIdentityAddress(), codec, groupId,
                         peerAddress, peerIdentityAddress);
-                final String mssgPrefix =
-                        "LE Audio " + (AudioSystem.isInputDevice(device) ? "source" : "sink")
+                final String msgPrefix = "LE Audio "
+                        + (AudioSystem.isBluetoothLeHearingAidDevice(device) ? "Hearing Aid " : "")
+                        + (AudioSystem.isInputDevice(device) ? "source" : "sink")
                                 + " device addr=" + Utils.anonymizeBluetoothAddress(address);
-                trackDeviceApmAvailable(res, di, mssgPrefix);
+                trackDeviceApmAvailable(res, di, msgPrefix);
             }
             // Reset LEA suspend state each time a new sink is connected
             mDeviceBroker.clearLeAudioSuspended(true /* internalOnly */);
@@ -2943,6 +2981,7 @@ public class AudioDeviceInventory {
                 mDeviceBroker.postAccessoryPlugMediaUnmute(device);
                 setCurrentAudioRouteNameIfPossible(name, /*fromA2dp=*/false);
             }
+
             addAudioDeviceInInventoryIfNeeded(device, address, peerAddress,
                     BtHelper.getBtDeviceCategory(address), /*userDefined=*/false);
         }
@@ -2985,10 +3024,11 @@ public class AudioDeviceInventory {
                         + " error=" + res).printSlog(EventLogger.Event.ALOGE, TAG));
                 // not taking further action: proceeding as if disconnection from APM worked
             } else {
-                AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                        "LE Audio " + (AudioSystem.isInputDevice(device) ? "source" : "sink")
-                            + "device addr=" + Utils.anonymizeBluetoothAddress(address)
-                            + " made unavailable, deviceSwitch: " + deviceSwitch)
+                AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent("LE Audio "
+                        + (AudioSystem.isInputDevice(device) ? "source " : "sink ")
+                        + (AudioSystem.isBluetoothLeHearingAidDevice(device) ? "Hearing Aid " : "")
+                        + "device addr=" + Utils.anonymizeBluetoothAddress(address)
+                        + " made unavailable, deviceSwitch: " + deviceSwitch)
                         .printSlog(EventLogger.Event.ALOGI, TAG));
             }
         }

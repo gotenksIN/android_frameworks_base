@@ -56,6 +56,7 @@ import android.processor.devicepolicy.ListOfStringPolicyDefinition;
 import android.processor.devicepolicy.ListResolutionMechanism;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
+import android.processor.devicepolicy.StringResolutionMechanism;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
@@ -332,6 +333,7 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            resolutionMechanism = @StringResolutionMechanism(custom = true),
             emptyStringAllowed = false)
     public static final PolicyIdentifier<String> LOCKSCREEN_MESSAGE =
             new PolicyIdentifier<>("LOCKSCREEN_MESSAGE");
@@ -621,8 +623,7 @@ public final class PolicyIdentifier<T> {
                                     @AllowedDpcTypes(
                                             deviceOwner = ALLOWED,
                                             profileOwnerOnUser0 = ALLOWED,
-                                            managedProfileOwnerOfOrganizationOwnedDevice =
-                                                    ALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice = ALLOWED,
                                             financedDeviceOwner = ALLOWED,
                                             managedProfileOwnerOfPersonalOwnedDevice = ALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),

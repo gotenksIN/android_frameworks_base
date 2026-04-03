@@ -381,29 +381,6 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun deviceUnlockStatus_notLocked_whenPowerGestureTriggered_powerButtonLocksInstantly() =
-        testScope.runTest {
-            setLockAfterScreenTimeout(5000)
-            kosmos.fakeAuthenticationRepository.fakePowerButtonInstantlyLocks = true
-            val deviceUnlockStatus by collectLastValue(underTest.deviceUnlockStatus)
-
-            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
-                unlockStateInt = BiometricUnlockController.MODE_DISMISS,
-                biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
-            )
-            runCurrent()
-            assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
-
-            kosmos.powerInteractor.setAsleepForTest(
-                sleepReason = PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON,
-                powerButtonGestureTriggered = true,
-            )
-            runCurrent()
-
-            assertThat(deviceUnlockStatus?.isUnlocked).isTrue()
-        }
-
-    @Test
     fun deviceUnlockStatus_locksImmediatelyOnPowerButton_powerButtonLocksInstantly() =
         testScope.runTest {
             setLockAfterScreenTimeout(5000)
@@ -763,6 +740,25 @@ class DeviceUnlockedInteractorTest : SysuiTestCase() {
 
             runCurrent()
             assertThat(isUnlocked).isTrue()
+        }
+
+    @Test
+    fun unlockNow_rejectedIfUserSwitchInProgress() =
+        testScope.runTest {
+            setLockAfterScreenTimeout(5000)
+            val isUnlocked by collectLastValue(underTest.deviceUnlockStatus.map { it.isUnlocked })
+            unlockDevice()
+            assertThat(isUnlocked).isTrue()
+            underTest.lockNow("test")
+            runCurrent()
+            assertThat(isUnlocked).isFalse()
+
+            kosmos.fakeUserRepository.setMainUserIsUserSwitching()
+
+            underTest.unlockNowForPowerButtonGesture("test")
+
+            runCurrent()
+            assertThat(isUnlocked).isFalse()
         }
 
     // Regression test for b/457867010

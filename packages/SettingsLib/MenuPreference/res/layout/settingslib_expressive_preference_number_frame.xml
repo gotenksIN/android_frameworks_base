@@ -28,8 +28,8 @@
 
     <TextView
         android:id="@+id/number"
-        android:layout_width="@dimen/settingslib_expressive_space_medium3"
-        android:layout_height="@dimen/settingslib_expressive_space_medium3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:gravity="center"
         android:singleLine="true"
         android:textAppearance="@style/TextAppearance.SettingsLib.HeadlineSmall.Emphasized"

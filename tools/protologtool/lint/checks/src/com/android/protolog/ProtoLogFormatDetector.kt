@@ -26,17 +26,20 @@ import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.SourceCodeScanner
 import com.intellij.psi.PsiMethod
-import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiType
 import java.util.EnumSet
 import kotlin.math.min
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
-import org.jetbrains.uast.UMethod
-import org.jetbrains.uast.toUElementOfType
 
 class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
+
+    private val frameworkExtractors = listOf(
+        DirectProtoLogCallDataExtractor(),
+        IndirectProtoLogCallDataExtractor(),
+        BubbleLogCallDataExtractor(),
+    )
 
     override fun getApplicableUastTypes(): List<Class<out UElement>> =
         listOf(UCallExpression::class.java)
@@ -46,9 +49,12 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
             override fun visitCallExpression(node: UCallExpression) {
                 val method = node.resolve() ?: return
 
-                var protoLogCall = getDirectProtoLogCall(context, node, method)
-                if (protoLogCall == null) {
-                    protoLogCall = getIndirectProtoLogCall(context, node, method)
+                var protoLogCall: ProtoLogCall? = null
+                for (extractor in frameworkExtractors) {
+                    protoLogCall = extractor.extractCall(context, node, method)
+                    if (protoLogCall != null) {
+                        break
+                    }
                 }
 
                 if (protoLogCall != null) {
@@ -56,96 +62,6 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
                 }
             }
         }
-
-    private data class ProtoLogCall(
-        val call: UCallExpression,
-        val formatStringArg: UExpression,
-        val formatString: String?,
-        val args: List<UExpression>
-    )
-
-    private fun getDirectProtoLogCall(
-        context: JavaContext,
-        node: UCallExpression,
-        method: PsiMethod
-    ): ProtoLogCall? {
-        if (!isProtoLogCall(context, node, method)) {
-            return null
-        }
-
-        if (node.valueArguments.size < 2) {
-            return null
-        }
-
-        val formatStringArg = node.valueArguments[1]
-        val formatArgs = node.valueArguments.subList(2, node.valueArguments.size)
-        val formatString = formatStringArg.evaluate() as? String
-
-        return ProtoLogCall(node, formatStringArg, formatString, formatArgs)
-    }
-
-    private fun getIndirectProtoLogCall(
-        context: JavaContext,
-        node: UCallExpression,
-        method: PsiMethod
-    ): ProtoLogCall? {
-        val internalCall = findInnerProtoLogCall(context, method) ?: return null
-
-        val internalArgs = internalCall.valueArguments
-        if (internalArgs.size < 2) {
-            return null
-        }
-
-        val internalFormatArg = internalArgs[1]
-        // If the format string is not a parameter of the wrapper method (or depends on it),
-        // we don't need to validate the indirect ProtoLog call site.
-        if (!checkDependsOnParameter(internalFormatArg, method)) {
-            return null
-        }
-
-        val mapping = context.evaluator.computeArgumentMapping(node, method)
-
-        val formatString =
-            evaluateSubstituted(internalFormatArg, node, method, mapping) as? String
-
-        val effectiveArgs = mutableListOf<UExpression>()
-
-        for (i in 2 until internalArgs.size) {
-            val arg = internalArgs[i]
-            // Check if the argument passed to the internal ProtoLog call is a parameter
-            // of the wrapper method.
-            val paramIndex = getParameterIndex(arg, method)
-            if (paramIndex != null) {
-                val param: PsiParameter = method.parameterList.parameters[paramIndex]
-                val mappedArgs = mapping.filterValues { it == param }.keys
-
-                if (param.isVarArgs) {
-                    // If the wrapper parameter is a varargs, we need to find all the arguments
-                    // passed to the wrapper that map to this parameter.
-                    for (callArg in node.valueArguments) {
-                        if (mapping[callArg] == param) {
-                            effectiveArgs.add(callArg)
-                        }
-                    }
-                } else {
-                    // If it's a regular parameter, we take the argument passed to the wrapper.
-                    val mappedArg = mappedArgs.firstOrNull()
-                    if (mappedArg != null) {
-                        effectiveArgs.add(mappedArg)
-                    } else {
-                        // If the argument is not mapped, it might be using a default value.
-                        // We use the internal argument for type checking.
-                        effectiveArgs.add(arg)
-                    }
-                }
-            } else {
-                // If the argument is not a parameter of the wrapper method we use the argument as is.
-                effectiveArgs.add(arg)
-            }
-        }
-
-        return ProtoLogCall(node, internalFormatArg, formatString, effectiveArgs)
-    }
 
     private fun validateProtoLogCall(
         context: JavaContext,
@@ -240,7 +156,7 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
 
             // Only report issues for arguments that are actually passed in this call.
             // Internal arguments of a wrapper are checked at the wrapper definition.
-            if (!call.valueArguments.contains(arg)) {
+            if (!isArgumentPassedInCall(call, arg)) {
                 continue
             }
 
@@ -267,6 +183,15 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
                 }
             }
         }
+    }
+
+    private fun isArgumentPassedInCall(call: UCallExpression, arg: UExpression): Boolean {
+        if (call.valueArguments.contains(arg)) {
+            return true
+        }
+        val callPsi = call.sourcePsi ?: return true
+        val argPsi = arg.sourcePsi ?: return true
+        return com.intellij.psi.util.PsiTreeUtil.isAncestor(callPsi, argPsi, false)
     }
 
     private fun checkArgumentType(context: JavaContext, specifier: Specifier, arg: UExpression) {
@@ -316,115 +241,6 @@ class ProtoLogFormatDetector : Detector(), SourceCodeScanner {
             )
         }
     }
-
-    private fun evaluateSubstituted(
-        expression: UExpression,
-        call: UCallExpression,
-        method: PsiMethod,
-        mapping: Map<UExpression, PsiParameter>
-    ): Any? {
-        var expr = expression
-        while (expr is org.jetbrains.uast.UParenthesizedExpression) {
-            expr = expr.expression
-        }
-
-        // Minimal evaluator supporting string concat and interpolation
-        if (expr is org.jetbrains.uast.UPolyadicExpression) {
-            val sb = StringBuilder()
-            for (operand in expr.operands) {
-                val valObj = evaluateSubstituted(operand, call, method, mapping) ?: return null
-                sb.append(valObj.toString())
-            }
-            return sb.toString()
-        }
-
-        // Check if expression is a reference to a parameter
-        val paramIndex = getParameterIndex(expr, method)
-        if (paramIndex != null) {
-            val param = method.parameterList.parameters[paramIndex]
-            val mappedArg = mapping.entries.firstOrNull { it.value == param }?.key
-            return mappedArg?.evaluate()
-        }
-
-        return expr.evaluate()
-    }
-
-    private fun getParameterIndex(expression: UExpression, method: PsiMethod): Int? {
-        var expr = expression
-        while (expr is org.jetbrains.uast.UParenthesizedExpression) {
-            expr = expr.expression
-        }
-
-        var resolved = (expr as? org.jetbrains.uast.UReferenceExpression)?.resolve()
-
-        if (resolved == null && expr.sourcePsi?.text?.startsWith("*") == true) {
-            // Handle spread operator which might be wrapped in USpreadExpression
-            // We scan children for the reference
-            var foundRef: com.intellij.psi.PsiElement? = null
-            expr.accept(object : org.jetbrains.uast.visitor.AbstractUastVisitor() {
-                override fun visitElement(node: UElement): Boolean {
-                    if (foundRef != null) return true
-                    if (node is org.jetbrains.uast.UReferenceExpression) {
-                        foundRef = node.resolve()
-                        return true
-                    }
-                    return false
-                }
-            })
-            resolved = foundRef
-        }
-
-        if (resolved is PsiParameter) {
-            val index = method.parameterList.parameters.indexOf(resolved)
-            if (index == -1) {
-                return null
-            }
-            return index
-        }
-        return null
-    }
-
-    private fun checkDependsOnParameter(expression: UExpression, method: PsiMethod): Boolean {
-        var depends = false
-        expression.accept(object : org.jetbrains.uast.visitor.AbstractUastVisitor() {
-            override fun visitElement(node: UElement): Boolean {
-                if (depends) return true
-                if (node is UExpression) {
-                    val paramIndex = getParameterIndex(node, method)
-                    if (paramIndex != null) {
-                        depends = true
-                        return true
-                    }
-                }
-                return false
-            }
-        })
-        return depends
-    }
-
-    private fun findInnerProtoLogCall(
-        context: JavaContext,
-        method: PsiMethod
-    ): UCallExpression? {
-        val uMethod = method.toUElementOfType<UMethod>() ?: return null
-        var foundCall: UCallExpression? = null
-
-        uMethod.accept(object : org.jetbrains.uast.visitor.AbstractUastVisitor() {
-            override fun visitCallExpression(node: UCallExpression): Boolean {
-                if (foundCall != null) return true
-
-                val resolved = node.resolve()
-                if (resolved != null && isProtoLogCall(context, node, resolved)) {
-                    foundCall = node
-                    return true
-                }
-                return false
-            }
-        })
-        return foundCall
-    }
-
-
 
     private fun validateSpecifiers(
         specs: List<Specifier>,

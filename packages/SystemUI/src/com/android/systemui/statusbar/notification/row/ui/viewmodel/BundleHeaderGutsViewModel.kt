@@ -16,18 +16,19 @@
 
 package com.android.systemui.statusbar.notification.row.ui.viewmodel
 
-import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.android.systemui.res.R.string
+import com.android.systemui.statusbar.notification.collection.BundleIcon
+import com.android.systemui.statusbar.notification.collection.BundleTitle
 
 class BundleHeaderGutsViewModel(
-    @StringRes val titleText: Int,
+    val titleText: BundleTitle,
     @StringRes val summaryTextRes: Int? = 0,
     val summaryText: String? = null,
-    @DrawableRes val bundleIcon: Int,
+    val bundleIcon: BundleIcon,
 
     /** Opens the settings page for this bundle. */
     val onSettingsClicked: () -> Unit = {},

@@ -127,7 +127,7 @@ private class ActiveNotificationsStoreBuilder(
         builder.addBundle(
             existingModels.createOrReuseBundle(
                 key = entry.key,
-                icon = Icon.createWithResource(context, entry.bundleRepository.bundleIcon),
+                icon = entry.bundleRepository.bundleIcon.getIcon(context),
                 children = childModels,
             )
         )

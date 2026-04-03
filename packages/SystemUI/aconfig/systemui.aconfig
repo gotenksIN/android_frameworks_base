@@ -167,16 +167,6 @@ flag {
 }
 
 flag {
-    name: "communal_accessibility_resize"
-    namespace: "systemui"
-    description: "Allows users to resize communal hub widgets by single-point actions."
-    bug: "431683508"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "communal_bouncer_do_not_modify_plugin_open"
   namespace: "systemui"
   description: "do not modify notification shade when handling bouncer expansion."
@@ -191,16 +181,6 @@ flag {
   namespace: "systemui"
   description: "Enable cancel button to cancel adding a new widget to the communal hub"
   bug: "424268360"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "communal_hub_use_thread_pool_for_widgets"
-  namespace: "systemui"
-  description: "Use a dedicated thread pool executor for loading widgets on glanceable hub"
-  bug: "369412569"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -519,6 +499,13 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "enabled_notes_lockscreen_consent_flow"
+    namespace: "note"
+    description: "Whether to show lock screen consent flow for notes lock screen entry points"
+    bug: "491809338"
 }
 
 flag {
@@ -1923,6 +1910,16 @@ flag {
   namespace: "systemui"
   description: "Use compose's AndroidUiDispatcher as default"
   bug: "460414443"
+}
+
+flag {
+   name: "volume_dialog_horizontal_no_buttons"
+   namespace: "systemui"
+   description: "Correct sizing and padding when the volume dialog has no buttons"
+   bug: "494251776"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
 }
 
 flag {

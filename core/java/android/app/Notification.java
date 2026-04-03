@@ -5768,6 +5768,8 @@ public class Notification implements Parcelable
          *
          * <p>This will override the layout that would otherwise be constructed by this Builder
          * object.
+         *
+         * <p>Note: The maximum memory use of view hierarchy is limited to 5MB.
          */
         @NonNull
         public Builder setCustomContentView(RemoteViews contentView) {
@@ -5780,6 +5782,8 @@ public class Notification implements Parcelable
          *
          * <p>This will override the expanded layout that would otherwise be constructed by this
          * Builder object.
+         *
+         * <p>Note: The maximum memory use of view hierarchy is limited to 5MB.
          */
         @NonNull
         public Builder setCustomBigContentView(RemoteViews contentView) {
@@ -5792,6 +5796,8 @@ public class Notification implements Parcelable
          *
          * <p>This will override the heads-up layout that would otherwise be constructed by this
          * Builder object.
+         *
+         * <p>Note: The maximum memory use of view hierarchy is limited to 5MB.
          */
         @NonNull
         public Builder setCustomHeadsUpContentView(RemoteViews contentView) {

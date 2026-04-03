@@ -689,17 +689,6 @@ public class Notifier {
 
             // Start input as soon as we start waking up or going to sleep.
             mInputMethodManagerInternal.setInteractive(interactive);
-            if (mShouldNotifyInputAboutWakefulnessChanges
-                    && !mFlags.isPerDisplayWakeByTouchEnabled()) {
-                // Since wakefulness is a global property in original logic, all displays should
-                // be set to the same interactive state, matching system's global wakefulness
-                SparseBooleanArray displayInteractivities = new SparseBooleanArray();
-                int[] ids = mDisplayManagerInternal.getDisplayIds(/*includeDisabled=*/ false);
-                for (int displayId : ids) {
-                    displayInteractivities.put(displayId, interactive);
-                }
-                mInputManagerInternal.setDisplayInteractivities(displayInteractivities);
-            }
 
             // Notify battery stats.
             try {
@@ -946,11 +935,9 @@ public class Notifier {
                     changeReason, eventTime);
 
             // Update input on which displays are interactive
-            if (mFlags.isPerDisplayWakeByTouchEnabled()) {
-                updateDisplayInteractivities(groupId, isInteractive);
-                if (mShouldNotifyInputAboutWakefulnessChanges) {
-                    mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
-                }
+            updateDisplayInteractivities(groupId, isInteractive);
+            if (mShouldNotifyInputAboutWakefulnessChanges) {
+                mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
             }
         }
     }
@@ -963,20 +950,16 @@ public class Notifier {
     public void onGroupRemoved(int groupId) {
         mInteractivityByGroupId.remove(groupId);
         mWakefulnessSessionObserver.removePowerGroup(groupId);
-        if (mFlags.isPerDisplayWakeByTouchEnabled()) {
-            resetDisplayInteractivities();
-            mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
-        }
+        resetDisplayInteractivities();
+        mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
     }
 
     /**
      * Called when a PowerGroup has been changed.
      */
     public void onGroupChanged() {
-        if (mFlags.isPerDisplayWakeByTouchEnabled()) {
-            resetDisplayInteractivities();
-            mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
-        }
+        resetDisplayInteractivities();
+        mInputManagerInternal.setDisplayInteractivities(mDisplayInteractivities);
     }
 
     /**

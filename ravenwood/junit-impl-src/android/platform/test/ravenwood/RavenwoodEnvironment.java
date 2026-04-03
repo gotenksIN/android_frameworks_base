@@ -167,7 +167,20 @@ public final class RavenwoodEnvironment {
         final var propFile = System.getProperty(
                 "android.ravenwood.prop_file", "ravenwood.properties");
 
-        final var props = RavenwoodSystemProperties.readProperties(propFile);
+        final Map<String, String> props;
+        if (propFile.isEmpty()) {
+            // If the filename is explicitly set to "", then don't read from a file.
+            // In that case, properties need to be set via java system properties; see below.
+            props = new HashMap<>();
+        } else {
+            props = RavenwoodSystemProperties.readProperties(propFile);
+        }
+
+        // Set the values from Java's android.ravenwood.prop_override.xxx properties, if any.
+        // For example, to overridet the package name, run the JVM
+        // with `-Dandroid.ravenwood.prop_override.packageName=PACKAGE_NAME`.
+        RavenwoodSystemProperties.overrideWithJavaProperties(
+                props, "android.ravenwood.prop_override.");
 
         // TODO: Why do we use a random PID? We can get the real PID via JNI. Why not use that?
         final int pid = new Random().nextInt(100, 32768);

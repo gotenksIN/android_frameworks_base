@@ -4800,6 +4800,9 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_save_error" translatable="false">The rule could not be saved. Please try again.</string>
+    <!-- Title for an error box explaining that a notification rule could not be deleted. [CHAR LIMIT=NONE]-->
+    <string name="notification_rules_deletion_error" translatable="false">The rule could not be deleted. Please try again.</string>
+
 
     <!-- Title for a button that will let users move to the next step of creating a new notification rule. [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4929,6 +4932,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_edit" translatable="false">Edit</string>
+    <!-- Text for a button letting users delete a particular notification rule. [CHAR LIMIT=30]-->
+    <string name="notification_rules_delete" translatable="false">Delete</string>
     <!-- Search box placeholder text for notification rules [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4953,6 +4958,9 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_deselect_all" translatable="false">Deselect all</string>
+
+    <!-- Default title for a bundle that will group multiple notifications together. -->
+    <string name="notification_rules_default_bundle_title" translatable="false">Notification Organizer</string>
 
     <!-- Summary of battery saver not available [CHAR LIMIT=NONE] -->
 

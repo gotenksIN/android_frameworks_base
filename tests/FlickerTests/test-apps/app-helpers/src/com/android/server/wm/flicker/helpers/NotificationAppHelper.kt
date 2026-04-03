@@ -43,8 +43,12 @@ constructor(
         }
         button.click()
 
-        uiDevice.wait(Until.findObject(By.text("Flicker Test Notification")), FIND_TIMEOUT)
+        uiDevice.wait(Until.findObject(By.text(NOTIFICATION_TEXT)), FIND_TIMEOUT)
             ?: error("Flicker Notification not found")
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+    }
+
+    companion object {
+        const val NOTIFICATION_TEXT = "Flicker Test Notification"
     }
 }

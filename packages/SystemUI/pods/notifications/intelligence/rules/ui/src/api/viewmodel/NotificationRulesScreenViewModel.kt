@@ -25,24 +25,30 @@ import com.android.systemui.lifecycle.Activatable
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 
 /** A view model for the notification rules screen. */
-public interface NotificationRulesScreenViewModel : Activatable {
-    /** The list of current saved rules for the user. */
-    public val rules: List<RuleModel>
+interface NotificationRulesScreenViewModel : Activatable {
+    /** The list of custom rules created by the user. */
+    val rules: List<RuleModel>
 
     /**
      * The back stack of screens viewed within the activity. The last screen in the list is the
      * current one.
      */
-    public val backStack: List<RulesScreenViewState>
+    val backStack: List<RulesScreenViewState>
 
     /** The screen currently being displayed. */
-    public val currentScreen: RulesScreenViewState
+    val currentScreen: RulesScreenViewState
+
+    /**
+     * If there was an error in deleting a rule, this has the ID of the rule with the error. Null
+     * otherwise.
+     */
+    val ruleWithDeletionError: Int?
 
     /**
      * Transforms [rule] into a readable string. Because this is a read-only view, individual fields
      * are more visually prominent but not clickable.
      */
-    public fun buildRuleText(rule: RuleModel, resources: Resources): RuleDisplayModel
+    fun buildRuleText(rule: RuleModel, resources: Resources): RuleDisplayModel
 
     /**
      * Loads the photo thumbnail for a contact from the given [uri].
@@ -51,7 +57,13 @@ public interface NotificationRulesScreenViewModel : Activatable {
      */
     suspend fun loadContactBitmapFromUri(uri: Uri, userContext: Context, @Px sizePx: Int): Bitmap?
 
-    public interface Factory {
-        public fun create(backStack: List<RulesScreenViewState>): NotificationRulesScreenViewModel
+    /**
+     * Deletes the rule with the given ID. [ruleWithDeletionError] will update based on whether the
+     * rule was deleted successfully or not.
+     */
+    fun deleteRule(ruleId: Int)
+
+    interface Factory {
+        fun create(backStack: List<RulesScreenViewState>): NotificationRulesScreenViewModel
     }
 }

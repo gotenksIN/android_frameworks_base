@@ -314,6 +314,7 @@ package android {
     field public static final String REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND = "android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND";
     field public static final String REQUEST_COMPANION_USE_DATA_IN_BACKGROUND = "android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND";
     field public static final String REQUEST_DELETE_PACKAGES = "android.permission.REQUEST_DELETE_PACKAGES";
+    field @FlaggedApi("com.android.window.flags.request_fullscreen_api_permission") public static final String REQUEST_FULLSCREEN_MODE = "android.permission.REQUEST_FULLSCREEN_MODE";
     field public static final String REQUEST_IGNORE_BATTERY_OPTIMIZATIONS = "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS";
     field public static final String REQUEST_INSTALL_PACKAGES = "android.permission.REQUEST_INSTALL_PACKAGES";
     field public static final String REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE = "android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE";
@@ -4731,7 +4732,7 @@ package android.app {
     method @Deprecated public final void removeDialog(int);
     method public void reportFullyDrawn();
     method public android.view.DragAndDropPermissions requestDragAndDropPermissions(android.view.DragEvent);
-    method public void requestFullscreenMode(int, @Nullable android.os.OutcomeReceiver<Void, Throwable>);
+    method @RequiresPermission(android.Manifest.permission.REQUEST_FULLSCREEN_MODE) public void requestFullscreenMode(int, @Nullable android.os.OutcomeReceiver<Void, Throwable>);
     method @FlaggedApi("com.android.window.flags.enable_desktop_windowing_app_to_web_education") public final void requestOpenInBrowserEducation();
     method public final void requestPermissions(@NonNull String[], int);
     method @FlaggedApi("android.permission.flags.device_aware_permission_apis_enabled") public final void requestPermissions(@NonNull String[], int, int);
@@ -12599,6 +12600,7 @@ package android.content {
     field public static final String CATEGORY_UNIT_TEST = "android.intent.category.UNIT_TEST";
     field public static final String CATEGORY_VOICE = "android.intent.category.VOICE";
     field public static final String CATEGORY_VR_HOME = "android.intent.category.VR_HOME";
+    field @FlaggedApi("android.xr.xr_manifest_entries") public static final String CATEGORY_XR_PROJECTED_LAUNCHER = "android.intent.category.XR_PROJECTED_LAUNCHER";
     field public static final int CHOOSER_CONTENT_TYPE_ALBUM = 1; // 0x1
     field @NonNull public static final android.os.Parcelable.Creator<android.content.Intent> CREATOR;
     field public static final String EXTRA_ALARM_COUNT = "android.intent.extra.ALARM_COUNT";
@@ -26246,6 +26248,7 @@ package android.media {
     method public final void notifySessionReleased(@NonNull String);
     method public final void notifySessionUpdated(@NonNull android.media.RoutingSessionInfo);
     method @CallSuper @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
+    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public void onCreateSession(@NonNull android.media.MediaRoute2ProviderService.SessionCreationParams);
     method public abstract void onCreateSession(long, @NonNull String, @NonNull String, @Nullable android.os.Bundle);
     method public abstract void onDeselectRoute(long, @NonNull String, @NonNull String);
     method public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference);
@@ -26264,6 +26267,13 @@ package android.media {
     field public static final int REASON_UNKNOWN_ERROR = 0; // 0x0
     field public static final long REQUEST_ID_NONE = 0L; // 0x0L
     field public static final String SERVICE_INTERFACE = "android.media.MediaRoute2ProviderService";
+  }
+
+  @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public static final class MediaRoute2ProviderService.SessionCreationParams {
+    method @NonNull public String getInitiallySelectedRouteId();
+    method public long getRequestId();
+    method @NonNull public android.os.Bundle getSessionHints();
+    method @NonNull public String getTargetPackageName();
   }
 
   public class MediaRouter {

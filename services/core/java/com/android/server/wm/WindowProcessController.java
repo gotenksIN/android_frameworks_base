@@ -86,7 +86,6 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-import android.util.IndentingPrintWriter;
 import android.util.Log;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -108,6 +107,7 @@ import com.android.server.wm.ActivityTaskManagerService.HotPath;
 import com.android.server.wm.BackgroundLaunchProcessController.BalCheckConfiguration;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -2389,29 +2389,18 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mOwner.toString();
     }
 
-    /**
-     * Dumps the state of this {@link WindowProcessController} for debugging purposes.
-     *
-     * <p>This includes activities (both local and remote), recent tasks, configuration states,
-     * animation reasons, and internal state flags used for priority calculation.
-     *
-     * @param pw The {@link IndentingPrintWriter} to which the state should be dumped.
-     */
-    public void dump(@NonNull IndentingPrintWriter pw) {
+    public void dump(PrintWriter pw, String prefix) {
         synchronized (mAtm.mGlobalLock) {
             if (mActivities.size() > 0) {
-                pw.println("Activities:");
-                pw.increaseIndent();
+                pw.print(prefix); pw.println("Activities:");
                 for (int i = 0; i < mActivities.size(); i++) {
-                    pw.print("- "); pw.println(mActivities.get(i));
+                    pw.print(prefix); pw.print("  - "); pw.println(mActivities.get(i));
                 }
-                pw.decreaseIndent();
             }
             if (mRemoteActivities != null && !mRemoteActivities.isEmpty()) {
-                pw.println("Remote Activities:");
-                pw.increaseIndent();
+                pw.print(prefix); pw.println("Remote Activities:");
                 for (int i = mRemoteActivities.size() - 1; i >= 0; i--) {
-                    pw.print("- ");
+                    pw.print(prefix); pw.print("  - ");
                     pw.print(mRemoteActivities.keyAt(i)); pw.print(" flags=");
                     final int flags = mRemoteActivities.valueAt(i)[0];
                     if ((flags & REMOTE_ACTIVITY_FLAG_HOST_ACTIVITY) != 0) {
@@ -2422,32 +2411,28 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
                     }
                     pw.println();
                 }
-                pw.decreaseIndent();
             }
             if (mRecentTasks.size() > 0) {
-                pw.println("Recent Tasks:");
-                pw.increaseIndent();
+                pw.println(prefix + "Recent Tasks:");
                 for (int i = 0; i < mRecentTasks.size(); i++) {
-                    pw.println("- " + mRecentTasks.get(i));
+                    pw.println(prefix + "  - " + mRecentTasks.get(i));
                 }
-                pw.decreaseIndent();
             }
 
             if (mVrThreadTid != 0) {
-                pw.print("mVrThreadTid", mVrThreadTid).println();
+                pw.print(prefix); pw.print("mVrThreadTid="); pw.println(mVrThreadTid);
             }
 
-            mBgLaunchController.dump(pw);
+            mBgLaunchController.dump(pw, prefix);
         }
-        pw.print("Configuration", getConfiguration()).println();
-        pw.print("OverrideConfiguration", getRequestedOverrideConfiguration()).println();
-        pw.print("mLastReportedConfiguration",
-                (mHasCachedConfiguration ? ("(cached) " + mLastReportedConfiguration)
-                        : mLastReportedConfiguration)).println();
+        pw.println(prefix + " Configuration=" + getConfiguration());
+        pw.println(prefix + " OverrideConfiguration=" + getRequestedOverrideConfiguration());
+        pw.println(prefix + " mLastReportedConfiguration=" + (mHasCachedConfiguration
+                ? ("(cached) " + mLastReportedConfiguration) : mLastReportedConfiguration));
 
         final int animatingReasons = mAnimatingReasons;
         if (animatingReasons != 0) {
-            pw.print("mAnimatingReasons=");
+            pw.print(prefix + " mAnimatingReasons=");
             if ((animatingReasons & ANIMATING_REASON_REMOTE_ANIMATION) != 0) {
                 pw.print("remote-animation|");
             }
@@ -2457,12 +2442,12 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             pw.println();
         }
         if (mUseFifoUiScheduling) {
-            pw.println("mUseFifoUiScheduling=true");
+            pw.println(prefix + " mUseFifoUiScheduling=true");
         }
 
         final int stateFlags = mActivityStateFlags;
         if (stateFlags != ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER) {
-            pw.print("mActivityStateFlags=");
+            pw.print(prefix + " mActivityStateFlags=");
             if ((stateFlags & ACTIVITY_STATE_FLAG_IS_WINDOW_VISIBLE) != 0) {
                 pw.print("W|");
             }
@@ -2490,7 +2475,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             }
             final int taskLayer = stateFlags & ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
             if (taskLayer != ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER) {
-                pw.print("taskLayer", taskLayer);
+                pw.print("taskLayer=" + taskLayer);
             }
             pw.println();
         }

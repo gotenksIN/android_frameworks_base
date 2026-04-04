@@ -220,16 +220,6 @@ flag {
 }
 
 flag {
-    name: "skip_emergency_check_without_bypass"
-    namespace: "location"
-    description: "When registration, only the caller with bypass permission needs to check emergency mode"
-    bug: "426562854"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "gnss_qzss_svid_range_extension"
     namespace: "location"
     description: "Extend QZSS SVID range from [183, 206] to [183, 212]"
@@ -258,12 +248,4 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "enable_public_satellite_pvt_api"
-    namespace: "location"
-    description: "Make SatPvt API from SystemApi to public API."
-    bug: "493351958"
-    is_exported: true
 }

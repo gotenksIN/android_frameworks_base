@@ -299,6 +299,7 @@ public class NotificationMediaManager implements Dumpable {
      * Find a notification and media controller associated with the playing media session, and
      * update this manager's internal state.
      * This method must be called in background.
+     * TODO(b/273443374) check this method
      */
     @WorkerThread
     void findPlayingMediaNotification(@NonNull List<StatusBarNotification> allNotifications) {

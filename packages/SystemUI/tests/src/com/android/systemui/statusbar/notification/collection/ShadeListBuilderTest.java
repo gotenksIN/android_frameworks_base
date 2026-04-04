@@ -47,6 +47,8 @@ import static java.util.Collections.singletonList;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.os.SystemClock;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
@@ -3279,23 +3281,9 @@ class TestBundler extends NotifBundler {
     public static final TestBundler INSTANCE = new TestBundler();
 
     List<BundleSpec> mBundleSpecs = List.of(
-            new BundleSpec(
-                    /* key= */ "bundle_1",
-                    new BundleTitle.StringResource(0),
-                    /* summaryTextRes= */ 0,
-                    /* summaryText= */ null,
-                    new BundleIcon.DrawableResource(0),
-                    /* bucket= */ 0,
-                    /* bucketType= */ 0),
-            new BundleSpec(
-                    /* key= */ "bundle_2",
-                    new BundleTitle.StringResource(0),
-                    /* summaryTextRes= */ 0,
-                    /* summaryText= */ null,
-                    new BundleIcon.DrawableResource(0),
-                    /* bucket= */ 0,
-                    /* bucketType= */ 0)
-            );
+            new BundleSpec("bundle_1", 0, 0, null, 0, 0, 0),
+            new BundleSpec("bundle_2", 0, 0, null, 0, 0, 0)
+    );
 
     List<String> mBundleIds = this.mBundleSpecs.stream()
             .map(BundleSpec::getKey)

@@ -392,13 +392,8 @@ abstract class CrossActivityBackAnimation(
             enteringTarget = null
         }
 
-        closingTarget?.let {
-            if (it.leash != null && it.leash.isValid) {
-                transaction.setCornerRadius(it.leash, 0f)
-                it.leash.release()
-            }
-            closingTarget = null
-        }
+        closingTarget?.leash?.release()
+        closingTarget = null
 
         background.removeBackground(transaction)
         applyTransaction()

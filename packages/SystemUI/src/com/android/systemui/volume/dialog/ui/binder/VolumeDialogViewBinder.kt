@@ -43,7 +43,6 @@ import com.android.systemui.util.view.listenToComputeInternalInsets
 import com.android.systemui.volume.dialog.captions.ui.viewmodel.VolumeDialogCaptionsButtonViewModel
 import com.android.systemui.volume.dialog.dagger.scope.VolumeDialog
 import com.android.systemui.volume.dialog.dagger.scope.VolumeDialogScope
-import com.android.systemui.volume.dialog.settings.ui.viewmodel.VolumeDialogSettingsButtonViewModel
 import com.android.systemui.volume.dialog.shared.model.VolumeDialogVisibilityModel
 import com.android.systemui.volume.dialog.ui.utils.JankListenerFactory
 import com.android.systemui.volume.dialog.ui.utils.suspendAnimate
@@ -75,7 +74,6 @@ constructor(
     @Application context: Context,
     private val viewModel: VolumeDialogViewModel,
     private val captionsButtonViewModel: VolumeDialogCaptionsButtonViewModel,
-    private val settingsButtonViewModel: VolumeDialogSettingsButtonViewModel,
     private val jankListenerFactory: JankListenerFactory,
     private val tracer: VolumeTracer,
     @VolumeDialog private val viewBinders: List<@JvmSuppressWildcards ViewBinder>,
@@ -101,12 +99,6 @@ constructor(
         )
     }
 
-    private val mainSliderNoButtonsToggleHorizontalMargin: Int by lazy {
-        context.resources.getDimensionPixelSize(
-            R.dimen.volume_dialog_slider_horizontal_margin_no_buttons
-        )
-    }
-
     private val mainSliderWidth: Int by lazy {
         context.resources.getDimensionPixelSize(R.dimen.volume_dialog_horizontal_slider_width)
     }
@@ -114,12 +106,6 @@ constructor(
     private val mainSliderWidthWithCaptions: Int by lazy {
         context.resources.getDimensionPixelSize(
             R.dimen.volume_dialog_horizontal_slider_width_with_captions
-        )
-    }
-
-    private val mainSliderWidthNoButtons: Int by lazy {
-        context.resources.getDimensionPixelSize(
-            R.dimen.volume_dialog_horizontal_slider_width_no_buttons
         )
     }
 
@@ -267,48 +253,19 @@ constructor(
             mainSliderVerticalMargin
         }
 
-    private fun getSliderHorizontalMargin(): Int {
-        val isCaptionsButtonVisible =
-            Flags.captionsToggleInVolumeDialogV1() && captionsButtonViewModel.isVisible.value
-        val isSettingsButtonVisible = settingsButtonViewModel.isVisible.value
-
-        // Edge case where no buttons are shown
-        if (
-            Flags.volumeDialogHorizontalNoButtons() &&
-                !isCaptionsButtonVisible &&
-                !isSettingsButtonVisible
-        ) {
-            return mainSliderNoButtonsToggleHorizontalMargin
-        }
-
-        return if (isCaptionsButtonVisible) {
+    private fun getSliderHorizontalMargin(): Int =
+        if (Flags.captionsToggleInVolumeDialogV1() && captionsButtonViewModel.isVisible.value) {
             mainSliderWithCaptionsToggleHorizontalMargin
         } else {
             mainSliderHorizontalMargin
         }
-    }
 
-    private fun getSliderWidth(): Int {
-
-        val isCaptionsButtonVisible =
-            Flags.captionsToggleInVolumeDialogV1() && captionsButtonViewModel.isVisible.value
-        val isSettingsButtonVisible = settingsButtonViewModel.isVisible.value
-
-        // Edge case where no buttons are shown
-        if (
-            Flags.volumeDialogHorizontalNoButtons() &&
-                !isCaptionsButtonVisible &&
-                !isSettingsButtonVisible
-        ) {
-            return mainSliderWidthNoButtons
-        }
-
-        return if (isCaptionsButtonVisible) {
+    private fun getSliderWidth(): Int =
+        if (Flags.captionsToggleInVolumeDialogV1() && captionsButtonViewModel.isVisible.value) {
             mainSliderWidthWithCaptions
         } else {
             mainSliderWidth
         }
-    }
 
     private class Accessibility(private val viewModel: VolumeDialogViewModel) :
         View.AccessibilityDelegate() {

@@ -75,7 +75,7 @@ import com.android.systemui.statusbar.phone.domain.interactor.LightsOutInteracto
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarIconBlockListInteractor
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarInteractor
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.StatusBarVisibilityInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.model.ChipsVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombinedVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
@@ -287,7 +287,7 @@ constructor(
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     keyguardInteractor: KeyguardInteractor,
     statusBarNotificationIconsInteractor: StatusBarNotificationIconsInteractor,
-    @DisplayAware homeStatusBarVisibilityInteractor: HomeStatusBarVisibilityInteractor,
+    @DisplayAware statusBarVisibilityInteractor: StatusBarVisibilityInteractor,
     override val operatorNameViewModel: StatusBarOperatorNameViewModel,
     sceneInteractor: SceneInteractor,
     private val shadeInteractor: ShadeInteractor,
@@ -389,7 +389,7 @@ constructor(
     override val isQuickSettingsChipHighlighted: Boolean by
         combine(
                 shadeInteractor.isQsExpanded,
-                homeStatusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
+                statusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
             ) { isQsExpanded, isShadeOnThisDisplay ->
                 isQsExpanded && isShadeOnThisDisplay
             }
@@ -398,7 +398,7 @@ constructor(
     override val isNotificationsChipHighlighted: Boolean by
         combine(
                 shadeInteractor.isNotificationsExpanded,
-                homeStatusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
+                statusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
             ) { isNotificationsExpanded, isShadeOnThisDisplay ->
                 isNotificationsExpanded && isShadeOnThisDisplay
             }
@@ -415,14 +415,14 @@ constructor(
     override val isQuickSettingsChipClickable: Boolean by
         deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(initialValue = false)
 
-    override val isHomeStatusBarAllowed = homeStatusBarVisibilityInteractor.isHomeStatusBarAllowed
+    override val isHomeStatusBarAllowed = statusBarVisibilityInteractor.isHomeStatusBarAllowed
 
     private val shadeInvocationSplitRatio: Float =
         resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
 
     override val shouldShowOperatorNameView: Flow<Boolean> =
         combine(
-                homeStatusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
+                statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
                 homeStatusBarInteractor.visibilityViaDisableFlags,
                 homeStatusBarInteractor.shouldShowOperatorName,
             ) { shouldStatusBarBeVisible, visibilityViaDisableFlags, shouldShowOperator ->
@@ -449,7 +449,7 @@ constructor(
             } else {
                 combine(
                         ongoingActivityChipsViewModel.chips,
-                        homeStatusBarVisibilityInteractor.canShowOngoingActivityChips,
+                        statusBarVisibilityInteractor.canShowOngoingActivityChips,
                     ) { chips, canShow ->
                         ChipsVisibilityModel(chips, areChipsAllowed = canShow)
                     }
@@ -550,14 +550,14 @@ constructor(
     private val isAnyChipVisible =
         combine(
             hasOngoingActivityChips,
-            homeStatusBarVisibilityInteractor.canShowOngoingActivityChips,
+            statusBarVisibilityInteractor.canShowOngoingActivityChips,
         ) { hasChips, canShowChips ->
             hasChips && canShowChips
         }
 
     override val isClockVisible: Flow<VisibilityModel> =
         combine(
-                homeStatusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
+                statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
                 homeStatusBarInteractor.visibilityViaDisableFlags,
             ) { shouldStatusBarBeVisible, visibilityViaDisableFlags ->
                 val showClock = shouldStatusBarBeVisible && visibilityViaDisableFlags.isClockAllowed
@@ -574,7 +574,7 @@ constructor(
 
     override val isNotificationIconContainerVisible: Flow<VisibilityModel> =
         combine(
-                homeStatusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
+                statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
                 isAnyChipVisible,
                 homeStatusBarInteractor.visibilityViaDisableFlags,
             ) { shouldStatusBarBeVisible, anyChipVisible, visibilityViaDisableFlags ->
@@ -600,7 +600,7 @@ constructor(
 
     private val isSystemInfoVisible =
         combine(
-            homeStatusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
+            statusBarVisibilityInteractor.shouldHomeStatusBarBeVisible,
             homeStatusBarInteractor.visibilityViaDisableFlags,
         ) { shouldStatusBarBeVisible, visibilityViaDisableFlags ->
             val showSystemInfo =

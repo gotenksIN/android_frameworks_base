@@ -5750,14 +5750,6 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.INTENT_CATEGORY)
     public static final String CATEGORY_CAR_LAUNCHER = "android.intent.category.CAR_LAUNCHER";
     /**
-     * Indicates that the activity should be used as a launcher on a connected XR device
-     * where applications are projected.
-     */
-    @SdkConstant(SdkConstantType.INTENT_CATEGORY)
-    @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES)
-    public static final String CATEGORY_XR_PROJECTED_LAUNCHER =
-            "android.intent.category.XR_PROJECTED_LAUNCHER";
-    /**
      * Used to indicate that the activity can be used in communal mode.
      * @hide
      */

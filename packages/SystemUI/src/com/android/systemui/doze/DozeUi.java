@@ -108,10 +108,8 @@ public class DozeUi implements DozeMachine.Part {
                             DozeMachine.State requestState = DozeMachine.State.DOZE_PULSING;
                             if (reason == DozeLog.PULSE_REASON_SENSOR_WAKE_REACH) {
                                 requestState = DozeMachine.State.DOZE_PULSING_BRIGHT;
-                            } else if (reason == DozeLog.REASON_SENSOR_QUICK_PICKUP) {
-                                requestState = DozeMachine.State.DOZE_PULSING_WITHOUT_UI;
                             } else if (reason == DozeLog.REASON_SENSOR_UDFPS_LONG_PRESS
-                                    && !mDozeParameters.getAlwaysOn()) {
+                                    || reason == DozeLog.REASON_SENSOR_QUICK_PICKUP) {
                                 requestState = DozeMachine.State.DOZE_PULSING_WITHOUT_UI;
                             } else if (reason
                                     == DozeLog.PULSE_REASON_FINGERPRINT_PULSE_SHOW_AUTH_UI) {

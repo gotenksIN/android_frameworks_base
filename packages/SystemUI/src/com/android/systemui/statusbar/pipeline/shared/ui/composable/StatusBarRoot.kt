@@ -631,13 +631,12 @@ private fun addEndSideComposable(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier =
                         Modifier.widthIn(max = with(LocalDensity.current) { endSideWidth.toDp() })
-                            .sysUiResTagContainer()
-                            .sysuiResTag("system_icons"),
+                            .sysUiResTagContainer(),
                 ) {
                     SystemStatusIconsContainer(
                         viewModelFactory = statusBarViewModel.systemStatusIconsViewModelFactory,
                         isDark = statusBarViewModel.areaDark,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f, fill = false).sysuiResTag("system_icons"),
                         systemStatusIconBlockListInteractor =
                             statusBarViewModel.systemStatusIconBlockListInteractor,
                     )

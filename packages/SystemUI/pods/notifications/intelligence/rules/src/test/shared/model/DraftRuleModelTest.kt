@@ -32,14 +32,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class DraftRuleModelTest : SysuiTestCase() {
     @Test
-    fun toDraft_isSystemRule_throws() {
-        assertThrows(IllegalArgumentException::class.java) {
-            RuleModel(id = 1, action = ActionModel.Block, filter = null, isSystemRule = true)
-                .toDraft()
-        }
-    }
-
-    @Test
     fun toDraft_filterNull() {
         val rule = RuleModel(id = 1, action = ActionModel.Block, filter = null)
 
@@ -181,7 +173,6 @@ class DraftRuleModelTest : SysuiTestCase() {
         assertThat(fullRule.filter!!.includedApps).isNull()
         assertThat(fullRule.filter!!.people).isEqualTo(PeopleModel(listOf(FAKE_CONTACT)))
         assertThat(fullRule.filter!!.keywords).isEqualTo(KeywordsModel(listOf("example")))
-        assertThat(fullRule.isSystemRule).isFalse()
     }
 
     @Test
@@ -222,7 +213,6 @@ class DraftRuleModelTest : SysuiTestCase() {
         assertThat(fullRule.filter!!.includedApps).isEqualTo(IncludedAppsModel(listOf(FAKE_APP)))
         assertThat(fullRule.filter!!.people).isNull()
         assertThat(fullRule.filter!!.keywords).isEqualTo(KeywordsModel(listOf("example")))
-        assertThat(fullRule.isSystemRule).isFalse()
     }
 
     @Test

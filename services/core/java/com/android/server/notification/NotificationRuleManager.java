@@ -44,10 +44,8 @@ import static android.service.notification.Adjustment.KEY_LIGHT;
 import static android.service.notification.Adjustment.KEY_MODE_BREAKTHROUGH_LIST;
 import static android.service.notification.Adjustment.KEY_SOUND;
 import static android.service.notification.Adjustment.KEY_TYPE;
-import static android.service.notification.Adjustment.TYPE_CONTENT_RECOMMENDATION;
 import static android.service.notification.Adjustment.TYPE_NEWS;
 import static android.service.notification.Adjustment.TYPE_PROMOTION;
-import static android.service.notification.Adjustment.TYPE_SOCIAL_MEDIA;
 
 import static com.android.server.notification.ManagedServices.ATT_USER_ID;
 import static com.android.server.notification.NotificationManagerService.NotificationAssistants.ATT_DENIED_KEY;
@@ -78,7 +76,6 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Slog;
 
-import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.XmlUtils;
 import com.android.modules.utils.TypedXmlPullParser;
@@ -900,11 +897,11 @@ public class NotificationRuleManager {
      * a collection of behavioral signals to apply. In order to be 'valid', a rule must have the
      * same primary action as the highest priority matching rule.
      */
-    List<Adjustment> getAdjustmentsForRules(Adjustment ruleIdAdjustment, int staticBundleType) {
+    List<Adjustment> getAdjustmentsForRules(Adjustment ruleIdAdjustment) {
         List<Integer> ruleIds = ruleIdAdjustment.getSignals().getIntegerArrayList(
                 Adjustment.KEY_NOTIFICATION_RULES);
         List<Adjustment> behavioralAdjustments = new ArrayList<>();
-        int userId = mUmInternal.getProfileParentId(ruleIdAdjustment.getUser());
+        int userId = ruleIdAdjustment.getUser();
         if (userId == USER_ALL) {
             userId = USER_SYSTEM;
         }
@@ -918,15 +915,6 @@ public class NotificationRuleManager {
                             .toList();
             int highestPriorityPrimaryAction = PRIMARY_ACTION_NONE;
             for (NotificationRule rule : matchingRules) {
-                if (rule.getId() == RESERVED_ID_STATIC_BUNDLES) {
-                    int adjustmentUser = ruleIdAdjustment.getUser();
-                    if (!isClassificationTypeAllowed(adjustmentUser, staticBundleType)
-                            || !isClassificationAdjustmentAllowed(adjustmentUser)
-                            || !isClassificationAllowedForPackage(adjustmentUser,
-                            ruleIdAdjustment.getPackage())) {
-                        continue;
-                    }
-                }
                 NotificationRule.Action action = rule.getAction();
                 Bundle signals = new Bundle();
                 if (highestPriorityPrimaryAction == PRIMARY_ACTION_NONE) {
@@ -945,16 +933,11 @@ public class NotificationRuleManager {
                             signals.putInt(KEY_IMPORTANCE, IMPORTANCE_LOW);
                             break;
                         case PRIMARY_ACTION_BUNDLE:
-                            int id = staticBundleType != Adjustment.TYPE_OTHER
-                                    ? staticBundleType
-                                    : rule.getId();
-                            String label  = staticBundleType != Adjustment.TYPE_OTHER
-                                    ? getClassificationChannelName(staticBundleType)
-                                    : action.getDynamicBundleName();
                             signals.putParcelable(KEY_DYNAMIC_BUNDLE,
                                     new NotificationRule.DynamicBundle(
-                                            NotificationChannel.getChannelIdForBundleType(id),
-                                            label,
+                                            NotificationChannel.getChannelIdForBundleType(
+                                                    rule.getId()),
+                                            action.getDynamicBundleName(),
                                             action.getDynamicBundleEmojiIcon()));
                             break;
                         case PRIMARY_ACTION_BLOCK:
@@ -973,20 +956,6 @@ public class NotificationRuleManager {
             }
         }
         return behavioralAdjustments;
-    }
-
-    private String getClassificationChannelName(int type) {
-        return switch (type) {
-            case TYPE_PROMOTION ->
-                    mContext.getString(R.string.promotional_notification_channel_label);
-            case TYPE_CONTENT_RECOMMENDATION ->
-                    mContext.getString(R.string.recs_notification_channel_label);
-            case TYPE_NEWS ->
-                    mContext.getString(R.string.news_notification_channel_label);
-            case TYPE_SOCIAL_MEDIA ->
-                    mContext.getString(R.string.social_notification_channel_label);
-            default -> null;
-        };
     }
 
     private void addActionOverrideBehaviors(NotificationRule.Action action, Bundle signals) {

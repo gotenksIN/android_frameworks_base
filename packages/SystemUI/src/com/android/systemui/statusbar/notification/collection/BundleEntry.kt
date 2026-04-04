@@ -35,9 +35,7 @@ class BundleEntry(val spec: BundleSpec) : PipelineEntry(spec.key) {
     override val bucket: Int = if (NmContextualDisplay.isEnabled) BUCKET_SILENT else spec.bucket
 
     override val bucketForLogging: Int
-        get() =
-            if (spec.bucket > DynamicBundle.DYNAMIC_RANGE_START) BUCKET_DYNAMIC_BUNDLE
-            else spec.bucket
+        get() = if (spec.bucket > DynamicBundle.DYNAMIC_RANGE_START) BUCKET_DYNAMIC_BUNDLE else spec.bucket
 
     /** The model used by UI. */
     val bundleRepository =

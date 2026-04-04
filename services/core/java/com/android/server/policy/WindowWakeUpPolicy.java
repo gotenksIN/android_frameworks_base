@@ -25,6 +25,7 @@ import static android.os.PowerManager.WAKE_REASON_WAKE_MOTION;
 import static android.view.KeyEvent.KEYCODE_POWER;
 
 import static com.android.server.policy.Flags.supportInputWakeupDelegate;
+import static com.android.server.power.feature.flags.Flags.perDisplayWakeByTouch;
 
 import android.annotation.Nullable;
 import android.content.Context;
@@ -93,11 +94,18 @@ class WindowWakeUpPolicy {
                         displayId, eventTime, keyCode, isDown, keyEventFlags)) {
             return true;
         }
-        wakeUp(
-                displayId,
-                eventTime,
-                keyCode == KEYCODE_POWER ? WAKE_REASON_POWER_BUTTON : WAKE_REASON_WAKE_KEY,
-                keyCode == KEYCODE_POWER ? "POWER" : "KEY");
+        if (perDisplayWakeByTouch()) {
+            wakeUp(
+                    displayId,
+                    eventTime,
+                    keyCode == KEYCODE_POWER ? WAKE_REASON_POWER_BUTTON : WAKE_REASON_WAKE_KEY,
+                    keyCode == KEYCODE_POWER ? "POWER" : "KEY");
+        } else {
+            wakeUp(
+                    eventTime,
+                    keyCode == KEYCODE_POWER ? WAKE_REASON_POWER_BUTTON : WAKE_REASON_WAKE_KEY,
+                    keyCode == KEYCODE_POWER ? "POWER" : "KEY");
+        }
         return true;
     }
 
@@ -121,7 +129,11 @@ class WindowWakeUpPolicy {
                         displayId, eventTime, source, isDown, deviceGoingToSleep)) {
             return true;
         }
-        wakeUp(displayId, eventTime, WAKE_REASON_WAKE_MOTION, "MOTION");
+        if (perDisplayWakeByTouch()) {
+            wakeUp(displayId, eventTime, WAKE_REASON_WAKE_MOTION, "MOTION");
+        } else {
+            wakeUp(eventTime, WAKE_REASON_WAKE_MOTION, "MOTION");
+        }
         return true;
     }
 

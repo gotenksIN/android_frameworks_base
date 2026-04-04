@@ -175,71 +175,6 @@ public abstract class MediaRoute2ProviderService extends Service {
     @Retention(RetentionPolicy.SOURCE)
     public @interface Reason {}
 
-    /**
-     * Holds parameters associated with the creation of a {@link RoutingSessionInfo routing
-     * session}.
-     */
-    @FlaggedApi(Flags.FLAG_ENABLE_MIRRORING_IN_MEDIA_ROUTER_2)
-    public static final class SessionCreationParams {
-        private final long mRequestId;
-        private final String mTargetPackageName;
-        private final String mInitialRouteId;
-        private final Bundle mSessionHints;
-
-        private SessionCreationParams(
-                long requestId,
-                @NonNull String targetPackageName,
-                @NonNull String initialRouteId,
-                @NonNull Bundle sessionHints) {
-            mRequestId = requestId;
-            mTargetPackageName = requireNonNull(targetPackageName);
-            mInitialRouteId = requireNonNull(initialRouteId);
-            mSessionHints = sessionHints;
-        }
-
-        /**
-         * Returns the ID of the request.
-         *
-         * <p>This value must be passed to event notifications associated with this session creation
-         * request. For example, when calling {@link #notifyRequestFailed(long, int)}, or {@link
-         * #notifySessionCreated(long, RoutingSessionInfo)}.
-         */
-        public long getRequestId() {
-            return mRequestId;
-        }
-
-        /** Returns the package name of the application that the session is intended for. */
-        // TODO: b/494592636 - Document the target package name value for system-wide sessions. For
-        // example, in the case of screen mirroring, as opposed to app mirroring.
-        @NonNull
-        public String getTargetPackageName() {
-            return mTargetPackageName;
-        }
-
-        /**
-         * Returns the ID of the route to make initially {@link
-         * RoutingSessionInfo#getSelectedRoutes()} selected.
-         */
-        @NonNull
-        public String getInitiallySelectedRouteId() {
-            return mInitialRouteId;
-        }
-
-        /**
-         * Returns a bundle of opaque arguments.
-         *
-         * <p>This bundle can be used by AndroidX MediaRouter to implement backwards compatible
-         * features, and it's also particularly useful for application-level message exchange, which
-         * can be used to control media playback, for example.
-         *
-         * <p>Populated by {@link MediaRouter2.OnGetControllerHintsListener}.
-         */
-        @NonNull
-        public Bundle getSessionHints() {
-            return mSessionHints;
-        }
-    }
-
     private static final int MAX_REQUEST_IDS_SIZE = 500;
 
     private final Handler mHandler;
@@ -453,38 +388,6 @@ public abstract class MediaRoute2ProviderService extends Service {
         } catch (RemoteException ex) {
             Log.w(TAG, "Failed to notify that the request has failed.");
         }
-    }
-
-    /**
-     * Called when the service receives a request to create a session.
-     *
-     * <p>The default implementation calls {@link #onCreateSession(long, String, String, Bundle)}.
-     *
-     * <p>Call {@link #notifySessionCreated(long, RoutingSessionInfo)} with the given {@link
-     * SessionCreationParams#getRequestId() requestId} to notify the system about the creation of
-     * the new session. The created session's initially {@link
-     * RoutingSessionInfo#getSelectedRoutes() selected route} must be {@link
-     * SessionCreationParams#getInitiallySelectedRouteId()}.
-     *
-     * <p>If you can't create the session or want to reject the request, call {@link
-     * #notifyRequestFailed(long, int)} with the given {@code requestId}.
-     *
-     * @param sessionCreationParams The {@link SessionCreationParams parameters} for creating the
-     *     session.
-     * @see RoutingSessionInfo.Builder#Builder(String, String)
-     * @see RoutingSessionInfo.Builder#addSelectedRoute(String)
-     * @see RoutingSessionInfo.Builder#setControlHints(Bundle)
-     *     <p>The created session must be passed to {@link #notifySessionCreated}.
-     *     <p>Failure to create the session must be notified by calling {@link
-     *     #notifyRequestFailed}.
-     */
-    @FlaggedApi(Flags.FLAG_ENABLE_MIRRORING_IN_MEDIA_ROUTER_2)
-    public void onCreateSession(@NonNull SessionCreationParams sessionCreationParams) {
-        onCreateSession(
-                sessionCreationParams.getRequestId(),
-                sessionCreationParams.getTargetPackageName(),
-                sessionCreationParams.getInitiallySelectedRouteId(),
-                sessionCreationParams.getSessionHints());
     }
 
     /**
@@ -797,11 +700,8 @@ public abstract class MediaRoute2ProviderService extends Service {
         }
 
         @Override
-        public void requestCreateSession(
-                long requestId,
-                String packageName,
-                String routeId,
-                @Nullable Bundle sessionControlHints) {
+        public void requestCreateSession(long requestId, String packageName, String routeId,
+                @Nullable Bundle requestCreateSession) {
             if (!checkCallerIsSystem()) {
                 return;
             }
@@ -809,28 +709,9 @@ public abstract class MediaRoute2ProviderService extends Service {
                 return;
             }
             addRequestId(requestId);
-
-            if (Flags.enableMirroringInMediaRouter2()) {
-                sessionControlHints =
-                        sessionControlHints != null ? sessionControlHints : new Bundle();
-                SessionCreationParams params =
-                        new SessionCreationParams(
-                                requestId, packageName, routeId, sessionControlHints);
-                mHandler.sendMessage(
-                        obtainMessage(
-                                MediaRoute2ProviderService::onCreateSession,
-                                MediaRoute2ProviderService.this,
-                                params));
-            } else {
-                mHandler.sendMessage(
-                        obtainMessage(
-                                MediaRoute2ProviderService::onCreateSession,
-                                MediaRoute2ProviderService.this,
-                                requestId,
-                                packageName,
-                                routeId,
-                                sessionControlHints));
-            }
+            mHandler.sendMessage(obtainMessage(MediaRoute2ProviderService::onCreateSession,
+                    MediaRoute2ProviderService.this, requestId, packageName, routeId,
+                    requestCreateSession));
         }
 
         @Override

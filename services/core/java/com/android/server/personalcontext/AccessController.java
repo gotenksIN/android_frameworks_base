@@ -21,7 +21,6 @@ import static android.companion.AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PRO
 import android.Manifest;
 import android.annotation.ArrayRes;
 import android.annotation.IntDef;
-import android.app.privatecompute.PccSandboxManager;
 import android.app.role.RoleManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -32,12 +31,10 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.permission.PermissionManager;
 import android.service.personalcontext.Flags;
-import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.R;
-import com.android.server.SystemConfig;
 import com.android.server.personalcontext.component.client.BaseServiceClientComponent;
 
 import java.lang.annotation.Retention;
@@ -69,10 +66,9 @@ public class AccessController {
             ACCESS_PUBLISH_INSIGHTS_PERMISSION,
             ACCESS_RECEIVE_INSIGHTS_PERMISSION,
             ACCESS_HOST_INSIGHT_SURFACE_PERMISSION,
-            ACCESS_PCC_OR_TRUSTED_PACKAGE,
+            ACCESS_PCC,
             ACCESS_PCC_OR_AUTO_COMPANION_ROLE,
             ACCESS_REGISTER_VISUALIZER,
-            ACCESS_BIND_CONTEXT_PERMISSION
     })
     public @interface Access {
     }
@@ -110,25 +106,14 @@ public class AccessController {
     /** Access to host insight surface */
     public static final int ACCESS_HOST_INSIGHT_SURFACE_PERMISSION = 1 << 9;
 
-    /**
-     * Component is PCC compliant, trusted by PCC, or has restricted connection and internet access.
-     *
-     * <p>Used for refiners and understanders.</p>
-     */
-    public static final int ACCESS_PCC_OR_TRUSTED_PACKAGE = 1 << 10;
+    /** Component is PCC compliant. */
+    public static final int ACCESS_PCC = 1 << 10;
 
-    /**
-     * Component is PCC compliant or has the automotive companion app role.
-     *
-     * <p>Used for renderers.</p>
-     */
+    /** Component is PCC compliant or has the automotive companion app role. */
     public static final int ACCESS_PCC_OR_AUTO_COMPANION_ROLE = 1 << 11;
 
     /** Access to register a visualizer. */
     public static final int ACCESS_REGISTER_VISUALIZER = 1 << 12;
-
-    /** Access to bind context via permissions. */
-    public static final int ACCESS_BIND_CONTEXT_PERMISSION = 1 << 13;
 
     /** All access flags related to permissions */
     public static final int ACCESS_ALL_PERMISSIONS =
@@ -146,6 +131,9 @@ public class AccessController {
             | ACCESS_RECEIVE_INSIGHTS_ALLOWLIST
             | ACCESS_FILTER_INSIGHTS_ALLOWLIST;
 
+    /** Access to bind context via permissions. */
+    public static final int ACCESS_BIND_CONTEXT_PERMISSION = 1 << 13;
+
     /** Interface to inject dependencies. */
     public interface Injector {
         /** Get {@link Resources}. */
@@ -162,12 +150,6 @@ public class AccessController {
 
         /** Get {@link RoleManager}. */
         RoleManager getRoleManager();
-
-        /** Get {@link SystemConfig}. */
-        SystemConfig getSystemConfig();
-
-        /** Get {@link PccSandboxManager}. */
-        PccSandboxManager getPccSandboxManager();
 
         /** Get {@link EventListener}. */
         EventListener getEventListener();
@@ -198,16 +180,6 @@ public class AccessController {
             @Override
             public RoleManager getRoleManager() {
                 return context.getSystemService(RoleManager.class);
-            }
-
-            @Override
-            public SystemConfig getSystemConfig() {
-                return SystemConfig.getInstance();
-            }
-
-            @Override
-            public PccSandboxManager getPccSandboxManager() {
-                return context.getSystemService(PccSandboxManager.class);
             }
 
             @Override
@@ -255,11 +227,9 @@ public class AccessController {
     private final PermissionEnforcer mPermissionEnforcer;
     private final PermissionManager mPermissionManager;
     private final RoleManager mRoleManager;
-    private final PccSandboxManager mPccSandboxManager;
     private final UserHandle mUser;
     private final SparseArray<Set<String>> mAllowLists = new SparseArray<>();
     private final EventListener mEventListener;
-    private final SystemConfig mSystemConfig;
 
     /**
      * Creates an {@link AccessController} from the given {@link Context}, which is used to
@@ -276,12 +246,10 @@ public class AccessController {
     AccessController(Injector injector, UserHandle user) {
         mResources = injector.getResources();
         mPackageManager = injector.getPackageManager();
-        mPermissionEnforcer = injector.getPermissionEnforcer();
         mPermissionManager = injector.getPermissionManager();
         mRoleManager = injector.getRoleManager();
-        mPccSandboxManager = injector.getPccSandboxManager();
         mEventListener = injector.getEventListener();
-        mSystemConfig = injector.getSystemConfig();
+        mPermissionEnforcer = injector.getPermissionEnforcer();
         mUser = user;
     }
 
@@ -352,8 +320,8 @@ public class AccessController {
         boolean result = true;
 
         // We only need the service info to check the PCC flag.
-        if ((accessFlags & ACCESS_PCC_OR_TRUSTED_PACKAGE) != 0) {
-            result &= checkPccFlagOrTrusted(serviceInfo);
+        if ((accessFlags & ACCESS_PCC) != 0) {
+            result &= checkPccFlag(serviceInfo);
         } else if ((accessFlags & ACCESS_PCC_OR_AUTO_COMPANION_ROLE) != 0) {
             result &= checkPccOrAutoCompanionFlag(serviceInfo);
         } else if ((accessFlags & ACCESS_BIND_CONTEXT_PERMISSION) != 0) {
@@ -361,12 +329,9 @@ public class AccessController {
                     serviceInfo.permission);
         }
 
-        return result
-                & isPackageAllowed(
-                        serviceInfo.packageName,
-                        accessFlags
-                                & ~ACCESS_PCC_OR_TRUSTED_PACKAGE
-                                & ~ACCESS_PCC_OR_AUTO_COMPANION_ROLE);
+        return result & isPackageAllowed(
+                serviceInfo.packageName,
+                accessFlags & ~ACCESS_PCC & ~ACCESS_PCC_OR_AUTO_COMPANION_ROLE);
     }
 
     /**
@@ -389,8 +354,7 @@ public class AccessController {
         boolean result = true;
 
         // We need the service info to check the PCC flag.
-        if ((accessFlags & (ACCESS_PCC_OR_TRUSTED_PACKAGE | ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                != 0) {
+        if ((accessFlags & (ACCESS_PCC | ACCESS_PCC_OR_AUTO_COMPANION_ROLE)) != 0) {
             Log.d(TAG, "PCC check: requires ServiceInfo");
             result = false;
         }
@@ -448,22 +412,18 @@ public class AccessController {
         return result;
     }
 
-    /** Performs checks for PCC, the auto companion role, or trusted component. */
+    /** Performs checks for PCC or the auto companion role. */
     private boolean checkPccOrAutoCompanionFlag(ServiceInfo serviceInfo) {
         return checkPccFlag(serviceInfo)
-                || checkRoleFlag(serviceInfo.packageName, DEVICE_PROFILE_AUTOMOTIVE_PROJECTION)
-                || checkTrustedComponent(serviceInfo);
-    }
-
-    /** Checks if the service meets our criteria for participating in PCC. */
-    private boolean checkPccFlagOrTrusted(ServiceInfo serviceInfo) {
-        return checkPccFlag(serviceInfo)
-                || checkAccessRestricted(serviceInfo.packageName)
-                || checkTrustedComponent(serviceInfo);
+                || checkRoleFlag(serviceInfo.packageName, DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
     }
 
     /** Performs checks for PCC. */
     private boolean checkPccFlag(ServiceInfo serviceInfo) {
+        if (!Flags.enforcePersonalContextPccAccessControl()) {
+            return makeAccessDecision(serviceInfo.packageName, "PCC", RESULT_BYPASSED);
+        }
+
         return makeAccessDecision(
                 serviceInfo.packageName,
                 "PCC",
@@ -471,50 +431,10 @@ public class AccessController {
                         ? RESULT_ALLOWED : RESULT_DENIED);
     }
 
-    /**
-     * Checks if the package does not have internet permissions and is also restricted in what
-     * components can connect to it using allowed-associations.
-     *
-     * <p>Check can only pass if {@link R.bool.config_enableStrictPersonalContextPccNextCheck} is
-     * not enabled, components.
-     */
-    private boolean checkAccessRestricted(String packageName) {
-        if (mResources.getBoolean(
-                R.bool.config_enableStrictPersonalContextPccNextCheck)) {
-            // Strict PCC check is enabled, fail this check.
-            return makeAccessDecision(packageName, "Access restricted", RESULT_DENIED);
-        }
-        ArraySet<String> allowedAssociations =
-                mSystemConfig.getAllowedAssociations().get(packageName);
-        boolean hasAllowedAssociations =
-                allowedAssociations != null && !allowedAssociations.isEmpty();
-        boolean hasInternetPermission =
-                checkPermission(packageName, Manifest.permission.INTERNET);
-
-        return makeAccessDecision(
-                packageName,
-                "Access restricted",
-                (!hasInternetPermission && hasAllowedAssociations)
-                        ? RESULT_ALLOWED
-                        : RESULT_DENIED);
-    }
-
-    /** Checks if a package is a trusted system component in the PCC sandbox. */
-    private boolean checkTrustedComponent(ServiceInfo serviceInfo) {
-        return makeAccessDecision(
-                serviceInfo.packageName,
-                "Trusted component",
-                mPccSandboxManager.isPccTrustedSystemComponent(
-                                serviceInfo.getUid(), serviceInfo.packageName)
-                        ? RESULT_ALLOWED
-                        : RESULT_DENIED);
-    }
-
     /** Performs checks for a role. */
     private boolean checkRoleFlag(String packageName, String role) {
         if (!Flags.enforcePersonalContextRoleAccessControl()) {
-            // Deny if flag is disabled since this check is used in an OR statement.
-            return makeAccessDecision(packageName, "Role " + role, RESULT_DENIED);
+            return makeAccessDecision(packageName, "Role " + role, RESULT_BYPASSED);
         }
 
         return makeAccessDecision(
@@ -566,20 +486,25 @@ public class AccessController {
 
     /** Performs checks for a permission. */
     private boolean checkPermission(String packageName, String permission) {
+        if (!Flags.enforcePersonalContextPermissions()) {
+            return makeAccessDecision(packageName, "Permission " + permission, RESULT_BYPASSED);
+        }
+
         if (PersonalContextManagerService.isSystemPackage(packageName)) {
             return makeAccessDecision(packageName, "Permission " + permission, RESULT_SYSTEM);
         }
 
-        final int permissionResult =
-                mPermissionManager.checkPackageNamePermission(
-                        permission, packageName, Context.DEVICE_ID_DEFAULT, mUser.getIdentifier());
+        final int permissionResult = mPermissionManager.checkPackageNamePermission(
+                permission,
+                packageName,
+                Context.DEVICE_ID_DEFAULT,
+                mUser.getIdentifier());
 
         return makeAccessDecision(
                 packageName,
                 "Permission " + permission,
                 permissionResult == PackageManager.PERMISSION_GRANTED
-                        ? RESULT_ALLOWED
-                        : RESULT_DENIED);
+                        ? RESULT_ALLOWED : RESULT_DENIED);
     }
 
     /** Performs checks for an allowlist. */
@@ -611,15 +536,11 @@ public class AccessController {
             String description,
             @AccessResult int result) {
         if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(
-                    TAG,
-                    String.format(
-                            "%s check: %s for %s",
-                            description,
-                            result == RESULT_ALLOWED
-                                    ? "allowed"
-                                    : result == RESULT_DENIED ? "denied" : "bypassed",
-                            packageName));
+            Log.d(TAG, String.format(
+                    "%s check: %s",
+                    description,
+                    result == RESULT_ALLOWED
+                            ? "allowed" : result == RESULT_DENIED ? "denied" : "bypassed"));
         }
 
         if (mEventListener != null) {

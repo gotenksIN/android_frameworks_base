@@ -82,11 +82,6 @@ constructor(
             return false
         }
 
-        if (selectedUserInteractor.isUserSwitching.value) {
-            Log.w(TAG, "Can not launch camera when user switch in progress")
-            return false
-        }
-
         val resolveInfo: ResolveInfo? =
             packageManager.resolveActivityAsUser(
                 getStartCameraIntent(),

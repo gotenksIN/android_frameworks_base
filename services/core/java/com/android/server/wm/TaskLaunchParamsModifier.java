@@ -379,6 +379,10 @@ class TaskLaunchParamsModifier extends DefaultLaunchParamsModifier {
         appendLog("display-area=" + taskDisplayArea);
         outParams.mPreferredTaskDisplayArea = taskDisplayArea;
 
+        if (phase == PHASE_DISPLAY_AREA) {
+            return RESULT_CONTINUE;
+        }
+
         // STEP 4: Determine final launch bounds based on resolved windowing mode and activity
         // requested orientation. We set bounds to empty for fullscreen mode and keep bounds as is
         // for all other windowing modes that's not freeform mode. One can read comments in

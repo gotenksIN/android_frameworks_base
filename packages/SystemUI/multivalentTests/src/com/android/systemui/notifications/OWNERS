@@ -1,4 +1,0 @@
-set noparent
-
-include /packages/SystemUI/compose/features/src/com/android/systemui/notifications/OWNERS
-include /packages/SystemUI/TEST_OWNERS

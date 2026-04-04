@@ -65,7 +65,7 @@ class FakeDisplayRepository @Inject constructor() : DisplayRepository {
     private val displayIdsWithSystemDecorationsFlow = MutableStateFlow<Set<Int>>(emptySet())
 
     init {
-        runBlocking { addDisplay(Display.DEFAULT_DISPLAY, type = Display.TYPE_INTERNAL) }
+        runBlocking { addDisplay(Display.DEFAULT_DISPLAY) }
     }
 
     fun addDisplayBlocking(displayId: Int) {

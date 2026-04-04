@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,10 @@
  * limitations under the License.
  */
 
-package com.android.protolog
+package com.android.systemui.clock.data.repository
 
-import com.android.tools.lint.detector.api.JavaContext
-import com.intellij.psi.PsiMethod
-import org.jetbrains.uast.UCallExpression
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.statusbar.policy.nextAlarmController
 
-interface LogCallDataExtractor {
-    fun extractCall(
-        context: JavaContext,
-        node: UCallExpression,
-        method: PsiMethod
-    ): ProtoLogCall?
-}
+var Kosmos.clockRepository: ClockRepository by
+    Kosmos.Fixture { ClockRepository(nextAlarmController) }

@@ -19,12 +19,12 @@ package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
 import com.android.systemui.headline.ui.viewmodel.HeadlineItemsAdapter
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.statusbar.chips.ui.viewmodel.ongoingActivityChipsViewModel
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.statusBarVisibilityInteractor
 
 val Kosmos.fakeHeadlineItemsAdapter: FakeHeadlineItemsAdapter by
     Kosmos.Fixture { FakeHeadlineItemsAdapter() }
 
 var Kosmos.headlineItemsAdapter: HeadlineItemsAdapter by
     Kosmos.Fixture {
-        HeadlineItemsAdapterImpl(homeStatusBarVisibilityInteractor, ongoingActivityChipsViewModel)
+        HeadlineItemsAdapterImpl(statusBarVisibilityInteractor, ongoingActivityChipsViewModel)
     }

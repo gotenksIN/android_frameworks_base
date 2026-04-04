@@ -96,7 +96,6 @@ sealed interface DraftRuleModel {
     companion object {
         /** Converts a rule to a draft version so it can be edited. */
         fun RuleModel.toDraft(): DraftRuleModel {
-            require(!isSystemRule) { "System rules cannot be edited" }
             return PreExisting(id = id, action = action, filter = filter.toDraft())
         }
 
@@ -123,13 +122,7 @@ sealed interface DraftRuleModel {
          * @throws IllegalStateException if any of the values in [filter] are [RuleValue.Ambiguous].
          */
         fun New.toFullRule(id: Int): RuleModel {
-            return RuleModel(
-                id = id,
-                action = this.action,
-                filter = this.filter.toFullFilter(),
-                // Users can never create system rules
-                isSystemRule = false,
-            )
+            return RuleModel(id = id, action = this.action, filter = this.filter.toFullFilter())
         }
 
         /**
@@ -142,8 +135,6 @@ sealed interface DraftRuleModel {
                 id = this.id,
                 action = this.action,
                 filter = this.filter.toFullFilter(),
-                // Users can never edit system rules
-                isSystemRule = false,
             )
         }
 

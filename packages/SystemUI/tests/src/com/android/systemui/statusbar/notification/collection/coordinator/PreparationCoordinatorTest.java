@@ -83,7 +83,6 @@ import com.android.systemui.statusbar.notification.row.NotifInflationErrorManage
 import com.android.systemui.statusbar.notification.row.icon.NotificationIconStyleProvider;
 import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionController;
 import com.android.systemui.util.settings.SecureSettings;
-import com.android.systemui.util.time.FakeSystemClock;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -162,8 +161,7 @@ public class PreparationCoordinatorTest extends SysuiTestCase {
                 mSensitiveNotifProtectionController,
                 mSectionStyleProvider,
                 mUserTracker,
-                mGroupMembershipManager,
-                new FakeSystemClock()
+                mGroupMembershipManager
         );
         mEntry = getNotificationEntryBuilder()
                 .setParent(ROOT_ENTRY)

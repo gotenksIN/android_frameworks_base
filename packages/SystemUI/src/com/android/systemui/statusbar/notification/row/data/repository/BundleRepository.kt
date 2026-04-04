@@ -16,20 +16,19 @@
 
 package com.android.systemui.statusbar.notification.row.data.repository
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
-import com.android.systemui.statusbar.notification.collection.BundleIcon
-import com.android.systemui.statusbar.notification.collection.BundleTitle
 import com.android.systemui.statusbar.notification.row.data.model.AppData
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Holds information about a BundleEntry that is relevant to UI. */
 class BundleRepository(
-    val titleText: BundleTitle,
-    val bundleIcon: BundleIcon,
+    @StringRes val titleText: Int,
+    @DrawableRes val bundleIcon: Int,
     @StringRes val summaryTextRes: Int? = 0,
     val summaryText: String? = null,
     val bundleType: Int,

@@ -753,12 +753,15 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                     WindowManagerGlobal.getWindowSession(),
                     mMainExecutor,
                     mBgExecutor,
+                    mTaskInfo,
                     mHandler,
                     mChoreographer,
                     mDisplay.getDisplayId(),
                     mDecorationContainerSurface,
                     mDragPositioningCallback,
                     mSurfaceControlBuilderSupplier,
+                    mSurfaceControlTransactionSupplier,
+                    mDisplayController,
                     event -> {
                         final boolean isDown = event.getAction() == ACTION_DOWN;
                         final boolean isUpOrCancel =

@@ -19,12 +19,9 @@ package com.android.systemui.statusbar.core
 import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.data.repository.fakeKeyguardBouncerRepository
 import com.android.systemui.dump.dumpManager
-import com.android.systemui.flags.DisableSceneContainer
-import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
@@ -34,9 +31,6 @@ import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.power.data.repository.fakePowerRepository
 import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.power.shared.model.WakefulnessState
-import com.android.systemui.scene.domain.interactor.sceneInteractor
-import com.android.systemui.scene.shared.model.Overlays
-import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.mockShadeSurface
 import com.android.systemui.statusbar.data.model.StatusBarMode
 import com.android.systemui.statusbar.data.model.StatusBarMode.LIGHTS_OUT
@@ -55,9 +49,7 @@ import com.android.systemui.statusbar.window.shared.model.StatusBarWindowState
 import com.android.systemui.testKosmos
 import com.android.wm.shell.bubbles.bubbles
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
@@ -85,12 +77,7 @@ class StatusBarOrchestratorTest : SysuiTestCase() {
     private val fakeStatusBarInitializer = kosmos.fakeStatusBarInitializer
     private val dumpManager = kosmos.dumpManager
 
-    private lateinit var orchestrator: StatusBarOrchestrator
-
-    @Before
-    fun setup() {
-        orchestrator = kosmos.statusBarOrchestrator
-    }
+    private val orchestrator = kosmos.statusBarOrchestrator
 
     @Test
     fun start_setsUpPluginDependencies() {
@@ -116,26 +103,11 @@ class StatusBarOrchestratorTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableSceneContainer
     fun bouncerShowing_setsImportanceForA11yToNoHideDescendants() =
         testScope.runTest {
             orchestrator.start()
 
             fakeBouncerRepository.setPrimaryShow(isShowing = true)
-
-            verify(fakeStatusBarInitializer.statusBarViewController)
-                .setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS)
-        }
-
-    @Test
-    @EnableSceneContainer
-    fun bouncerOverlayShowing_setsImportanceForA11yToNoHideDescendants() =
-        testScope.runTest {
-            orchestrator.start()
-
-            kosmos.sceneInteractor.setTransitionState(
-                flowOf(ObservableTransitionState.Idle(Scenes.Lockscreen, setOf(Overlays.Bouncer)))
-            )
 
             verify(fakeStatusBarInitializer.statusBarViewController)
                 .setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS)

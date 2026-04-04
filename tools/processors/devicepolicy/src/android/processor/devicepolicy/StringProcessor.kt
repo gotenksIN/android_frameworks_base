@@ -17,7 +17,6 @@
 package android.processor.devicepolicy
 
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata
-import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.StringPolicyMetadata.ResolutionMechanism as StringResolutionMechanismProto
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.type.TypeMirror
@@ -63,7 +62,7 @@ class StringProcessor(processingEnv: ProcessingEnvironment) :
 
         val typeSpecificMetadata =
             TypeSpecificPolicyMetadata.newBuilder()
-                .setStringMetadata(extractTypeSpecificMetadata(stringDefinition, element))
+                .setStringMetadata(extractTypeSpecificMetadata(stringDefinition))
                 .build()
 
         return Pair(typeSpecificMetadata, stringDefinition.base)
@@ -74,60 +73,15 @@ class StringProcessor(processingEnv: ProcessingEnvironment) :
     }
 
     fun extractTypeSpecificMetadata(
-        definition: StringPolicyDefinition,
-        element: Element,
+        definition: StringPolicyDefinition
     ): TypeSpecificPolicyMetadata.StringPolicyMetadata {
         val builder =
             TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder()
                 .setEmptyStringAllowed(definition.emptyStringAllowed)
                 .setUnprintableCharactersAllowed(definition.unprintableCharactersAllowed)
-                .setResolutionMechanism(getResolutionMechanism(definition, element))
-
         if (definition.maxLength != Integer.MAX_VALUE) {
             builder.setMaxLength(definition.maxLength)
         }
-
         return builder.build()
-    }
-
-    private fun getResolutionMechanism(annotation: StringPolicyDefinition, element: Element) =
-        ResolutionMechanismProcessor(element).getResolutionMechanism(annotation.resolutionMechanism)
-
-    // Helper class to process the resolution mechanism field
-    inner class ResolutionMechanismProcessor(val element: Element) {
-
-        public fun getResolutionMechanism(
-            annotationValue: StringResolutionMechanism
-        ): StringResolutionMechanismProto {
-            if (!verifyResolutionMechanism(annotationValue)) {
-                // Error is already printed
-                return StringResolutionMechanismProto.newBuilder().build()
-            }
-
-            val builder = StringResolutionMechanismProto.newBuilder()
-            if (annotationValue.custom) {
-                builder.setCustom(true)
-            } else {
-                builder.setNotCoexistable(true)
-            }
-            return builder.build()
-        }
-
-        private fun verifyResolutionMechanism(annotationValue: StringResolutionMechanism): Boolean {
-            val isCustom = annotationValue.custom
-            val isNotCoexistable = annotationValue.notCoexistable
-
-            if (isCustom && isNotCoexistable) {
-                printError(element, "Only one resolution mechanism can be selected")
-                return false
-            }
-
-            if (!isCustom && !isNotCoexistable) {
-                printError(element, "Resolution mechanism can not be empty")
-                return false
-            }
-
-            return true
-        }
     }
 }

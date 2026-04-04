@@ -16,22 +16,12 @@
 
 package android.app.memory.testhelper;
 
+import android.app.Activity;
 import android.os.Bundle;
 
-import androidx.fragment.app.FragmentActivity;
-
-public class EmptyActivity extends FragmentActivity {
-    public EmptyActivity() {
-        super(R.layout.empty_activity);
-    }
+public class EmptyActivity extends Activity {
     @Override
-    protected void onCreate(Bundle icicle) {
+    public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-        if (icicle == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .setReorderingAllowed(true)
-                    .add(R.id.empty_activity, EmptyFragment.class, null)
-                    .commit();
-        }
     }
 }

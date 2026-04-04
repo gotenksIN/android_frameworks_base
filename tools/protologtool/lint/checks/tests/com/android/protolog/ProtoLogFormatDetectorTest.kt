@@ -72,42 +72,6 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
                 .indented(),
         )
 
-    private val bubbleLogApi: Array<TestFile> =
-        arrayOf(
-            kotlin(
-                """
-                package com.android.wm.shell.shared.bubbles.logging
-
-                object BubbleLog {
-                    @JvmOverloads
-                    @JvmStatic
-                    fun d(message: String, vararg parameters: Any? = emptyArray(), \
-                        eventData: String? = null) {}
-
-                    @JvmOverloads
-                    @JvmStatic
-                    fun v(message: String, vararg parameters: Any? = emptyArray(), \
-                        eventData: String? = null) {}
-
-                    @JvmOverloads
-                    @JvmStatic
-                    fun i(message: String, vararg parameters: Any? = emptyArray(), \
-                        eventData: String? = null) {}
-
-                    @JvmOverloads
-                    @JvmStatic
-                    fun w(message: String, vararg parameters: Any? = emptyArray(), \
-                        eventData: String? = null) {}
-
-                    @JvmOverloads
-                    @JvmStatic
-                    fun e(message: String, vararg parameters: Any? = emptyArray(), \
-                        eventData: String? = null) {}
-                }
-                """.addLineContinuation()
-            ).indented()
-        )
-
     @Test
     fun testValidCases() {
         lint()
@@ -266,93 +230,75 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.java:8: Error: Unsupported format specifier '%z'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %z", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:9: Error: Unsupported format specifier '%X'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %X", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:10: Error: Unsupported format specifier '%a'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %abc", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:11: Error: Unsupported format specifier '%u'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %ul", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:12: Error: Unsupported format specifier '%l'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %lld", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:13: Error: Unsupported format specifier '%B'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %B", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:14: Error: Unsupported format specifier '%D'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %D", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:15: Error: Unsupported format specifier '%.'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %.2f", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:16: Error: Unsupported format specifier '%0'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %03d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:17: Error: Unsupported format specifier '%1'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %1${'$'}s", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:18: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:19: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,f", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:20: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,s", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:21: Error: Unsupported format specifier '%,'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %,b", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:22: Error: Unsupported format specifier '%-'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %-d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:23: Error: Unsupported format specifier '%+'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %+d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:24: Error: Unsupported format specifier '%('. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %(d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:25: Error: Unsupported format specifier '% '. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: % d", arg);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~
                 18 errors, 0 warnings
@@ -493,18 +439,15 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.kt:8: Error: Unsupported format specifier '%z'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %z", randomArg)
                                                              ~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.kt:9: Error: Unsupported format specifier '%0'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %03d", randomArg)
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.kt:10: Error: Unsupported format specifier '%.'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Invalid specifier: %.2f", randomArg)
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~
                 3 errors, 0 warnings
@@ -580,18 +523,15 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.java:8: Error: Unsupported format specifier '%'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Dangling %");
                                                              ~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:9: Error: Unsupported format specifier '% '. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Dangling % in middle");
                                                              ~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:10: Error: Unsupported format specifier '% '. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Dangling % ");
                                                              ~~~~~~~~~~~~~
                 3 errors, 0 warnings
@@ -624,8 +564,7 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .expect(
                 """
                 src/test/pkg/TestClass.java:9: Error: Unsupported format specifier '%0'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "number%03din", i);
                                                              ~~~~~~~~~~~~~~
                 1 errors, 0 warnings
@@ -739,8 +678,7 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Format with trailing percent %%", s);
                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 src/test/pkg/TestClass.java:12: Error: Unsupported format specifier '%'. \
-                    Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. \
-                    [ProtoLogInvalidFormatSpecifier]
+                Supported: [%b, %d, %o, %x, %f, %e, %g, %s]. Use %% to escape. [ProtoLogInvalidFormatSpecifier]
                         ProtoLog.i(ProtoLogGroup.TEST_GROUP, "Format with trailing percent %", s);
                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 2 errors, 0 warnings
@@ -1658,8 +1596,7 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
                         }
 
                         fun check() {
-                            // These should ideally be ALLOWED, but currently might fail if we are \
-                                too strict.
+                            // These should ideally be ALLOWED, but currently might fail if we are too strict.
                             ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Int: %d", CONST_INT)
                             ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Q: %s", MyEnum.VALUE_ONE)
                             ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Str: %s", CONST_STR)
@@ -1676,12 +1613,10 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             .run()
             .expect(
                 """
-                src/test/pkg/TestClass.kt:23: Error: ProtoLog format string argument should not be \
-                    a constant. [ProtoLogConstantArgument]
+                src/test/pkg/TestClass.kt:23: Error: ProtoLog format string argument should not be a constant. [ProtoLogConstantArgument]
                         ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Int: %d", 42)
                                                                         ~~
-                src/test/pkg/TestClass.kt:24: Error: ProtoLog format string argument should not be \
-                    a constant. [ProtoLogConstantArgument]
+                src/test/pkg/TestClass.kt:24: Error: ProtoLog format string argument should not be a constant. [ProtoLogConstantArgument]
                         ProtoLog.d(ProtoLogGroup.TEST_GROUP, "Str: %s", "literal")
                                                                         ~~~~~~~~~
                 2 errors, 0 warnings
@@ -1689,151 +1624,6 @@ class ProtoLogFormatDetectorTest : LintDetectorTest() {
             )
     }
 
-    @Test
-    fun testBubbleLogValidCases() {
-        lint()
-            .files(
-                kotlin(
-                    """
-                    package test.pkg
-
-                    import com.android.wm.shell.shared.bubbles.logging.BubbleLog
-
-                    class TestClass {
-                        fun good(s: String, i: Int) {
-                            BubbleLog.d("User %s, id %d", s, i)
-                            BubbleLog.v("Simple message")
-                            BubbleLog.d("Event user %s", s, eventData = "login")
-                        }
-                    }
-                    """.addLineContinuation()
-                ).indented(),
-                *bubbleLogApi
-            )
-            .run()
-            .expectClean()
-    }
-
-    @Test
-    fun testBubbleLogInvalidCases() {
-        lint()
-            .files(
-                kotlin(
-                    """
-                    package test.pkg
-
-                    import com.android.wm.shell.shared.bubbles.logging.BubbleLog
-
-                    class TestClass {
-                        fun bad(s: String, i: Int) {
-                            BubbleLog.d("User %d", s)
-                            BubbleLog.v("Message %s", s, i)
-                            BubbleLog.d("Missing args %s %d", s)
-                            BubbleLog.v("Too many args %s", s, i)
-                            BubbleLog.d("Event %d", i, s, eventData = "event")
-                            BubbleLog.d("Named args %s", eventData = s, parameters = arrayOf(i))
-                        }
-                    }
-                    """.addLineContinuation()
-                ).indented(),
-                *bubbleLogApi
-            )
-            .run()
-            .expect(
-                """
-                src/test/pkg/TestClass.kt:8: Error: Incorrect argument count: format string \
-                expects 1 arguments but 2 were provided. [ProtoLogArgCount]
-                        BubbleLog.v("Message %s", s, i)
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.kt:9: Error: Incorrect argument count: format string \
-                expects 2 arguments but 1 were provided. [ProtoLogArgCount]
-                        BubbleLog.d("Missing args %s %d", s)
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.kt:10: Error: Incorrect argument count: format string \
-                expects 1 arguments but 2 were provided. [ProtoLogArgCount]
-                        BubbleLog.v("Too many args %s", s, i)
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.kt:11: Error: Incorrect argument count: format string \
-                expects 1 arguments but 2 were provided. [ProtoLogArgCount]
-                        BubbleLog.d("Event %d", i, s, eventData = "event")
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.kt:7: Error: Incorrect argument type for format specifier \
-                '%d': expected integer, long, short, or byte but got String [ProtoLogArgType]
-                        BubbleLog.d("User %d", s)
-                                               ~
-                src/test/pkg/TestClass.kt:12: Error: Incorrect argument type for format specifier \
-                '%s': expected String but got int [ProtoLogArgType]
-                        BubbleLog.d("Named args %s", eventData = s, parameters = arrayOf(i))
-                                                                                         ~
-                6 errors, 0 warnings
-                """.addLineContinuation()
-            )
-    }
-
-    @Test
-    fun testBubbleLogJavaCaller() {
-        lint()
-            .files(
-                java(
-                    """
-                    package test.pkg;
-
-                    import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
-
-                    class TestClass {
-                        void bad(String s, int i, boolean mIsStatusBarShade) {
-                            BubbleLog.d("User %d", s);
-                            BubbleLog.v("Message %s", s, i);
-                            BubbleLog.v(
-                                "BubbleController.updateBubbleViews() mIsStatusBarShade=%s " +
-                                "hasBubbles=%b", mIsStatusBarShade, hasBubbles()
-                            );
-                            BubbleLog.d("Missing args %s %d", s);
-                            BubbleLog.v("Too many args %s", s, i);
-                            BubbleLog.d("Array type mismatch %d", new Object[] { s });
-                        }
-
-                        boolean hasBubbles() { return true; }
-                    }
-                    """.addLineContinuation()
-                ).indented(),
-                *bubbleLogApi
-            )
-            .run()
-            .expect(
-                """
-                src/test/pkg/TestClass.java:8: Error: Incorrect argument count: format string \
-                    expects 1 arguments but 2 were provided. [ProtoLogArgCount]
-                        BubbleLog.v("Message %s", s, i);
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.java:13: Error: Incorrect argument count: format string \
-                    expects 2 arguments but 1 were provided. [ProtoLogArgCount]
-                        BubbleLog.d("Missing args %s %d", s);
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.java:14: Error: Incorrect argument count: format string \
-                    expects 1 arguments but 2 were provided. [ProtoLogArgCount]
-                        BubbleLog.v("Too many args %s", s, i);
-                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.java:7: Error: Incorrect argument type for format \
-                    specifier '%d': expected integer, long, short, or byte but got String \
-                    [ProtoLogArgType]
-                        BubbleLog.d("User %d", s);
-                                               ~
-                src/test/pkg/TestClass.java:11: Error: Incorrect argument type for format \
-                    specifier '%s': expected String but got boolean [ProtoLogArgType]
-                            "hasBubbles=%b", mIsStatusBarShade, hasBubbles()
-                                             ~~~~~~~~~~~~~~~~~
-                src/test/pkg/TestClass.java:15: Error: Incorrect argument type for format \
-                    specifier '%d': expected integer, long, short, or byte but got String \
-                    [ProtoLogArgType]
-                        BubbleLog.d("Array type mismatch %d", new Object[] { s });
-                                                                             ~
-                6 errors, 0 warnings
-                """.addLineContinuation()
-            )
-    }
-
     // Substitutes "backslash + new line" with an empty string to imitate line continuation
-    private fun String.addLineContinuation(): String =
-        this.trimIndent().replace("""\\ *\n\h*""".toRegex(), "")
+    private fun String.addLineContinuation(): String = this.trimIndent().replace("""\\ *\n\h*""".toRegex(), "")
 }

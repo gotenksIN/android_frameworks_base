@@ -267,6 +267,8 @@ public class BubbleController implements ConfigurationChangeListener,
     private final BubbleFeatureConfig mFeatureConfig;
     private Bubbles.SysuiProxy mSysuiProxy;
 
+    @Nullable private Runnable mOnImeHidden;
+
     // Tracks the id of the current (foreground) user.
     private int mCurrentUserId;
     // Current profiles of the user (e.g. user with a workprofile)
@@ -786,9 +788,11 @@ public class BubbleController implements ConfigurationChangeListener,
     /**
      * Hides the current input method, wherever it may be focused, via InputMethodManagerInternal.
      */
-    void hideCurrentInputMethod() {
+    void hideCurrentInputMethod(@Nullable Runnable onImeHidden) {
         final boolean isDeviceLocked = isDeviceLocked();
-        BubbleLog.d("BubbleController.hideCurrentInputMethod() deviceLocked=%b", isDeviceLocked);
+        BubbleLog.d("BubbleController.hideCurrentInputMethod() runnable=%s, deviceLocked=%b",
+                onImeHidden, isDeviceLocked);
+        mOnImeHidden = onImeHidden;
         mBubblePositioner.setImeVisible(false /* visible */, 0 /* height */);
         int displayId = mWindowManager.getDefaultDisplay().getDisplayId();
         // if the device is locked we can't use the status bar service to hide the IME because
@@ -804,6 +808,15 @@ public class BubbleController implements ConfigurationChangeListener,
         } catch (RemoteException e) {
             Log.e(TAG, "Failed to hide IME", e);
         }
+    }
+
+    /**
+     * Allows callers to reset runnable scheduled to run after IME is hidden by
+     * {@link #hideCurrentInputMethod(Runnable)}
+     */
+    void clearImeHiddenRunnable() {
+        BubbleLog.d("BubbleController.clearImeHiddenRunnable() runnable=%s", mOnImeHidden);
+        mOnImeHidden = null;
     }
 
     /**
@@ -849,9 +862,15 @@ public class BubbleController implements ConfigurationChangeListener,
         if (!mIsStatusBarShade && didChange) {
             if (mBubbleData.isExpanded()) {
                 if (mBubblePositioner.isImeVisible()) {
-                    hideCurrentInputMethod();
+                    hideCurrentInputMethod(/* onImeHidden= */ null);
                 }
                 collapseStack();
+            } else if (mOnImeHidden != null) {
+                // a request to collapse started before we're notified that the device is locking.
+                // we're currently waiting for the IME to collapse, before mOnImeHidden can be
+                // executed, which may not happen since the screen may already be off. hide the IME
+                // immediately now that we're locked and pass the same runnable so it can complete.
+                hideCurrentInputMethod(mOnImeHidden);
             }
         }
 
@@ -1232,6 +1251,10 @@ public class BubbleController implements ConfigurationChangeListener,
             }
         });
         try {
+            if (mOnImeHidden != null) {
+                Log.w(TAG, "removing bubbles from window manager with non-null onImeHidden");
+            }
+            mOnImeHidden = null;
             if (mStackView != null) {
                 if (mStackView.isExpanded()) {
                     BubbleLog.w(
@@ -2932,7 +2955,7 @@ public class BubbleController implements ConfigurationChangeListener,
         if (mLayerView != null && mLayerView.isExpanded()) {
             if (mBubblePositioner.isImeVisible()) {
                 // If we're collapsing, hide the IME
-                hideCurrentInputMethod();
+                hideCurrentInputMethod(null);
             }
             mLayerView.collapse();
         }
@@ -3110,6 +3133,7 @@ public class BubbleController implements ConfigurationChangeListener,
         pw.print(prefix); pw.println("  bubbleStateListenerSet= " + (mBubbleStateListener != null));
         pw.print(prefix); pw.println("  stackViewSet= " + (mStackView != null));
         pw.print(prefix); pw.println("  layerViewSet= " + (mLayerView != null));
+        pw.print(prefix); pw.println("  mOnImeHidden= " + mOnImeHidden);
         final boolean isScrimEnabled = mFeatureConfig.isScrimEnabled(mContext.getDisplayId());
         pw.print(prefix); pw.println("  isScrimEnabled= " + isScrimEnabled);
         pw.print(prefix);
@@ -3196,10 +3220,10 @@ public class BubbleController implements ConfigurationChangeListener,
             if (getDisplayId() != mContext.getDisplayId()) {
                 return;
             }
-            if (mStackView != null) {
+            if (mOnImeHidden != null || mStackView != null) {
                 // Only log if there's something relevant to log
                 BubbleLog.d("BubbleController.BubblesImeListener.onImeVisibilityChanged visible=%b"
-                        + " stackView=%s", imeVisible, mStackView);
+                        + " runnable=%s stackView=%s", imeVisible, mOnImeHidden, mStackView);
             }
             boolean heightChanged = imeHeight != mBubblePositioner.getImeHeight();
             // the imeHeight here is actually the ime inset; it only includes the part of the ime
@@ -3209,6 +3233,10 @@ public class BubbleController implements ConfigurationChangeListener,
             mBubblePositioner.setImeVisible(imeVisible, totalImeHeight);
             if (mStackView != null) {
                 mStackView.setImeVisible(imeVisible, heightChanged);
+                if (!imeVisible && mOnImeHidden != null) {
+                    mOnImeHidden.run();
+                    mOnImeHidden = null;
+                }
             }
         }
 

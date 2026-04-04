@@ -229,10 +229,6 @@ public class HubEndpoint {
      * @param regionId The ID of the shared data region.
      * @param regionSize The size of the shared data region in bytes.
      * @param regionFd The file descriptor of the shared data region.
-     * @param metadataRegionId The ID of the shared data region for metadata. If there is no
-     *     separate metadata region, this should be -1.
-     * @param metadataRegionSize The size of the shared data region for metadata in bytes.
-     * @param metadataRegionFd The file descriptor of the shared data region for metadata.
      * @param dataFlowHubId The hub ID of the data flow.
      * @param dataFlowId The ID of the data flow.
      * @param sourceId The ID of the source endpoint, scoped to dataFlowHubId.
@@ -250,9 +246,6 @@ public class HubEndpoint {
             int regionId,
             long regionSize,
             int regionFd,
-            int metadataRegionId,
-            long metadataRegionSize,
-            int metadataRegionFd,
             long dataFlowHubId,
             int dataFlowId,
             long sourceId,
@@ -1686,23 +1679,12 @@ public class HubEndpoint {
             if (mNativeHandle == 0) {
                 throw new IllegalStateException("Endpoint is not registered.");
             }
-            int metadataRegionId = -1;
-            long metadataRegionSize = 0;
-            int metadataRegionFd = -1;
-            if (context.sinkMetadataRegion != null) {
-                metadataRegionId = context.sinkMetadataRegion.id;
-                metadataRegionSize = context.sinkMetadataRegion.sizeBytes;
-                metadataRegionFd = context.sinkMetadataRegion.sharedMemory.getFd();
-            }
             hostSinkValues =
                     native_enableHostSink(
                             mNativeHandle,
                             context.info.region.id,
                             context.info.region.sizeBytes,
                             context.info.region.sharedMemory.getFd(),
-                            metadataRegionId,
-                            metadataRegionSize,
-                            metadataRegionFd,
                             context.id.hubId,
                             context.id.id,
                             sourceId.getEndpoint(),

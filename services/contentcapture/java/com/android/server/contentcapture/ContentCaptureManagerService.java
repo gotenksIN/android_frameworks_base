@@ -815,7 +815,7 @@ public class ContentCaptureManagerService extends
         final PackageManager pm = getContext().getPackageManager();
         final int serviceUid;
         try {
-            serviceUid = pm.getServiceInfo(serviceComponent, /*flags*/ 0).getUid();
+            serviceUid = pm.getPackageUidAsUser(servicePackageName, getCallingUserId());
         } catch (NameNotFoundException e) {
             Slog.w(TAG, methodName + ": could not verify UID for " + serviceName);
             return false;

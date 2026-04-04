@@ -20,7 +20,6 @@ import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_EMPTY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_STARTED_SERVICE;
 
-import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.app.IApplicationThread;
 import android.app.ProcessMemoryState.HostingComponentType;
@@ -29,7 +28,6 @@ import android.os.Debug;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.DebugUtils;
-import android.util.IndentingPrintWriter;
 import android.util.TimeUtils;
 
 import com.android.internal.annotations.CompositeRWLock;
@@ -41,6 +39,7 @@ import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.power.stats.BatteryStatsImpl;
 
+import java.io.PrintWriter;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -672,10 +671,11 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
     }
 
     @GuardedBy("mService")
-    void dumpPss(@NonNull IndentingPrintWriter pw, long nowUptime) {
+    void dumpPss(PrintWriter pw, String prefix, long nowUptime) {
         synchronized (mProfilerLock) {
             // TODO(b/297542292): Remove this case once PSS profiling is replaced
             if (mService.mAppProfiler.isProfilingPss()) {
+                pw.print(prefix);
                 pw.print("lastPssTime=");
                 TimeUtils.formatDuration(mLastPssTime, nowUptime, pw);
                 pw.print(" pssProcState=");
@@ -685,7 +685,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
                 pw.print(" nextPssTime=");
                 TimeUtils.formatDuration(mNextPssTime, nowUptime, pw);
                 pw.println();
-
+                pw.print(prefix);
                 pw.print("lastPss=");
                 DebugUtils.printSizeValue(pw, mLastPss * 1024);
                 pw.print(" lastSwapPss=");
@@ -697,6 +697,7 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
                 pw.print(" lastRss=");
                 DebugUtils.printSizeValue(pw, mLastRss * 1024);
             } else {
+                pw.print(prefix);
                 pw.print("lastRssTime=");
                 TimeUtils.formatDuration(mLastPssTime, nowUptime, pw);
                 pw.print(" rssProcState=");
@@ -706,20 +707,19 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
                 pw.print(" nextRssTime=");
                 TimeUtils.formatDuration(mNextPssTime, nowUptime, pw);
                 pw.println();
-
+                pw.print(prefix);
                 pw.print("lastRss=");
                 DebugUtils.printSizeValue(pw, mLastRss * 1024);
                 pw.print(" lastCachedRss=");
                 DebugUtils.printSizeValue(pw, mLastCachedRss * 1024);
             }
             pw.println();
-
+            pw.print(prefix);
             pw.print("trimMemoryLevel=");
             pw.println(mTrimMemoryLevel);
-
-            pw.print("procStateMemTracker: ");
+            pw.print(prefix); pw.print("procStateMemTracker: ");
             mProcStateMemTracker.dumpLine(pw);
-
+            pw.print(prefix);
             pw.print("lastRequestedGc=");
             TimeUtils.formatDuration(mLastRequestedGc, nowUptime, pw);
             pw.print(" lastLowMemory=");
@@ -727,18 +727,20 @@ final class ProcessProfileRecord implements ProcessRecordInternal.StartedService
             pw.print(" reportLowMemory=");
             pw.println(mReportLowMemory);
         }
-
+        pw.print(prefix);
         pw.print("currentHostingComponentTypes=0x");
         pw.print(Integer.toHexString(getCurrentHostingComponentTypes()));
         pw.print(" historicalHostingComponentTypes=0x");
         pw.println(Integer.toHexString(getHistoricalHostingComponentTypes()));
     }
 
-    void dumpCputime(@NonNull IndentingPrintWriter pw) {
+    void dumpCputime(PrintWriter pw, String prefix) {
         final long lastCpuTime = mLastCpuTime.get();
-        pw.print("lastCpuTime", lastCpuTime);
+        pw.print(prefix);
+        pw.print("lastCpuTime=");
+        pw.print(lastCpuTime);
         if (lastCpuTime > 0) {
-            pw.print("timeUsed=");
+            pw.print(" timeUsed=");
             TimeUtils.formatDuration(mCurCpuTime.get() - lastCpuTime, pw);
         }
         pw.println();

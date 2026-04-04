@@ -37,6 +37,7 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer
 import com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession
 import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import com.android.testing.wm.util.MockToken
+import com.android.window.flags.Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
@@ -419,6 +420,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
     }
 
     @Test
+    @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
     fun keyGestureQuitFocusedDesktopTask_shouldQuitFullscreenTask() {
         // Setup a focused fullscreen task
         val task = setUpFullscreenTask()
@@ -443,6 +445,7 @@ class DesktopModeKeyGestureHandlerTest : ShellTestCase() {
     }
 
     @Test
+    @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
     fun keyGestureQuitFocusedDesktopTask_shouldQuitSplitScreenTask() {
         // Setup a focused split screen task
         val task = setUpSplitScreenTask()

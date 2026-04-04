@@ -40,8 +40,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.never
-import org.mockito.kotlin.verify
 
 /**
  * Test class for [CloseDesktopTaskTransitionHandler]
@@ -97,20 +95,17 @@ class CloseDesktopTaskTransitionHandlerTest : ShellTestCase() {
     }
 
     @Test
-    fun startAnimation_closeTransitionFullscreenTask_returnsFalseAndDoesNotApplyTransaction() {
-        val startTransaction = mock<SurfaceControl.Transaction>()
+    fun startAnimation_closeTransitionFullscreenTask_returnsFalse() {
         val animates =
             handler.startAnimation(
                 transition = mock(),
                 info = createTransitionInfo(task = createTask(WINDOWING_MODE_FULLSCREEN)),
-                startTransaction = startTransaction,
+                startTransaction = mock(),
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertFalse("Should not animate fullscreen task close transition", animates)
-        // Verifies that startTransaction is not applied when the transition is not handled
-        verify(startTransaction, never()).apply()
     }
 
     @Test
@@ -132,20 +127,17 @@ class CloseDesktopTaskTransitionHandlerTest : ShellTestCase() {
     }
 
     @Test
-    fun startAnimation_closeTransitionClosingFreeformTask_returnsTrueAndAppliesTransaction() {
-        val startTransaction = mock<SurfaceControl.Transaction>()
+    fun startAnimation_closeTransitionClosingFreeformTask_returnsTrue() {
         val animates =
             handler.startAnimation(
                 transition = mock(),
                 info = createTransitionInfo(task = createTask(WINDOWING_MODE_FREEFORM)),
-                startTransaction = startTransaction,
+                startTransaction = mock(),
                 finishTransaction = mock(),
                 finishCallback = {},
             )
 
         assertTrue("Should animate closing freeform task close transition", animates)
-        // Verifies that startTransaction is applied to prevent leaks when the transition is handled
-        verify(startTransaction).apply()
     }
 
     private fun createTransitionInfo(

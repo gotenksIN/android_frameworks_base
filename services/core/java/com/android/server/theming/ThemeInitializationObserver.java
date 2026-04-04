@@ -33,8 +33,6 @@ import com.android.server.SystemService;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * Handles the events specifically required to move the theming system from
  * "Booting" to "Ready".
@@ -47,16 +45,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 class ThemeInitializationObserver {
     private static final String TAG = "ThemeInitializationObserver";
-    private static final int WALLPAPER_TIMEOUT_MS = 15000;
-    private static final int OVERLAY_TIMEOUT_MS = 5000;
 
     private final Context mContext;
     private final ThemeManagerImpl mImpl;
     private final ThemeWallpaperManager mWallpaperManager;
     private final ThemeEnvironment mEnvironment;
 
-    private final AtomicBoolean mTriggered = new AtomicBoolean(false);
-    private final AtomicBoolean mWaitingForOverlay = new AtomicBoolean(false);
+    private boolean mTriggered = false;
+    private boolean mWaitingForOverlay = false;
 
     private final WallpaperManagerInternal.ColorsChangedCallbackInternal mWallpaperListener =
             this::onWallpaperColorsChanged;
@@ -69,9 +65,9 @@ class ThemeInitializationObserver {
             final int userId = intent.getIntExtra(Intent.EXTRA_USER_ID, UserHandle.USER_NULL);
 
             Slog.d(TAG, "onReceive: ACTION_OVERLAY_CHANGED for package=" + changedPackage
-                    + " user=" + userId + " mWaitingForOverlay=" + mWaitingForOverlay.get());
+                    + " user=" + userId + " mWaitingForOverlay=" + mWaitingForOverlay);
 
-            if (!mWaitingForOverlay.get()) {
+            if (!mWaitingForOverlay) {
                 return;
             }
 
@@ -79,9 +75,8 @@ class ThemeInitializationObserver {
                 // Check if the overlays for the current user are now correct.
                 if (userId == mEnvironment.getCurrentUserId()) {
                     if (mImpl.checkAndSignalReady(userId)) {
-                        if (completeInitialization()) {
-                            Slog.i(TAG, "Initial theme application confirmed. System is ready.");
-                        }
+                        Slog.i(TAG, "Initial theme application confirmed. System is ready.");
+                        finish();
                     } else {
                         Slog.d(TAG,
                                 "Overlay change for 'android' received, but checkAndSignalReady "
@@ -132,15 +127,6 @@ class ThemeInitializationObserver {
             // Listen for the first wallpaper color change to kick off initialization.
             mWallpaperManager.addOnColorsChangedListener(mWallpaperListener,
                     BackgroundThread.getHandler());
-
-            BackgroundThread.getHandler().postDelayed(() -> {
-                if (!mTriggered.get()) {
-                    Slog.w(TAG,
-                            "Wallpaper colors not received within timeout. Forcing initialization"
-                                    + ".");
-                    triggerInitialization(userId);
-                }
-            }, WALLPAPER_TIMEOUT_MS);
         } else {
             if (!wallpaperManagerAvailable) {
                 Slog.i(TAG, "Wallpaper service unavailable. Triggering immediate initialization.");
@@ -158,7 +144,7 @@ class ThemeInitializationObserver {
     @RequiresPermission(Manifest.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE)
     void onBootPhase(int phase) {
         if (phase == SystemService.PHASE_BOOT_COMPLETED) {
-            if (mTriggered.get()) return;
+            if (mTriggered) return;
             Slog.i(TAG, "Wallpaper colors not received by BOOT_COMPLETE. Forcing initialization.");
             triggerInitialization(mEnvironment.getCurrentUserId());
         }
@@ -178,52 +164,44 @@ class ThemeInitializationObserver {
     @RequiresPermission(Manifest.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE)
     private void triggerInitialization(int userId) {
         // Only trigger if we are still in the booting phase and haven't triggered yet.
-        if (!mEnvironment.isBooting() || !mTriggered.compareAndSet(false, true)) {
+        if (mTriggered || !mEnvironment.isBooting()) {
             return;
         }
+        mTriggered = true;
 
         Slog.i(TAG, "Triggering initialization for user " + userId);
 
-        mWaitingForOverlay.set(true);
-
         if (mImpl.initializeThemingSystem()) {
+            // Initialization started an update. The overlay receiver is already
+            // registered and will handle the transition once the update is applied.
+            mWaitingForOverlay = true;
+
             // Check if we are already ready (e.g. if the update was synchronous and already
             // reflected)
             if (mImpl.checkAndSignalReady(userId)) {
-                if (completeInitialization()) {
-                    Slog.i(TAG, "System already ready after initialization. Finishing observer.");
-                }
-            } else {
-                BackgroundThread.getHandler().postDelayed(() -> {
-                    if (completeInitialization()) {
-                        Slog.w(TAG, "Overlay update broadcast not received within timeout. Forcing "
-                                + "ready.");
-                    }
-                }, OVERLAY_TIMEOUT_MS);
+                Slog.i(TAG, "System already ready after initialization. Finishing observer.");
+                finish();
             }
         } else {
             // No update was needed (theme already matches), so we are ready now.
-            completeInitialization();
+            mImpl.onThemingSystemReady();
+            finish();
         }
     }
 
-    private boolean completeInitialization() {
-        if (mWaitingForOverlay.compareAndSet(true, false)) {
-            mImpl.onThemingSystemReady();
-            mWallpaperManager.removeOnColorsChangedListener(mWallpaperListener);
-            try {
-                mContext.unregisterReceiver(mOverlayReceiver);
-            } catch (IllegalArgumentException e) {
-                // Receiver might not be registered or already unregistered.
-            }
-
-            WindowManagerInternal wm = LocalServices.getService(WindowManagerInternal.class);
-            if (wm != null) {
-                Slog.i(TAG, "Notifying WindowManager to remove ThemeManager boot blocker.");
-                wm.setThemeReady(true);
-            }
-            return true;
+    private void finish() {
+        mWaitingForOverlay = false;
+        mWallpaperManager.removeOnColorsChangedListener(mWallpaperListener);
+        try {
+            mContext.unregisterReceiver(mOverlayReceiver);
+        } catch (IllegalArgumentException e) {
+            // Receiver might not be registered or already unregistered.
         }
-        return false;
+
+        WindowManagerInternal wm = LocalServices.getService(WindowManagerInternal.class);
+        if (wm != null) {
+            Slog.i(TAG, "Notifying WindowManager to remove ThemeManager boot blocker.");
+            wm.setThemeReady(true);
+        }
     }
 }

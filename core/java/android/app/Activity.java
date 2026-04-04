@@ -21,7 +21,6 @@ import static android.Manifest.permission.DETECT_SCREEN_CAPTURE;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
-import static android.Manifest.permission.REQUEST_FULLSCREEN_MODE;
 import static android.app.Instrumentation.DEBUG_FINISH_ACTIVITY;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.inMultiWindowMode;
@@ -3345,13 +3344,10 @@ public class Activity extends ContextThemeWrapper
      *                         will happen before any configuration change. The callback will be
      *                         dispatched on the main thread except on devices with API level 36.1
      *                         or lower, where the behavior is undefined. If the request is
-     *                         rejected, the Throwable provided will be either
-     *                         {@link IllegalStateException}, {@link UnsupportedOperationException}
-     *                         or {@link SecurityException} for apps targeting SDK level 38 or
-     *                         higher. The Throwable will contain a detailed message that can be
+     *                         rejected, the Throwable provided will be an
+     *                         {@link IllegalStateException} with a detailed message can be
      *                         retrieved by {@link Throwable#getMessage()}.
      */
-    @RequiresPermission(value = REQUEST_FULLSCREEN_MODE)
     public void requestFullscreenMode(@FullscreenModeRequest int request,
             @Nullable OutcomeReceiver<Void, Throwable> approvalCallback) {
         FullscreenRequestHandler.getInstance().requestFullscreenMode(

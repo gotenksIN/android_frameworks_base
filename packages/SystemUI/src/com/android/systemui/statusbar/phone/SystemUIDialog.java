@@ -395,15 +395,6 @@ public class SystemUIDialog extends AlertDialog {
         return mDelegate.getHeight(this);
     }
 
-    /**
-     * Returns whether this dialog should "stash" the taskbar.
-     * A stashing dialog typically hides other parts of the UI and prevents them from being
-     * interactable while the dialog is showing.
-     */
-    public boolean shouldStashTaskbar() {
-        return mDelegate.shouldStashTaskbar(this);
-    }
-
     @Override
     protected final void onStart() {
         super.onStart();

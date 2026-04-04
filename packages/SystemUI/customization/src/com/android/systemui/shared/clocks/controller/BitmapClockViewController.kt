@@ -19,7 +19,7 @@ package com.android.systemui.shared.clocks.controller
 import android.icu.util.TimeZone
 import android.view.View
 import android.view.ViewGroup
-import com.android.systemui.customization.clocks.DigitalTimeFormatter
+import android.widget.RelativeLayout
 import com.android.systemui.customization.clocks.DigitalTimespecHandler
 import com.android.systemui.plugins.keyguard.VRect
 import com.android.systemui.plugins.keyguard.data.model.AlarmData
@@ -31,6 +31,7 @@ import com.android.systemui.plugins.keyguard.ui.clocks.ClockEvents
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceConfig
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceEvents
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockPositionAnimationArgs
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockViewIds
 import com.android.systemui.plugins.keyguard.ui.clocks.ThemeConfig
 import com.android.systemui.plugins.keyguard.ui.clocks.TimeFormatKind
 import com.android.systemui.shared.clocks.FlexClockContext
@@ -40,27 +41,14 @@ import java.util.Locale
 class BitmapClockViewController(
     private val clockCtx: FlexClockContext,
     layerConfig: LayerConfig, // contains time spec
-    private val isLargeClock: Boolean,
+    isLargeClock: Boolean,
 ) : FlexClockViewController {
-    override val view = BitmapClockView(clockCtx, isLargeClock, null)
+    override val view = BitmapClockView(clockCtx.context, null)
 
     override var onViewBoundsChanged by view::onViewBoundsChanged
     override var onViewMaxSizeChanged by view::onViewMaxSizeChanged
-    private val timespec =
-        DigitalTimespecHandler(
-            layerConfig.timespec,
-            layerConfig.timeFormatter ?: DigitalTimeFormatter("hh", clockCtx.timeKeeper),
-        )
 
-    init {
-        view.id = timespec.getViewId()
-        view.layoutParams =
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-        view.applyBitmapStyles(layerConfig.style)
-    }
+    private val timespec = DigitalTimespecHandler(layerConfig.timespec, layerConfig.timeFormatter!!)
 
     override val events =
         object : ClockEvents {
@@ -77,6 +65,17 @@ class BitmapClockViewController(
             override fun onZenDataChanged(data: ZenData) {}
         }
 
+    init {
+        // To get HOUR_DIGIT_PAIR or MINUTE_DIGIT_PAIR
+        view.id = timespec.getViewId()
+
+        view.layoutParams =
+            RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+    }
+
     fun refreshTime() {
         val text = timespec.getText()
         if (view.text != text) {
@@ -84,9 +83,26 @@ class BitmapClockViewController(
         }
     }
 
+    private fun applyLayout() {
+        val lp = view.layoutParams as? RelativeLayout.LayoutParams ?: return
+        lp.addRule(RelativeLayout.TEXT_ALIGNMENT_CENTER)
+        lp.addRule(RelativeLayout.CENTER_VERTICAL)
+
+        when (view.id) {
+            ClockViewIds.HOUR_DIGIT_PAIR -> {
+                lp.addRule(RelativeLayout.ALIGN_PARENT_START)
+            }
+            ClockViewIds.MINUTE_DIGIT_PAIR -> {
+                lp.addRule(RelativeLayout.END_OF, ClockViewIds.HOUR_DIGIT_PAIR)
+            }
+        }
+        view.layoutParams = lp
+    }
+
     override val animations =
         object : ClockAnimations {
             override fun enter() {
+                applyLayout()
                 refreshTime()
             }
 
@@ -94,7 +110,9 @@ class BitmapClockViewController(
                 view.dozeFraction = fraction
             }
 
-            override fun fold(fraction: Float) {}
+            override fun fold(fraction: Float) {
+                applyLayout()
+            }
 
             override fun charge() {
                 view.animateCharge()

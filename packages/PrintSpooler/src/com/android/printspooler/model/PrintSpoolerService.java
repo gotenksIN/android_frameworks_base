@@ -69,6 +69,7 @@ import com.android.internal.util.Preconditions;
 import com.android.internal.util.dump.DualDumpOutputStream;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.printspooler.R;
+import com.android.printspooler.flags.Flags;
 import com.android.printspooler.stats.StatsAsyncLogger;
 import com.android.printspooler.util.ApprovedPrintServices;
 
@@ -157,12 +158,16 @@ public final class PrintSpoolerService extends Service {
             sInstance = this;
         }
 
-        StatsAsyncLogger.INSTANCE.startLogging();
+        if (Flags.printingTelemetry()) {
+            StatsAsyncLogger.INSTANCE.startLogging();
+        }
     }
 
     @Override
     public void onDestroy() {
-        StatsAsyncLogger.INSTANCE.stopLogging();
+        if (Flags.printingTelemetry()) {
+            StatsAsyncLogger.INSTANCE.stopLogging();
+        }
         super.onDestroy();
     }
 
@@ -548,6 +553,9 @@ public final class PrintSpoolerService extends Service {
 
     // Stats Logging
     private void logPrintJobFinalState(PrinterId printerId, PrintJobInfo printJob) {
+        if (!Flags.printingTelemetry()) {
+            return;
+        }
         final ComponentName service = (printerId == null) ? null : printerId.getServiceName();
         if (service == null) {
             // We don't know what to do without an identifiable service.

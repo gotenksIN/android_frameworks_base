@@ -497,31 +497,6 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
     }
 
     /**
-     * Verifies that onActivityRemovedFromDisplay cleans up the activity correctly.
-     */
-    @Test
-    public void testOnActivityRemovedFromDisplay_cleansUpActivityAndNotifiesMetrics() {
-        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
-        spyOn(mSupervisor.getActivityMetricsLogger());
-
-        // Set the activity as the last reported top resumed activity
-        activity.setState(ActivityRecord.State.RESUMED, "test");
-        mSupervisor.mStoppingActivities.add(activity);
-
-        mSupervisor.onActivityRemovedFromDisplay(activity);
-
-        verify(mSupervisor.getActivityMetricsLogger()).notifyActivityRemoved(activity);
-        assertFalse(mSupervisor.mStoppingActivities.contains(activity));
-
-        // Verify mLastReportedTopResumedActivity is cleared.
-        // Resuming another activity should not trigger state loss for the removed activity.
-        final ActivityRecord activity2 = new ActivityBuilder(mAtm).setCreateTask(true).build();
-        activity2.setState(ActivityRecord.State.RESUMED, "test");
-
-        verify(activity, never()).scheduleTopResumedActivityChanged(eq(false));
-    }
-
-    /**
      * We need to launch home again after user unlocked for those displays that do not have
      * encryption aware home app.
      */

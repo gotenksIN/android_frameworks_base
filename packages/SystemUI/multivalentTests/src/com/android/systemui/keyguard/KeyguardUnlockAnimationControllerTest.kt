@@ -95,11 +95,6 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
-        whenever(surfaceControl1.isValid).thenReturn(true)
-        whenever(surfaceControl2.isValid).thenReturn(true)
-        whenever(surfaceControlWp.isValid).thenReturn(true)
-        whenever(surfaceControlLockWp.isValid).thenReturn(true)
-
         keyguardUnlockAnimationController =
             object :
                 KeyguardUnlockAnimationController(
@@ -352,6 +347,8 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @Test
     fun manualUnlock_multipleWallpapers() {
         whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
+        whenever(surfaceControlLockWp.isValid).thenReturn(true)
 
         var lastFadeInAlpha = -1f
         var lastFadeOutAlpha = -1f
@@ -401,6 +398,7 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun surfaceAnimation_multipleTargets() {
         whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
 
         keyguardUnlockAnimationController.notifyStartSurfaceBehindRemoteAnimation(
             arrayOf(animatedSurface1, animatedSurface2),
@@ -454,6 +452,7 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     fun surfaceBehindAlphaOverriddenTo0_ifNotInteractive() {
         whenever(powerManager.isInteractive).thenReturn(false)
         whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
 
         keyguardUnlockAnimationController.notifyStartSurfaceBehindRemoteAnimation(
             animatedSurfaces,
@@ -494,6 +493,7 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     fun surfaceBehindAlphaNotOverriddenTo0_ifInteractive() {
         whenever(powerManager.isInteractive).thenReturn(true)
         whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
 
         keyguardUnlockAnimationController.notifyStartSurfaceBehindRemoteAnimation(
             animatedSurfaces,

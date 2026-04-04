@@ -29,9 +29,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import android.Manifest;
-import android.app.privatecompute.PccSandboxManager;
 import android.app.role.RoleManager;
-import android.companion.AssociationRequest;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
@@ -40,18 +38,14 @@ import android.os.PermissionEnforcer;
 import android.os.Process;
 import android.os.UserHandle;
 import android.permission.PermissionManager;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.service.personalcontext.Flags;
-import android.util.ArrayMap;
-import android.util.ArraySet;
 
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.R;
-import com.android.server.SystemConfig;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -59,7 +53,6 @@ import org.junit.runner.RunWith;
 
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -156,6 +149,7 @@ public class AccessControllerTest {
                 deniedPackage, AccessController.ACCESS_FILTER_INSIGHTS_ALLOWLIST)).isFalse();
     }
 
+    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
     @Test
     public void testHintPublishingPermission() {
         final String allowedPackage = "com.foo.baz";
@@ -172,6 +166,7 @@ public class AccessControllerTest {
                 deniedPackage, AccessController.ACCESS_PUBLISH_HINTS_PERMISSION)).isFalse();
     }
 
+    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
     @Test
     public void testInsightPublishingPermission() {
         final String allowedPackage = "com.foo.baz";
@@ -188,6 +183,7 @@ public class AccessControllerTest {
                 deniedPackage, AccessController.ACCESS_PUBLISH_INSIGHTS_PERMISSION)).isFalse();
     }
 
+    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
     @Test
     public void testHintReceivingPermission() {
         final String allowedPackage = "com.foo.baz";
@@ -204,6 +200,7 @@ public class AccessControllerTest {
                 deniedPackage, AccessController.ACCESS_RECEIVE_HINTS_PERMISSION)).isFalse();
     }
 
+    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
     @Test
     public void testInsightReceivingPermission() {
         final String allowedPackage = "com.foo.baz";
@@ -261,6 +258,7 @@ public class AccessControllerTest {
                 .isFalse();
     }
 
+    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
     @Test
     public void testServiceBindContextPermissionEnforced() {
         final ServiceInfo allowedService = serviceInfo("com.foo.baz", "good_service", true);
@@ -273,192 +271,6 @@ public class AccessControllerTest {
 
         assertThat(controller.isServiceAllowed(deniedService,
                 AccessController.ACCESS_BIND_CONTEXT_PERMISSION)).isFalse();
-    }
-
-    @Test
-    public void testPccOrTrustedCheck_strictCheckEnabled() {
-        final ServiceInfo pccService = serviceInfo("com.foo.baz", "good_service", true);
-        pccService.flags |= ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX;
-        final ServiceInfo nonPccService = serviceInfo("com.foo.bar", "bad_service", false);
-
-        // This service has restricted access but should not be allowed as the strict check is
-        // enabled.
-        final String accessRestrictedPackage = "com.access.restricted";
-        final ServiceInfo accessRestrictedService =
-                serviceInfo(accessRestrictedPackage, "bad_service_2", false);
-
-        // Trusted components are always allowed.
-        final ServiceInfo trustedService = serviceInfo("com.trusted", "good_service_2", false);
-
-        final AccessController controller =
-                new AccessControllerBuilder()
-                        .setStrictPccCheckEnabled(true)
-                        .setHasAllowedAssociationsPackages(List.of(accessRestrictedPackage))
-                        .addTrustedService(trustedService)
-                        .build();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                pccService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
-        assertThat(
-                        controller.isServiceAllowed(
-                                nonPccService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isFalse();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                accessRestrictedService,
-                                AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isFalse();
-
-        assertThat(
-                controller.isServiceAllowed(
-                        trustedService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
-    }
-
-    @Test
-    public void testPccOrTrustedCheck_strictCheckDisabled() {
-        final ServiceInfo pccService = serviceInfo("com.foo.baz", "good_service", true);
-        pccService.flags |= ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX;
-        final ServiceInfo nonPccService = serviceInfo("com.foo.bar", "bad_service", false);
-
-        // Restricted access is allowed if strict check is disabled
-        final String accessRestrictedPackage = "com.access.restricted";
-        final ServiceInfo accessRestrictedService =
-                serviceInfo(accessRestrictedPackage, "bad_service_2", false);
-
-        // Having internet permission cancels out restricted access status.
-        final String notAccessRestrictedPackage = "com.access.restricted2";
-        final ServiceInfo notAccessRestrictedService =
-                serviceInfo(notAccessRestrictedPackage, "bad_service_2", false);
-
-        // Trusted components are always allowed.
-        final ServiceInfo trustedService = serviceInfo("com.trusted", "good_service_2", false);
-
-        final AccessController controller =
-                new AccessControllerBuilder()
-                        .setStrictPccCheckEnabled(false)
-                        .setHasAllowedAssociationsPackages(
-                                List.of(accessRestrictedPackage, notAccessRestrictedPackage))
-                        .allowPermission(
-                                Set.of(notAccessRestrictedPackage), Manifest.permission.INTERNET)
-                        .addTrustedService(trustedService)
-                        .build();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                pccService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
-        assertThat(
-                        controller.isServiceAllowed(
-                                nonPccService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isFalse();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                accessRestrictedService,
-                                AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
-        assertThat(
-                        controller.isServiceAllowed(
-                                notAccessRestrictedService,
-                                AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isFalse();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                trustedService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
-    }
-
-    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_ROLE_ACCESS_CONTROL)
-    @Test
-    public void testPccOrAutoRoleCheck() {
-        final ServiceInfo pccService = serviceInfo("com.foo.baz", "good_service", true);
-        pccService.flags |= ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX;
-        final ServiceInfo nonPccService = serviceInfo("com.foo.bar", "bad_service", false);
-
-        final String autoRolePackageName = "com.access.restricted";
-        final ServiceInfo autoRoleService =
-                serviceInfo(autoRolePackageName, "bad_service_2", false);
-
-        // Trusted components are always allowed.
-        final ServiceInfo trustedService = serviceInfo("com.trusted", "good_service_2", false);
-
-        final AccessController controller =
-                new AccessControllerBuilder()
-                        .setStrictPccCheckEnabled(true)
-                        .setRoleHolders(
-                                List.of(autoRolePackageName),
-                                AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION)
-                        .addTrustedService(trustedService)
-                        .build();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                pccService, AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                .isTrue();
-        assertThat(
-                        controller.isServiceAllowed(
-                                nonPccService, AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                .isFalse();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                autoRoleService,
-                                AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                .isTrue();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                trustedService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
-    }
-
-    @DisableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_ROLE_ACCESS_CONTROL)
-    @Test
-    public void testPccOrAutoRoleCheck_roleFlagDisabled() {
-        final ServiceInfo pccService = serviceInfo("com.foo.baz", "good_service", true);
-        pccService.flags |= ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX;
-        final ServiceInfo nonPccService = serviceInfo("com.foo.bar", "bad_service", false);
-
-        final String autoRolePackageName = "com.access.restricted";
-        final ServiceInfo autoRoleService =
-                serviceInfo(autoRolePackageName, "bad_service_2", false);
-
-        // Trusted components are always allowed.
-        final ServiceInfo trustedService = serviceInfo("com.trusted", "good_service_2", false);
-
-        final AccessController controller =
-                new AccessControllerBuilder()
-                        .setStrictPccCheckEnabled(true)
-                        .setRoleHolders(
-                                List.of(autoRolePackageName),
-                                AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION)
-                        .addTrustedService(trustedService)
-                        .build();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                pccService, AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                .isTrue();
-        assertThat(
-                        controller.isServiceAllowed(
-                                nonPccService, AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                .isFalse();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                autoRoleService,
-                                AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE))
-                .isFalse();
-
-        assertThat(
-                        controller.isServiceAllowed(
-                                trustedService, AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE))
-                .isTrue();
     }
 
     @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_ALLOWLIST_ACCESS_CONTROL)
@@ -586,9 +398,6 @@ public class AccessControllerTest {
     private static class AccessControllerBuilder {
         private final Resources mResources = mock(Resources.class);
         private final PermissionManager mPermissionManager = mock(PermissionManager.class);
-        private final RoleManager mRoleManager = mock(RoleManager.class);
-        private final PccSandboxManager mPccSandboxManager = mock(PccSandboxManager.class);
-        private final SystemConfig mSystemConfig = mock(SystemConfig.class);
 
         private final PermissionEnforcer mPermissionEnforcer = mock(PermissionEnforcer.class);
 
@@ -611,21 +420,12 @@ public class AccessControllerTest {
             when(mResources.getStringArray(eq(resourceId))).thenReturn(stringArray);
         }
 
-        private AccessControllerBuilder allowPermission(
-                Set<String> packageNames, String permission) {
+        private void allowPermission(Set<String> packageNames, String permission) {
             for (String packageName : packageNames) {
                 doReturn(PackageManager.PERMISSION_GRANTED)
-                        .when(mPermissionManager)
-                        .checkPackageNamePermission(
+                        .when(mPermissionManager).checkPackageNamePermission(
                                 eq(permission), eq(packageName), anyInt(), anyInt());
             }
-            return this;
-        }
-
-        public AccessControllerBuilder setStrictPccCheckEnabled(boolean enabled) {
-            when(mResources.getBoolean(R.bool.config_enableStrictPersonalContextPccNextCheck))
-                    .thenReturn(enabled);
-            return this;
         }
 
         public AccessControllerBuilder revokePermission(String permission) {
@@ -675,49 +475,24 @@ public class AccessControllerTest {
             return this;
         }
 
-        public AccessControllerBuilder setHasAllowedAssociationsPackages(
-                List<String> packageNames) {
-            ArrayMap<String, ArraySet<String>> allowedAssociations = new ArrayMap<>();
-            for (String packageName : packageNames) {
-                // Just need to put anything in the set so it's not empty.
-                ArraySet<String> associations = new ArraySet<>();
-                associations.add("test association");
-                allowedAssociations.put(packageName, associations);
-            }
-            when(mSystemConfig.getAllowedAssociations()).thenReturn(allowedAssociations);
-            return this;
-        }
-
-        public AccessControllerBuilder addTrustedService(ServiceInfo serviceInfo) {
-            when(mPccSandboxManager.isPccTrustedSystemComponent(
-                            serviceInfo.getUid(), serviceInfo.packageName))
-                    .thenReturn(true);
-            return this;
-        }
-
-        public AccessControllerBuilder setRoleHolders(List<String> packageNames, String role) {
-            when(mRoleManager.getRoleHolders(role)).thenReturn(packageNames);
-            return this;
-        }
-
         public AccessControllerBuilder setPermittedHintPublishers(Set<String> packageNames) {
-            return allowPermission(
-                    packageNames, Manifest.permission.PERSONAL_CONTEXT_PUBLISH_HINTS);
+            allowPermission(packageNames, Manifest.permission.PERSONAL_CONTEXT_PUBLISH_HINTS);
+            return this;
         }
 
         public AccessControllerBuilder setPermittedHintReceivers(Set<String> packageNames) {
-            return allowPermission(
-                    packageNames, Manifest.permission.PERSONAL_CONTEXT_RECEIVE_HINTS);
+            allowPermission(packageNames, Manifest.permission.PERSONAL_CONTEXT_RECEIVE_HINTS);
+            return this;
         }
 
         public AccessControllerBuilder setPermittedInsightPublishers(Set<String> packageNames) {
-            return allowPermission(
-                    packageNames, Manifest.permission.PERSONAL_CONTEXT_PUBLISH_INSIGHTS);
+            allowPermission(packageNames, Manifest.permission.PERSONAL_CONTEXT_PUBLISH_INSIGHTS);
+            return this;
         }
 
         public AccessControllerBuilder setPermittedInsightReceivers(Set<String> packageNames) {
-            return allowPermission(
-                    packageNames, Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS);
+            allowPermission(packageNames, Manifest.permission.PERSONAL_CONTEXT_RECEIVE_INSIGHTS);
+            return this;
         }
 
         public AccessController build() {
@@ -753,17 +528,7 @@ public class AccessControllerTest {
 
                         @Override
                         public RoleManager getRoleManager() {
-                            return mRoleManager;
-                        }
-
-                        @Override
-                        public SystemConfig getSystemConfig() {
-                            return mSystemConfig;
-                        }
-
-                        @Override
-                        public PccSandboxManager getPccSandboxManager() {
-                            return mPccSandboxManager;
+                            return mock(RoleManager.class);
                         }
 
                         @Override

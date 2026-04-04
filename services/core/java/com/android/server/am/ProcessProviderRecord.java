@@ -16,12 +16,12 @@
 
 package com.android.server.am;
 
-import android.annotation.NonNull;
-import android.util.IndentingPrintWriter;
 import android.util.TimeUtils;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.am.psc.ProcessProviderRecordInternal;
+
+import java.io.PrintWriter;
 
 /**
  * The state info of all content providers in the process.
@@ -95,28 +95,25 @@ final class ProcessProviderRecord extends ProcessProviderRecordInternal {
         return restart;
     }
 
-    void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
+    void dump(PrintWriter pw, String prefix, long nowUptime) {
         if (getLastProviderTime() > 0) {
-            pw.print("lastProviderTime=");
+            pw.print(prefix); pw.print("lastProviderTime=");
             TimeUtils.formatDuration(getLastProviderTime(), nowUptime, pw);
             pw.println();
         }
         if (numberOfProviders() > 0) {
-            pw.println("Published Providers:");
-            pw.increaseIndent();
+            pw.print(prefix); pw.println("Published Providers:");
             for (int i = 0, size = numberOfProviders(); i < size; i++) {
-                pw.print("- "); pw.println(getProviderNameAt(i));
-                pw.print("  -> "); pw.println(getProviderAt(i));
+                pw.print(prefix); pw.print("  - "); pw.println(getProviderNameAt(i));
+                pw.print(prefix); pw.print("    -> "); pw.println(getProviderAt(i));
             }
-            pw.decreaseIndent();
         }
         if (numberOfProviderConnections() > 0) {
-            pw.println("Connected Providers:");
-            pw.increaseIndent();
+            pw.print(prefix); pw.println("Connected Providers:");
             for (int i = 0, size = numberOfProviderConnections(); i < size; i++) {
-                pw.print("- "); pw.println(getProviderConnectionAt(i).toShortString());
+                pw.print(prefix); pw.print("  - ");
+                pw.println(getProviderConnectionAt(i).toShortString());
             }
-            pw.decreaseIndent();
         }
     }
 }

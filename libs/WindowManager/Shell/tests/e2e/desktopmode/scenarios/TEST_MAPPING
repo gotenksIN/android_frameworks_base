@@ -49,12 +49,6 @@
       ]
     },
     {
-      "name": "FunctionalTestsDesktopMode-desktopfirst-DesktopFirstPolicyTest",
-      "keywords": [
-        "desktop"
-      ]
-    },
-    {
       "name": "FunctionalTestsDesktopMode-drag-DragAppWindowMultiWindowAndPipTest",
       "keywords": [
         "desktop"

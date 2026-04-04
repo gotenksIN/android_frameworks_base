@@ -46,6 +46,7 @@ import android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManagerGlobal
 import android.window.DesktopExperienceFlags
+import android.window.DesktopModeFlags
 import android.window.WindowContainerTransaction
 import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.traceSection
@@ -813,6 +814,7 @@ constructor(
                     WindowManagerGlobal.getWindowSession(),
                     mainExecutor,
                     bgExecutor,
+                    taskInfo,
                     handler,
                     choreographer,
                     checkNotNull(display?.displayId) { "expected non-null display" },
@@ -821,6 +823,8 @@ constructor(
                     },
                     dragPositioningCallback,
                     surfaceControlBuilderSupplier,
+                    surfaceControlTransactionSupplier,
+                    displayController,
                 ) {
                     captionController?.injectMotionEvent(it)
                 }

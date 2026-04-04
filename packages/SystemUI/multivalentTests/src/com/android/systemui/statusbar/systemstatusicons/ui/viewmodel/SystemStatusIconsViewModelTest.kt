@@ -21,8 +21,6 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.fakeAuthenticationRepository
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
-import com.android.systemui.flags.Flags
-import com.android.systemui.flags.fakeFeatureFlagsClassic
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.runTest
@@ -32,8 +30,8 @@ import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.statusbar.systemstatusicons.data.repository.statusBarConfigIconSlotNames
 import com.android.systemui.statusbar.systemstatusicons.domain.interactor.SystemStatusIconBlocklistInteractor
+import com.android.systemui.statusbar.systemstatusicons.data.repository.statusBarConfigIconSlotNames
 import com.android.systemui.statusbar.systemstatusicons.flags.EnableSystemStatusIconsInCompose
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModelHelper.hideAirplaneMode
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModelHelper.showAirplaneMode
@@ -101,7 +99,6 @@ class SystemStatusIconsViewModelTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
-        kosmos.fakeFeatureFlagsClassic.set(Flags.FILTER_PROVISIONING_NETWORK_SUBSCRIPTIONS, true)
         slotAirplane = context.getString(com.android.internal.R.string.status_bar_airplane)
         slotBluetooth = context.getString(com.android.internal.R.string.status_bar_bluetooth)
         slotConnectedDisplay =
@@ -251,7 +248,6 @@ class SystemStatusIconsViewModelTest : SysuiTestCase() {
             )
             kosmos.fakeKeyguardRepository.setKeyguardEnabled(false)
             kosmos.sceneInteractor.changeScene(Scenes.Gone, "SystemStatusIconsViewModelTest")
-            assertThat(underTest.activeSlotNames).isEmpty()
 
             showZenMode()
             showBluetooth()

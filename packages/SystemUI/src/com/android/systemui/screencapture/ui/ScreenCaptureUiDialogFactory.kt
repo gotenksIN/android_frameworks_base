@@ -84,10 +84,7 @@ constructor(
                     ),
                 theme = R.style.Theme_SystemUI_Dialog_ScreenCapture,
                 dialogDelegate =
-                    EdgeToEdgeDialogDelegate(
-                        shouldStashTaskbar = false,
-                        touchEvent = dialogViewModel::onTouchEvent,
-                    ),
+                    EdgeToEdgeDialogDelegate(touchEvent = dialogViewModel::onTouchEvent),
                 dismissOnDeviceLock = true,
                 isTransient = !dialogViewModel.isLargeScreen,
             ) { dialog: SystemUIDialog ->

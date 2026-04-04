@@ -165,15 +165,13 @@ constructor(
             KeyguardState.DREAMING,
             KeyguardState.PRIMARY_BOUNCER,
             KeyguardState.AOD -> 0f
-
             KeyguardState.ALTERNATE_BOUNCER,
             KeyguardState.LOCKSCREEN -> 1f
             KeyguardState.UNDEFINED ->
                 if (SceneContainerFlag.isEnabled) {
                     when (sceneInteractor.get().currentScene.value) {
                         Scenes.Shade,
-                        Scenes.QuickSettings,
-                        Scenes.Communal -> 1f
+                        Scenes.QuickSettings -> 1f
                         else -> 0f
                     }
                 } else {

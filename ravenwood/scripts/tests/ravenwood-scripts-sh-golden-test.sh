@@ -23,7 +23,7 @@ update_result=0
 while getopts "u" opt; do
 case "$opt" in
     u)
-        # Update golden file.
+        # Remove slow tests.
         update_result=1
         ;;
     '?')

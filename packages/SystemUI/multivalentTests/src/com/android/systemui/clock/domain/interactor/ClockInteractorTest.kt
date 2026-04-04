@@ -16,18 +16,27 @@
 
 package com.android.systemui.clock.domain.interactor
 
+import android.app.AlarmManager
 import android.content.Intent
+import android.platform.test.annotations.EnableFlags
 import android.provider.AlarmClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.broadcast.broadcastDispatcher
+import com.android.systemui.clock.ClockModernization
 import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.advanceTimeBy
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.collectValues
+import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.plugins.activityStarter
+import com.android.systemui.statusbar.policy.NextAlarmController.NextAlarmChangeCallback
+import com.android.systemui.statusbar.policy.nextAlarmController
 import com.android.systemui.testKosmosNew
+import com.android.systemui.tuner.TunerService.Tunable
+import com.android.systemui.tuner.tunerService
 import com.android.systemui.util.time.fakeSystemClock
 import com.google.common.truth.Truth.assertThat
 import java.util.Date
@@ -38,6 +47,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 
 @SmallTest
@@ -55,6 +66,22 @@ class ClockInteractorTest : SysuiTestCase() {
                     argThat { intent: Intent? -> intent?.action == AlarmClock.ACTION_SHOW_ALARMS },
                     any<Int>(),
                 )
+        }
+
+    @Test
+    fun launchClockActivity_nextAlarmIntent() =
+        kosmos.runTest {
+            // Need to initialize underTest to register the callback.
+            val underTest = kosmos.clockInteractor
+
+            val captor =
+                argumentCaptor<NextAlarmChangeCallback> {
+                    verify(nextAlarmController).addCallback(capture())
+                }
+            captor.firstValue.onNextAlarmChanged(AlarmManager.AlarmClockInfo(1L, mock()))
+
+            underTest.launchClockActivity()
+            verify(activityStarter).postStartActivityDismissingKeyguard(any())
         }
 
     @Test
@@ -89,6 +116,7 @@ class ClockInteractorTest : SysuiTestCase() {
             val earlierTime = checkNotNull(currentTime)
 
             fakeSystemClock.advanceTime(3.seconds.inWholeMilliseconds)
+            runCurrent()
 
             sendIntentActionBroadcast(Intent.ACTION_TIME_CHANGED)
             val laterTime = checkNotNull(currentTime)
@@ -105,11 +133,125 @@ class ClockInteractorTest : SysuiTestCase() {
             val earlierTime = checkNotNull(currentTime)
 
             fakeSystemClock.advanceTime(7.seconds.inWholeMilliseconds)
+            runCurrent()
 
             sendIntentActionBroadcast(Intent.ACTION_TIME_TICK)
             val laterTime = checkNotNull(currentTime)
 
             assertThat(differenceBetween(laterTime, earlierTime)).isEqualTo(7.seconds)
+        }
+
+    @Test
+    @EnableFlags(ClockModernization.FLAG_NAME)
+    fun showSeconds_tunerChanges_flowEmits() =
+        kosmos.runTest {
+            val showSeconds by collectLastValue(underTest.showSeconds)
+            assertThat(showSeconds).isFalse()
+
+            getTunable().onTuningChanged(ClockInteractor.CLOCK_SECONDS_TUNER_KEY, "1")
+
+            assertThat(showSeconds).isTrue()
+
+            getTunable().onTuningChanged(ClockInteractor.CLOCK_SECONDS_TUNER_KEY, "0")
+
+            assertThat(showSeconds).isFalse()
+        }
+
+    @Test
+    fun currentTime_showSecondsFalse_notChangeEverySecond() =
+        kosmos.runTest {
+            val currentTime by collectLastValue(underTest.currentTime)
+            val showSeconds by collectLastValue(underTest.showSeconds)
+            val initialTime = currentTime!!
+
+            assertThat(showSeconds).isFalse()
+
+            fakeSystemClock.advanceTime(1000)
+            advanceTimeBy(1000)
+
+            // currentTime should not tick since showSeconds is false by default
+            assertThat(currentTime).isEqualTo(initialTime)
+        }
+
+    @Test
+    @EnableFlags(ClockModernization.FLAG_NAME)
+    fun currentTime_showSecondsTrue_changesEverySecond() =
+        kosmos.runTest {
+            val currentTime by collectLastValue(underTest.currentTime)
+            val showSeconds by collectLastValue(underTest.showSeconds)
+            val initialTime = currentTime!!
+
+            getTunable().onTuningChanged(ClockInteractor.CLOCK_SECONDS_TUNER_KEY, "1")
+
+            assertThat(showSeconds).isTrue()
+
+            fakeSystemClock.advanceTime(1000)
+            advanceTimeBy(1000)
+
+            assertThat(currentTime).isNotEqualTo(initialTime)
+
+            val timeAfterTick = currentTime!!
+            fakeSystemClock.advanceTime(1000)
+            advanceTimeBy(1000)
+
+            assertThat(currentTime).isNotEqualTo(timeAfterTick)
+        }
+
+    @Test
+    @EnableFlags(ClockModernization.FLAG_NAME)
+    fun currentTime_showSecondsTrueToFalse_notChangesEverySecond() =
+        kosmos.runTest {
+            val currentTime by collectLastValue(underTest.currentTime)
+            val showSeconds by collectLastValue(underTest.showSeconds)
+            val initialTime = currentTime!!
+
+            getTunable().onTuningChanged(ClockInteractor.CLOCK_SECONDS_TUNER_KEY, "1")
+
+            assertThat(showSeconds).isTrue()
+
+            fakeSystemClock.advanceTime(1000)
+            advanceTimeBy(1000)
+
+            assertThat(currentTime).isNotEqualTo(initialTime)
+
+            val timeAfterTick = currentTime!!
+
+            getTunable().onTuningChanged(ClockInteractor.CLOCK_SECONDS_TUNER_KEY, "0")
+
+            assertThat(showSeconds).isFalse()
+
+            advanceTimeBy(1000)
+            fakeSystemClock.advanceTime(1000)
+
+            // currentTime should not tick since showSeconds is now false.
+            assertThat(currentTime).isEqualTo(timeAfterTick)
+        }
+
+    @Test
+    @EnableFlags(ClockModernization.FLAG_NAME)
+    fun currentTime_showSecondsFalseToTrue_changesEverySecond() =
+        kosmos.runTest {
+            val currentTime by collectLastValue(underTest.currentTime)
+            val showSeconds by collectLastValue(underTest.showSeconds)
+            val initialTime = currentTime!!
+
+            assertThat(showSeconds).isFalse()
+
+            fakeSystemClock.advanceTime(1000)
+            advanceTimeBy(1000)
+
+            assertThat(currentTime).isEqualTo(initialTime)
+
+            val timeAfterTick = currentTime!!
+
+            getTunable().onTuningChanged(ClockInteractor.CLOCK_SECONDS_TUNER_KEY, "1")
+
+            assertThat(showSeconds).isTrue()
+
+            advanceTimeBy(1000)
+            fakeSystemClock.advanceTime(1000)
+
+            assertThat(currentTime).isNotEqualTo(timeAfterTick)
         }
 
     private fun differenceBetween(date1: Date, date2: Date): Duration {
@@ -118,5 +260,12 @@ class ClockInteractorTest : SysuiTestCase() {
 
     private fun Kosmos.sendIntentActionBroadcast(intentAction: String) {
         broadcastDispatcher.sendIntentToMatchingReceiversOnly(context, Intent(intentAction))
+        runCurrent()
+    }
+
+    private fun Kosmos.getTunable(): Tunable {
+        val tunableCaptor = argumentCaptor<Tunable>()
+        verify(tunerService).addTunable(tunableCaptor.capture(), any())
+        return tunableCaptor.firstValue
     }
 }

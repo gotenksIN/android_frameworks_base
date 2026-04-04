@@ -1909,8 +1909,10 @@ public final class GnssMeasurement implements Parcelable {
     /**
      * Returns {@code true} if {@link #getSatellitePvt()} is available,
      * {@code false} otherwise.
+     *
+     * @hide
      */
-    @FlaggedApi(Flags.FLAG_ENABLE_PUBLIC_SATELLITE_PVT_API)
+    @SystemApi
     public boolean hasSatellitePvt() {
         return isFlagSet(HAS_SATELLITE_PVT);
     }
@@ -1921,9 +1923,10 @@ public final class GnssMeasurement implements Parcelable {
      * <p>The value is only available if {@link #hasSatellitePvt()} is
      * {@code true}.
      *
+     * @hide
      */
-    @FlaggedApi(Flags.FLAG_ENABLE_PUBLIC_SATELLITE_PVT_API)
     @Nullable
+    @SystemApi
     public SatellitePvt getSatellitePvt() {
         return mSatellitePvt;
     }

@@ -135,15 +135,17 @@ constructor(
     }
 
     override suspend fun getPickerScreenState(): PickerScreenState {
-        val user = userResolver.getUserForHandlingNoteTaking(QUICK_AFFORDANCE)
+        if (!lockscreenNoteTakingAvailability.shouldShowNotesInLockscreenShortcutPicker()) {
+            return PickerScreenState.UnavailableOnDevice
+        }
         val isDefaultNotesAppSet =
-            noteTaskInfoResolver.resolveInfo(QUICK_AFFORDANCE, user = user) != null
+            noteTaskInfoResolver.resolveInfo(
+                QUICK_AFFORDANCE,
+                user = userResolver.getUserForHandlingNoteTaking(QUICK_AFFORDANCE),
+            ) != null
         return when {
-            !isEnabled ||
-                !lockscreenNoteTakingAvailability.shouldShowNotesInLockscreenShortcutPicker() ->
-                PickerScreenState.UnavailableOnDevice
-
-            !isDefaultNotesAppSet ->
+            isEnabled && isDefaultNotesAppSet -> PickerScreenState.Default()
+            isEnabled -> {
                 PickerScreenState.Disabled(
                     explanation =
                         context.getString(
@@ -158,8 +160,8 @@ constructor(
                             setPackage(context.packageName)
                         },
                 )
-
-            else -> PickerScreenState.Default()
+            }
+            else -> PickerScreenState.UnavailableOnDevice
         }
     }
 

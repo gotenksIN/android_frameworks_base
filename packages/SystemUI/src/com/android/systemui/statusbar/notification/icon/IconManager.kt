@@ -339,7 +339,9 @@ constructor(
             return it
         }
         val (icon: Icon?, type: StatusBarIcon.Type) =
-            entry.bundleRepository.bundleIcon.getIcon(context) to StatusBarIcon.Type.ResourceIcon
+            Icon.createWithResource(context, entry.bundleRepository.bundleIcon) to
+                StatusBarIcon.Type.ResourceIcon
+
         if (icon == null) {
             throw InflationException("No icon for bundle ${entry.bundleRepository.bundleType}")
         }
@@ -453,7 +455,7 @@ constructor(
             /* icon = */ this,
             0,
             0,
-            entry.bundleRepository.titleText.getText(context),
+            context.getString(entry.bundleRepository.titleText),
             type,
         )
     }

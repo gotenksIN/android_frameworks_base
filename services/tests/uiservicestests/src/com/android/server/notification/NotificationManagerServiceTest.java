@@ -100,7 +100,6 @@ import static android.service.notification.Adjustment.KEY_TYPE;
 import static android.service.notification.Adjustment.KEY_USER_SENTIMENT;
 import static android.service.notification.Adjustment.TYPE_CONTENT_RECOMMENDATION;
 import static android.service.notification.Adjustment.TYPE_NEWS;
-import static android.service.notification.Adjustment.TYPE_OTHER;
 import static android.service.notification.Adjustment.TYPE_PROMOTION;
 import static android.service.notification.Adjustment.TYPE_SOCIAL_MEDIA;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_BITMAP_OFFLOADING;
@@ -1595,13 +1594,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 eq(TOAST_DURATION), any(), eq(displayId));
     }
 
-    private void postNotification(NotificationRecord r) throws Exception {
-        mBinderService.enqueueNotificationWithTag(r.getSbn().getPackageName(),
-                r.getSbn().getOpPkg(), r.getSbn().getTag(), r.getSbn().getId(),
-                r.getNotification(), r.getUserId());
-        waitForPost();
-    }
-
     @Test
     public void testNoUriGrantsForBadMessagesList() throws RemoteException {
         Uri targetUri = Uri.parse("content://com.android.contacts/display_photo/1");
@@ -2276,6 +2268,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // They get both classified as "News".
         mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, true);
+        doAnswer(invocationOnMock -> {
+            RankingReconsideration recon =
+                    ((RankingReconsideration) invocationOnMock.getArguments()[0]);
+            final NotificationRecord r = mService.mNotificationsByKey.get(recon.getKey());
+            if (r != null) {
+                recon.applyChangesLocked(r);
+            }
+            return null;
+        }).when(mRankingHandler).requestReconsideration(any());
         for (NotificationRecord nr : mService.mNotificationList) {
             if (!nr.getNotification().isGroupSummary()) {
                 Bundle signals = new Bundle();
@@ -2285,6 +2286,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
             }
         }
+        mService.handleRankingSort();
         waitForIdle();
         // the original autogroup notification will be removed and replaced with a 'news' autogroup
         waitForPost();
@@ -3098,18 +3100,28 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testAutogrouping_updateBeforeAdjustment_triggersGroupHelper() throws Exception {
         // Add 2 ungrouped notifications
         NotificationRecord nr0 = generateNotificationRecord(mTestNotificationChannel, 0, mUserId);
-        postNotification(nr0);
+        mService.addEnqueuedNotification(nr0);
+        NotificationManagerService.PostNotificationRunnable runnable =
+                mService.new PostNotificationRunnable(nr0.getKey(), nr0.getSbn().getPackageName(),
+                        nr0.getUid(), mPostNotificationTrackerFactory.newTracker(
+                                null, nr0.getKey()));
+        runnable.run();
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+        waitForPost();
 
         NotificationRecord nr1 = generateNotificationRecord(mTestNotificationChannel, 1, mUserId);
-        postNotification(nr1);
-
-        // auto group summary
+        mService.addEnqueuedNotification(nr1);
+        runnable = mService.new PostNotificationRunnable(nr1.getKey(),
+                nr1.getSbn().getPackageName(), nr1.getUid(),
+                mPostNotificationTrackerFactory.newTracker(null, nr1.getKey()));
+        runnable.run();
+        waitForIdle();
         moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
         waitForPost();
 
         // Check that the aggregate group summary was created
-        final String fullAggregateGroupKey =
-                mService.getNotificationRecord(nr1.getKey()).getGroupKey();
+        final String fullAggregateGroupKey = nr1.getGroupKey();
         NotificationRecord aggregateSummary = mService.mSummaryByGroupKey.get(
                 fullAggregateGroupKey);
         assertThat(aggregateSummary).isNotNull();
@@ -3120,10 +3132,19 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // Update nr0 without any changes
         final NotificationRecord updatedNotification = generateNotificationRecord(
                 mTestNotificationChannel, 0, mUserId);
-        postNotification(updatedNotification);
+        mService.addEnqueuedNotification(updatedNotification);
+        runnable = mService.new PostNotificationRunnable(updatedNotification.getKey(),
+                updatedNotification.getSbn().getPackageName(), updatedNotification.getUid(),
+                mPostNotificationTrackerFactory.newTracker(null, updatedNotification.getKey()));
+        runnable.run();
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
+        waitForPost();
 
-        assertThat(mService.getNotificationRecord(nr0.getKey()).getGroupKey()).isEqualTo(
-                fullAggregateGroupKey);
+        // Check that GroupHelper was invoked again and that the record has applied
+        // group key adjustments
+        verify(mGroupHelper, times(1)).onNotificationPosted(eq(updatedNotification), eq(true));
+        assertThat(updatedNotification.getGroupKey()).isEqualTo(fullAggregateGroupKey);
     }
 
     @Test
@@ -3532,15 +3553,19 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testUpdateGroupNameAfterBundling_summaryCanceled() throws Exception {
         mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, true);
 
-        // Add some ungrouped notifications to trigger autogrouping in the alerting section
+        // Add some ungrouped notifications to trigger autogrouping
         final int numNotif = 3;
         for (int i = 0; i < numNotif; i++) {
-            final NotificationRecord nr = generateNotificationRecord(mTestNotificationChannel, i,
+            final NotificationRecord nr0 = generateNotificationRecord(mTestNotificationChannel, i,
                     mUserId);
-            mBinderService.enqueueNotificationWithTag(nr.getSbn().getPackageName(),
-                    nr.getSbn().getOpPkg(), nr.getSbn().getTag(), nr.getSbn().getId(),
-                    nr.getNotification(), nr.getUserId());
-            waitForPost();
+            mService.addEnqueuedNotification(nr0);
+            NotificationManagerService.PostNotificationRunnable runnable =
+                    mService.new PostNotificationRunnable(nr0.getKey(),
+                        nr0.getSbn().getPackageName(),
+                        nr0.getUid(),
+                            mPostNotificationTrackerFactory.newTracker(null, nr0.getKey()));
+            runnable.run();
+            waitForIdle();
         }
 
         moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
@@ -3588,7 +3613,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         waitForIdle();
 
         mTestableLooper.moveTimeForward(DELAY_FORCE_REGROUP_TIME);
-        waitForPost();
+        waitForIdle();
 
         // Check that the notification was bundled and a group summary was created
         assertThat(mService.mSummaryByGroupKey).hasSize(2);
@@ -3600,7 +3625,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertThat(GroupHelper.isAggregatedGroup(bundleSummary)).isTrue();
         assertThat(mService.mNotificationList).doesNotContain(summary);
 
-        // Update summary + r1 notification
+        // Update summary + notification
+        reset(mWorkerHandler);
         final String newGroupName = "newGroupName";
         final NotificationRecord rUpdate = generateNotificationRecord(mTestNotificationChannel,
                 summaryId + 1, "tag0", newGroupName, false);
@@ -9298,14 +9324,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentTitle("foo");
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setFlag(FLAG_FOREGROUND_SERVICE, true)
                 .setContentTitle("bar");
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9316,13 +9344,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentTitle("foo");
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setContentTitle("bar");
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9334,14 +9364,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                     .addLine("line1").addLine("line2"));
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setStyle(new Notification.InboxStyle()
                         .addLine("line1").addLine("line2_changed"));
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r2)); // line 2 changed unnoticed
 
@@ -9350,7 +9382,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                         .addLine("line1"));
         StatusBarNotification sbn3 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb3.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r3 = new NotificationRecord(mContext, sbn3, mTestNotificationChannel);
+        NotificationRecord r3 =
+                new NotificationRecord(mContext, sbn3, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r3)); // line 2 removed unnoticed
 
@@ -9359,7 +9392,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                         .addLine("line1").addLine("line2").addLine("line3"));
         StatusBarNotification sbn4 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb4.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r4 = new NotificationRecord(mContext, sbn4, mTestNotificationChannel);
+        NotificationRecord r4 =
+                new NotificationRecord(mContext, sbn4, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r4)); // line 3 added unnoticed
 
@@ -9367,7 +9401,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             .setContentText("not an inbox");
         StatusBarNotification sbn5 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb5.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r5 = new NotificationRecord(mContext, sbn5, mTestNotificationChannel);
+        NotificationRecord r5 =
+                new NotificationRecord(mContext, sbn5, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r5)); // changed Styles, went unnoticed
     }
@@ -9378,13 +9413,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText("foo");
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setContentText("bar");
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9395,13 +9432,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText("foo");
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setContentText("foo");
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9412,13 +9451,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText(Html.fromHtml("<b>foo</b>"));
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setContentText(Html.fromHtml("<b>foo</b>"));
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9429,13 +9470,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText(Html.fromHtml("<b>foo</b>"));
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setContentText(Html.fromHtml("<b>bar</b>"));
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9446,13 +9489,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setProgress(100, 90, false);
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setProgress(100, 100, false);
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertTrue(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9463,13 +9508,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setProgress(100, 90, false);
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setProgress(100, 91, false);
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9480,13 +9527,15 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setProgress(100, 100, false);
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setProgress(100, 100, false);
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9499,7 +9548,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText("foo");
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r1 = new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+        NotificationRecord r1 =
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setGroup("bananas")
@@ -9507,7 +9557,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText("bar");
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9520,7 +9571,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setContentText("bar");
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
-        NotificationRecord r2 = new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+        NotificationRecord r2 =
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(null, r2));
     }
@@ -9575,7 +9627,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         StatusBarNotification sbn1 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb1.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
         NotificationRecord r1 =
-                new NotificationRecord(mContext, sbn1, mTestNotificationChannel);
+                new NotificationRecord(mContext, sbn1, mock(NotificationChannel.class));
 
         Notification.Builder nb2 = new Notification.Builder(mContext, "")
                 .setFlag(FLAG_USER_INITIATED_JOB, true)
@@ -9583,7 +9635,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         StatusBarNotification sbn2 = new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0,
                 nb2.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
         NotificationRecord r2 =
-                new NotificationRecord(mContext, sbn2, mTestNotificationChannel);
+                new NotificationRecord(mContext, sbn2, mock(NotificationChannel.class));
 
         assertFalse(mService.isVisuallyInterruptive(r1, r2));
     }
@@ -9593,7 +9645,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mContext,
                 new StatusBarNotification(mPkg, mPkg, 0, "tag", mUid, 0, n,
                         UserHandle.getUserHandleForUid(mUid), null, 0),
-                mTestNotificationChannel);
+                mock(NotificationChannel.class));
     }
 
     @Test
@@ -12020,13 +12072,14 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Bundle signals = new Bundle();
         signals.putInt(KEY_IMPORTANCE, IMPORTANCE_LOW);
         signals.putInt(KEY_USER_SENTIMENT, USER_SENTIMENT_NEGATIVE);
+        signals.putInt(KEY_TYPE, TYPE_PROMOTION);
         Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
                "", r.getUser().getIdentifier());
 
         mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
         r.applyAdjustments();
 
-        assertEquals(IMPORTANCE_LOW, r.getImportance());
+        assertEquals(IMPORTANCE_LOW, r.getAssistantImportance());
         assertEquals(USER_SENTIMENT_NEUTRAL, r.getUserSentiment());
     }
 
@@ -18299,6 +18352,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         for (int i = 0; i < times; i++) {
             NotificationRecord copy = generateNotificationRecord(mTestNotificationChannel);
             mService.addEnqueuedNotification(copy);
+        }
+        // Assistant gets all the enqueues, so classifies the same notification multiple times too,
+        // before actual post has occurred.
+        for (int i = 0; i < times; i++) {
             Bundle signals = new Bundle();
             signals.putInt(KEY_TYPE, TYPE_NEWS);
             Adjustment adjustment = new Adjustment(
@@ -18311,12 +18368,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             mService.new PostNotificationRunnable(sample.getKey(), sample.getSbn().getPackageName(),
                     sample.getUid(),
                     mPostNotificationTrackerFactory.newTracker(null, sample.getKey())).run();
-            waitForIdle();
         }
-        assertThat(mService.mNotificationList).hasSize(1);
-
-        // wait for autogroup summary
-        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
         waitForPost();
 
         assertThat(mService.mEnqueuedNotifications).isEmpty();
@@ -18345,7 +18397,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // When we block adjustments for this package
         mBinderService.setAdjustmentSupportedForPackage(mUserId, KEY_TYPE, mPkg, false);
-        waitForIdle();
 
         signals.putInt(KEY_TYPE, TYPE_PROMOTION);
         mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
@@ -18393,23 +18444,14 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertThat(ranking.getChannel().getLockscreenVisibility()).isEqualTo(
                 Notification.VISIBILITY_SECRET);
 
-        if (android.app.Flags.nmContextualDisplayLaunch()) {
-            signals.putInt(KEY_TYPE, TYPE_OTHER);
-            adjustment = new Adjustment(
-                    r.getSbn().getPackageName(), r.getKey(), signals, "",
-                    r.getUser().getIdentifier());
-            mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
-            waitForIdle();
-        } else {
-            mService.unclassifyNotification(r.getKey());
-            waitForIdle();
-        }
+        mService.unclassifyNotification(r.getKey());
+        waitForIdle();
 
         // confirm it's unclassified
         assertThat(r.getChannel().getId()).isEqualTo(secret.getId());
 
         // and that the original channel visibility is reset
-        assertThat(r.getPackageVisibilityOverride()).isEqualTo(secret.getLockscreenVisibility());
+        assertThat(r.getOriginalChannelVisibility()).isEqualTo(VISIBILITY_NO_OVERRIDE);
 
         // and the ranking objects will be updated accordingly (the ranking's channel should be the
         // notification's original channel)
@@ -18765,6 +18807,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // Post a single notification
         final boolean hasOriginalSummary = false;
         final NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
+        final String keyToUnbundle = r.getKey();
         mService.addNotification(r);
 
         // Classify notification into the NEWS bundle
@@ -18782,17 +18825,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // Check that the bundleType is updated
         assertThat(r.getBundleType()).isEqualTo(Adjustment.TYPE_NEWS);
 
-        if (android.app.Flags.nmContextualDisplayLaunch()) {
-            signals.putInt(KEY_TYPE, TYPE_OTHER);
-            adjustment = new Adjustment(
-                    r.getSbn().getPackageName(), r.getKey(), signals, "",
-                    r.getUser().getIdentifier());
-            mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
-            waitForIdle();
-        } else {
-            mService.unclassifyNotification(r.getKey());
-            waitForIdle();
-        }
+        // Unclassify the notification
+        mService.unclassifyNotification(keyToUnbundle);
+        waitForIdle();
 
         // Check that the original channel was restored
         assertThat(r.getChannel().getId()).isEqualTo(TEST_CHANNEL_ID);
@@ -18836,17 +18871,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertThat(r1.getBundleType()).isEqualTo(Adjustment.TYPE_NEWS);
         assertThat(r1.getSbn().getOverrideGroupKey()).isNotEmpty();
 
-        if (android.app.Flags.nmContextualDisplayLaunch()) {
-            signals.putInt(KEY_TYPE, TYPE_OTHER);
-            adjustment = new Adjustment(
-                    r1.getSbn().getPackageName(), r1.getKey(), signals, "",
-                    r1.getUser().getIdentifier());
-            mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
-            waitForIdle();
-        } else {
-            mService.unclassifyNotification(r1.getKey());
-            waitForIdle();
-        }
+        // Unclassify the notification
+        mService.unclassifyNotification(keyToUnbundle);
+        waitForIdle();
+        moveTimeForwardAndWaitForIdle(DELAY_FORCE_REGROUP_TIME);
 
         // Check that the original channel was restored
         r1 = mService.getNotificationRecord(r1.getKey());
@@ -18891,17 +18919,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         final boolean hasOriginalSummary = false;
         mService.mSummaryByGroupKey.remove(summary.getGroupKey());
 
-        if (android.app.Flags.nmContextualDisplayLaunch()) {
-            signals.putInt(KEY_TYPE, TYPE_OTHER);
-            adjustment = new Adjustment(
-                    r1.getSbn().getPackageName(), r1.getKey(), signals, "",
-                    r1.getUser().getIdentifier());
-            mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
-            waitForIdle();
-        } else {
-            mService.unclassifyNotification(r1.getKey());
-            waitForIdle();
-        }
+        // Unclassify the notification
+        mService.unclassifyNotification(keyToUnbundle);
+        waitForIdle();
 
         // Check that the original channel was restored
         assertThat(r1.getChannel().getId()).isEqualTo(TEST_CHANNEL_ID);
@@ -18930,28 +18950,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertThat(r.getChannel().getId()).isEqualTo(NEWS_ID);
         assertThat(r.getBundleType()).isEqualTo(Adjustment.TYPE_NEWS);
 
-        if (android.app.Flags.nmContextualDisplayLaunch()) {
-            signals.putInt(KEY_TYPE, TYPE_OTHER);
-            adjustment = new Adjustment(
-                    r.getSbn().getPackageName(), r.getKey(), signals, "",
-                    r.getUser().getIdentifier());
-            mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
-            waitForIdle();
-        } else {
-            mService.unclassifyNotification(r.getKey());
-            waitForIdle();
-        }
+        // Unbundle the notification
+        mService.unclassifyNotification(keyToUnbundle);
+        waitForIdle();
 
         // Check that the original channel was restored
         assertThat(r.hadGroupSummaryWhenUnclassified()).isFalse(); // we didn't add a group summary
         assertThat(r.getChannel().getId()).isEqualTo(mSilentChannel.getId());
 
         // Rebundle the notification
-        signals.putInt(KEY_TYPE, TYPE_NEWS);
-        adjustment = new Adjustment(
-                r.getSbn().getPackageName(), r.getKey(), signals, "",
-                r.getUser().getIdentifier());
-        mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
+        mService.reclassifyNotification(keyToUnbundle);
         waitForIdle();
 
         // Check that the bundle channel was restored
@@ -19180,123 +19188,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mBinderService.setAssistantClassificationTypeState(TYPE_SOCIAL_MEDIA, true);
         mBinderService.setAssistantClassificationTypeState(TYPE_CONTENT_RECOMMENDATION, true);
 
-        // post some notifications and classify in different bundles during enqueue
-        final int numNotifications = NotificationChannel.SYSTEM_RESERVED_IDS.size();
-        for (int i = 0; i < numNotifications; i++) {
-            NotificationRecord r = generateNotificationRecord(mTestNotificationChannel, i, mUserId);
-            mService.addEnqueuedNotification(r);
-            Bundle signals = new Bundle();
-            final int adjustmentType = i + 1;
-            signals.putInt(Adjustment.KEY_TYPE, adjustmentType);
-            Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
-                    "", r.getUser().getIdentifier());
-            mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
-            mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
-                    r.getUid(),
-                    mPostNotificationTrackerFactory.newTracker(null, r.getKey())).run();
-            waitForIdle();
-
-            // Check that the NotificationRecord channel is updated
-            assertThat(r.getChannel().getId()).isIn(NotificationChannel.SYSTEM_RESERVED_IDS);
-            assertThat(r.getBundleType()).isEqualTo(adjustmentType);
-        }
-
-        // enqueue some updates
-        for (int i = 0; i < numNotifications; i++) {
-            NotificationRecord r = generateNotificationRecord(mTestNotificationChannel, i, mUserId);
-            mService.addEnqueuedNotification(r);
-            Bundle signals = new Bundle();
-            final int adjustmentType = i + 1;
-            signals.putInt(Adjustment.KEY_TYPE, adjustmentType);
-            Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
-                    "", r.getUser().getIdentifier());
-            mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
-        }
-
-        // Disable type adjustment for the package
-        mBinderService.setAdjustmentSupportedForPackage(mUserId, KEY_TYPE, mPkg, false);
-        waitForIdle();
-
-        // finish post, ensure that notifications are unbundled
-        for (int i = 0; i < numNotifications; i++) {
-            NotificationRecord r = generateNotificationRecord(mTestNotificationChannel, i, mUserId);
-            mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
-                    r.getUid(),
-                    mPostNotificationTrackerFactory.newTracker(null, r.getKey())).run();
-            waitForIdle();
-        }
-
-        //Check that all notifications were unbundled
-        for (NotificationRecord record : mService.mNotificationList) {
-            assertThat(record.getChannel().getId()).isEqualTo(TEST_CHANNEL_ID);
-        }
-    }
-
-    @Test
-    @EnableFlags({android.app.Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH})
-    public void testDisableEnableBundleAdjustmentByPkg_classifiesEnqueuedNotifications()
-            throws Exception {
-        mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, true);
-
-
-        NotificationRecord r = generateNotificationRecord(mSilentChannel, 0, mUserId);
-        mService.addEnqueuedNotification(r);
-        Bundle signals = new Bundle();
-        signals.putInt(Adjustment.KEY_TYPE, TYPE_NEWS);
-        Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
-                    "", r.getUser().getIdentifier());
-        mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
-        mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
-                r.getUid(),
-                mPostNotificationTrackerFactory.newTracker(null, r.getKey())).run();
-        waitForIdle();
-
-        // bundle summary
-        waitForPost();
-
-        // Check that the NotificationRecord channel is updated
-        assertThat(r.getChannel().isBundleChannel()).isTrue();
-        assertThat(r.getBundleType()).isEqualTo(TYPE_NEWS);
-
-        // enqueue an update
-        NotificationRecord r1 = generateNotificationRecord(mSilentChannel, 0, mUserId);
-        mService.addEnqueuedNotification(r1);
-        signals = new Bundle();
-        signals.putInt(Adjustment.KEY_TYPE, TYPE_NEWS);
-        adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
-                "", r.getUser().getIdentifier());
-        mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
-
-        // Disable type adjustment for the package
-        mBinderService.setAdjustmentSupportedForPackage(mUserId, KEY_TYPE, mPkg, false);
-        waitForIdle();
-
-        // Enable type adjustment for the package
-        mBinderService.setAdjustmentSupportedForPackage(mUserId, KEY_TYPE, mPkg, true);
-        waitForIdle();
-
-        // finish post, ensure that notifications are bundled
-        for (int i = mService.mEnqueuedNotifications.size() - 1; i >= 0; i--) {
-            NotificationRecord enqueued = mService.mEnqueuedNotifications.get(i);
-            mService.new PostNotificationRunnable(enqueued.getKey(),
-                    enqueued.getSbn().getPackageName(), enqueued.getUid(),
-                    mPostNotificationTrackerFactory.newTracker(null, enqueued.getKey())).run();
-            waitForIdle();
-        }
-
-        assertThat(mService.getNotificationRecord(r.getKey()).getChannel().isBundleChannel())
-                .isTrue();
-    }
-
-    @Test
-    @EnableFlags({FLAG_NOTIFICATION_REGROUP_ON_CLASSIFICATION})
-    public void testDisableBundleAdjustmentByType_unclassifiesEnqueuedNotifications()
-            throws Exception {
-        mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, true);
-        mBinderService.setAssistantClassificationTypeState(TYPE_PROMOTION, true);
-        mBinderService.setAssistantClassificationTypeState(TYPE_SOCIAL_MEDIA, true);
-        mBinderService.setAssistantClassificationTypeState(TYPE_CONTENT_RECOMMENDATION, true);
-
         // Enqueue some notifications and classify in different bundles
         final int numNotifications = NotificationChannel.SYSTEM_RESERVED_IDS.size();
         for (int i = 0; i < numNotifications; i++) {
@@ -19313,12 +19204,44 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                     mPostNotificationTrackerFactory.newTracker(null, r.getKey())).run();
             waitForIdle();
 
+            r.setBundleType(adjustmentType);
             // Check that the NotificationRecord channel is updated
             assertThat(r.getChannel().getId()).isIn(NotificationChannel.SYSTEM_RESERVED_IDS);
             assertThat(r.getBundleType()).isEqualTo(adjustmentType);
         }
 
-        // enqueue some updates
+        // Disable type adjustment for the package
+        mBinderService.setAdjustmentSupportedForPackage(mUserId, KEY_TYPE, mPkg, false);
+        waitForIdle();
+
+        //Check that all notifications were unbundled
+        for (NotificationRecord record : mService.mEnqueuedNotifications) {
+            assertThat(record.getChannel().getId()).isEqualTo(TEST_CHANNEL_ID);
+        }
+
+        // Re-enable bundles for package
+        mBinderService.setAdjustmentSupportedForPackage(mUserId, KEY_TYPE, mPkg, true);
+        waitForIdle();
+
+        // Check that the bundle channel was restored
+        // expect an additional numNotifications sorts after the earlier check
+        for (NotificationRecord record : mService.mEnqueuedNotifications) {
+            assertThat(record.getChannel().getId()).isIn(NotificationChannel.SYSTEM_RESERVED_IDS);
+        }
+    }
+
+    @Test
+    @EnableFlags({FLAG_NOTIFICATION_REGROUP_ON_CLASSIFICATION})
+    public void testDisableBundleAdjustmentByType_unclassifiesEnqueuedNotifications()
+            throws Exception {
+        mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, true);
+        mBinderService.setAssistantClassificationTypeState(TYPE_PROMOTION, true);
+        mBinderService.setAssistantClassificationTypeState(TYPE_SOCIAL_MEDIA, true);
+        mBinderService.setAssistantClassificationTypeState(TYPE_CONTENT_RECOMMENDATION, true);
+
+        // Enqueue some notifications and classify in different bundles
+        final int numNotifications = NotificationChannel.SYSTEM_RESERVED_IDS.size();
+        final int numNewsNotifications = 1;
         for (int i = 0; i < numNotifications; i++) {
             NotificationRecord r = generateNotificationRecord(mTestNotificationChannel, i, mUserId);
             mService.addEnqueuedNotification(r);
@@ -19328,26 +19251,38 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
                     "", r.getUser().getIdentifier());
             mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
+            mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
+                    r.getUid(),
+                    mPostNotificationTrackerFactory.newTracker(null, r.getKey())).run();
+            waitForIdle();
+
+            r.setBundleType(adjustmentType);
+            // Check that the NotificationRecord channel is updated
+            assertThat(r.getChannel().getId()).isIn(NotificationChannel.SYSTEM_RESERVED_IDS);
+            assertThat(r.getBundleType()).isEqualTo(adjustmentType);
         }
 
         // Disable TYPE_NEWS bundle
         mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, false);
         waitForIdle();
 
-        // finish post, ensure that notifications are unbundled
-        for (int i = 0; i < numNotifications; i++) {
-            NotificationRecord r = generateNotificationRecord(mTestNotificationChannel, i, mUserId);
-            mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
-                    r.getUid(),
-                    mPostNotificationTrackerFactory.newTracker(null, r.getKey())).run();
-            waitForIdle();
-        }
-
-        // Check that all notifications were unbundled
-        for (NotificationRecord record : mService.mNotificationList) {
-            if (record.getSbn().getId() == (TYPE_NEWS - 1)) {
+        //Check that all notifications were unbundled
+        for (NotificationRecord record : mService.mEnqueuedNotifications) {
+            // Check that the original channel was restored
+            // for notifications classified as TYPE_NEWS
+            if (record.getBundleType() == TYPE_NEWS) {
                 assertThat(record.getChannel().getId()).isEqualTo(TEST_CHANNEL_ID);
             }
+        }
+
+        // Re-enable bundles for package
+        mBinderService.setAssistantClassificationTypeState(TYPE_NEWS, true);
+        waitForIdle();
+
+        // Check that the bundle channel was restored
+        // expect another numNewsNotifications requests for sorting after the last check
+        for (NotificationRecord record : mService.mEnqueuedNotifications) {
+            assertThat(record.getChannel().getId()).isIn(NotificationChannel.SYSTEM_RESERVED_IDS);
         }
     }
 
@@ -19471,7 +19406,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // Disallow KEY_TYPE adjustment just for profile user.
         mBinderService.disallowAssistantAdjustment(mZeroManagedProfile.id, KEY_TYPE);
 
-        // Re-allow KEY_TYPE adjustment for mUserId
+        // Re-allow KEY_TYPE adjustment (even though it's alrady allowed)
         mBinderService.allowAssistantAdjustment(mUserId, Adjustment.KEY_TYPE);
         waitForIdle();
 
@@ -19574,16 +19509,17 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // Setup: will make notifications for userids current user and its profile
         // One notification for each user for each classification type.
+
         for (int i = 0; i < NotificationChannel.SYSTEM_RESERVED_IDS.size(); i++) {
             NotificationRecord r = generateNotificationRecord(mSilentChannel, i + 1, mZero.id);
             NotificationRecord r2 = generateNotificationRecord(
-                    mSilentChannel, 30 * TYPE_NEWS, mZeroManagedProfile.id);
+                    mSilentChannel, 30 * (i + 1), mZeroManagedProfile.id);
 
             mService.addNotification(r);
             mService.addNotification(r2);
 
             Bundle signals = new Bundle();
-            final int adjustmentType = TYPE_NEWS;
+            final int adjustmentType = i + 1;
             signals.putInt(Adjustment.KEY_TYPE, adjustmentType);
             Bundle signals2 = new Bundle(signals);
             Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
@@ -19593,10 +19529,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             mBinderService.applyAdjustmentsFromAssistant(mAssistant, List.of(adjustment));
             mBinderService.applyAdjustmentsFromAssistant(mAssistantManagedProfile, List.of(a2));
             waitForIdle();
-            // wait for autogroup summary
-            waitForPost();
 
-            for (NotificationRecord record : List.of(r2)) {
+            for (NotificationRecord record : List.of(r, r2)) {
                    // Check that the NotificationRecord channel is updated
                 assertThat(record.getChannel().getId()).isIn(
                         NotificationChannel.SYSTEM_RESERVED_IDS);
@@ -19829,7 +19763,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         final int summaryId = 0;
         final NotificationRecord summary = generateNotificationRecord(mTestNotificationChannel,
                 summaryId, originalGroupName, true);
-        postNotification(summary);
+        mService.addEnqueuedNotification(summary);
+        mService.new PostNotificationRunnable(summary.getKey(), summary.getSbn().getPackageName(),
+                summary.getUid(),
+                mPostNotificationTrackerFactory.newTracker(null, summary.getKey())).run();
+        waitForIdle();
 
         // Check that the summary does NOT have FLAG_SILENT set
         NotificationRecord s = mService.findNotificationLocked(summary.getSbn().getPackageName(),
@@ -19865,7 +19803,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // Post summary
         final NotificationRecord summary = generateNotificationRecord(mTestNotificationChannel,
                 summaryId, originalGroupName, true);
-        postNotification(summary);
+        mService.addEnqueuedNotification(summary);
+        mService.new PostNotificationRunnable(summary.getKey(), summary.getSbn().getPackageName(),
+                summary.getUid(),
+                mPostNotificationTrackerFactory.newTracker(null, summary.getKey())).run();
+        waitForIdle();
 
         // Check that the summary does NOT have FLAG_SILENT set
         NotificationRecord s = mService.findNotificationLocked(summary.getSbn().getPackageName(),
@@ -19889,10 +19831,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Adjustment adjustment = new Adjustment(r1.getSbn().getPackageName(), r1.getKey(), signals,
                 "", r1.getUser().getIdentifier());
         mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
-        mService.new PostNotificationRunnable(r1.getKey(), r1.getSbn().getPackageName(),
-                r1.getUid(),
-                mPostNotificationTrackerFactory.newTracker(null, r1.getKey())).run();
         waitForIdle();
+        r1.applyAdjustments();
         assertThat(r1.getChannel().getId()).isEqualTo(NEWS_ID);
 
         final NotificationRecord r2 = generateNotificationRecord(mTestNotificationChannel,
@@ -19902,19 +19842,18 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         adjustment = new Adjustment(r2.getSbn().getPackageName(), r2.getKey(), signals,
                 "", r2.getUser().getIdentifier());
         mBinderService.applyAdjustmentFromAssistant(mAssistant, adjustment);
-        mService.new PostNotificationRunnable(r2.getKey(), r2.getSbn().getPackageName(),
-                r2.getUid(),
-                mPostNotificationTrackerFactory.newTracker(null, r2.getKey())).run();
         waitForIdle();
+        r2.applyAdjustments();
         assertThat(r2.getChannel().getId()).isEqualTo(PROMOTIONS_ID);
 
         // Post summary
         final NotificationRecord summary = generateNotificationRecord(mTestNotificationChannel,
                 summaryId, originalGroupName, true);
-        mBinderService.enqueueNotificationWithTag(summary.getSbn().getPackageName(),
-                summary.getSbn().getOpPkg(), summary.getSbn().getTag(), summary.getSbn().getId(),
-                summary.getNotification(), summary.getUserId());
-        waitForPost();
+        mService.addEnqueuedNotification(summary);
+        mService.new PostNotificationRunnable(summary.getKey(), summary.getSbn().getPackageName(),
+                summary.getUid(),
+                mPostNotificationTrackerFactory.newTracker(null, summary.getKey())).run();
+        waitForIdle();
 
         // Check that the summary has FLAG_SILENT set
         NotificationRecord s = mService.findNotificationLocked(summary.getSbn().getPackageName(),
@@ -20681,16 +20620,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .build();
     }
 
-    private NotificationRule createBlockRule(int id, boolean isEnabled) {
-        int primaryAction = NotificationRule.Action.PRIMARY_ACTION_BLOCK;
-
-        return new NotificationRule.Builder(id,
-                new NotificationRule.Action.Builder(primaryAction)
-                        .build())
-                .setEnabled(isEnabled)
-                .build();
-    }
-
     @Test
     @EnableFlags(android.app.Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH)
     public void testRemoveRuleUpdatesNotification() throws Exception {
@@ -21012,34 +20941,5 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         // Verify Bitmap WAS removed because it's not reachable in any list
         verify(mBitmapOffloader).removeBitmap(eq(offloadUri));
-    }
-
-    @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_CONTEXTUAL_DISPLAY_LAUNCH)
-    public void testBlockRule() throws Exception {
-        NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
-        mService.addEnqueuedNotification(r);
-
-        mBinderService.allowAssistantAdjustment(mUserId, KEY_NOTIFICATION_RULES);
-        NotificationRule first = createBlockRule(101, true);
-        mBinderService.addNotificationRule(mUserId, first, 0);
-
-
-        Bundle signals = new Bundle();
-        ArrayList<Integer> rules = new ArrayList<>();
-        rules.add(first.getId());
-        signals.putIntegerArrayList(KEY_NOTIFICATION_RULES, rules);
-        Adjustment adjustment = new Adjustment(r.getSbn().getPackageName(), r.getKey(), signals,
-                "", r.getUser().getIdentifier());
-
-        mBinderService.applyEnqueuedAdjustmentFromAssistant(mAssistant, adjustment);
-        NotificationManagerService.PostNotificationRunnable runnable =
-                mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
-                        r.getUid(), mPostNotificationTrackerFactory.newTracker(null, r.getKey()));
-        runnable.run();
-        waitForIdle();
-
-        assertThat(mService.getNotificationRecord(r.getKey())).isNull();
-        assertThat(mService.getNotificationRecordCount()).isEqualTo(0);
     }
 }

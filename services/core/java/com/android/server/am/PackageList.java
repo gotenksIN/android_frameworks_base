@@ -19,11 +19,11 @@ package com.android.server.am;
 import android.annotation.NonNull;
 import android.content.pm.VersionedPackage;
 import android.util.ArrayMap;
-import android.util.IndentingPrintWriter;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.app.procstats.ProcessStats;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -152,9 +152,9 @@ final class PackageList {
         }
     }
 
-    void dump(@NonNull IndentingPrintWriter pw) {
+    void dump(PrintWriter pw, String prefix) {
         synchronized (this) {
-            pw.print("packageList={");
+            pw.print(prefix); pw.print("packageList={");
             for (int i = 0, size = mPkgList.size(); i < size; i++) {
                 if (i > 0) pw.print(", ");
                 pw.print(mPkgList.keyAt(i));

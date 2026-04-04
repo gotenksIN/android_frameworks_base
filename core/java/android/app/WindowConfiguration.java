@@ -791,6 +791,15 @@ public class WindowConfiguration implements Parcelable, Comparable<WindowConfigu
     }
 
     /**
+     * Returns true if the activities associated with this window configuration display a shadow
+     * around their border.
+     * @hide
+     */
+    public boolean hasWindowShadow() {
+        return mWindowingMode != WINDOWING_MODE_MULTI_WINDOW && tasksAreFloating();
+    }
+
+    /**
      * Returns true if the tasks associated with this window configuration can be resized
      * independently of their parent container.
      * @hide

@@ -28,6 +28,7 @@ import android.graphics.drawable.Icon
 import android.os.Binder
 import android.os.UserHandle
 import android.platform.test.annotations.EnableFlags
+import android.platform.test.flag.junit.FlagsParameterization
 import android.platform.test.flag.junit.SetFlagsRule
 import android.service.notification.NotificationListenerService.Ranking
 import android.service.notification.StatusBarNotification
@@ -37,7 +38,6 @@ import android.widget.FrameLayout
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.internal.protolog.ProtoLog
@@ -73,6 +73,8 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 
 /**
  * Tests for [BubbleTaskViewListener].
@@ -82,10 +84,10 @@ import org.mockito.kotlin.whenever
  * - atest WMShellMultivalentTestsOnDevice:BubbleTaskViewListenerTest (on device)
  */
 @SmallTest
-@RunWith(AndroidJUnit4::class)
-class BubbleTaskViewListenerTest() {
+@RunWith(ParameterizedAndroidJunit4::class)
+class BubbleTaskViewListenerTest(flags: FlagsParameterization) {
 
-    @get:Rule val setFlagsRule = SetFlagsRule()
+    @get:Rule val setFlagsRule = SetFlagsRule(flags)
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -506,7 +508,11 @@ class BubbleTaskViewListenerTest() {
         bubbleHelper.stub { on { isAppBubbleTask(eq(taskInfo)) } doReturn true }
         getInstrumentation().runOnMainSync { bubbleTaskViewListener.onTaskRemovalStarted(taskId) }
 
-        verify(expandedViewManager).removeBubble(b.key, taskId, Bubbles.DISMISS_TASK_FINISHED)
+        if (Flags.fixVerifyBubbleTaskIdOnRemoval()) {
+            verify(expandedViewManager).removeBubble(b.key, taskId, Bubbles.DISMISS_TASK_FINISHED)
+        } else {
+            verify(expandedViewManager).removeBubble(b.key, Bubbles.DISMISS_TASK_FINISHED)
+        }
         verify(mockTaskView).release()
 
         // Capture the WCT used to clean up the task
@@ -677,5 +683,12 @@ class BubbleTaskViewListenerTest() {
             super.removeView(v)
             lastRemovedView = v
         }
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameters(name = "{0}")
+        fun getParams() =
+            FlagsParameterization.allCombinationsOf(Flags.FLAG_FIX_VERIFY_BUBBLE_TASK_ID_ON_REMOVAL)
     }
 }

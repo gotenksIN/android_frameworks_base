@@ -106,11 +106,3 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
-
-flag {
-    name: "enable_restore_any_version_system_backup_agent"
-    namespace: "onboarding"
-    description: "Make SystemBackupAgent support restore any version, passing version info to helpers"
-    bug: "448353634"
-    is_fixed_read_only: true
-}

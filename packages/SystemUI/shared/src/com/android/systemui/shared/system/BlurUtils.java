@@ -26,9 +26,6 @@ import android.os.SystemProperties;
 
 public abstract class BlurUtils {
 
-    private static final boolean sIsBlurExpansionEnabledOnDevice = Resources.getSystem().getBoolean(
-            com.android.internal.R.bool.config_enableBlurExpansion);
-
     /**
      * If this device can render blurs.
      *
@@ -40,6 +37,11 @@ public abstract class BlurUtils {
     }
 
     public static boolean isVolumeAndPowerBlurEnabled() {
-        return blurOnMoreSurfaces() && sIsBlurExpansionEnabledOnDevice;
+        return blurOnMoreSurfaces() && isBlurExpansionEnabledOnDevice();
+    }
+
+    private static boolean isBlurExpansionEnabledOnDevice() {
+        return Resources.getSystem().getBoolean(
+                com.android.internal.R.bool.config_enableBlurExpansion);
     }
 }

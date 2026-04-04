@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 import android.app.AlarmManager;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.platform.test.annotations.EnableFlags;
 import android.testing.TestableLooper;
 
 import androidx.test.filters.SmallTest;
@@ -168,7 +169,6 @@ public class DozeUiTest extends SysuiTestCase {
         mDozeUi.transitionTo(UNINITIALIZED, INITIALIZED);
         mDozeUi.transitionTo(INITIALIZED, DOZE_AOD);
 
-        when(mDozeParameters.getAlwaysOn()).thenReturn(false);
         when(mMachine.getPulseReason()).thenReturn(DozeLog.REASON_SENSOR_UDFPS_LONG_PRESS);
         mDozeUi.transitionTo(DOZE_AOD, DOZE_REQUEST_PULSE);
 
@@ -176,21 +176,6 @@ public class DozeUiTest extends SysuiTestCase {
 
         mPulseCallbackCaptor.getValue().onPulseStarted();
         verify(mMachine).requestState(DozeMachine.State.DOZE_PULSING_WITHOUT_UI);
-    }
-
-    @Test
-    public void onPulseStarted_udfpsLongpressRequestsPulsing() {
-        mDozeUi.transitionTo(UNINITIALIZED, INITIALIZED);
-        mDozeUi.transitionTo(INITIALIZED, DOZE_AOD);
-
-        when(mDozeParameters.getAlwaysOn()).thenReturn(true);
-        when(mMachine.getPulseReason()).thenReturn(DozeLog.REASON_SENSOR_UDFPS_LONG_PRESS);
-        mDozeUi.transitionTo(DOZE_AOD, DOZE_REQUEST_PULSE);
-
-        capturePulseCallback(DozeLog.REASON_SENSOR_UDFPS_LONG_PRESS);
-
-        mPulseCallbackCaptor.getValue().onPulseStarted();
-        verify(mMachine).requestState(DozeMachine.State.DOZE_PULSING);
     }
 
     @Test

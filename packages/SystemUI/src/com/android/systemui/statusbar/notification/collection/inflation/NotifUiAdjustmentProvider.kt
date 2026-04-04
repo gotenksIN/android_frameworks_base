@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.notification.collection.inflation
 
-import android.app.Notification
 import android.content.Context
 import android.database.ContentObserver
 import android.os.Handler
@@ -36,7 +35,6 @@ import com.android.systemui.statusbar.notification.collection.render.GroupMember
 import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionController
 import com.android.systemui.util.ListenerSet
 import com.android.systemui.util.settings.SecureSettings
-import com.android.systemui.util.time.SystemClock
 import javax.inject.Inject
 
 /**
@@ -54,7 +52,6 @@ constructor(
     private val sectionStyleProvider: SectionStyleProvider,
     private val userTracker: UserTracker,
     private val groupMembershipManager: GroupMembershipManager,
-    private val systemClock: SystemClock,
 ) {
     private val dirtyListeners = ListenerSet<Runnable>()
     private var isSnoozeSettingsEnabled = false
@@ -131,13 +128,6 @@ constructor(
         return isMinimizedSection && (isTopLevelEntry || isGroupSummary)
     }
 
-    private fun isPromotedNotifShowingFutureTime(notif: Notification): Boolean {
-        if (!notif.isPromotedOngoing) return false
-        if (notif.showsChronometer()) return false
-        if (!notif.showsTime()) return false
-        return notif.getWhen() > systemClock.currentTimeMillis()
-    }
-
     /**
      * Returns a adjustment object for the given entry. This can be compared to a previous instance
      * from the same notification using [NotifUiAdjustment.needReinflate] to determine if it should
@@ -164,7 +154,5 @@ constructor(
             isGroupSummary = entry.hasEverBeenGroupSummary(),
             summarization = entry.summarization,
             isBundled = entry.isBundled,
-            isPromotedNotifShowingFutureTime =
-                isPromotedNotifShowingFutureTime(entry.sbn.notification),
         )
 }

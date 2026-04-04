@@ -18,11 +18,9 @@ package com.android.server.aiseal;
 
 import android.annotation.NonNull;
 import android.content.BroadcastReceiver;
-import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.Configuration;
 import android.os.Environment;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
@@ -45,7 +43,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /** AiSeal system service. */
-public class AiSealSystemService extends SystemService implements ComponentCallbacks2 {
+public class AiSealSystemService extends SystemService {
 
     private static final String TAG = "AiSealSystemService";
     private static final String AISEAL_PRIVATE_FOLDER = "AiSeal";
@@ -71,7 +69,6 @@ public class AiSealSystemService extends SystemService implements ComponentCallb
     public void onStart() {
         Slog.i(TAG, "AiSealSystemService has started, connecting to AiSeal internal service");
         connectAiSealInternalService();
-        getContext().registerComponentCallbacks(this);
         mContext.registerReceiverForAllUsers(
             new UserActionReceiver(),
             new IntentFilter(Intent.ACTION_USER_REMOVED),
@@ -232,28 +229,5 @@ public class AiSealSystemService extends SystemService implements ComponentCallb
     private File getKekFile(int userId) {
         return Environment.buildPath(Environment.getDataSystemCeDirectory(userId),
                 AISEAL_PRIVATE_FOLDER, KEK_FILENAME);
-    }
-
-    @Override
-    public void onTrimMemory(int level) {
-        Slog.i(TAG, "onTrimMemory level=" + level);
-        // We trim on any memory pressure signal.
-        synchronized (sLock) {
-            if (mAiSealInternalService != null) {
-                try {
-                    mAiSealInternalService.trimMemory();
-                } catch (Exception e) {
-                    Slog.e(TAG, "Unable to trim memory", e);
-                }
-            }
-        }
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {}
-
-    @Override
-    public void onLowMemory() {
-        onTrimMemory(TRIM_MEMORY_COMPLETE);
     }
 }

@@ -166,7 +166,6 @@ object ListOfStringPolicy {
                 /*requiredPermission=*/ "testPermission",
                 /*requiredCrossUserPermission=*/ "testCrossUserPermission",
                 /* allowedDpcTypes= */ setOf(),
-                /* resolutionMechanism= */ null,
                 /* emptyStringAllowed= */ false,
                 /* unprintableCharactersAllowed= */ false,
                 /* maxLength= */ Integer.MAX_VALUE,
@@ -210,7 +209,6 @@ fun ListPolicyMetadata<String>.copy(
             /* requiredCrossUserPermission= */ requiredCrossUserPermission
                 ?: this.elementMetadata.requiredCrossUserPermission,
             /* allowedDpcTypes= */ allowedDpcTypes ?: this.elementMetadata.allowedDpcTypes,
-            /* resolutionMechanism= */ null,
             /* emptyStringAllowed= */ emptyStringAllowed
                 ?: (this.elementMetadata as StringPolicyMetadata).isEmptyStringAllowed,
             /* unprintableCharactersAllowed= */ unprintableCharactersAllowed

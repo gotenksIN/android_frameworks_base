@@ -17,12 +17,8 @@
 package com.android.systemui.notetask
 
 import android.content.Context
-import android.provider.Settings
-import androidx.annotation.VisibleForTesting
-import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.notetask.NoteTaskEntryPoint.QUICK_AFFORDANCE
 import com.android.systemui.res.R
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -35,7 +31,6 @@ class LockscreenNoteTakingAvailability
 constructor(
     private val context: Context,
     @Background private val bgDispatcher: CoroutineDispatcher,
-    private val userResolver: NoteTaskUserResolver,
 ) {
 
     /** Whether note taking on the lock screen is supported without user consent flow. */
@@ -46,36 +41,16 @@ constructor(
     /** Returns true if note taking on lock screen is enabled. */
     suspend fun isLockscreenNoteTakingEnabled(): Boolean =
         withContext(bgDispatcher) {
-            when {
-                Flags.enabledNotesLockscreenConsentFlow() -> isConsentAccepted()
-                isLegacyUnconsentedLockScreenNoteTakingSupported -> true
-                else -> false
-            }
+            // TODO(b/491809338): If consent flow flag is enabled check consent instead of
+            //  isLegacyUnconsentedLockScreenNoteTakingSupported.
+            isLegacyUnconsentedLockScreenNoteTakingSupported
         }
 
     /** Returns true if notes should show in lockscreen shortcut picker. */
     suspend fun shouldShowNotesInLockscreenShortcutPicker(): Boolean =
         withContext(bgDispatcher) {
-            when {
-                Flags.enabledNotesLockscreenConsentFlow() -> true
-                isLegacyUnconsentedLockScreenNoteTakingSupported -> true
-                else -> false
-            }
+            // TODO(b/491809338):If consent flow flag is enabled don't check
+            //  isLegacyUnconsentedLockScreenNoteTakingSupported, just return true.
+            isLegacyUnconsentedLockScreenNoteTakingSupported
         }
-
-    private suspend fun isConsentAccepted(): Boolean {
-        val rawUser = userResolver.getUserForHandlingNoteTaking(QUICK_AFFORDANCE)
-        val user = userResolver.resolveParentUserIfManaged(rawUser) ?: return false
-        return Settings.Secure.getIntForUser(
-            context.contentResolver,
-            Settings.Secure.LOCK_SCREEN_NOTE_TAKING_CONSENT,
-            CONSENT_NOT_GRANTED,
-            user.identifier,
-        ) == CONSENT_GRANTED
-    }
-
-    companion object {
-        @VisibleForTesting const val CONSENT_NOT_GRANTED = 0
-        @VisibleForTesting const val CONSENT_GRANTED = 1
-    }
 }

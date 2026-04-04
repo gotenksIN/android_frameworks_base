@@ -497,9 +497,7 @@ object PhysicsAnimatorTestUtils {
             // should just call cancelInternal rather than posting it. If we post it, the
             // cancellation will occur after the rest of startInternal() and we'll immediately
             // cancel the animation we worked so hard to start!
-            if (
-                currentlyRunningStartInternal || Looper.myLooper() == animationThreadHandler.looper
-            ) {
+            if (currentlyRunningStartInternal) {
                 animator.cancelInternal(properties)
                 return
             }

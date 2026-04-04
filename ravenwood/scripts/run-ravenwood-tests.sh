@@ -272,17 +272,6 @@ if (( "${#targets[@]}" == 0 )) ; then
     ) )
 fi
 
-# Get all targets that are also in $all_raven_tests.
-raven_targets=()
-for t in "${targets[@]}"; do
-    for rt in "${all_raven_tests[@]}"; do
-        if [[ "$t" == "$rt" ]]; then
-            raven_targets+=("$t")
-            break
-        fi
-    done
-done
-
 # Show the target tests
 
 echo "Target tests:"
@@ -353,9 +342,9 @@ fi
 extra_args+=("--")
 
 # Need to add the following two options for each module.
-# But we can't add it to non-ravenwood tests, so use $raven_targets
+# But we can't add it to non-ravenwood tests, so use $all_raven_tests
 # instead of $targets.
-for module in "${raven_targets[@]}" ; do
+for module in "${all_raven_tests[@]}" ; do
     for anno in "${exclude_annos[@]}" ; do
         extra_args+=(
             "--module-arg $module:exclude-annotation:$anno"

@@ -46,7 +46,6 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
-import android.os.Process;
 import android.os.UserHandle;
 import android.permission.PermissionControllerManager.CountPermissionAppsFlag;
 import android.permission.flags.Flags;
@@ -777,7 +776,7 @@ public abstract class PermissionControllerService extends Service {
                     final int callingUid = Binder.getCallingUid();
                     int targetPackageUid = getPackageManager().getPackageUid(packageName,
                             PackageManager.PackageInfoFlags.of(0));
-                    if (targetPackageUid != getPccAwareUid(callingUid)) {
+                    if (targetPackageUid != callingUid) {
                         enforceSomePermissionsGrantedToCaller(
                                 Manifest.permission.REVOKE_RUNTIME_PERMISSIONS);
                     }
@@ -786,14 +785,6 @@ public abstract class PermissionControllerService extends Service {
                 } catch (Throwable t) {
                     callback.completeExceptionally(t);
                 }
-            }
-
-            private int getPccAwareUid(int uid) {
-                if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()
-                        && Process.isPrivateComputeCoreUid(uid)) {
-                    return getPackageManager().getAppUidForPrivateComputeCoreUid(uid);
-                }
-                return uid;
             }
         };
     }

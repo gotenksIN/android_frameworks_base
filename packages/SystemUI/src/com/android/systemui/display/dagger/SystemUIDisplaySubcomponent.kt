@@ -33,7 +33,7 @@ import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEvent
 import com.android.systemui.statusbar.gesture.SwipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.StatusBarVisibilityInteractor
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.AvControlsChipInteractor
 import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
@@ -72,7 +72,7 @@ interface SystemUIDisplaySubcomponent {
 
     @get:DisplayAware val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel
 
-    @get:DisplayAware val homeStatusBarVisibilityInteractor: HomeStatusBarVisibilityInteractor
+    @get:DisplayAware val statusBarVisibilityInteractor: StatusBarVisibilityInteractor
 
     @get:DisplayAware val statusBarContentInsetsProvider: StatusBarContentInsetsProvider
 

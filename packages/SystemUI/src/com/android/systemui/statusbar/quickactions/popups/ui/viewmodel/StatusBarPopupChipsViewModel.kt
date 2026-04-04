@@ -20,7 +20,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import com.android.systemui.lifecycle.HydratedActivatable
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.StatusBarVisibilityInteractor
 import com.android.systemui.statusbar.quickactions.assistant.StatusBarAssistantIcon
 import com.android.systemui.statusbar.quickactions.assistant.ui.viewmodel.AssistantIconViewModel
 import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.AvControlsChipViewModel
@@ -49,7 +49,7 @@ class StatusBarPopupChipsViewModel
 constructor(
     @Assisted private val displayId: Int,
     private val quickActionsInteractor: QuickActionsInteractor,
-    private val homeStatusBarVisibilityInteractor: HomeStatusBarVisibilityInteractor,
+    private val statusBarVisibilityInteractor: StatusBarVisibilityInteractor,
     mediaControlChipFactory: MediaControlChipViewModel.Factory,
     avControlsChipFactory: AvControlsChipViewModel.Factory,
     shareScreenPrivacyIndicatorFactory: ShareScreenPrivacyIndicatorViewModel.Factory,
@@ -72,7 +72,7 @@ constructor(
         get() = quickActionsInteractor.activePanel?.chipId.takeIf { isShadeWindowOnThisDisplay }
 
     private val isShadeWindowOnThisDisplay by
-        homeStatusBarVisibilityInteractor.isShadeWindowOnThisDisplay.hydratedStateOf(
+        statusBarVisibilityInteractor.isShadeWindowOnThisDisplay.hydratedStateOf(
             traceName = "isShadeWindowOnThisDisplay"
         )
 

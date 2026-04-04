@@ -130,26 +130,6 @@ public class ThemeInitializationObserverTest {
     }
 
     @Test
-    public void testRegisterListeners_requiresWallpaper_waitsForColors() {
-        doReturn(true).when(mMockWallpaperManager).isWallpaperManagerAvailable();
-        doReturn(true).when(mMockImpl).requiresWallpaperForInitialization(anyInt());
-        mEvents.registerListeners();
-
-        // Should listen for colors, NOT initialize immediately
-        verify(mMockWallpaperManager).addOnColorsChangedListener(any(), any());
-        verify(mMockImpl, never()).initializeThemingSystem();
-    }
-
-    @Test
-    public void testRegisterListeners_doesNotRequireWallpaper_triggersInit() {
-        doReturn(true).when(mMockWallpaperManager).isWallpaperManagerAvailable();
-        doReturn(false).when(mMockImpl).requiresWallpaperForInitialization(anyInt());
-        mEvents.registerListeners();
-
-        verify(mMockImpl).initializeThemingSystem();
-    }
-
-    @Test
     public void testWallpaperChanged_triggersInit() {
         doReturn(true).when(mMockWallpaperManager).isWallpaperManagerAvailable();
         doReturn(true).when(mMockImpl).initializeThemingSystem();

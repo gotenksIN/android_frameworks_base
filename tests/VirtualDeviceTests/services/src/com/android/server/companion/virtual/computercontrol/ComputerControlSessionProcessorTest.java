@@ -521,7 +521,6 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
-    @DisableFlags(android.companion.virtualdevice.flags.Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
     public void consentDeniedInSettings_sessionNotCreated() throws Exception {
         when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
                 .thenReturn(AppOpsManager.MODE_IGNORED);
@@ -911,22 +910,6 @@ public class ComputerControlSessionProcessorTest {
     @EnableFlags(android.companion.virtualdevice.flags.Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
     public void processNewSessionRequest_perAppConsentEnabled_notAutomatable_sendsPendingIntent()
             throws Exception {
-        when(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(anyInt(), anyString(),
-                anyString())).thenReturn(false);
-
-        mProcessor.processNewSessionRequest(
-                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
-
-        verify(mPendingIntentFactory).create(any(), anyInt(), mIntentArgumentCaptor.capture());
-        verify(mComputerControlSessionCallback).onSessionPending(any());
-    }
-
-    @Test
-    @EnableFlags(android.companion.virtualdevice.flags.Flags.FLAG_COMPUTER_CONTROL_PER_APP_CONSENT)
-    public void processNewSessionRequest_perAppConsentEnabled_appOpIgnored_sendsPendingIntent()
-            throws Exception {
-        when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
-                .thenReturn(AppOpsManager.MODE_IGNORED);
         when(mAllowlistController.doesAgentHaveConsentToAutomateTargetApp(anyInt(), anyString(),
                 anyString())).thenReturn(false);
 

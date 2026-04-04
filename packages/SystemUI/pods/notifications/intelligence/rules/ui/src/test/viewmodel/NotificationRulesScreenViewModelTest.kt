@@ -27,7 +27,6 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.runTest
-import com.android.systemui.notifications.intelligence.rules.data.repository.fakeNotificationRulesRepository
 import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftFilterModel
@@ -433,49 +432,6 @@ class NotificationRulesScreenViewModelTest : SysuiTestCase() {
             assertThat(ruleDisplay.textChunks[12])
                 .isEqualTo(TextChunk.FieldValueText("\uD83C\uDF81"))
             assertThat(ruleDisplay.textChunks[13]).isEqualTo(TextChunk.BasicText(" emoji"))
-        }
-
-    @Test
-    fun deleteRule_success_ruleWithDeletionErrorStillNull() =
-        kosmos.runTest {
-            val rule = RuleModel(id = 101, action = ActionModel.Highlight, filter = null)
-            fakeNotificationRulesRepository.rules.add(rule)
-
-            fakeNotificationRulesRepository.deleteRuleSuccessfully = true
-            underTest.deleteRule(101)
-
-            assertThat(underTest.ruleWithDeletionError).isNull()
-        }
-
-    @Test
-    fun deleteRule_failure_ruleWithDeletionErrorUpdated() =
-        kosmos.runTest {
-            val rule = RuleModel(id = 101, action = ActionModel.Highlight, filter = null)
-            fakeNotificationRulesRepository.rules.add(rule)
-
-            fakeNotificationRulesRepository.deleteRuleSuccessfully = false
-            underTest.deleteRule(101)
-
-            assertThat(underTest.ruleWithDeletionError).isEqualTo(101)
-        }
-
-    @Test
-    fun deleteRule_twice_usesSecondRuleValue() =
-        kosmos.runTest {
-            val rule1 = RuleModel(id = 101, action = ActionModel.Highlight, filter = null)
-            val rule2 = RuleModel(id = 102, action = ActionModel.Block, filter = null)
-            fakeNotificationRulesRepository.rules.add(rule1)
-            fakeNotificationRulesRepository.rules.add(rule2)
-
-            fakeNotificationRulesRepository.deleteRuleSuccessfully = false
-            underTest.deleteRule(101)
-            assertThat(underTest.ruleWithDeletionError).isEqualTo(101)
-
-            // WHEN there's a second deletion that succeeds
-            fakeNotificationRulesRepository.deleteRuleSuccessfully = true
-            underTest.deleteRule(102)
-            // THEN `ruleWithDeletionError` is reset
-            assertThat(underTest.ruleWithDeletionError).isNull()
         }
 
     companion object {

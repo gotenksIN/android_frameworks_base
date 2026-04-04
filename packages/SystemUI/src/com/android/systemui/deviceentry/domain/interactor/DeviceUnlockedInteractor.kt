@@ -49,7 +49,6 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.securelockdevice.domain.interactor.SecureLockDeviceInteractor
 import com.android.systemui.shared.settings.data.repository.SecureSettingsRepository
 import com.android.systemui.user.data.repository.UserSwitcherRepository
-import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.utils.coroutines.flow.flatMapLatestConflated
 import dagger.Lazy
 import javax.inject.Inject
@@ -89,7 +88,6 @@ constructor(
     private val systemPropertiesHelper: SystemPropertiesHelper,
     private val secureSettingsRepository: SecureSettingsRepository,
     private val keyguardInteractor: KeyguardInteractor,
-    private val selectedUserInteractor: SelectedUserInteractor,
     @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
     biometricUnlockInteractor: BiometricUnlockInteractor,
     private val keyguardEnabledInteractor: KeyguardEnabledInteractor,
@@ -312,13 +310,8 @@ constructor(
      * launch gesture, which has the unilateral authority to cancel a lock and go back to being
      * unlocked.
      */
-    fun unlockNowForPowerButtonGesture(debuggingReason: String): Boolean {
-        if (selectedUserInteractor.isUserSwitching.value) {
-            Log.w(TAG, "Power gesture detected with user switch in progress. Ignoring unlock")
-            return false
-        }
+    fun unlockNowForPowerButtonGesture(debuggingReason: String) {
         unlockForPowerButtonGestureRequests.trySend(debuggingReason)
-        return true
     }
 
     private suspend fun handleLockAndUnlockEvents() {

@@ -58,7 +58,6 @@ import android.util.IndentingPrintWriter;
 import com.android.server.SystemTimeZone.TimeZoneConfidence;
 import com.android.server.timezonedetector.ftzd.FusedSignals;
 
-import java.util.Objects;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -131,8 +130,6 @@ public class FusedTimeZoneDetectorImplTest {
         mFakeServiceConfigAccessor = spy(new FakeServiceConfigAccessor());
         mFakeDeviceActivityMonitor = new FakeDeviceActivityMonitor();
         mFakeTimeZoneSetter = new FakeTimeZoneSetter();
-        mFakeServiceConfigAccessor.initializeCurrentUserConfiguration(
-                ConfigInternalForTests.CONFIG_AUTO_ENABLED_GEO_ENABLED);
 
         mFusedTimeZoneDetector =
                 new FusedTimeZoneDetectorImpl(
@@ -144,6 +141,9 @@ public class FusedTimeZoneDetectorImplTest {
                         /* airplaneModeResetDelay= */ Duration.ofSeconds(1));
         mFusedTimeZoneDetector.init();
         mFusedTimeZoneDetector.setTimeZoneSetter(mFakeTimeZoneSetter);
+
+        mFakeServiceConfigAccessor.initializeCurrentUserConfiguration(
+                ConfigInternalForTests.CONFIG_AUTO_ENABLED_GEO_ENABLED);
 
         mScript = new Script();
     }
@@ -317,8 +317,7 @@ public class FusedTimeZoneDetectorImplTest {
                 mFusedTimeZoneDetector
                         .mUntrustedTelephonyTz
                         .get(telephonyMcc)
-                        .stream()
-                        .anyMatch(info -> Objects.equals(info.timeZoneId(), telephonyZoneId)));
+                        .contains(telephonyZoneId));
 
         // 5. Then a different location arrives, check that the time zone changes.
         String newLocationZoneId = "Asia/Tokyo";

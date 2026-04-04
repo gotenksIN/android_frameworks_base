@@ -3049,7 +3049,7 @@ public class WindowManagerService extends IWindowManager.Stub
         // Do not mark as destroying if the activity is requested to be visible. This prevents a
         // late "relayout to invisible" request from making the window invisible when the app is
         // already being brought back to the foreground.
-        final boolean isReappearing = activity != null
+        final boolean isReappearing = Flags.avoidIntermediateDestroyingState() && activity != null
                 && activity.isVisibleRequested() && !activity.isVisible()
                 && win.mAttrs.type == WindowManager.LayoutParams.TYPE_BASE_APPLICATION
                 && win.mTransitionController.isCollecting(activity);

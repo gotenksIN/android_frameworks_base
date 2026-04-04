@@ -455,11 +455,7 @@ public class LocationProviderManager extends
 
             // initialization order is important as there are ordering dependencies
             onLocationPermissionsChanged();
-            if (!Flags.skipEmergencyCheckWithoutBypass()
-                    || mContext.checkPermission(LOCATION_BYPASS, getIdentity().getPid(),
-                    getIdentity().getUid()) == PERMISSION_GRANTED) {
-                onBypassLocationPermissionsChanged(mIsInEmergency);
-            }
+            onBypassLocationPermissionsChanged(mIsInEmergency);
             mForeground = mAppForegroundHelper.isAppForeground(getIdentity().getUid());
             mProviderLocationRequest = calculateProviderLocationRequest();
             mIsUsingHighPower = isUsingHighPower();
@@ -2026,13 +2022,7 @@ public class LocationProviderManager extends
                         identity,
                         new GetCurrentLocationTransport(callback),
                         permissionLevel);
-        boolean checkEmergency = true;
-        if (Flags.skipEmergencyCheckWithoutBypass()) {
-            checkEmergency = mContext.checkPermission(
-                    LOCATION_BYPASS, identity.getPid(), identity.getUid())
-                    == PERMISSION_GRANTED;
-        }
-        registerAndHandleIdentity(callback.asBinder(), registration, checkEmergency, () -> {
+        registerAndHandleIdentity(callback.asBinder(), registration, () -> {
             if (!registration.isActive()) {
                 // if the registration never activated, fail it immediately
                 registration.deliverNull();
@@ -2071,7 +2061,6 @@ public class LocationProviderManager extends
         }
     }
 
-    /** Register a location request with a listener */
     public void registerLocationRequest(LocationRequest request, CallerIdentity identity,
             @PermissionLevel int permissionLevel, ILocationListener listener) {
         LocationListenerRegistration registration = new LocationListenerRegistration(
@@ -2079,38 +2068,22 @@ public class LocationProviderManager extends
                 identity,
                 new LocationListenerTransport(listener),
                 permissionLevel);
-        boolean checkEmergency = true;
-        if (Flags.skipEmergencyCheckWithoutBypass()) {
-            checkEmergency = mContext.checkPermission(
-                    LOCATION_BYPASS, identity.getPid(), identity.getUid())
-                    == PERMISSION_GRANTED;
-        }
-        registerAndHandleIdentity(listener.asBinder(), registration, checkEmergency, () -> {});
+        registerAndHandleIdentity(listener.asBinder(), registration, () -> {});
     }
 
-    /** Register a location request with a PendingIntent */
-    public void registerLocationRequest(LocationRequest request, CallerIdentity identity,
+    public void registerLocationRequest(LocationRequest request, CallerIdentity callerIdentity,
             @PermissionLevel int permissionLevel, PendingIntent pendingIntent) {
         LocationPendingIntentRegistration registration = new LocationPendingIntentRegistration(
                 request,
-                identity,
+                callerIdentity,
                 new LocationPendingIntentTransport(mContext, pendingIntent),
                 permissionLevel);
-        boolean checkEmergency = true;
-        if (Flags.skipEmergencyCheckWithoutBypass()) {
-            checkEmergency = mContext.checkPermission(
-                    LOCATION_BYPASS, identity.getPid(), identity.getUid())
-                    == PERMISSION_GRANTED;
-        }
-        registerAndHandleIdentity(pendingIntent, registration, checkEmergency, () -> {});
+        registerAndHandleIdentity(pendingIntent, registration, () -> {});
     }
 
     private <T> void registerAndHandleIdentity(T key, Registration registration,
-                                               boolean checkEmergency,
                                                Runnable postRegistrationRunnable) {
-        if (checkEmergency) {
-            registration.updateIsInEmergency();
-        }
+        registration.updateIsInEmergency();
 
         synchronized (mMultiplexerLock) {
             Preconditions.checkState(mState != STATE_STOPPED);

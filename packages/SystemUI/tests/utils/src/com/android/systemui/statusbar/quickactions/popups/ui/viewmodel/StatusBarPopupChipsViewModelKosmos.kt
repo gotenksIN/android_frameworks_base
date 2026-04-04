@@ -18,7 +18,7 @@ package com.android.systemui.statusbar.quickactions.popups.ui.viewmodel
 
 import android.view.Display
 import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStatusBarVisibilityInteractor
+import com.android.systemui.statusbar.pipeline.shared.domain.interactor.statusBarVisibilityInteractor
 import com.android.systemui.statusbar.quickactions.assistant.ui.viewmodel.assistantIconViewModelFactory
 import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.avControlsChipViewModelFactory
 import com.android.systemui.statusbar.quickactions.domain.interactor.quickActionsInteractor
@@ -32,7 +32,7 @@ private val Kosmos.statusBarPopupChipsViewModel: StatusBarPopupChipsViewModel by
         StatusBarPopupChipsViewModel(
             displayId = Display.DEFAULT_DISPLAY,
             quickActionsInteractor = quickActionsInteractor,
-            homeStatusBarVisibilityInteractor = homeStatusBarVisibilityInteractor,
+            statusBarVisibilityInteractor = statusBarVisibilityInteractor,
             mediaControlChipFactory = mediaControlChipViewModelFactory,
             avControlsChipFactory = avControlsChipViewModelFactory,
             shareScreenPrivacyIndicatorFactory = shareScreenPrivacyIndicatorViewModelFactory,

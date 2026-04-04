@@ -99,14 +99,6 @@ public final class ProtoLogNative {
                         primitiveArgs[argIdx++] = x;
                         mask |= 0b01 << (i * 2);
                     }
-                    case Short x -> {
-                        primitiveArgs[argIdx++] = x.longValue();
-                        mask |= 0b01 << (i * 2);
-                    }
-                    case Byte x -> {
-                        primitiveArgs[argIdx++] = x.longValue();
-                        mask |= 0b01 << (i * 2);
-                    }
                     case Float x -> {
                         primitiveArgs[argIdx++] = Double.doubleToRawLongBits(x);
                         mask |= 0b10 << (i * 2);
@@ -174,8 +166,6 @@ public final class ProtoLogNative {
                 switch (arg) {
                     case Integer x -> primitiveArgs[argIdx++] = x.longValue();
                     case Long x -> primitiveArgs[argIdx++] = x;
-                    case Short x -> primitiveArgs[argIdx++] = x.longValue();
-                    case Byte x -> primitiveArgs[argIdx++] = x.longValue();
                     case Float x -> primitiveArgs[argIdx++] = Double.doubleToRawLongBits(x);
                     case Double x -> primitiveArgs[argIdx++] = Double.doubleToRawLongBits(x);
                     case Boolean x -> primitiveArgs[argIdx++] = x ? 1 : 0;

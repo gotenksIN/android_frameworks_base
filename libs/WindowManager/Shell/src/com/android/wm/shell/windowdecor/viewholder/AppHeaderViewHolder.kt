@@ -29,7 +29,6 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnLongClickListener
-import android.view.ViewTreeObserver
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
@@ -162,8 +161,6 @@ class AppHeaderViewHolder(
     private lateinit var a11yTextRestore: String
     private lateinit var currentTaskInfo: RunningTaskInfo
     private var isTaskInFullImmersiveState: Boolean = false
-
-    private var layoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
 
     init {
         if (Flags.interceptTouchEventForAppHeaderDragMove()) {
@@ -704,23 +701,6 @@ class AppHeaderViewHolder(
         if (headerType != Header.Type.DEFAULT) {
             return false
         }
-
-        if (captionView.width == 0) {
-            // Before the first layout pass, we can't reliably determine the visibility of the app
-            // name. For now let's assume it is visible until the first layout pass.
-            if (layoutListener == null) {
-                layoutListener =
-                    ViewTreeObserver.OnGlobalLayoutListener {
-                        captionView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
-                        layoutListener = null
-
-                        appNameTextView.isVisible = shouldAddAppName(headerType)
-                    }
-                captionView.viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
-            }
-            return true
-        }
-
         val openMenuWidthWithText =
             if (appNameTextView.isVisible) {
                 openMenuButton.width

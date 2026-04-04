@@ -94,7 +94,6 @@ import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_ON
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR;
 import static android.app.NotificationManager.SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED;
 import static android.app.NotificationManager.zenModeFromInterruptionFilter;
-import static android.app.NotificationRule.RESERVED_ID_STATIC_BUNDLES;
 import static android.app.StatusBarManager.ACTION_KEYGUARD_PRIVATE_NOTIFICATIONS_CHANGED;
 import static android.app.StatusBarManager.EXTRA_KM_PRIVATE_NOTIFS_ALLOWED;
 import static android.content.Context.BIND_ALLOW_FREEZE;
@@ -131,7 +130,6 @@ import static android.service.notification.Adjustment.KEY_TYPE;
 import static android.service.notification.Adjustment.KEY_UNCLASSIFY;
 import static android.service.notification.Adjustment.TYPE_CONTENT_RECOMMENDATION;
 import static android.service.notification.Adjustment.TYPE_NEWS;
-import static android.service.notification.Adjustment.TYPE_OTHER;
 import static android.service.notification.Adjustment.TYPE_PROMOTION;
 import static android.service.notification.Adjustment.TYPE_SOCIAL_MEDIA;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_CONVERSATION_CHANNEL_DELETION;
@@ -2213,10 +2211,6 @@ public class NotificationManagerService extends SystemService {
         if (DBG) {
             Slog.v(TAG, "unclassifyNotification: " + r);
         }
-        if (nmContextualDisplayLaunch()) {
-            Slog.wtf(TAG, "Method called with flag enabled");
-            return;
-        }
         // Only NotificationRecord's mChannel is updated when bundled, the Notification
         // mChannelId will always be the original channel.
         String origChannelId = r.getNotification().getChannelId();
@@ -2253,10 +2247,6 @@ public class NotificationManagerService extends SystemService {
             final boolean isPosted) {
         if (DBG) {
             Slog.v(TAG, "reclassifyNotification: " + r);
-        }
-        if (nmContextualDisplayLaunch()) {
-            Slog.wtf(TAG, "Method called with flag enabled");
-            return;
         }
 
         boolean isClassified = r.getChannel().isBundleChannel();
@@ -4883,17 +4873,14 @@ public class NotificationManagerService extends SystemService {
                         getEnabledProfileIdsFiltered(userId,
                                 id -> mAssistants.isAdjustmentAllowed(id, adjustmentType)),
                         mNotificationRuleManager.getAllowedClassificationTypes(userId), true);
-
+                if (notificationRegroupOnClassification()) {
+                    // Consider reclassifying for all profiles of this user. If the adjustment is
+                    // disallowed for that profile, it will be removed at a later stage.
+                    applyNotificationUpdateForUserProfiles(userId,
+                            NotificationManagerService.this::reclassifyNotificationLocked);
+                }
                 if (nmContextualDisplayLaunch()) {
-                    onClassificationRuleUpdated();
                     handleSaveRulesFile();
-                } else {
-                    if (notificationRegroupOnClassification()) {
-                        // Consider reclassifying for all profiles of this user. If the adjustment
-                        // is disallowed for that profile, it will be removed at a later stage.
-                        applyNotificationUpdateForUserProfiles(userId,
-                                NotificationManagerService.this::reclassifyNotificationLocked);
-                    }
                 }
             }
             Binder.withCleanCallingIdentity(() -> {
@@ -4919,14 +4906,12 @@ public class NotificationManagerService extends SystemService {
                 mPreferencesHelper.updateReservedChannels(
                         getEnabledProfileIdsFiltered(userId, null),
                         mNotificationRuleManager.getAllowedClassificationTypes(userId), false);
+                if (notificationRegroupOnClassification()) {
+                    applyNotificationUpdateForUserProfiles(userId,
+                            NotificationManagerService.this::unclassifyNotificationLocked);
+                }
                 if (nmContextualDisplayLaunch()) {
-                    onClassificationRuleUpdated();
                     handleSaveRulesFile();
-                } else {
-                    if (notificationRegroupOnClassification()) {
-                        applyNotificationUpdateForUserProfiles(userId,
-                                NotificationManagerService.this::unclassifyNotificationLocked);
-                    }
                 }
             }
             if (KEY_SUMMARIZATION.equals(adjustmentType)) {
@@ -4967,40 +4952,22 @@ public class NotificationManagerService extends SystemService {
                     userId = info.userid;
                     mAssistants.setAdjustmentKeySupportedState(info.userid,  key, supported);
                 }
-                if (!supported && KEY_TYPE.equals(key)) {
-                    // mark any existing channels for all currently allowed types as deleted,
-                    // including all associated profiles for this user
-                    mPreferencesHelper.updateReservedChannels(
-                            getEnabledProfileIdsFiltered(userId, null),
-                            mNotificationRuleManager.getAllowedClassificationTypes(userId),
-                            false);
-                    if (nmContextualDisplayLaunch()) {
-                        synchronized (mNotificationLock) {
-                            List<NotificationRecord> recordsToUnclassify = findNotificationsLocked(
-                                    record -> {
-                                        return record.getChannel().isBundleChannel();
-                                    });
-                            if (!recordsToUnclassify.isEmpty()) {
-                                for (NotificationRecord record : recordsToUnclassify) {
-                                    if (record.getMatchingRulesAdjustment() != null) {
-                                        record.getMatchingRulesAdjustment().getSignals()
-                                                .getIntegerArrayList(KEY_NOTIFICATION_RULES)
-                                                .remove(Integer.valueOf(
-                                                        RESERVED_ID_STATIC_BUNDLES));
-                                    }
-                                }
-                                mRankingHandler.requestSort();
-                            }
-                        }
-                    } else {
+                if (!supported) {
+                    if (KEY_TYPE.equals(key)) {
+                        // mark any existing channels for all currently allowed types as deleted,
+                        // including all associated profiles for this user
+                        mPreferencesHelper.updateReservedChannels(
+                                getEnabledProfileIdsFiltered(userId, null),
+                                mNotificationRuleManager.getAllowedClassificationTypes(userId),
+                                false);
                         if (notificationRegroupOnClassification()) {
                             applyNotificationUpdateForUserProfiles(userId,
                                     NotificationManagerService.this::unclassifyNotificationLocked);
                         }
+                    } else if (KEY_SUMMARIZATION.equals(key)) {
+                        applyNotificationUpdateForUserProfiles(userId,
+                                NotificationManagerService.this::unsummarizeNotificationLocked);
                     }
-                } else if (!supported && KEY_SUMMARIZATION.equals(key)) {
-                    applyNotificationUpdateForUserProfiles(userId,
-                        NotificationManagerService.this::unsummarizeNotificationLocked);
                 }
             } finally {
                 Binder.restoreCallingIdentity(identity);
@@ -5040,21 +5007,19 @@ public class NotificationManagerService extends SystemService {
             mPreferencesHelper.updateReservedChannels(
                     getEnabledProfileIdsFiltered(userId, null), List.of(type), enabled);
 
-            if (nmContextualDisplayLaunch()) {
-                onClassificationRuleUpdated();
-                handleSaveRulesFile();
-            } else {
-                if (notificationRegroupOnClassification()) {
-                    if (enabled) {
-                        applyNotificationUpdateForUserProfilesAndType(userId, type,
-                                NotificationManagerService.this::reclassifyNotificationLocked);
-                    } else {
-                        applyNotificationUpdateForUserProfilesAndChannelType(userId, type,
-                                NotificationManagerService.this::unclassifyNotificationLocked);
-                    }
+            if (notificationRegroupOnClassification()) {
+                if (enabled) {
+                    applyNotificationUpdateForUserProfilesAndType(userId, type,
+                            NotificationManagerService.this::reclassifyNotificationLocked);
+                } else {
+                    applyNotificationUpdateForUserProfilesAndChannelType(userId, type,
+                            NotificationManagerService.this::unclassifyNotificationLocked);
                 }
             }
             handleSavePolicyFile();
+            if (nmContextualDisplayLaunch()) {
+                handleSaveRulesFile();
+            }
         }
 
         @Override
@@ -5084,20 +5049,17 @@ public class NotificationManagerService extends SystemService {
             assertCallerIsSystemOrSystemUiOrShell();
             if (KEY_TYPE.equals(key)) {
                 mNotificationRuleManager.setClassificationSupportedForPackage(userId, pkg, enabled);
-
-                if (nmContextualDisplayLaunch()) {
-                    onClassificationRuleUpdated();
-                    handleSaveRulesFile();
-                } else {
-                    if (notificationRegroupOnClassification()) {
-                        if (enabled) {
-                            applyNotificationUpdateForUid(userId, pkg,
-                                    NotificationManagerService.this::reclassifyNotificationLocked);
-                        } else {
-                            applyNotificationUpdateForUid(userId, pkg,
-                                    NotificationManagerService.this::unclassifyNotificationLocked);
-                        }
+                if (notificationRegroupOnClassification()) {
+                    if (enabled) {
+                        applyNotificationUpdateForUid(userId,
+                                pkg, NotificationManagerService.this::reclassifyNotificationLocked);
+                    } else {
+                        applyNotificationUpdateForUid(userId,
+                                pkg, NotificationManagerService.this::unclassifyNotificationLocked);
                     }
+                }
+                if (nmContextualDisplayLaunch()) {
+                    handleSaveRulesFile();
                 }
             } else {
                 mAssistants.setAdjustmentSupportedForPackage(userId, key, pkg, enabled);
@@ -8202,9 +8164,7 @@ public class NotificationManagerService extends SystemService {
                     handleSavePolicyFile();
                 }
                 if (!granted) {
-                    if (nmContextualDisplayLaunch()) {
-                        onNotificationRuleRemoved(userId, RESERVED_ID_STATIC_BUNDLES);
-                    } else if (notificationRegroupOnClassification()) {
+                    if (notificationRegroupOnClassification()) {
                         applyNotificationUpdateForUserProfiles(userId,
                                 NotificationManagerService.this::unclassifyNotificationLocked);
                     }
@@ -8221,86 +8181,76 @@ public class NotificationManagerService extends SystemService {
         if (r == null) {
             return;
         }
-        final @UserIdInt int userId =
-                adjustment.getUser() == UserHandle.USER_ALL ? UserHandle.USER_SYSTEM
-                        : adjustment.getUser();
-        final Bundle signals = adjustment.getSignals();
-        Bundle.setDefusable(signals, true);
-        // Save classification even if the adjustment is disabled, in case user enables it later
-        if (signals.containsKey(KEY_TYPE)) {
-            r.setBundleType(signals.getInt(KEY_TYPE));
-        }
-        List<String> toRemove = new ArrayList<>();
-        for (String potentialKey : signals.keySet()) {
-            if (!mAssistants.isAdjustmentAllowed(userId, potentialKey)) {
-                toRemove.add(potentialKey);
+        if (adjustment.getSignals() != null) {
+            final @UserIdInt int userId =
+                    adjustment.getUser() == UserHandle.USER_ALL ? UserHandle.USER_SYSTEM
+                            : adjustment.getUser();
+            final Bundle adjustments = adjustment.getSignals();
+            Bundle.setDefusable(adjustments, true);
+            // Save classification even if the adjustment is disabled, in case user enables it later
+            if (adjustments.containsKey(KEY_TYPE)) {
+                r.setBundleType(adjustments.getInt(KEY_TYPE));
             }
-            if (potentialKey.equals(KEY_TYPE)) {
-                mAssistants.setAdjustmentKeySupportedState(userId, potentialKey, true);
-                if (!mNotificationRuleManager.isClassificationTypeAllowed(userId,
-                        signals.getInt(KEY_TYPE))) {
-                    toRemove.add(potentialKey);
-                } else if (!mNotificationRuleManager.isClassificationAllowedForPackage(
-                        userId, r.getSbn().getPackageName())) {
+            List<String> toRemove = new ArrayList<>();
+            for (String potentialKey : adjustments.keySet()) {
+                if (!mAssistants.isAdjustmentAllowed(userId, potentialKey)) {
                     toRemove.add(potentialKey);
                 }
-            }
-            if (potentialKey.equals(KEY_SUMMARIZATION)) {
-                mAssistants.setAdjustmentKeySupportedState(userId, potentialKey, true);
-                if (!mAssistants.isAdjustmentAllowedForPackage(userId, KEY_SUMMARIZATION,
-                        r.getSbn().getPackageName())) {
-                    toRemove.add(potentialKey);
-                }
-            }
-            if (nmContextualDisplayLaunch()) {
-                if (potentialKey.equals(KEY_NOTIFICATION_RULES)) {
+                if (potentialKey.equals(KEY_TYPE)) {
                     mAssistants.setAdjustmentKeySupportedState(userId, potentialKey, true);
-                    mAssistants.setAdjustmentKeySupportedState(userId, KEY_TYPE, true);
+                    if (!mNotificationRuleManager.isClassificationTypeAllowed(userId,
+                            adjustments.getInt(KEY_TYPE))) {
+                        toRemove.add(potentialKey);
+                    } else if (!mNotificationRuleManager.isClassificationAllowedForPackage(
+                            userId, r.getSbn().getPackageName())) {
+                        toRemove.add(potentialKey);
+                    }
+                }
+                if (potentialKey.equals(KEY_SUMMARIZATION)) {
+                    mAssistants.setAdjustmentKeySupportedState(userId, potentialKey, true);
+                    if (!mAssistants.isAdjustmentAllowedForPackage(userId, KEY_SUMMARIZATION,
+                            r.getSbn().getPackageName())) {
+                        toRemove.add(potentialKey);
+                    }
+                }
+                if (nmContextualDisplayLaunch()) {
+                    if (potentialKey.equals(KEY_NOTIFICATION_RULES)) {
+                        mAssistants.setAdjustmentKeySupportedState(userId, potentialKey, true);
+                        mAssistants.setAdjustmentKeySupportedState(userId, KEY_TYPE, true);
 
-                    // this adjustment is not directly applied like other adjustments
-                    // so log it specially to help with debugging
-                    EventLogTags.writeNotificationAdjusted(adjustment.getKey(),
-                            potentialKey, signals.getIntegerArrayList(
-                            Adjustment.KEY_NOTIFICATION_RULES).toString());
+                        // this adjustment is not directly applied like other adjustments
+                        // so log it specially to help with debugging
+                        EventLogTags.writeNotificationAdjusted(adjustment.getKey(),
+                                potentialKey, adjustments.getIntegerArrayList(
+                                Adjustment.KEY_NOTIFICATION_RULES).toString());
+                    }
                 }
             }
-        }
-        for (String removeKey : toRemove) {
-            signals.remove(removeKey);
-        }
-        if (nmContextualDisplayLaunch() && signals.containsKey(KEY_TYPE)) {
-            if (signals.containsKey(KEY_TYPE)) {
-                signals.remove(KEY_TYPE);
-                if (!hasFlag(r.getNotification().flags, FLAG_PROMOTED_ONGOING)) {
-                    addStaticBundleRuleAdjustment(r);
-                    logClassificationChannelAdjustmentReceived(r, isPosted, r.getBundleType());
-                }
-            } else {
-                r.addAdjustment(adjustment);
+            for (String removeKey : toRemove) {
+                adjustments.remove(removeKey);
             }
-        } else {
-            if (signals.containsKey(KEY_TYPE)) {
+            if (adjustments.containsKey(KEY_TYPE)) {
                 final NotificationChannel newChannel = getClassificationChannelLocked(r,
-                        signals);
+                        adjustments);
                 if (newChannel == null || newChannel.getId().equals(r.getChannel().getId())) {
-                    signals.remove(KEY_TYPE);
+                    adjustments.remove(KEY_TYPE);
                 } else if (hasFlag(r.getNotification().flags, FLAG_PROMOTED_ONGOING)) {
                     // Don't bundle any promoted ongoing notifications
-                    signals.remove(KEY_TYPE);
+                    adjustments.remove(KEY_TYPE);
                 } else {
                     // Save the app-provided type for logging.
-                    int classification = signals.getInt(KEY_TYPE);
+                    int classification = adjustments.getInt(KEY_TYPE);
                     // swap app provided type with the real thing
-                    signals.putParcelable(KEY_TYPE, newChannel);
+                    adjustments.putParcelable(KEY_TYPE, newChannel);
                     logClassificationChannelAdjustmentReceived(r, isPosted, classification);
                 }
             }
             r.addAdjustment(adjustment);
-        }
-        if (signals.containsKey(Adjustment.KEY_SENSITIVE_CONTENT)) {
-            logSensitiveAdjustmentReceived(isPosted,
-                    adjustment.getSignals().getBoolean(Adjustment.KEY_SENSITIVE_CONTENT),
-                    r.getLifespanMs(System.currentTimeMillis()));
+            if (adjustment.getSignals().containsKey(Adjustment.KEY_SENSITIVE_CONTENT)) {
+                logSensitiveAdjustmentReceived(isPosted,
+                        adjustment.getSignals().getBoolean(Adjustment.KEY_SENSITIVE_CONTENT),
+                        r.getLifespanMs(System.currentTimeMillis()));
+            }
         }
     }
 
@@ -10803,6 +10753,7 @@ public class NotificationManagerService extends SystemService {
                 // EnqueueNotificationRunnable is created directly by NMS (as we do for group
                 // summaries) instead of via notify(). Fix that.
                 r.getNotification().overrideAllowlistToken(ALLOWLIST_TOKEN);
+
                 final long snoozeAt =
                         mSnoozeHelper.getSnoozeTimeForUnpostedNotification(
                                 r.getUser().getIdentifier(),
@@ -11078,22 +11029,6 @@ public class NotificationManagerService extends SystemService {
                         notification.flags &= ~FLAG_AUTO_CANCEL;
                     }
 
-                    int position = -1;
-                    if (nmContextualDisplayLaunch()) {
-                        NotificationRecordExtractorData before =
-                                new NotificationRecordExtractorData(-1, r);
-                        mRankingHelper.extractSignals(r);
-                        mRankingHelper.sort(mNotificationList);
-                        position = mRankingHelper.indexOf(mNotificationList, r);
-
-                        if (nmContextualDisplayLaunch() && before.hasBeenUnbundled(r)) {
-                            mGroupHelper.onNotificationUnbundled(r, true);
-                        }
-                        if (nmContextualDisplayLaunch() && before.hasBeenBundled(r)) {
-                            mGroupHelper.onChannelUpdated(r);
-                        }
-                    }
-
                     // Posts the notification if it has a small icon, and potentially autogroup
                     // the new notification.
                     if (notification.getSmallIcon() != null && !isCritical(r)) {
@@ -11137,11 +11072,9 @@ public class NotificationManagerService extends SystemService {
                         }
                     }
 
-                    if (!nmContextualDisplayLaunch()) {
-                        mRankingHelper.extractSignals(r);
-                        mRankingHelper.sort(mNotificationList);
-                        position = mRankingHelper.indexOf(mNotificationList, r);
-                    }
+                    mRankingHelper.extractSignals(r);
+                    mRankingHelper.sort(mNotificationList);
+                    final int position = mRankingHelper.indexOf(mNotificationList, r);
 
                     int buzzBeepBlinkLoggingCode = 0;
                     if (!r.isHidden()) {
@@ -11781,7 +11714,25 @@ public class NotificationManagerService extends SystemService {
             for (int i = 0; i < N; i++) {
                 final NotificationRecord r = mNotificationList.get(i);
                 NotificationRecordExtractorData extractorData = new NotificationRecordExtractorData(
-                        i, r);
+                        i,
+                        r.getPackageVisibilityOverride(),
+                        r.canShowBadge(),
+                        r.canBubble(),
+                        r.getNotification().isBubbleNotification(),
+                        r.getChannel(),
+                        r.getGroupKey(),
+                        r.getPeopleOverride(),
+                        r.getSnoozeCriteria(),
+                        r.getUserSentiment(),
+                        r.getSuppressedVisualEffects(),
+                        r.getSystemGeneratedSmartActions(),
+                        r.getSmartReplies(),
+                        r.getImportance(),
+                        r.getRankingScore(),
+                        r.isConversation(),
+                        r.getProposedImportance(),
+                        r.hasSensitiveContent(),
+                        r.getSummarization());
                 extractorDataBefore.put(r.getKey(), extractorData);
                 mRankingHelper.extractSignals(r);
             }
@@ -11798,9 +11749,6 @@ public class NotificationManagerService extends SystemService {
 
                 if (nmContextualDisplayLaunch() && before.hasBeenUnbundled(r)) {
                     mGroupHelper.onNotificationUnbundled(r, true);
-                }
-                if (nmContextualDisplayLaunch() && before.hasBeenBundled(r)) {
-                    mGroupHelper.onChannelUpdated(r);
                 }
 
                 if (before.hasDiffForRankingLocked(r, i)) {
@@ -12785,69 +12733,6 @@ public class NotificationManagerService extends SystemService {
     }
 
     /**
-     * Updates all notifications when the static bundle rule changes (user enables/disables the
-     * entire rule, user changes what types are enabled, the NAS supports/does not support the rule)
-     */
-    private void onClassificationRuleUpdated() {
-        synchronized (mNotificationLock) {
-            List<NotificationRecord> recordsToClassify = findNotificationsLocked(
-                    record -> {
-                        return !record.getChannel().isBundleChannel()
-                                && record.getBundleType() != TYPE_OTHER
-                                && mNotificationRuleManager.isClassificationAdjustmentAllowed(
-                                        record.getUserId())
-                                && mNotificationRuleManager.isClassificationAllowedForPackage(
-                                        record.getUserId(), record.getSbn().getPackageName())
-                                && mNotificationRuleManager.isClassificationTypeAllowed(
-                                        record.getUserId(), record.getBundleType());
-                    });
-            List<NotificationRecord> recordsToUnclassify = findNotificationsLocked(
-                    record -> {
-                        return record.getChannel().isBundleChannel()
-                                && (!mNotificationRuleManager.isClassificationAdjustmentAllowed(
-                                record.getUserId())
-                                || !mNotificationRuleManager.isClassificationAllowedForPackage(
-                                        record.getUserId(), record.getSbn().getPackageName())
-                                || !mNotificationRuleManager.isClassificationTypeAllowed(
-                                        record.getUserId(), record.getBundleType()));
-
-                    });
-            if (!recordsToClassify.isEmpty() || !recordsToUnclassify.isEmpty()) {
-                for (NotificationRecord record : recordsToClassify) {
-                    addStaticBundleRuleAdjustment(record);
-                }
-                for (NotificationRecord record : recordsToUnclassify) {
-                    if (record.getMatchingRulesAdjustment() != null) {
-                        record.getMatchingRulesAdjustment().getSignals().getIntegerArrayList(
-                                KEY_NOTIFICATION_RULES).remove(
-                                Integer.valueOf(RESERVED_ID_STATIC_BUNDLES));
-                    }
-                }
-
-                mRankingHandler.requestSort();
-            }
-        }
-    }
-
-    private void addStaticBundleRuleAdjustment(NotificationRecord record) {
-        Adjustment ruleAdjustment = record.getMatchingRulesAdjustment();
-        if (ruleAdjustment == null) {
-            ruleAdjustment = new Adjustment(record.getSbn().getPackageName(),
-                    record.getKey(), new Bundle(), "", record.getUserId());
-            record.addAdjustment(ruleAdjustment);
-        }
-        if (!ruleAdjustment.getSignals().containsKey(KEY_NOTIFICATION_RULES)) {
-            ruleAdjustment.getSignals().putIntegerArrayList(
-                    KEY_NOTIFICATION_RULES, new ArrayList<>());
-        }
-        ArrayList<Integer> ruleIds = ruleAdjustment.getSignals().getIntegerArrayList(
-                KEY_NOTIFICATION_RULES);
-        if (!ruleIds.contains(RESERVED_ID_STATIC_BUNDLES)) {
-            ruleIds.add(RESERVED_ID_STATIC_BUNDLES);
-        }
-    }
-
-    /**
      * Updates all notifications potentially affected by a rule when that rule is deleted.
      */
     private void onNotificationRuleRemoved(@UserIdInt int userId, int ruleId) {
@@ -12865,7 +12750,7 @@ public class NotificationManagerService extends SystemService {
             if (!affectedRecords.isEmpty()) {
                 for (NotificationRecord record : affectedRecords) {
                     record.getMatchingRulesAdjustment().getSignals().getIntegerArrayList(
-                            KEY_NOTIFICATION_RULES).remove(Integer.valueOf(ruleId));
+                            KEY_NOTIFICATION_RULES).remove(new Integer(ruleId));
                 }
                 mRankingHandler.requestSort();
             }

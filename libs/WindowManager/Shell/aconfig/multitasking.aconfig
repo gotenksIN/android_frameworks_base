@@ -281,6 +281,16 @@ flag {
 }
 
 flag {
+    name: "use_bubble_icon_from_activity_info"
+    namespace: "multitasking"
+    description: "Load Bubble app icon from specific ActivityInfo rather than just the ApplicationInfo."
+    bug: "462281202"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "update_bubble_bar_taskbar_intersection"
     namespace: "multitasking"
     description: "Update the logic to determine if the expanded  bubble bar will intersect the persistent taskbar"
@@ -400,6 +410,15 @@ flag {
     }
 }
 
+flag {
+    name: "fix_verify_bubble_task_id_on_removal"
+    namespace: "multitasking"
+    description: "Fixes a bug where we remove a bubble based on package name after the bubble task has changed"
+    bug: "482877474"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
 
 flag {
     name: "fix_taskbar_scrim_view_on_home"
@@ -496,16 +515,6 @@ flag {
     namespace: "multitasking"
     description: "Fixes bubble bar visibility update being dropped when animations are interrupted"
     bug: "474032293"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_pip_to_bubble_relaunch"
-    namespace: "multitasking"
-    description: "Fixes a bug where relaunching an app that was bubble'd after being PIP'd didn't work"
-    bug: "496911676"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

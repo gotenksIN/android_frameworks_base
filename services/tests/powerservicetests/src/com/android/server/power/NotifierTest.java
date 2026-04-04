@@ -317,22 +317,30 @@ public class NotifierTest {
 
     @Test
     @DisableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
-    public void testOnGlobalWakefulnessChangeStarted_interactiveDozeFlagOff() {
-        testOnGlobalWakefulnessChangeStarted();
+    public void testOnGlobalWakefulnessChangeStarted_interactiveDozeFlagOff(
+                @TestParameter boolean interactivDozeConfigEnabled) {
+        testOnGlobalWakefulnessChangeStarted(
+                /* interactiveDozeConfigEnabled= */ interactivDozeConfigEnabled,
+                /* expectCallSetDisplayInteractivity= */ true);
     }
 
     @Test
     @EnableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
-    public void testOnGlobalWakefulnessChangeStarted_interactiveDozeFlagOn() {
-        testOnGlobalWakefulnessChangeStarted();
+    public void testOnGlobalWakefulnessChangeStarted_interactiveDozeFlagOn(
+                @TestParameter boolean interactivDozeConfigEnabled) {
+        testOnGlobalWakefulnessChangeStarted(
+                /* interactiveDozeConfigEnabled= */ interactivDozeConfigEnabled,
+                /* expectCallSetDisplayInteractivity= */ !interactivDozeConfigEnabled);
     }
 
-    private void testOnGlobalWakefulnessChangeStarted() {
-        boolean isInteractiveDozeEnabled = Flags.interactiveDozeExperience();
+    private void testOnGlobalWakefulnessChangeStarted(
+            boolean interactiveDozeConfigEnabled,
+            boolean expectCallSetDisplayInteractivity) {
         // GIVEN system is currently non-interactive
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(false);
         when(mResourcesSpy.getBoolean(
                 com.android.internal.R.bool.config_enableInteractiveDoze))
-                .thenReturn(isInteractiveDozeEnabled);
+                .thenReturn(interactiveDozeConfigEnabled);
         createNotifier();
         final int displayId1 = 101;
         final int displayId2 = 102;
@@ -347,15 +355,118 @@ public class NotifierTest {
                 PowerManager.WAKE_REASON_TAP, /* eventTime= */ 2000);
         mTestLooper.dispatchAll();
 
-        verify(mInputManagerInternal, never()).setDisplayInteractivities(any());
+        // THEN input is notified of all displays being interactive
+        if (expectCallSetDisplayInteractivity) {
+            final SparseBooleanArray expectedDisplayInteractivities = new SparseBooleanArray();
+            expectedDisplayInteractivities.put(displayId1, true);
+            expectedDisplayInteractivities.put(displayId2, true);
+            verify(mInputManagerInternal).setDisplayInteractivities(expectedDisplayInteractivities);
+        } else {
+            verify(mInputManagerInternal, never()).setDisplayInteractivities(any());
+        }
         verify(mInputMethodManagerInternal).setInteractive(/* interactive= */ true);
+    }
+
+    @Test
+    public void testOnGroupWakefulnessChangeStarted_newPowerGroup_perDisplayWakeDisabled() {
+        createNotifier();
+        // GIVEN power group is not yet known to Notifier and per-display wake by touch is disabled
+        final int groupId = 123;
+        final int changeReason = PowerManager.WAKE_REASON_TAP;
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(false);
+
+        // WHEN a power group wakefulness change starts
+        mNotifier.onGroupWakefulnessChangeStarted(
+                groupId,
+                WAKEFULNESS_AWAKE,
+                changeReason,
+                /* anyDefaultOrAdjacentGroupInteractive= */ true,
+                /* eventTime= */ 999);
+        mTestLooper.dispatchAll();
+
+        // THEN window manager policy is informed that device has started waking up
+        verify(mPolicy)
+                .startedWakingUp(
+                        groupId, changeReason, /* anyDefaultOrAdjacentGroupInteractive= */ true);
+        verify(mDisplayManagerInternal, never()).getDisplayIds(eq(false));
+        verify(mInputManagerInternal, never()).setDisplayInteractivities(any());
+    }
+
+    @Test
+    public void testOnGroupWakefulnessChangeStarted_interactivityNoChange_perDisplayWakeDisabled() {
+        createNotifier();
+        // GIVEN power group is not interactive and per-display wake by touch is disabled
+        final int groupId = 234;
+        final int changeReason = PowerManager.GO_TO_SLEEP_REASON_TIMEOUT;
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(false);
+        mNotifier.onGroupWakefulnessChangeStarted(
+                groupId,
+                WAKEFULNESS_ASLEEP,
+                changeReason,
+                /* anyDefaultOrAdjacentGroupInteractive= */ false,
+                /* eventTime= */ 999);
+        mTestLooper.dispatchAll();
+        verify(mPolicy, times(1))
+                .startedGoingToSleep(
+                        groupId, changeReason, /* anyDefaultOrAdjacentGroupInteractive= */ false);
+
+        // WHEN a power wakefulness change to not interactive starts
+        mNotifier.onGroupWakefulnessChangeStarted(
+                groupId,
+                WAKEFULNESS_ASLEEP,
+                changeReason,
+                /* anyDefaultOrAdjacentGroupInteractive= */ false,
+                /* eventTime= */ 999);
+        mTestLooper.dispatchAll();
+
+        // THEN policy is only informed once of non-interactive wakefulness change
+        verify(mPolicy, times(1))
+                .startedGoingToSleep(
+                        groupId, changeReason, /* anyDefaultOrAdjacentGroupInteractive= */ false);
+        verify(mDisplayManagerInternal, never()).getDisplayIds(eq(false));
+        verify(mInputManagerInternal, never()).setDisplayInteractivities(any());
+    }
+
+    @Test
+    public void testOnGroupWakefulnessChangeStarted_interactivityChange_perDisplayWakeDisabled() {
+        createNotifier();
+        // GIVEN power group is not interactive and per-display wake by touch is disabled
+        final int groupId = 345;
+        final int firstChangeReason = PowerManager.GO_TO_SLEEP_REASON_TIMEOUT;
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(false);
+        mNotifier.onGroupWakefulnessChangeStarted(
+                groupId,
+                WAKEFULNESS_ASLEEP,
+                firstChangeReason,
+                /* anyDefaultOrAdjacentGroupInteractive= */ false,
+                /* eventTime= */ 999);
+        mTestLooper.dispatchAll();
+
+        // WHEN a power wakefulness change to interactive starts
+        final int secondChangeReason = PowerManager.WAKE_REASON_TAP;
+        mNotifier.onGroupWakefulnessChangeStarted(
+                groupId,
+                WAKEFULNESS_AWAKE,
+                secondChangeReason,
+                /* anyDefaultOrAdjacentGroupInteractive= */ false,
+                /* eventTime= */ 999);
+        mTestLooper.dispatchAll();
+
+        // THEN policy is informed of the change
+        verify(mPolicy)
+                .startedWakingUp(
+                        groupId,
+                        secondChangeReason,
+                        /* anyDefaultOrAdjacentGroupInteractive= */ false);
+        verify(mDisplayManagerInternal, never()).getDisplayIds(eq(false));
+        verify(mInputManagerInternal, never()).setDisplayInteractivities(any());
     }
 
     @Test
     @DisableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
     public void testOnGroupWakefulnessChangeStarted_perDisplayWakeByTouchOn_interactiveDozeFlagOff(
             @TestParameter boolean interactivDozeConfigEnabled) {
-        testOnGroupWakefulnessChangeStarted(
+        testOnGroupWakefulnessChangeStarted_perDisplayWakeByTouchEnabled(
                 /* interactiveDozeConfigEnabled= */ interactivDozeConfigEnabled,
                 /* expectCallSetDisplayInteractivity= */ true);
     }
@@ -364,14 +475,16 @@ public class NotifierTest {
     @EnableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
     public void testOnGroupWakefulnessChangeStarted_perDisplayWakeByTouchOn_interactiveDozeFlagOn(
             @TestParameter boolean interactivDozeConfigEnabled) {
-        testOnGroupWakefulnessChangeStarted(
+        testOnGroupWakefulnessChangeStarted_perDisplayWakeByTouchEnabled(
                 /* interactiveDozeConfigEnabled= */ interactivDozeConfigEnabled,
                 /* expectCallSetDisplayInteractivity= */ !interactivDozeConfigEnabled);
     }
 
-    private void testOnGroupWakefulnessChangeStarted(
+    private void testOnGroupWakefulnessChangeStarted_perDisplayWakeByTouchEnabled(
             boolean interactiveDozeConfigEnabled,
             boolean expectCallSetDisplayInteractivity) {
+        // GIVEN per-display wake by touch flag is enabled
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(true);
         when(mResourcesSpy.getBoolean(
                 com.android.internal.R.bool.config_enableInteractiveDoze))
                 .thenReturn(interactiveDozeConfigEnabled);
@@ -405,8 +518,10 @@ public class NotifierTest {
     }
 
     @Test
-    public void testOnGroupRemoved() {
+    public void testOnGroupRemoved_perDisplayWakeByTouchEnabled() {
         createNotifier();
+        // GIVEN per-display wake by touch is enabled and one display group has been defined
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(true);
         final int groupId = 313;
         final int displayId1 = 3113;
         final int displayId2 = 4114;
@@ -433,8 +548,11 @@ public class NotifierTest {
     }
 
     @Test
-    public void testOnGroupChanged() {
+    public void testOnGroupChanged_perDisplayWakeByTouchEnabled() {
         createNotifier();
+        // GIVEN per-display wake by touch is enabled and one display group has been defined with
+        // two displays
+        when(mPowerManagerFlags.isPerDisplayWakeByTouchEnabled()).thenReturn(true);
         final int groupId = 121;
         final int displayId1 = 1221;
         final int displayId2 = 1222;

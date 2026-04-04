@@ -178,7 +178,7 @@ final class TrustTokenMasterKey {
         private static final String ED25519 = "Ed25519";
         // COSE IANA IDs needed for Ed25519 CoseKey
         private static final int KEY_PARAMETER_KEY_TYPE = 1;
-        private static final int KEY_TYPE_OKP = 1;
+        private static final int KEY_TYPE_EC2 = 2;
         private static final int KEY_PARAMETER_CURVE = -1;
         private static final int KEY_PARAMETER_X = -2;
         private static final int CURVE_OKP_ED25519 = 6;
@@ -239,7 +239,7 @@ final class TrustTokenMasterKey {
             List<DataItem> items =
                     new CborBuilder()
                             .addMap()
-                            .put(KEY_PARAMETER_KEY_TYPE, KEY_TYPE_OKP)
+                            .put(KEY_PARAMETER_KEY_TYPE, KEY_TYPE_EC2)
                             .put(KEY_PARAMETER_CURVE, CURVE_OKP_ED25519)
                             .put(KEY_PARAMETER_X, rawKey)
                             .end()

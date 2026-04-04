@@ -32,7 +32,6 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.statusbar.RankingBuilder
 import com.android.systemui.statusbar.notification.collection.buildNotificationEntry
 import com.android.systemui.statusbar.notification.collection.coordinator.SummarizationDecorator
-import com.android.systemui.statusbar.notification.collection.coordinator.shared.NotificationSummarizationAllowAnimation
 import com.android.systemui.statusbar.notification.collection.makeEntryOfPeopleType
 import com.android.systemui.statusbar.notification.data.repository.SummarizationAnimationRepository
 import com.android.systemui.statusbar.notification.row.NotificationRowContentBinderLogger
@@ -84,8 +83,7 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(NmSummarizationAllFlag.FLAG_NAME)
-    @DisableFlags(NotificationSummarizationAllowAnimation.FLAG_NAME)
-    fun processNotification_messagingStyleWithSummarization_allFlagEnabled() {
+    fun processNotification_messagingStyleWithSummarization_flagOff() {
         val summarization = "hello"
         val entry = kosmos.makeEntryOfPeopleType()
         entry.setRanking(RankingBuilder(entry.ranking).setSummarization(summarization).build())
@@ -98,23 +96,6 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
 
     @Test
     @DisableFlags(NmSummarizationAllFlag.FLAG_NAME)
-    @EnableFlags(NotificationSummarizationAllowAnimation.FLAG_NAME)
-    fun processNotification_messagingStyleWithSummarization_animateFlagEnabled() {
-        val summarization = "hello"
-        val entry = kosmos.makeEntryOfPeopleType()
-        entry.setRanking(RankingBuilder(entry.ranking).setSummarization(summarization).build())
-        val builder = Notification.Builder.recoverBuilder(context, entry.sbn.notification)
-
-        assertThat(conversationNotificationProcessor.processNotification(entry, builder, logger))
-            .isNotNull()
-        assertThat(builder.build().extras.getCharSequence(EXTRA_SUMMARIZED_CONTENT)).isNull()
-    }
-
-    @Test
-    @DisableFlags(
-        NmSummarizationAllFlag.FLAG_NAME,
-        NotificationSummarizationAllowAnimation.FLAG_NAME,
-    )
     fun processNotification_messagingStyleWithSummarization() {
         val summarization = "hello"
         val entry = kosmos.makeEntryOfPeopleType()
@@ -139,10 +120,7 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(
-        NmSummarizationAllFlag.FLAG_NAME,
-        NotificationSummarizationAllowAnimation.FLAG_NAME,
-    )
+    @DisableFlags(NmSummarizationAllFlag.FLAG_NAME)
     fun processNotification_messagingStyleUpdateSummarizationToNull() {
         val entry = kosmos.makeEntryOfPeopleType()
         entry.setRanking(RankingBuilder(entry.ranking).setSummarization("hello").build())
@@ -158,10 +136,7 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(
-        NmSummarizationAllFlag.FLAG_NAME,
-        NotificationSummarizationAllowAnimation.FLAG_NAME,
-    )
+    @DisableFlags(NmSummarizationAllFlag.FLAG_NAME)
     fun processNotification_messagingStyleWithoutSummarization() {
         val entry = kosmos.makeEntryOfPeopleType()
         val builder = Notification.Builder.recoverBuilder(context, entry.sbn.notification)

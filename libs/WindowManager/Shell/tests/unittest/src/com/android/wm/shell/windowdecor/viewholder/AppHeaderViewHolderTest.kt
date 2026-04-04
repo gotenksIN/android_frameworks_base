@@ -23,14 +23,10 @@ import android.platform.test.annotations.EnableFlags
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
-import android.view.WindowInsetsController.APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND
 import android.view.accessibility.AccessibilityManager
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.view.marginStart
 import androidx.test.core.view.MotionEventBuilder
 import com.android.window.flags.Flags
 import com.android.wm.shell.R
@@ -50,7 +46,6 @@ import org.junit.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.same
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -146,18 +141,6 @@ class AppHeaderViewHolderTest : ShellTestCase() {
         doReturn(Theme.DARK).whenever(mockDecorThemeUtil).getAppTheme(task)
         doReturn(mockDecorThemeUtil).whenever(mockDecorThemeUtilFactory).create(mContext)
 
-        doReturn(CAPTION_WIDTH_LARGE).whenever(mockAppHeader).width
-        doReturn(APP_NAME_MAX_WIDTH).whenever(mockAppTextView).maxWidth
-
-        val appTextViewLayoutParams = mock<LinearLayout.LayoutParams>()
-        doReturn(APP_NAME_MARGIN_START).whenever(appTextViewLayoutParams).marginStart
-        doReturn(appTextViewLayoutParams).whenever(mockAppTextView).layoutParams
-
-        doReturn(WINDOW_CONTROL_BUTTON_WIDTH).whenever(mockDimensions).windowControlButtonWidth
-        doReturn(WINDOW_CONTROL_BUTTON_MARGIN_END)
-            .whenever(mockDimensions)
-            .windowControlButtonMarginEnd
-
         appHeaderViewHolder =
             AppHeaderViewHolder(
                 mockAppHeader,
@@ -246,83 +229,6 @@ class AppHeaderViewHolderTest : ShellTestCase() {
         verify(mockWindowDecorationActions).onCaptionViewReceivedInteraction(task)
     }
 
-    @Test
-    fun testShouldAddAppName_nonDefaultAppHeader() {
-        val taskDescription = ActivityManager.TaskDescription.Builder().build()
-        taskDescription.topOpaqueSystemBarsAppearance =
-            APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND
-        task.taskDescription = taskDescription
-        bindData()
-
-        verify(mockAppTextView).visibility = View.GONE
-    }
-
-    @Test
-    fun testShouldAddAppName_enoughRoom_alreadyVisible_staysVisible() {
-        doReturn(OPEN_MENU_BUTTON_WIDTH_WITH_APP_NAME).whenever(mockOpenMenuButton).width
-        doReturn(View.VISIBLE).whenever(mockAppTextView).visibility
-
-        bindData()
-
-        verify(mockAppTextView).visibility = View.VISIBLE
-    }
-
-    @Test
-    fun testShouldAddAppName_enoughRoom_notVisible_becomesVisible() {
-        doReturn(OPEN_MENU_BUTTON_WIDTH_WITHOUT_APP_NAME).whenever(mockOpenMenuButton).width
-        doReturn(View.GONE).whenever(mockAppTextView).visibility
-
-        bindData()
-
-        verify(mockAppTextView).visibility = View.VISIBLE
-    }
-
-    @Test
-    fun testShouldAddAppName_notEnoughRoom_alreadyVisible_becomesGone() {
-        doReturn(CAPTION_WIDTH_SMALL).whenever(mockAppHeader).width
-        doReturn(OPEN_MENU_BUTTON_WIDTH_WITH_APP_NAME).whenever(mockOpenMenuButton).width
-        doReturn(View.VISIBLE).whenever(mockAppTextView).visibility
-
-        bindData()
-
-        verify(mockAppTextView).visibility = View.GONE
-    }
-
-    @Test
-    fun testShouldAddAppName_notEnoughRoom_notVisible_staysGone() {
-        doReturn(CAPTION_WIDTH_SMALL).whenever(mockAppHeader).width
-        doReturn(OPEN_MENU_BUTTON_WIDTH_WITHOUT_APP_NAME).whenever(mockOpenMenuButton).width
-        doReturn(View.GONE).whenever(mockAppTextView).visibility
-
-        bindData()
-
-        verify(mockAppTextView).visibility = View.GONE
-    }
-
-    @Test
-    fun testShouldAddAppName_afterLayout_updatesVisibility() {
-        val mockViewTreeObserver = mock<ViewTreeObserver>()
-        doReturn(mockViewTreeObserver).whenever(mockAppHeader).viewTreeObserver
-        doReturn(0).whenever(mockAppHeader).width
-
-        bindData()
-        verify(mockAppTextView).visibility = View.VISIBLE
-
-        val listenerCaptor =
-            ArgumentCaptor.forClass(ViewTreeObserver.OnGlobalLayoutListener::class.java)
-        verify(mockViewTreeObserver).addOnGlobalLayoutListener(listenerCaptor.capture())
-
-        // Now simulate layout happening and width becoming non-zero but small
-        doReturn(CAPTION_WIDTH_SMALL).whenever(mockAppHeader).width
-        doReturn(OPEN_MENU_BUTTON_WIDTH_WITH_APP_NAME).whenever(mockOpenMenuButton).width
-        doReturn(View.VISIBLE).whenever(mockAppTextView).visibility
-
-        listenerCaptor.value.onGlobalLayout()
-
-        verify(mockAppTextView).visibility = View.GONE
-        verify(mockViewTreeObserver).removeOnGlobalLayoutListener(same(listenerCaptor.value))
-    }
-
     private fun bindData(
         taskInfo: ActivityManager.RunningTaskInfo = task,
         isTaskMaximized: Boolean = false,
@@ -341,21 +247,5 @@ class AppHeaderViewHolderTest : ShellTestCase() {
                 isCaptionVisible,
             )
         )
-    }
-
-    companion object {
-        private const val APP_ICON_WIDTH = 50
-        private const val WINDOW_CONTROL_BUTTON_WIDTH = 30
-        private const val WINDOW_CONTROL_BUTTON_MARGIN_END = 20
-
-        private const val APP_NAME_MAX_WIDTH = 100
-        private const val APP_NAME_MARGIN_START = 20
-
-        private const val OPEN_MENU_BUTTON_WIDTH_WITH_APP_NAME =
-            APP_ICON_WIDTH + APP_NAME_MAX_WIDTH - 20 + APP_NAME_MARGIN_START
-        private const val OPEN_MENU_BUTTON_WIDTH_WITHOUT_APP_NAME = APP_ICON_WIDTH
-
-        private const val CAPTION_WIDTH_LARGE = 500
-        private const val CAPTION_WIDTH_SMALL = 200
     }
 }

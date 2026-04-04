@@ -602,9 +602,7 @@ public final class ActiveServicesTest {
                         anyInt());
 
         mActiveServices.bringUpServiceLocked(
-                r, r.serviceInfo.flags, /* execInFg */ false, /* whileRestarting */ false,
-                /* permissionsReviewRequired */ false, /* packageFrozen */ false,
-                /* enqueueOomAdj */ false, /* serviceBindingOomAdjPolicy */ 0);
+                r, r.serviceInfo.flags, false, false, false, false, false, 0);
 
         verify(mService).getProcessRecordLocked(r.processName, r.appInfo.pccUid);
 
@@ -630,12 +628,9 @@ public final class ActiveServicesTest {
 
         final ServiceRecord r = createServiceRecord();
         when(r.isStartRequested()).thenReturn(true);
-        r.pendingStarts.add(new ServiceRecord.StartItem(r, false, 1, null, null, 0, null, null, 0));
 
         mActiveServices.bringUpServiceLocked(
-                r, r.serviceInfo.flags, /* execInFg */ false, /* whileRestarting */ false,
-                /* permissionsReviewRequired */ false, /* packageFrozen */ false,
-                /* enqueueOomAdj */ false, /* serviceBindingOomAdjPolicy */ 0);
+                r, r.serviceInfo.flags, false, false, false, false, false, 0);
 
         final ArgumentCaptor<HostingRecord> hostingRecord =
                 ArgumentCaptor.forClass(HostingRecord.class);
@@ -662,9 +657,7 @@ public final class ActiveServicesTest {
         when(r.isStartRequested()).thenReturn(false);
 
         mActiveServices.bringUpServiceLocked(
-                r, r.serviceInfo.flags, /* execInFg */ false, /* whileRestarting */ false,
-                /* permissionsReviewRequired */ false, /* packageFrozen */ false,
-                /* enqueueOomAdj */ false, /* serviceBindingOomAdjPolicy */ 0);
+                r, r.serviceInfo.flags, false, false, false, false, false, 0);
 
         final ArgumentCaptor<HostingRecord> hostingRecord =
                 ArgumentCaptor.forClass(HostingRecord.class);
@@ -680,64 +673,6 @@ public final class ActiveServicesTest {
                         anyBoolean());
         assertThat(hostingRecord.getValue().getType())
                 .isEqualTo(HostingRecord.HOSTING_TYPE_BOUND_SERVICE);
-    }
-
-    @Test
-    public void testBringUpServiceLocked_reusedStartedService() throws Exception {
-        prepareTestRescheduleServiceRestarts();
-        setupBringUpServiceLocked();
-
-        final ServiceRecord r = createServiceRecord();
-        when(r.isStartRequested()).thenReturn(true);
-
-        mActiveServices.bringUpServiceLocked(
-                r, r.serviceInfo.flags, /* execInFg */ false, /* whileRestarting */ false,
-                /* permissionsReviewRequired */ false, /* packageFrozen */ false,
-                /* enqueueOomAdj */ false, /* serviceBindingOomAdjPolicy */ 0);
-
-        final ArgumentCaptor<HostingRecord> hostingRecord =
-                ArgumentCaptor.forClass(HostingRecord.class);
-        verify(mService)
-                .startProcessLocked(
-                        anyString(),
-                        any(),
-                        anyBoolean(),
-                        anyInt(),
-                        hostingRecord.capture(),
-                        anyInt(),
-                        anyBoolean(),
-                        anyBoolean());
-        assertThat(hostingRecord.getValue().getType())
-                .isEqualTo(HostingRecord.HOSTING_TYPE_BOUND_SERVICE);
-    }
-
-    @Test
-    public void testBringUpServiceLocked_restartedService() throws Exception {
-        prepareTestRescheduleServiceRestarts();
-        setupBringUpServiceLocked();
-
-        final ServiceRecord r = createServiceRecord();
-        when(r.isStartRequested()).thenReturn(true);
-
-        mActiveServices.bringUpServiceLocked(
-                r, r.serviceInfo.flags, /* execInFg */ false, /* whileRestarting */ true,
-                /* permissionsReviewRequired */ false, /* packageFrozen */ false,
-                /* enqueueOomAdj */ false, /* serviceBindingOomAdjPolicy */ 0);
-
-        final ArgumentCaptor<HostingRecord> hostingRecord =
-                ArgumentCaptor.forClass(HostingRecord.class);
-        verify(mService)
-                .startProcessLocked(
-                        anyString(),
-                        any(),
-                        anyBoolean(),
-                        anyInt(),
-                        hostingRecord.capture(),
-                        anyInt(),
-                        anyBoolean(),
-                        anyBoolean());
-        assertThat(hostingRecord.getValue().getType())
-                .isEqualTo(HostingRecord.HOSTING_TYPE_STARTED_SERVICE);
     }
 
     private void setupBringUpServiceLocked() {
@@ -1246,8 +1181,6 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "processName", PROCESS_NAME_1);
         setFieldValue(ServiceRecord.class, r, "intent", new Intent.FilterComparison(new Intent()));
         setFieldValue(ServiceRecord.class, r, "mRecentCallingPackage", PACKAGE_NAME_1);
-        setFieldValue(ServiceRecord.class, r, "pendingStarts",
-                new ArrayList<ServiceRecord.StartItem>());
 
         ServiceInfo si = new ServiceInfo();
         si.applicationInfo = r.appInfo;

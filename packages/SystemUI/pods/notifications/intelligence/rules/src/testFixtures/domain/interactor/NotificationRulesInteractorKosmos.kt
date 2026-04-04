@@ -17,7 +17,7 @@
 package com.android.systemui.notifications.intelligence.rules.domain.interactor
 
 import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.notifications.intelligence.rules.data.repository.fakeNotificationRulesRepository
+import com.android.systemui.notifications.intelligence.rules.data.repository.realNotificationRulesRepository
 
 val Kosmos.notificationRulesInteractor by
-    Kosmos.Fixture { NotificationRulesInteractorImpl(fakeNotificationRulesRepository) }
+    Kosmos.Fixture { NotificationRulesInteractorImpl(realNotificationRulesRepository) }

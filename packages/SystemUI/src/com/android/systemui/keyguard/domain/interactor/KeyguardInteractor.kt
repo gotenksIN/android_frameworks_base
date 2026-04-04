@@ -181,24 +181,8 @@ constructor(
                     keyguardTransitionInteractor.isInTransition(
                         edge = Edge.create(from = AOD, to = Scenes.Occluded)
                     ),
-                    keyguardTransitionInteractor.isInTransition(
-                        edge = Edge.create(from = Scenes.Occluded, to = DOZING)
-                    ),
-                    keyguardTransitionInteractor.isInTransition(
-                        edge = Edge.create(from = DOZING, to = Scenes.Occluded)
-                    ),
-                ) {
-                    dozeAmt,
-                    isTransitioningToAod,
-                    isTransitioningFromAod,
-                    isTransitioningToDozing,
-                    isTransitioningFromDozing ->
-                    if (
-                        isTransitioningToAod ||
-                            isTransitioningFromAod ||
-                            isTransitioningToDozing ||
-                            isTransitioningFromDozing
-                    ) {
+                ) { dozeAmt, isTransitioningToAod, isTransitioningFromAod ->
+                    if (isTransitioningToAod || isTransitioningFromAod) {
                         return@combine 1f
                     } else {
                         return@combine dozeAmt

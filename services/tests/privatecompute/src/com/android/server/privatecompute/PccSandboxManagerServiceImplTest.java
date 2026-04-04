@@ -204,8 +204,7 @@ public class PccSandboxManagerServiceImplTest {
         // Capture the listener.
         ArgumentCaptor<AlarmManager.OnAlarmListener> listenerCaptor =
                 ArgumentCaptor.forClass(AlarmManager.OnAlarmListener.class);
-        // It was called once in writeToAuditLogInternal.
-        verify(mAlarmManager, times(1))
+        verify(mAlarmManager)
                 .set(anyInt(), anyLong(), anyString(), listenerCaptor.capture(), any());
         AlarmManager.OnAlarmListener listener = listenerCaptor.getValue();
 
@@ -409,7 +408,6 @@ public class PccSandboxManagerServiceImplTest {
         when(mPackageManagerInternal.isSameApp(
                         eq(TEST_PACKAGE_NAME), anyInt(), anyInt()))
                 .thenReturn(true);
-        when(mInternal.isPccTrustedSystemComponent(anyInt(), anyString())).thenReturn(true);
         List<PersistableBundle> data = new ArrayList<>(1);
         data.add(new PersistableBundle());
 
@@ -421,8 +419,8 @@ public class PccSandboxManagerServiceImplTest {
         when(mInjector.getCallingUid()).thenReturn(UserHandle.PER_USER_RANGE * 10);
         mService.writeToAuditLogInternal(data, TEST_PACKAGE_NAME);
 
-        // Verify this is called only once for the first user.
-        verify(mInjector, times(1)).deleteAuditLogFilesAllUsers();
+        // Verify this is called only twice: once in constructor, once for the first user
+        verify(mInjector, times(2)).deleteAuditLogFilesAllUsers();
     }
 
     @Test
@@ -433,16 +431,15 @@ public class PccSandboxManagerServiceImplTest {
         when(mPackageManagerInternal.isSameApp(
                         eq(TEST_PACKAGE_NAME), anyInt(), anyInt()))
                 .thenReturn(true);
-        when(mInternal.isPccTrustedSystemComponent(anyInt(), anyString())).thenReturn(true);
         List<PersistableBundle> data = new ArrayList<>(1);
         data.add(new PersistableBundle());
         when(mInjector.getCallingUid()).thenReturn(0);
         mService.writeToAuditLogInternal(data, TEST_PACKAGE_NAME);
         when(mInjector.getCallingUid()).thenReturn(UserHandle.PER_USER_RANGE * 10);
         mService.writeToAuditLogInternal(data, TEST_PACKAGE_NAME);
-        // deleteAuditLogFilesAllUsers is called once so far (when creating the audit mode context
-        // for the first user).
-        verify(mInjector, times(1)).deleteAuditLogFilesAllUsers();
+        // deleteAuditLogFilesAllUsers is called twice so far (in the constructor, plus when
+        // creating the audit mode context for the first user).
+        verify(mInjector, times(2)).deleteAuditLogFilesAllUsers();
         // Disable audit mode - Logs are not cleared, so they can be read.
         when(mInjector.auditModeEnabled()).thenReturn(false);
         mService.writeToAuditLogInternal(data, TEST_PACKAGE_NAME);

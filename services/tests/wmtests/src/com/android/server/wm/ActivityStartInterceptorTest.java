@@ -24,7 +24,6 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.any;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.times;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
 
@@ -691,39 +690,6 @@ public class ActivityStartInterceptorTest {
 
     @EnableFlags(com.android.window.flags.Flags.FLAG_ACTIVITY_START_INTERCEPTOR_SPEEDBUMPS)
     @Test
-    public void testDistractingPackage_hasForegroundActivity_notIntercepted() {
-        // GIVEN the package is currently marked as distracting with speedbumps restriction
-        when(mPackageManagerInternal.getDistractingPackageRestrictions(
-                TEST_PACKAGE_NAME, TEST_USER_ID))
-                .thenReturn(android.content.pm.PackageManager
-                        .RESTRICTION_CONFIRM_WITH_SPEEDBUMP);
-
-        android.content.pm.PackageManager mockPm = mock(android.content.pm.PackageManager.class);
-        when(mContext.getPackageManager()).thenReturn(mockPm);
-        when(mockPm.getWellbeingPackageName()).thenReturn("com.android.wellbeing");
-
-        when(mSupervisor.resolveIntent(any(), any(), anyInt(), anyInt(), anyInt(), anyInt()))
-                .thenReturn(new ResolveInfo());
-        when(mSupervisor.resolveActivity(any(), any(), anyInt(), any()))
-                .thenReturn(new ActivityInfo());
-
-        when(mPackageManagerInternal.getPackageUid(TEST_PACKAGE_NAME, 0, TEST_USER_ID))
-                .thenReturn(TEST_REAL_CALLING_UID);
-
-        spyOn(mInterceptor);
-        doReturn(true).when(mInterceptor).hasForegroundActivitiesPackage(
-                TEST_PACKAGE_NAME, mPackageManagerInternal);
-
-        // WHEN the interceptor is run
-        final boolean intercepted = mInterceptor.intercept(null, null, mAInfo, null, null, null, 0,
-                0, null, null);
-
-        // THEN the launch is not intercepted
-        assertFalse(intercepted);
-    }
-
-    @EnableFlags(com.android.window.flags.Flags.FLAG_ACTIVITY_START_INTERCEPTOR_SPEEDBUMPS)
-    @Test
     public void testDistractingPackage_wellbeingPackageCannotResolve_notIntercepted() {
         // GIVEN the package is currently marked as distracting with speedbumps restriction
         when(mPackageManagerInternal.getDistractingPackageRestrictions(
@@ -897,5 +863,4 @@ public class ActivityStartInterceptorTest {
         assertThat(resultIntent.getParcelableExtra(Intent.EXTRA_INTENT, IntentSender.class))
                 .isNotNull();
     }
-
 }

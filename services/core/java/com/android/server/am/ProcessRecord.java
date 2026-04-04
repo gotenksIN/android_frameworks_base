@@ -58,7 +58,6 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.DebugUtils;
 import android.util.EventLog;
-import android.util.IndentingPrintWriter;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
@@ -82,6 +81,7 @@ import com.android.server.am.psc.ProcessServiceRecordInternal;
 import com.android.server.wm.WindowProcessController;
 import com.android.server.wm.WindowProcessListener;
 
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
@@ -468,12 +468,12 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @GuardedBy({"mService", "mProcLock"})
-    void dump(@NonNull IndentingPrintWriter pw) {
+    void dump(PrintWriter pw, String prefix) {
         final long nowUptime = SystemClock.uptimeMillis();
         final long nowElapsedTime = SystemClock.elapsedRealtime();
 
-        pw.print("user #"); pw.print(userId);
-        pw.print(" uid="); pw.print(info.uid);
+        pw.print(prefix); pw.print("user #"); pw.print(userId);
+                pw.print(" uid="); pw.print(info.uid);
         if (uid != info.uid) {
             pw.print(" ISOLATED uid="); pw.print(uid);
         }
@@ -486,91 +486,89 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             }
         }
         pw.println("}");
-
         if (processInfo != null) {
-            pw.println("processInfo:");
-            pw.increaseIndent();
+            pw.print(prefix); pw.println("processInfo:");
             if (processInfo.deniedPermissions != null) {
                 for (int i = 0; i < processInfo.deniedPermissions.size(); i++) {
-                    pw.print("deny: ");
+                    pw.print(prefix); pw.print("  deny: ");
                     pw.println(processInfo.deniedPermissions.valueAt(i));
                 }
             }
             if (processInfo.gwpAsanMode != ApplicationInfo.GWP_ASAN_DEFAULT) {
-                pw.print("gwpAsanMode", processInfo.gwpAsanMode).println();
+                pw.print(prefix); pw.println("  gwpAsanMode=" + processInfo.gwpAsanMode);
             }
             if (processInfo.memtagMode != ApplicationInfo.MEMTAG_DEFAULT) {
-                pw.print("memtagMode", processInfo.memtagMode).println();
+                pw.print(prefix); pw.println("  memtagMode=" + processInfo.memtagMode);
             }
-            pw.decreaseIndent();
         }
-
-        pw.print("mRequiredAbi", mRequiredAbi);
-        pw.print("instructionSet", mInstructionSet).println();
+        pw.print(prefix); pw.print("mRequiredAbi="); pw.print(mRequiredAbi);
+        pw.print(" instructionSet="); pw.println(mInstructionSet);
         if (info.className != null) {
-            pw.print("class", info.className).println();
+            pw.print(prefix); pw.print("class="); pw.println(info.className);
         }
         if (info.manageSpaceActivityName != null) {
-            pw.print("manageSpaceActivityName", info.manageSpaceActivityName).println();
+            pw.print(prefix); pw.print("manageSpaceActivityName=");
+            pw.println(info.manageSpaceActivityName);
         }
 
-        pw.print("dir", info.sourceDir);
-        pw.print("publicDir", info.publicSourceDir);
-        pw.print("data", info.dataDir).println();
-        mPkgList.dump(pw);
+        pw.print(prefix); pw.print("dir="); pw.print(info.sourceDir);
+                pw.print(" publicDir="); pw.print(info.publicSourceDir);
+                pw.print(" data="); pw.println(info.dataDir);
+        mPkgList.dump(pw, prefix);
         if (mPkgDeps != null) {
-            pw.print("packageDependencies={");
+            pw.print(prefix); pw.print("packageDependencies={");
             for (int i = 0; i < mPkgDeps.size(); i++) {
                 if (i > 0) pw.print(", ");
                 pw.print(mPkgDeps.valueAt(i));
             }
             pw.println("}");
         }
-        pw.print("compat", mCompat).println();
+        pw.print(prefix); pw.print("compat="); pw.println(mCompat);
         if (mInstr != null) {
-            pw.print("mInstr", mInstr).println();
+            pw.print(prefix); pw.print("mInstr="); pw.println(mInstr);
         }
-        pw.print("thread", mThread).println();
-        pw.print("pid", mPid).println();
-        pw.print("lastActivityTime=");
+        pw.print(prefix); pw.print("thread="); pw.println(mThread);
+        pw.print(prefix); pw.print("pid="); pw.println(mPid);
+        pw.print(prefix); pw.print("lastActivityTime=");
         TimeUtils.formatDuration(getLastActivityTime(), nowUptime, pw);
-        pw.print(" startUpTime=");
+        pw.print(prefix); pw.print("startUpTime=");
         TimeUtils.formatDuration(mStartUptime, nowUptime, pw);
-        pw.print(" startElapsedTime=");
+        pw.print(prefix); pw.print("startElapsedTime=");
         TimeUtils.formatDuration(mStartElapsedTime, nowElapsedTime, pw);
         pw.println();
         if (mPersistent || mRemoved) {
-            pw.print("persistent", mPersistent);
-            pw.print("removed", mRemoved).println();
+            pw.print(prefix); pw.print("persistent="); pw.print(mPersistent);
+            pw.print(" removed="); pw.println(mRemoved);
         }
         if (mDebugging) {
-            pw.print("mDebugging", mDebugging).println();
+            pw.print(prefix); pw.print("mDebugging="); pw.println(mDebugging);
         }
         if (mPendingStart) {
-            pw.print("pendingStart", mPendingStart).println();
+            pw.print(prefix); pw.print("pendingStart="); pw.println(mPendingStart);
         }
-        pw.print("startSeq", mStartSeq);
-        pw.print("lruSeq", mLruSeq).println();
-        pw.print("mountMode",
-                DebugUtils.valueToString(Zygote.class, "MOUNT_EXTERNAL_", mMountMode)).println();
+        pw.print(prefix); pw.print("startSeq="); pw.print(mStartSeq);
+        pw.print(" lruSeq="); pw.println(mLruSeq);
+        pw.print(prefix); pw.print("mountMode="); pw.println(
+                DebugUtils.valueToString(Zygote.class, "MOUNT_EXTERNAL_", mMountMode));
         if (isKilled() || isKilledByAm() || getWaitingToKill() != null) {
-            pw.print("killed", isKilled());
-            pw.print("killedByAm", isKilledByAm());
-            pw.print("waitingToKill", getWaitingToKill()).println();
+            pw.print(prefix); pw.print("killed="); pw.print(isKilled());
+            pw.print(" killedByAm="); pw.print(isKilledByAm());
+            pw.print(" waitingToKill="); pw.println(getWaitingToKill());
         }
         if (getIsolatedEntryPoint() != null || mIsolatedEntryPointArgs != null) {
-            pw.print("isolatedEntryPoint", getIsolatedEntryPoint()).println();
-            pw.print("isolatedEntryPointArgs", Arrays.toString(mIsolatedEntryPointArgs)).println();
+            pw.print(prefix); pw.print("isolatedEntryPoint="); pw.println(getIsolatedEntryPoint());
+            pw.print(prefix); pw.print("isolatedEntryPointArgs=");
+            pw.println(Arrays.toString(mIsolatedEntryPointArgs));
         }
         if (getSetProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
-            mProfile.dumpCputime(pw);
+            mProfile.dumpCputime(pw, prefix);
         }
         if (mProfile.hasPendingUiClean()) {
-            pw.print("pendingUiClean", mProfile.hasPendingUiClean()).println();
+            pw.print(prefix); pw.print("pendingUiClean="); pw.println(mProfile.hasPendingUiClean());
         }
-        mProfile.dumpPss(pw, nowUptime);
+        mProfile.dumpPss(pw, prefix, nowUptime);
         if (mHasReportedInteraction || mFgInteractionTime != 0) {
-            pw.print("reportedInteraction=");
+            pw.print(prefix); pw.print("reportedInteraction=");
             pw.print(mHasReportedInteraction);
             if (mInteractionEventTime != 0) {
                 pw.print(" time=");
@@ -582,18 +580,19 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             }
             pw.println();
         }
-        super.dump(pw, nowUptime);
+        super.dump(pw, prefix, nowUptime);
         if (getSetProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
+            pw.print(prefix);
             pw.print("whenUnimportant=");
             TimeUtils.formatDuration(mWhenUnimportant - nowUptime, pw);
             pw.println();
         }
-        mErrorState.dump(pw, nowUptime);
-        mServices.dump(pw, nowUptime);
-        mProviders.dump(pw, nowUptime);
-        mReceivers.dump(pw, nowUptime);
-        mOptRecord.dump(pw, nowUptime);
-        mWindowProcessController.dump(pw);
+        mErrorState.dump(pw, prefix, nowUptime);
+        mServices.dump(pw, prefix, nowUptime);
+        mProviders.dump(pw, prefix, nowUptime);
+        mReceivers.dump(pw, prefix, nowUptime);
+        mOptRecord.dump(pw, prefix, nowUptime);
+        mWindowProcessController.dump(pw, prefix);
     }
 
     ProcessRecord(ActivityManagerService _service, ApplicationInfo _info, String _processName,
@@ -1613,8 +1612,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         final StringBuilder sb = new StringBuilder();
         sb.append(this);
         final StringWriter sw = new StringWriter();
-        final IndentingPrintWriter pw = new IndentingPrintWriter(sw, "  ", "  ");
-        dump(pw);
+        final PrintWriter pw = new PrintWriter(sw);
+        dump(pw, "  ");
         sb.append(sw);
         return sb.toString();
     }

@@ -1363,6 +1363,16 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
      * @param task Task to be closed.
      */
     private void closeDesktopTask(RunningTaskInfo task, Boolean forceKeepDesktop) {
+        if (!DesktopExperienceFlags
+                .CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT.isTrue()) {
+            final WindowDecorationWrapper decoration = mWindowDecorByTaskId.get(task.taskId);
+            if (decoration == null) {
+                ProtoLog.e(WM_SHELL_WINDOW_DECORATION,
+                        "%s: closeDesktopTask(taskId=%d): decoration is null, ignoring",
+                        TAG,
+                        task.taskId);
+            }
+        }
         mDesktopTasksController.closeTask(task, forceKeepDesktop);
     }
 

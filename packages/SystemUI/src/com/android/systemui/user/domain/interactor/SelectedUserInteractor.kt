@@ -4,23 +4,17 @@ import android.annotation.UserIdInt
 import android.content.pm.UserInfo
 import android.os.UserManager
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.user.data.model.SelectionStatus
 import com.android.systemui.user.data.repository.UserRepository
 import javax.inject.Inject
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /** Encapsulates business logic to interact the selected user */
 @SysUISingleton
-class SelectedUserInteractor
-@Inject
-constructor(private val repository: UserRepository, @Application val scope: CoroutineScope) {
+class SelectedUserInteractor @Inject constructor(private val repository: UserRepository) {
 
     /** Flow providing the ID of the currently selected user. */
     val selectedUser: Flow<Int> = repository.selectedUserInfo.map { it.id }.distinctUntilChanged()
@@ -33,10 +27,10 @@ constructor(private val repository: UserRepository, @Application val scope: Coro
         repository.isCurrentUserHeadlessSystemUser
 
     /** Flow providing whether we're currently switching to another user. */
-    val isUserSwitching: StateFlow<Boolean> =
+    val isUserSwitching =
         repository.selectedUser
             .map { it.selectionStatus == SelectionStatus.SELECTION_IN_PROGRESS }
-            .stateIn(scope = scope, started = SharingStarted.Eagerly, initialValue = false)
+            .distinctUntilChanged()
 
     /** Returns the ID of the currently-selected user. */
     @UserIdInt

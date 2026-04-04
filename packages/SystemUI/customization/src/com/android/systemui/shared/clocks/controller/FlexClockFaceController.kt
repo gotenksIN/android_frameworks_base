@@ -58,7 +58,6 @@ import com.android.systemui.plugins.keyguard.ui.clocks.ClockViewIds
 import com.android.systemui.plugins.keyguard.ui.clocks.ThemeConfig
 import com.android.systemui.plugins.keyguard.ui.clocks.TimeFormatKind
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Clock
-import com.android.systemui.shared.Flags.enableAiClocks
 import com.android.systemui.shared.clocks.FlexClockContext
 import com.android.systemui.shared.clocks.controller.FlexClockController.Companion.getDefaultAxes
 import com.android.systemui.shared.clocks.view.FlexClockViewGroup
@@ -95,16 +94,12 @@ class FlexClockFaceController(
         clockCtx.resources.getDimensionPixelSize(R.dimen.keyguard_large_clock_top_margin)
     private val timeFormatter =
         DigitalTimeFormatter("h:mm", clockCtx.timeKeeper, enableContentDescription = true)
-    val cfg = SMALL_LAYER_CONFIG.copy(timeFormatter = timeFormatter)
     val layerController: FlexClockViewController =
-        if (enableAiClocks()) {
-            FlexClockViewGroupController(clockCtx, cfg, isLargeClock)
+        if (isLargeClock) {
+            FlexClockViewGroupController(clockCtx)
         } else {
-            if (isLargeClock) {
-                FlexClockViewGroupController(clockCtx, cfg, isLargeClock)
-            } else {
-                FlexClockTextViewController(clockCtx, cfg, isLargeClock)
-            }
+            val cfg = SMALL_LAYER_CONFIG.copy(timeFormatter = timeFormatter)
+            FlexClockTextViewController(clockCtx, cfg, isLargeClock)
         }
 
     init {
@@ -274,8 +269,8 @@ class FlexClockFaceController(
 
             override fun onFontAxesChanged(style: ClockAxisStyle) {
                 val axes = ClockAxisStyle(getDefaultAxes(clockCtx.settings).merge(style))
-                if (!isLargeClock && axes[GSFAxes.WIDTH] > SMALL_CLOCK_MAX_WIDTH) {
-                    axes[GSFAxes.WIDTH] = SMALL_CLOCK_MAX_WIDTH
+                if (!isLargeClock && axes[GSFAxes.WIDTH] > SMALL_CLOCK_MAX_WDTH) {
+                    axes[GSFAxes.WIDTH] = SMALL_CLOCK_MAX_WDTH
                 }
 
                 layerController.animations.onFontAxesChanged(axes)
@@ -283,7 +278,7 @@ class FlexClockFaceController(
         }
 
     companion object {
-        const val SMALL_CLOCK_MAX_WIDTH = 120f
+        const val SMALL_CLOCK_MAX_WDTH = 120f
 
         val SMALL_LAYER_CONFIG =
             LayerConfig(

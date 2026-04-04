@@ -35,7 +35,6 @@ import android.os.ResultReceiver;
 import android.os.ShellCallback;
 import android.os.SystemClock;
 import android.provider.Settings;
-import android.timezone.flags.Flags;
 import android.util.IndentingPrintWriter;
 import android.util.LocalLog;
 import android.util.Log;
@@ -123,14 +122,12 @@ public class NetworkTimeUpdateService extends Binder {
                     @Override
                     public void scheduleNextRefresh(
                             @ElapsedRealtimeLong long elapsedRealtimeMillis) {
-
                         alarmManager.cancel(mOnAlarmListener);
+
                         String alarmTag = "NetworkTimeUpdateService.POLL";
                         Handler handler = null; // Use the main thread
                         alarmManager.set(
-                                Flags.useElapsedRealtimeWakeupForNetworkTimeUpdateService()
-                                        ? AlarmManager.ELAPSED_REALTIME_WAKEUP
-                                        : AlarmManager.ELAPSED_REALTIME,
+                                AlarmManager.ELAPSED_REALTIME,
                                 elapsedRealtimeMillis,
                                 alarmTag,
                                 mOnAlarmListener,

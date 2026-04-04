@@ -253,8 +253,12 @@ public class BubbleTaskViewListener implements TaskView.Listener {
                 "BubbleTaskViewListener.onTaskRemovalStarted() taskId=%d bubble=%s bubbleTaskId=%s",
                 taskId, getBubbleKey(), (mBubble != null ? mBubble.getTaskId() : "null"));
         if (mBubble != null) {
-            mExpandedViewManager.removeBubble(mBubble.getKey(), taskId,
-                    Bubbles.DISMISS_TASK_FINISHED);
+            if (Flags.fixVerifyBubbleTaskIdOnRemoval()) {
+                mExpandedViewManager.removeBubble(mBubble.getKey(), taskId,
+                        Bubbles.DISMISS_TASK_FINISHED);
+            } else {
+                mExpandedViewManager.removeBubble(mBubble.getKey(), Bubbles.DISMISS_TASK_FINISHED);
+            }
         }
         if (mTaskView != null) {
             final TaskViewTaskController tvc = mTaskView.getController();

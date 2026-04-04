@@ -18,8 +18,6 @@ package com.android.systemui.statusbar.pipeline.dagger
 
 import android.net.wifi.WifiManager
 import com.android.systemui.CoreStartable
-import com.android.systemui.clock.data.repository.ClockRepository
-import com.android.systemui.clock.data.repository.ClockRepositorySwitcher
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.LogBufferFactory
@@ -139,8 +137,6 @@ abstract class StatusBarPipelineModule {
 
     @Binds
     abstract fun connectivityConstants(impl: ConnectivityConstantsImpl): ConnectivityConstants
-
-    @Binds abstract fun clockRepository(impl: ClockRepositorySwitcher): ClockRepository
 
     @Binds abstract fun wifiRepository(impl: WifiRepositorySwitcher): WifiRepository
 

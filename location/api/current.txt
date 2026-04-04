@@ -295,7 +295,6 @@ package android.location {
     method public long getReceivedSvTimeUncertaintyNanos();
     method public double getSatelliteInterSignalBiasNanos();
     method @FloatRange(from=0.0) public double getSatelliteInterSignalBiasUncertaintyNanos();
-    method @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") @Nullable public android.location.SatellitePvt getSatellitePvt();
     method public double getSnrInDb();
     method public int getState();
     method public int getSvid();
@@ -311,7 +310,6 @@ package android.location {
     method public boolean hasFullInterSignalBiasUncertaintyNanos();
     method public boolean hasSatelliteInterSignalBiasNanos();
     method public boolean hasSatelliteInterSignalBiasUncertaintyNanos();
-    method @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public boolean hasSatellitePvt();
     method public boolean hasSnrInDb();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final int ADR_STATE_CYCLE_SLIP = 4; // 0x4
@@ -688,80 +686,6 @@ package android.location {
 
   public interface OnNmeaMessageListener {
     method public void onNmeaMessage(String, long);
-  }
-
-  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public final class SatellitePvt implements android.os.Parcelable {
-    method public int describeContents();
-    method @Nullable public android.location.SatellitePvt.ClockInfo getClockInfo();
-    method public int getEphemerisSource();
-    method @FloatRange public double getIonoDelayMeters();
-    method @IntRange(from=0, to=1023) public int getIssueOfDataClock();
-    method @IntRange(from=0, to=1023) public int getIssueOfDataEphemeris();
-    method @Nullable public android.location.SatellitePvt.PositionEcef getPositionEcef();
-    method @IntRange(from=0) public long getTimeOfClockSeconds();
-    method @IntRange(from=0) public long getTimeOfEphemerisSeconds();
-    method @FloatRange public double getTropoDelayMeters();
-    method @Nullable public android.location.SatellitePvt.VelocityEcef getVelocityEcef();
-    method public boolean hasIono();
-    method public boolean hasIssueOfDataClock();
-    method public boolean hasIssueOfDataEphemeris();
-    method public boolean hasPositionVelocityClockInfo();
-    method public boolean hasTimeOfClockSeconds();
-    method public boolean hasTimeOfEphemerisSeconds();
-    method public boolean hasTropo();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt> CREATOR;
-    field public static final int EPHEMERIS_SOURCE_DEMODULATED = 0; // 0x0
-    field public static final int EPHEMERIS_SOURCE_OTHER = 3; // 0x3
-    field public static final int EPHEMERIS_SOURCE_SERVER_LONG_TERM = 2; // 0x2
-    field public static final int EPHEMERIS_SOURCE_SERVER_NORMAL = 1; // 0x1
-  }
-
-  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.Builder {
-    ctor public SatellitePvt.Builder();
-    method @NonNull public android.location.SatellitePvt build();
-    method @NonNull public android.location.SatellitePvt.Builder setClockInfo(@Nullable android.location.SatellitePvt.ClockInfo);
-    method @NonNull public android.location.SatellitePvt.Builder setEphemerisSource(int);
-    method @NonNull public android.location.SatellitePvt.Builder setIonoDelayMeters(@FloatRange(from=0.0f, to=100.0f) double);
-    method @NonNull public android.location.SatellitePvt.Builder setIssueOfDataClock(@IntRange(from=0, to=1023) int);
-    method @NonNull public android.location.SatellitePvt.Builder setIssueOfDataEphemeris(@IntRange(from=0, to=1023) int);
-    method @NonNull public android.location.SatellitePvt.Builder setPositionEcef(@Nullable android.location.SatellitePvt.PositionEcef);
-    method @NonNull public android.location.SatellitePvt.Builder setTimeOfClockSeconds(@IntRange(from=0) long);
-    method @NonNull public android.location.SatellitePvt.Builder setTimeOfEphemerisSeconds(@IntRange(from=0) long);
-    method @NonNull public android.location.SatellitePvt.Builder setTropoDelayMeters(@FloatRange(from=0.0f, to=100.0f) double);
-    method @NonNull public android.location.SatellitePvt.Builder setVelocityEcef(@Nullable android.location.SatellitePvt.VelocityEcef);
-  }
-
-  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.ClockInfo implements android.os.Parcelable {
-    ctor public SatellitePvt.ClockInfo(double, double, double);
-    method public int describeContents();
-    method @FloatRange public double getClockDriftMetersPerSecond();
-    method @FloatRange public double getHardwareCodeBiasMeters();
-    method @FloatRange public double getTimeCorrectionMeters();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt.ClockInfo> CREATOR;
-  }
-
-  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.PositionEcef implements android.os.Parcelable {
-    ctor public SatellitePvt.PositionEcef(double, double, double, double);
-    method public int describeContents();
-    method @FloatRange(from=0.0f, fromInclusive=false) public double getUreMeters();
-    method @FloatRange public double getXMeters();
-    method @FloatRange public double getYMeters();
-    method @FloatRange public double getZMeters();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt.PositionEcef> CREATOR;
-  }
-
-  @FlaggedApi("android.location.flags.enable_public_satellite_pvt_api") public static final class SatellitePvt.VelocityEcef implements android.os.Parcelable {
-    ctor public SatellitePvt.VelocityEcef(double, double, double, double);
-    method public int describeContents();
-    method @FloatRange(from=0.0f, fromInclusive=false) public double getUreRateMetersPerSecond();
-    method @FloatRange public double getXMetersPerSecond();
-    method @FloatRange public double getYMetersPerSecond();
-    method @FloatRange public double getZMetersPerSecond();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.SatellitePvt.VelocityEcef> CREATOR;
   }
 
   public abstract class SettingInjectorService extends android.app.Service {

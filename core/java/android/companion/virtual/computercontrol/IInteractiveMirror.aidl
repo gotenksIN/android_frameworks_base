@@ -24,6 +24,7 @@ import android.hardware.input.VirtualTouchEvent;
  *
  * @hide
  */
+// TODO(b/432678187): Replace the permission check with an alternative
 @RequiresNoPermission
 oneway interface IInteractiveMirror {
 

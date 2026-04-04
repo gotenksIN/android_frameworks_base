@@ -19,15 +19,9 @@ package com.android.systemui.notifications.intelligence.rules.data.repository
 import android.app.notificationManager
 import android.content.applicationContext
 import android.content.mockContentResolver
-import androidx.compose.runtime.mutableStateListOf
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.kosmos.testDispatcher
-import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel.Companion.toFullRule
-import com.android.systemui.notifications.intelligence.rules.shared.model.ResponseModel
-import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 import com.android.systemui.notifications.intelligence.rules.shared.notificationRulesLogBuffer
 
 val Kosmos.realNotificationRulesRepository by
@@ -46,44 +40,3 @@ val Kosmos.realNotificationRulesRepository by
             logBuffer = notificationRulesLogBuffer,
         )
     }
-
-val Kosmos.fakeNotificationRulesRepository by Kosmos.Fixture { FakeNotificationRulesRepository() }
-
-class FakeNotificationRulesRepository : NotificationRulesRepository {
-    override var rules = mutableStateListOf<RuleModel>()
-
-    var deleteRuleSuccessfully = true
-
-    override suspend fun createDraftRuleFromFreeformText(
-        action: ActionModel,
-        text: String,
-    ): ResponseModel<DraftRuleModel> {
-        return ResponseModel.Error
-    }
-
-    override suspend fun saveRule(rule: DraftRuleModel): Boolean {
-        return when (rule) {
-            is DraftRuleModel.New -> {
-                rules.add(0, rule.toFullRule(generateNewId()))
-                true
-            }
-            is DraftRuleModel.PreExisting -> {
-                val existingRuleIndex = rules.indexOfFirst { it.id == rule.id }
-                rules[existingRuleIndex] = rule.toFullRule()
-                true
-            }
-        }
-    }
-
-    override suspend fun deleteRule(ruleId: Int): Boolean {
-        if (deleteRuleSuccessfully) {
-            rules.removeIf { it.id == ruleId }
-        }
-        return deleteRuleSuccessfully
-    }
-
-    private fun generateNewId(): Int {
-        val currentRuleIds = rules.map { it.id }
-        return (100..200).first { newIdCandidate -> newIdCandidate !in currentRuleIds }
-    }
-}

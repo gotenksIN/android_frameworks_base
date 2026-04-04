@@ -134,6 +134,11 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
     private static final boolean SWEEP_OPEN_MENU = false;
 
+    // The height of a window which has focus in DIP.
+    public static final int DECOR_SHADOW_FOCUSED_HEIGHT_IN_DIP = 20;
+    // The height of a window which has not in DIP.
+    public static final int DECOR_SHADOW_UNFOCUSED_HEIGHT_IN_DIP = 5;
+
     private static final int SCRIM_LIGHT = 0xe6ffffff; // 90% white
 
     private static final int SCRIM_ALPHA = 0xcc000000; // 80% alpha
@@ -161,6 +166,13 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
             outline.setAlpha(1f);
         }
     };
+
+    // Cludge to address b/22668382: Set the shadow size to the maximum so that the layer
+    // size calculation takes the shadow size into account. We set the elevation currently
+    // to max until the first layout command has been executed.
+    private boolean mAllowUpdateElevation = false;
+
+    private boolean mElevationAdjustedForStack = false;
 
     // Keeps track of the picture-in-picture mode for the view shadow
     private boolean mIsInPictureInPictureMode;
@@ -768,6 +780,11 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         if (mApplyFloatingHorizontalInsets) {
             offsetLeftAndRight(mFloatingInsets.left);
         }
+
+        // If the application changed its SystemUI metrics, we might also have to adapt
+        // our shadow elevation.
+        updateElevation();
+        mAllowUpdateElevation = true;
 
         if (changed && mDrawLegacyNavigationBarBackground) {
             getViewRootImpl().requestInvalidateRootRenderNode();
@@ -1561,45 +1578,52 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
         int opacity = PixelFormat.OPAQUE;
         final WindowConfiguration winConfig = getResources().getConfiguration().windowConfiguration;
-
-        // Note: If there is no background, we will assume opaque. The
-        // common case seems to be that an application sets there to be
-        // no background so it can draw everything itself. For that,
-        // we would like to assume OPAQUE and let the app force it to
-        // the slower TRANSLUCENT mode if that is really what it wants.
-        Drawable bg = getBackground();
-        Drawable fg = getForeground();
-        if (bg != null) {
-            if (fg == null) {
-                opacity = bg.getOpacity();
-            } else if (framePadding.left <= 0 && framePadding.top <= 0
-                    && framePadding.right <= 0 && framePadding.bottom <= 0) {
-                // If the frame padding is zero, then we can be opaque
-                // if either the frame -or- the background is opaque.
-                int fop = fg.getOpacity();
-                int bop = bg.getOpacity();
-                if (false)
-                    Log.v(mLogTag, "Background opacity: " + bop + ", Frame opacity: " + fop);
-                if (fop == PixelFormat.OPAQUE || bop == PixelFormat.OPAQUE) {
-                    opacity = PixelFormat.OPAQUE;
-                } else if (fop == PixelFormat.UNKNOWN) {
-                    opacity = bop;
-                } else if (bop == PixelFormat.UNKNOWN) {
-                    opacity = fop;
+        final boolean renderShadowsInCompositor = mWindow.mRenderShadowsInCompositor;
+        // If we draw shadows in the compositor we don't need to force the surface to be
+        // translucent.
+        if (winConfig.hasWindowShadow() && !renderShadowsInCompositor) {
+            // If the window has a shadow, it must be translucent.
+            opacity = PixelFormat.TRANSLUCENT;
+        } else{
+            // Note: If there is no background, we will assume opaque. The
+            // common case seems to be that an application sets there to be
+            // no background so it can draw everything itself. For that,
+            // we would like to assume OPAQUE and let the app force it to
+            // the slower TRANSLUCENT mode if that is really what it wants.
+            Drawable bg = getBackground();
+            Drawable fg = getForeground();
+            if (bg != null) {
+                if (fg == null) {
+                    opacity = bg.getOpacity();
+                } else if (framePadding.left <= 0 && framePadding.top <= 0
+                        && framePadding.right <= 0 && framePadding.bottom <= 0) {
+                    // If the frame padding is zero, then we can be opaque
+                    // if either the frame -or- the background is opaque.
+                    int fop = fg.getOpacity();
+                    int bop = bg.getOpacity();
+                    if (false)
+                        Log.v(mLogTag, "Background opacity: " + bop + ", Frame opacity: " + fop);
+                    if (fop == PixelFormat.OPAQUE || bop == PixelFormat.OPAQUE) {
+                        opacity = PixelFormat.OPAQUE;
+                    } else if (fop == PixelFormat.UNKNOWN) {
+                        opacity = bop;
+                    } else if (bop == PixelFormat.UNKNOWN) {
+                        opacity = fop;
+                    } else {
+                        opacity = Drawable.resolveOpacity(fop, bop);
+                    }
                 } else {
-                    opacity = Drawable.resolveOpacity(fop, bop);
+                    // For now we have to assume translucent if there is a
+                    // frame with padding... there is no way to tell if the
+                    // frame and background together will draw all pixels.
+                    if (false)
+                        Log.v(mLogTag, "Padding: " + mFramePadding);
+                    opacity = PixelFormat.TRANSLUCENT;
                 }
-            } else {
-                // For now we have to assume translucent if there is a
-                // frame with padding... there is no way to tell if the
-                // frame and background together will draw all pixels.
-                if (false)
-                    Log.v(mLogTag, "Padding: " + mFramePadding);
-                opacity = PixelFormat.TRANSLUCENT;
             }
+            if (false)
+                Log.v(mLogTag, "Background: " + bg + ", Frame: " + fg);
         }
-        if (false)
-            Log.v(mLogTag, "Background: " + bg + ", Frame: " + fg);
 
         if (false)
             Log.v(mLogTag, "Selected default opacity: " + opacity);
@@ -1627,6 +1651,8 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         }
 
         mActionModeController.onWindowFocusChanged(hasWindowFocus);
+
+        updateElevation();
     }
 
     @Override
@@ -1758,6 +1784,8 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
     protected void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
+        initializeElevation();
+
         ViewRootImpl viewRootImpl = getViewRootImpl();
         if (viewRootImpl != null) {
             viewRootImpl.getOnBackInvokedDispatcher().onConfigurationChanged(newConfig);
@@ -1788,6 +1816,7 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         // Put it below the color views.
         addView(root, 0, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
         mContentRoot = (ViewGroup) root;
+        initializeElevation();
     }
 
     void clearContentView() {
@@ -1845,6 +1874,52 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         }
         canvas.drawRect(v.getLeft(), v.getTop(), v.getRight(), v.getBottom(),
                 mLegacyNavigationBarBackgroundPaint);
+    }
+
+    /**
+     * The elevation gets set for the first time and the framework needs to be informed that
+     * the surface layer gets created with the shadow size in mind.
+     */
+    private void initializeElevation() {
+        // TODO(skuhne): Call setMaxElevation here accordingly after b/22668382 got fixed.
+        mAllowUpdateElevation = false;
+        updateElevation();
+    }
+
+    private void updateElevation() {
+        final int windowingMode =
+                getResources().getConfiguration().windowConfiguration.getWindowingMode();
+        final boolean renderShadowsInCompositor = mWindow.mRenderShadowsInCompositor;
+        // If rendering shadows in the compositor, don't set an elevation on the view
+        if (renderShadowsInCompositor) {
+            return;
+        }
+        float elevation = 0;
+        final boolean wasAdjustedForStack = mElevationAdjustedForStack;
+        // Do not use a shadow when we are in resizing mode (mBackdropFrameRenderer not null)
+        // since the shadow is bound to the content size and not the target size.
+        if (windowingMode == WINDOWING_MODE_FREEFORM) {
+            elevation = hasWindowFocus() ?
+                    DECOR_SHADOW_FOCUSED_HEIGHT_IN_DIP : DECOR_SHADOW_UNFOCUSED_HEIGHT_IN_DIP;
+            // Add a maximum shadow height value to the top level view.
+            // Note that pinned stack doesn't have focus
+            // so maximum shadow height adjustment isn't needed.
+            // TODO(skuhne): Remove this if clause once b/22668382 got fixed.
+            if (!mAllowUpdateElevation) {
+                elevation = DECOR_SHADOW_FOCUSED_HEIGHT_IN_DIP;
+            }
+            // Convert the DP elevation into physical pixels.
+            elevation = dipToPx(elevation);
+            mElevationAdjustedForStack = true;
+        } else {
+            mElevationAdjustedForStack = false;
+        }
+
+        // Don't change the elevation if we didn't previously adjust it for the stack it was in
+        // or it didn't change.
+        if ((wasAdjustedForStack || mElevationAdjustedForStack) && getElevation() != elevation) {
+            mWindow.setElevation(elevation);
+        }
     }
 
     /**

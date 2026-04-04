@@ -16,6 +16,7 @@
 
 package com.android.systemui.qs.footer.ui.viewmodel
 
+import android.app.supervision.flags.Flags
 import android.content.pm.UserInfo
 import android.graphics.drawable.Drawable
 import android.os.UserHandle
@@ -74,6 +75,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.`when` as whenever
 import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
@@ -85,8 +87,7 @@ class FooterActionsViewModelTest : SysuiTestCase() {
     private val userManager = mock<UserManager>()
     private val userRepository =
         FakeUserRepository(UserIconProvider(context, userManager, testDispatcher))
-    private val selectedUserInteractor =
-        SelectedUserInteractor(userRepository, testScope.backgroundScope)
+    private val selectedUserInteractor = SelectedUserInteractor(userRepository)
     private lateinit var utils: FooterActionsTestUtils
 
     private val themedContext = ContextThemeWrapper(context, R.style.Theme_SystemUI_QuickSettings)

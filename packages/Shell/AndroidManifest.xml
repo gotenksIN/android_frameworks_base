@@ -52,9 +52,6 @@
     <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission
-        android:name="android.permission.ACCESS_LOCAL_NETWORK"
-        android:featureFlag="android.permission.flags.access_local_network_permission_enabled" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
@@ -733,12 +730,10 @@
     <!-- Permission required for CTS test - CtsAlarmManagerTestCases -->
     <uses-permission android:name="android.permission.SCHEDULE_PRIORITIZED_ALARM" />
 
-    <!-- Permission required for CTS test - CtsMediaRouterTestCases -->
+    <!-- Permission required for CTS test - SystemMediaRouter2Test -->
     <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
     <uses-permission android:name="android.permission.MEDIA_ROUTING_CONTROL" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" />
-    <uses-permission android:name="android.permission.REMOTE_DISPLAY_PROVIDER"
-        android:featureFlag="com.android.media.flags.enable_mirroring_in_media_router_2" />
 
     <!-- Permission required for CTS test - MediaSessionTest -->
     <uses-permission android:name="android.permission.OVERRIDE_MEDIA_SESSION_OWNER"

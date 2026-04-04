@@ -1763,7 +1763,10 @@ public class SmartReplyViewTest extends SysuiTestCase {
         // 1. Verify the text is correct
         assertEquals(title, button.getText().toString());
 
-        // 2. Verify the background is set to the shader drawable.
+        // 2. Verify the special phishing tag is set (used by SmartReplyView to identify it)
+        assertTrue(Boolean.TRUE.equals(button.getTag(R.id.is_phishing_animated_action)));
+
+        // 3. Verify the background is set to the shader drawable.
         assertTrue(button.getBackground() instanceof AnimatableActionBackground);
     }
 

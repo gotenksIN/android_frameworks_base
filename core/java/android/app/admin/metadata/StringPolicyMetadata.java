@@ -38,6 +38,29 @@ public class StringPolicyMetadata extends PolicyMetadata<String> {
             @Nullable String requiredPermission,
             @Nullable String requiredCrossUserPermission,
             @NonNull Set<Integer> allowedDpcTypes,
+            boolean emptyStringAllowed,
+            boolean unprintableCharactersAllowed,
+            int maxLength) {
+        this(
+                id,
+                allowedScopes,
+                affectedResource,
+                requiredPermission,
+                requiredCrossUserPermission,
+                allowedDpcTypes,
+                null,
+                emptyStringAllowed,
+                unprintableCharactersAllowed,
+                maxLength);
+    }
+
+    public StringPolicyMetadata(
+            @NonNull PolicyIdentifier<String> id,
+            @NonNull Set<Integer> allowedScopes,
+            int affectedResource,
+            @Nullable String requiredPermission,
+            @Nullable String requiredCrossUserPermission,
+            @NonNull Set<Integer> allowedDpcTypes,
             @Nullable ResolutionMechanismMetadata<String> resolutionMechanism,
             boolean emptyStringAllowed,
             boolean unprintableCharactersAllowed,

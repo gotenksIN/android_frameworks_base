@@ -16,21 +16,23 @@
 
 package com.android.systemui.shared.clocks.view
 
+import android.content.Context
 import android.util.AttributeSet
 import android.widget.ImageView
 import com.android.systemui.customization.R
-import com.android.systemui.customization.clocks.FontTextStyle
 import com.android.systemui.customization.clocks.view.IDigitalClockTextView
 import com.android.systemui.plugins.keyguard.VPointF
 import com.android.systemui.plugins.keyguard.VRectF
-import com.android.systemui.shared.clocks.FlexClockContext
-import com.android.systemui.shared.clocks.controller.FlexClockFaceController.Companion.SMALL_CLOCK_MAX_WIDTH
 
-class BitmapClockView(
-    clockCtx: FlexClockContext,
-    private val isLargeClock: Boolean,
-    attrs: AttributeSet?,
-) : ImageView(clockCtx.context, attrs), IDigitalClockTextView {
+class BitmapClockView(context: Context, attrs: AttributeSet?) :
+    ImageView(context, attrs), IDigitalClockTextView {
+
+    init {
+        // make it have a minimum to occupy space no matter what
+        minimumWidth = 400
+        minimumHeight = 400
+    }
+
     override var dozeFraction: Float = 0f
         set(value) {
             field = value
@@ -50,18 +52,6 @@ class BitmapClockView(
         setImageResource(R.drawable.eight)
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        val ratio = measuredHeight / measuredWidth
-
-        if (!isLargeClock) {
-            val finalWidth = minOf(measuredWidth.toFloat(), SMALL_CLOCK_MAX_WIDTH).toInt()
-            val finalHeight = finalWidth * ratio
-
-            setMeasuredDimension(finalWidth, finalHeight)
-        }
-    }
-
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         if (changed) {
@@ -72,11 +62,6 @@ class BitmapClockView(
             onViewBoundsChanged?.invoke(rect)
             onViewMaxSizeChanged?.invoke(size)
         }
-    }
-
-    fun applyBitmapStyles(style: FontTextStyle) {
-        this.scaleX = style.fontSizeScale
-        this.scaleY = style.fontSizeScale
     }
 
     override var maxSize = VPointF(-1f, -1f)

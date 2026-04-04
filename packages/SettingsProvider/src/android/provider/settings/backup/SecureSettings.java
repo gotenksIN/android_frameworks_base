@@ -183,7 +183,6 @@ public class SecureSettings {
         Settings.Secure.HUSH_GESTURE_USED,
         Settings.Secure.IN_CALL_NOTIFICATION_ENABLED,
         Settings.Secure.LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS,
-        Settings.Secure.LOCK_SCREEN_NOTE_TAKING_CONSENT,
         Settings.Secure.LOCK_SCREEN_CUSTOM_CLOCK_FACE,
         Settings.Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS,
         Settings.Secure.LOCK_SCREEN_SHOW_SILENT_NOTIFICATIONS,

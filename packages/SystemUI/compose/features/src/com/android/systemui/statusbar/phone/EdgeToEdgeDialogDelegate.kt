@@ -26,13 +26,10 @@ import com.android.systemui.animation.back.bottomSheetForSysUi
 
 /** [DialogDelegate] that configures a dialog to be an edge-to-edge one. */
 class EdgeToEdgeDialogDelegate(
-    val shouldStashTaskbar: Boolean = true,
     private val touchEvent: (dialog: SystemUIDialog, event: MotionEvent) -> Boolean = { _, _ ->
         false
-    },
+    }
 ) : DialogDelegate<SystemUIDialog> {
-
-    override fun shouldStashTaskbar(dialog: SystemUIDialog): Boolean = shouldStashTaskbar
 
     override fun onCreate(dialog: SystemUIDialog, savedInstanceState: Bundle?) {
         dialog.window?.apply {

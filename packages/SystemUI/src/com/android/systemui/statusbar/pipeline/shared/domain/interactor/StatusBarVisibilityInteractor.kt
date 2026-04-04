@@ -43,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.WhileSubscribed
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -51,7 +52,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 
 @PerDisplaySingleton
-class HomeStatusBarVisibilityInteractor
+class StatusBarVisibilityInteractor
 @Inject
 constructor(
     @field:DisplayId @DisplayAware private val thisDisplayId: Int,

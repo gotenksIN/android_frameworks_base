@@ -358,7 +358,6 @@ public class RavenwoodDriver {
     private static void dumpRavenwoodProperties() {
         Log.i(TAG, "Ravenwood properties:");
         var env = RavenwoodEnvironment.getInstance();
-        Log.i(TAG, "  moduleName=" + env.getTestModuleName());
         Log.i(TAG, "  targetPackageName=" + env.getTargetPackageName());
         Log.i(TAG, "  testPackageName=" + env.getInstPackageName());
         Log.i(TAG, "  targetSdkLevel=" + env.getTargetSdkLevel());

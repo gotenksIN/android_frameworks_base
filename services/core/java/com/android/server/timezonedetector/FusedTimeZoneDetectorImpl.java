@@ -17,9 +17,7 @@ package com.android.server.timezonedetector;
 
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_FUSED;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_LOCATION;
-import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_MANUAL;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_TELEPHONY;
-import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.Origin;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -38,10 +36,8 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.timezonedetector.ftzd.AirplaneModeEvent;
 import com.android.server.timezonedetector.ftzd.FusedSignals;
-import com.android.server.timezonedetector.ftzd.UntrustedSignalInfo;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -118,7 +114,7 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
 
     @GuardedBy("this")
     @VisibleForTesting
-    final Map<String, Set<UntrustedSignalInfo>> mUntrustedTelephonyTz = new ArrayMap<>();
+    final Map<String, Set<String>> mUntrustedTelephonyTz = new ArrayMap<>();
 
     /**
      * The key for the {@link android.provider.Settings.Global} setting that stores whether the
@@ -165,8 +161,6 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
 
     @GuardedBy("this")
     private boolean mIsAirplaneModeOn;
-
-    private final TimeZone mTimeZoneAtBoot;
 
     /**
      * The location suggestions that disagreed with the current time zone. When the number of
@@ -242,7 +236,6 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
         mHandler = handler;
         mAirplaneModeResetDelay = airplaneModeResetDelay;
         mTelemetry = telemetry;
-        mTimeZoneAtBoot = TimeZone.getDefault();
 
         synchronized (this) {
             mIsLocationOnlyTzDetection =
@@ -256,8 +249,7 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
         setupAirplaneModeListener();
 
         synchronized (this) {
-            @Origin Integer origin = isManualDetectionMode() ? ORIGIN_MANUAL : null;
-            updateCurrentFusedSignals(new FusedSignals(TimeZone.getDefault().getID(), origin));
+            updateCurrentFusedSignals(new FusedSignals(TimeZone.getDefault().getID(), null));
         }
     }
 
@@ -368,8 +360,7 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
         if (telephonySignal != null
                 && mUntrustedTelephonyTz
                         .getOrDefault(telephonySignal.getMcc(), Set.of())
-                        .stream()
-                        .anyMatch(info -> Objects.equals(info.timeZoneId(), newZoneId))
+                        .contains(newZoneId)
                 && !Objects.equals(newZoneId, mCurrentFusedSignals.getTimeZoneId())) {
             // Telephony detection is not trusted and it disagrees with the current zone, so we
             // ignore the event.
@@ -439,8 +430,7 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
             String mcc = suggestion.suggestion().getTelephonySignal().getMcc();
             String zoneId = suggestion.suggestion().getZoneId();
 
-            mUntrustedTelephonyTz.computeIfAbsent(mcc, k -> new ArraySet<>())
-                    .add(new UntrustedSignalInfo(SystemClock.elapsedRealtime(), zoneId));
+            mUntrustedTelephonyTz.computeIfAbsent(mcc, k -> new ArraySet<>()).add(zoneId);
         } else if (mLocationDisagreementCandidate != null
                 && mLocationDisagreementCandidate.getZoneIds().contains(newZoneId)) {
             // The new telephony suggestion agrees with a pending location candidate. This resolves
@@ -615,8 +605,7 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
         }
     }
 
-    private void printMapItems(
-            @NonNull IndentingPrintWriter ipw, Map<String, ? extends Collection<?>> map) {
+    private void printMapItems(@NonNull IndentingPrintWriter ipw, Map<String, Set<String>> map) {
         map.forEach(
                 (key, value) -> {
                     ipw.println(key + ":");
@@ -631,16 +620,12 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
     @GuardedBy("this")
     private void updateCurrentFusedSignals(@NonNull FusedSignals fusedSignals) {
         mCurrentFusedSignals = fusedSignals;
-
-        if (fusedSignals.hasSingleOrigin(ORIGIN_MANUAL, QUALITY_LOW)) {
-            return;
-        }
-
         addTimeZoneToHistory(fusedSignals);
     }
 
     private void setDeviceTimeZoneIfRequired(@NonNull FusedSignals fusedSignals, String source) {
-        if (isManualDetectionMode()) {
+        if (mServiceConfigAccessor.getCurrentUserConfigurationInternal().getDetectionMode()
+                == ConfigurationInternal.DETECTION_MODE_MANUAL) {
             return;
         }
         if (fusedSignals.getTimeZoneId() == null) {
@@ -719,11 +704,6 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
                 .isTelephonyDetectionSupported();
     }
 
-    private boolean isManualDetectionMode() {
-        return mServiceConfigAccessor.getCurrentUserConfigurationInternal().getDetectionMode()
-                == ConfigurationInternal.DETECTION_MODE_MANUAL;
-    }
-
     /** Gets the state of Airplane Mode. */
     private boolean isAirplaneModeOn() {
         return Settings.Global.getInt(
@@ -751,46 +731,42 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
     /** Dumps internal state such as field values. */
     @Override
     public synchronized void dump(@NonNull IndentingPrintWriter ipw, @Nullable String[] args) {
-        long now = SystemClock.elapsedRealtime();
         ipw.println(
-                "Fused Time Zone Detector (FTZD) at "
-                        + Duration.ofMillis(now).toString()
-                        + " / "
-                        + Instant.now());
+                "FusedTimeZoneDetector ("
+                        + Duration.ofMillis(SystemClock.elapsedRealtime()).toString()
+                        + ")");
         ipw.increaseIndent(); // level 1
 
         ipw.println("Configuration:");
         ipw.increaseIndent(); // level 2
-        ipw.println(
-                "Location time zone detection enabled: " + isLocationTimeZoneDetectionEnabled());
+        ipw.println("isLocationTimeZoneDetectionEnabled=" + isLocationTimeZoneDetectionEnabled());
 
         ipw.increaseIndent(); // level 3
         ipw.println(
-                "- Location enabled in Settings: "
+                "isLocationEnabledSetting="
                         + mServiceConfigAccessor
                                 .getCurrentUserConfigurationInternal()
                                 .getLocationEnabledSetting());
         ipw.println(
-                "- Geo-detection supported: "
+                "isGeoDetectionSupported="
                         + mServiceConfigAccessor
                                 .getCurrentUserConfigurationInternal()
                                 .isGeoDetectionSupported());
-        ipw.println("- Geo-detection enabled in Settings: " + isGeoDetectionEnabledInSettings());
+        ipw.println("isGeoDetectionEnabledSetting=" + isGeoDetectionEnabledInSettings());
         ipw.decreaseIndent(); // level 3
 
-        ipw.println("Telephony supported: " + isTelephonyTimeZoneDetectionSupported());
+        ipw.println("isTelephonySupported=" + isTelephonyTimeZoneDetectionSupported());
         ipw.println(
-                "Airplane mode on: "
+                "mIsAirplaneModeOn="
                         + mIsAirplaneModeOn
                         + (mIsAirplaneModeOn && mLastAirplaneModeEvent != null
                                 ? " (" + mLastAirplaneModeEvent.getStartTimeToString() + ")"
                                 : ""));
-        ipw.println("Location-only time zone detection: " + mIsLocationOnlyTzDetection);
-        ipw.println("Manual detection mode: " + isManualDetectionMode());
-        ipw.println("Current fused signals: " + mCurrentFusedSignals);
+        ipw.println("mIsLocationOnlyTzDetection=" + mIsLocationOnlyTzDetection);
+        ipw.println("mCurrentFusedSignals=" + mCurrentFusedSignals);
         ipw.decreaseIndent(); // level 1
 
-        ipw.println("Time zone detection history:");
+        ipw.println("Time zone history:");
         ipw.increaseIndent(); // level 2
         mTimeZoneHistory.dump(ipw);
         ipw.decreaseIndent(); // level 1
@@ -802,35 +778,33 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
 
         ipw.println("Usage stats:");
         ipw.increaseIndent(); // level 2
-        ipw.println("Valid location updates: " + mValidLocationUpdates);
-        ipw.println("Total location updates: " + mTotalLocationUpdates);
-        ipw.println("Valid telephony updates: " + mValidTelephonyUpdates);
-        ipw.println("Total telephony updates: " + mTotalTelephonyUpdates);
-        ipw.println("Total disagreements: " + mTotalDisagreements);
+        ipw.println("mValidLocationUpdates=" + mValidLocationUpdates);
+        ipw.println("mTotalLocationUpdates=" + mTotalLocationUpdates);
+        ipw.println("mValidTelephonyUpdates=" + mValidTelephonyUpdates);
+        ipw.println("mTotalTelephonyUpdates=" + mTotalTelephonyUpdates);
+        ipw.println("mTotalDisagreements=" + mTotalDisagreements);
         ipw.decreaseIndent(); // level 1
 
         ipw.println("Detection state:");
         ipw.increaseIndent(); // level 2
-        ipw.println("Time zone at boot: " + mTimeZoneAtBoot.getID());
-        ipw.println("Last telephony suggestion: " + mLastTelephonySuggestion);
+        ipw.println("mLastTelephonySuggestion=" + mLastTelephonySuggestion);
 
         if (!mUntrustedTelephonyTz.isEmpty()) {
-            ipw.println(
-                    "Untrusted telephony time zones (count=" + mUntrustedTelephonyTz.size() + "):");
+            ipw.println("mUntrustedTelephonyTz (count=" + mUntrustedTelephonyTz.size() + "):");
             ipw.increaseIndent(); // level 3
             printMapItems(ipw, mUntrustedTelephonyTz);
             ipw.decreaseIndent(); // level 2
         }
 
         if (mLocationDisagreementCandidate != null) {
-            ipw.println("Location disagreement candidate:");
+            ipw.println("mLocationDisagreementCandidate:");
             ipw.increaseIndent(); // level 3
             ipw.println("- " + mLocationDisagreementCandidate);
             ipw.decreaseIndent(); // level 2
         }
 
         if (mTelephonyDisagreementCandidate != null) {
-            ipw.println("Telephony disagreement candidate:");
+            ipw.println("mTelephonyDisagreementCandidate:");
             ipw.increaseIndent(); // level 3
             ipw.println("- " + mTelephonyDisagreementCandidate);
             ipw.decreaseIndent(); // level 2

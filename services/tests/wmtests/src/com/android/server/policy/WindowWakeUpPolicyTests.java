@@ -31,6 +31,7 @@ import static android.view.KeyEvent.KEYCODE_POWER;
 import static android.view.KeyEvent.KEYCODE_STEM_PRIMARY;
 
 import static com.android.server.policy.Flags.FLAG_SUPPORT_INPUT_WAKEUP_DELEGATE;
+import static com.android.server.power.feature.flags.Flags.FLAG_PER_DISPLAY_WAKE_BY_TOUCH;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -126,6 +127,7 @@ public final class WindowWakeUpPolicyTests {
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testMotionWakeUpDelegation_wakePowerManagerIfDelegateDoesNotHandleWake() {
         mSetFlagsRule.enableFlags(FLAG_SUPPORT_INPUT_WAKEUP_DELEGATE);
         mPolicy = new WindowWakeUpPolicy(mContextSpy, mClock);
@@ -152,20 +154,11 @@ public final class WindowWakeUpPolicyTests {
                 .isTrue();
         verify(mInputWakeUpDelegate)
                 .wakeUpFromMotion(DEFAULT_DISPLAY, 300, SOURCE_ROTARY_ENCODER, false, false);
-        if (com.android.server.display.feature.flags.Flags.separateTimeouts()) {
-            verify(mPowerManager)
-                    .wakeUp(300, WAKE_REASON_WAKE_MOTION, "android.policy:MOTION");
-        } else {
-            verify(mPowerManager)
-                    .wakeUp(
-                            300,
-                            WAKE_REASON_WAKE_MOTION,
-                            "android.policy:MOTION",
-                            DEFAULT_DISPLAY);
-        }
+        verify(mPowerManager).wakeUp(300, WAKE_REASON_WAKE_MOTION, "android.policy:MOTION");
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testKeyWakeUpDelegation_wakePowerManagerIfDelegateDoesNotHandleWake() {
         mSetFlagsRule.enableFlags(FLAG_SUPPORT_INPUT_WAKEUP_DELEGATE);
         mPolicy = new WindowWakeUpPolicy(mContextSpy, mClock);
@@ -208,20 +201,11 @@ public final class WindowWakeUpPolicyTests {
                         KEYCODE_STEM_PRIMARY,
                         /* isDown= */ false,
                         /* keyEventFlags= */ 0);
-        if (com.android.server.display.feature.flags.Flags.separateTimeouts()) {
-            verify(mPowerManager)
-                    .wakeUp(300, WAKE_REASON_WAKE_KEY, "android.policy:KEY");
-        } else {
-            verify(mPowerManager)
-                    .wakeUp(
-                            300,
-                            WAKE_REASON_WAKE_KEY,
-                            "android.policy:KEY",
-                            DEFAULT_DISPLAY);
-        }
+        verify(mPowerManager).wakeUp(300, WAKE_REASON_WAKE_KEY, "android.policy:KEY");
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testWakeUpFromMotion() {
         runPowerManagerUpChecks(
                 () ->
@@ -232,12 +216,12 @@ public final class WindowWakeUpPolicyTests {
                                 true,
                                 false),
                 WAKE_REASON_WAKE_MOTION,
-                "android.policy:MOTION",
-                /* isGlobalEvent= */ false);
+                "android.policy:MOTION");
     }
 
     @Test
-    public void testWakeUpFromMotion_specificDisplay() {
+    @EnableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
+    public void testWakeUpFromMotion_perDisplayWakeByTouchEnabled() {
         final int displayId = 555;
         mPolicy = new WindowWakeUpPolicy(mContextSpy, mClock);
 
@@ -252,6 +236,25 @@ public final class WindowWakeUpPolicyTests {
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
+    public void testWakeUpFromMotion_perDisplayWakeByTouchDisabled() {
+        final int displayId = 555;
+        mPolicy = new WindowWakeUpPolicy(mContextSpy, mClock);
+
+        boolean displayWokeUp = mPolicy.wakeUpFromMotion(
+                displayId, mClock.uptimeMillis(), SOURCE_TOUCHSCREEN, /* isDown= */ true,
+                /* deviceGoingToSleep= */ false);
+
+        // Verify that power is woken up and display isn't woken up individually
+        assertThat(displayWokeUp).isTrue();
+        verify(mPowerManager).wakeUp(
+                anyLong(), eq(WAKE_REASON_WAKE_MOTION), eq("android.policy:MOTION"));
+        verify(mPowerManager, never()).wakeUp(anyLong(), eq(WAKE_REASON_WAKE_MOTION),
+                eq("android.policy:MOTION"), eq(displayId));
+    }
+
+    @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testWakeUpFromKey_nonPowerKey() {
         runPowerManagerUpChecks(
                 () ->
@@ -262,13 +265,13 @@ public final class WindowWakeUpPolicyTests {
                                 /* isDown= */ true,
                                 /* keyEventFlags= */ 0),
                 WAKE_REASON_WAKE_KEY,
-                "android.policy:KEY",
-                /* isGlobalEvent= */ false);
+                "android.policy:KEY");
     }
 
     @Test
+    @EnableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     @DisableFlags({com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS})
-    public void testWakeUpFromKey_invalidDisplay_wakesDefaultDisplay() {
+    public void testWakeUpFromKey_invalidDisplay_perDisplayWakeByTouchEnabled() {
         final int displayId = Display.INVALID_DISPLAY;
         mPolicy = new WindowWakeUpPolicy(mContextSpy, mClock);
 
@@ -307,64 +310,51 @@ public final class WindowWakeUpPolicyTests {
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testWakeUpFromLid() {
         runPowerManagerUpChecks(
                 () -> mPolicy.wakeUpFromLid(),
                 WAKE_REASON_LID,
-                "android.policy:LID",
-                /* isGlobalEvent= */ true);
+                "android.policy:LID");
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testWakeUpFromWakeGesture() {
         runPowerManagerUpChecks(
                 () -> mPolicy.wakeUpFromWakeGesture(),
                 WAKE_REASON_GESTURE,
-                "android.policy:GESTURE",
-                /* isGlobalEvent= */ true);
+                "android.policy:GESTURE");
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testwakeUpFromCameraCover() {
         runPowerManagerUpChecks(
                 () -> mPolicy.wakeUpFromCameraCover(mClock.uptimeMillis()),
                 WAKE_REASON_CAMERA_LAUNCH,
-                "android.policy:CAMERA_COVER",
-                /* isGlobalEvent= */ true);
+                "android.policy:CAMERA_COVER");
     }
 
     @Test
+    @DisableFlags({FLAG_PER_DISPLAY_WAKE_BY_TOUCH})
     public void testWakeUpFromPowerKeyCameraGesture() {
         runPowerManagerUpChecks(
                 () -> mPolicy.wakeUpFromPowerKeyCameraGesture(),
                 WAKE_REASON_CAMERA_LAUNCH,
-                "android.policy:CAMERA_GESTURE_PREVENT_LOCK",
-                /* isGlobalEvent= */ true);
+                "android.policy:CAMERA_GESTURE_PREVENT_LOCK");
     }
 
     private void runPowerManagerUpChecks(
             BooleanSupplier wakeUpCall,
             int expectedWakeReason,
-            String expectedWakeDetails,
-            boolean isGlobalEvent) {
+            String expectedWakeDetails) {
         Mockito.reset(mPowerManager);
         LocalServices.removeServiceForTest(WindowWakeUpPolicyInternal.class);
         mPolicy = new WindowWakeUpPolicy(mContextSpy, mClock);
         setUptimeMillis(300);
         assertWithMessage("Device should wake up.").that(wakeUpCall.getAsBoolean()).isTrue();
-
-        if (isGlobalEvent) {
-            // Global events always trigger the 3-argument global wakeup
-            verify(mPowerManager).wakeUp(300L, expectedWakeReason, expectedWakeDetails);
-        } else {
-            // Localized events to DEFAULT_DISPLAY dynamically adapt based on separateTimeouts logic
-            if (com.android.server.display.feature.flags.Flags.separateTimeouts()) {
-                verify(mPowerManager).wakeUp(300L, expectedWakeReason, expectedWakeDetails);
-            } else {
-                verify(mPowerManager)
-                        .wakeUp(300L, expectedWakeReason, expectedWakeDetails, DEFAULT_DISPLAY);
-            }
-        }
+        verify(mPowerManager).wakeUp(300L, expectedWakeReason, expectedWakeDetails);
     }
 
     private void verifyNoPowerManagerWakeUp() {

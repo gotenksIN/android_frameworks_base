@@ -821,6 +821,11 @@ public class SmartReplyView extends ViewGroup {
     }
 
     private void setButtonColors(Button button) {
+        // Check if this is a phishing animated button that manages its own colors.
+        if (Boolean.TRUE.equals(button.getTag(R.id.is_phishing_animated_action))) {
+            return; // Skip the dynamic override
+        }
+
         Drawable drawable = button.getBackground();
         if (drawable instanceof RippleDrawable) {
             // Mutate in case other notifications are using this drawable.

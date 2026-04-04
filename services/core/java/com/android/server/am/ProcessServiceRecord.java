@@ -25,13 +25,13 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-import android.util.IndentingPrintWriter;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.am.psc.ProcessServiceRecordInternal;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 
 /**
@@ -290,56 +290,52 @@ final class ProcessServiceRecord extends ProcessServiceRecordInternal {
         }
     }
 
-    void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
+    void dump(PrintWriter pw, String prefix, long nowUptime) {
         if (hasForegroundServices() || mApp.getForcingToImportant() != null) {
-            pw.print("mHasForegroundServices", hasForegroundServices());
-            pw.print("forcingToImportant", mApp.getForcingToImportant()).println();
+            pw.print(prefix);
+            pw.print("mHasForegroundServices="); pw.print(hasForegroundServices());
+            pw.print(" forcingToImportant="); pw.println(mApp.getForcingToImportant());
         }
         if (getHasTopStartedAlmostPerceptibleServices()
                 || getLastTopStartedAlmostPerceptibleBindRequestUptimeMs() > 0) {
-            pw.print("mHasTopStartedAlmostPerceptibleServices",
-                    getHasTopStartedAlmostPerceptibleServices());
-            pw.print("mLastTopStartedAlmostPerceptibleBindRequestUptimeMs",
-                    getLastTopStartedAlmostPerceptibleBindRequestUptimeMs()).println();
+            pw.print(prefix); pw.print("mHasTopStartedAlmostPerceptibleServices=");
+            pw.print(getHasTopStartedAlmostPerceptibleServices());
+            pw.print(" mLastTopStartedAlmostPerceptibleBindRequestUptimeMs=");
+            pw.println(getLastTopStartedAlmostPerceptibleBindRequestUptimeMs());
         }
         if (hasClientActivities() || hasBindAboveClient() || isTreatLikeActivity()) {
-            pw.print("hasClientActivities", hasClientActivities());
-            pw.print("hasAboveClient", hasBindAboveClient());
-            pw.print("treatLikeActivity", isTreatLikeActivity()).println();
+            pw.print(prefix); pw.print("hasClientActivities="); pw.print(hasClientActivities());
+            pw.print(" hasAboveClient="); pw.print(hasBindAboveClient());
+            pw.print(" treatLikeActivity="); pw.println(isTreatLikeActivity());
         }
         if (getConnectionGroup() != 0) {
-            pw.print("connectionGroup", getConnectionGroup());
-            pw.print("Importance", getConnectionImportance()).println();
+            pw.print(prefix); pw.print("connectionGroup="); pw.print(getConnectionGroup());
+            pw.print(" Importance="); pw.print(getConnectionImportance());
         }
         if (mAllowlistManager) {
-            pw.print("allowlistManager", mAllowlistManager).println();
+            pw.print(prefix); pw.print("allowlistManager="); pw.println(mAllowlistManager);
         }
         if (numberOfRunningServices() > 0) {
-            pw.println("Services:");
-            pw.increaseIndent();
+            pw.print(prefix); pw.println("Services:");
             for (int i = 0, size = numberOfRunningServices(); i < size; i++) {
-                pw.print("- "); pw.println(getRunningServiceAt(i));
+                pw.print(prefix); pw.print("  - "); pw.println(getRunningServiceAt(i));
             }
-            pw.decreaseIndent();
         }
         if (hasExecutingServices()) {
-            pw.print("Executing Services (fg=");
+            pw.print(prefix); pw.print("Executing Services (fg=");
             pw.print(isExecServicesFg()); pw.println(")");
-            pw.increaseIndent();
             for (int i = 0, size = numberOfExecutingServices(); i < size; i++) {
-                pw.print("- "); pw.println(getExecutingServiceAt(i));
+                pw.print(prefix); pw.print("  - "); pw.println(getExecutingServiceAt(i));
             }
-            pw.decreaseIndent();
         }
         if (numberOfConnections() > 0) {
-            pw.println("mConnections:");
-            pw.increaseIndent();
+            pw.print(prefix); pw.println("mConnections:");
             for (int i = 0, size = numberOfConnections(); i < size; i++) {
-                pw.print("- "); pw.println(getConnectionAt(i));
+                pw.print(prefix); pw.print("  - "); pw.println(getConnectionAt(i));
             }
-            pw.decreaseIndent();
         }
-
-        pw.print("scheduleServiceTimeoutPending", mScheduleServiceTimeoutPending).println();
+        pw.print(prefix);
+        pw.print("scheduleServiceTimeoutPending=");
+        pw.println(mScheduleServiceTimeoutPending);
     }
 }

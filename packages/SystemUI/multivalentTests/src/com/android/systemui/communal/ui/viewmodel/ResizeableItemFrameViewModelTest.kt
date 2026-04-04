@@ -17,11 +17,13 @@
 package com.android.systemui.communal.ui.viewmodel
 
 import android.content.ComponentName
+import android.platform.test.annotations.EnableFlags
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.testing.UiEventLoggerFake
 import com.android.internal.logging.uiEventLoggerFake
+import com.android.systemui.Flags.FLAG_COMMUNAL_ACCESSIBILITY_RESIZE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.communal.ui.metrics.CommunalUiEvent
 import com.android.systemui.compose.runTestWithSnapshots
@@ -69,13 +71,7 @@ class ResizeableItemFrameViewModelTest : SysuiTestCase() {
     @Before
     fun setUp() {
         uiEventLogger = kosmos.uiEventLoggerFake
-        underTest =
-            ResizeableItemFrameViewModel(
-                uiEventLogger,
-                ComponentName("pkg", "cls"),
-                1,
-                Int.MAX_VALUE,
-            )
+        underTest = ResizeableItemFrameViewModel(uiEventLogger, ComponentName("pkg", "cls"))
         underTest.activateIn(testScope)
     }
 
@@ -263,6 +259,7 @@ class ResizeableItemFrameViewModelTest : SysuiTestCase() {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    @EnableFlags(FLAG_COMMUNAL_ACCESSIBILITY_RESIZE)
     fun testRepeatedResizeOperations_emitsCorrectly() =
         testScope.runTestWithSnapshots {
             val collectedResizeInfo = mutableListOf<ResizeInfo>()
@@ -645,6 +642,7 @@ class ResizeableItemFrameViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_COMMUNAL_ACCESSIBILITY_RESIZE)
     fun toggleAccessibilityResizeHandle_togglesState() {
         assertThat(underTest.visibleAccessibilityResizeHandle.value).isNull()
 
@@ -662,6 +660,7 @@ class ResizeableItemFrameViewModelTest : SysuiTestCase() {
     }
 
     @Test
+    @EnableFlags(FLAG_COMMUNAL_ACCESSIBILITY_RESIZE)
     fun toggleAccessibilityResizeHandle_logsShowAndHide() {
         val componentName = ComponentName("pkg", "cls")
 
@@ -682,6 +681,7 @@ class ResizeableItemFrameViewModelTest : SysuiTestCase() {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    @EnableFlags(FLAG_COMMUNAL_ACCESSIBILITY_RESIZE)
     fun reset_clearsStateAndResetsDragState() =
         testScope.runTestWithSnapshots {
             // Set up some state
@@ -734,94 +734,6 @@ class ResizeableItemFrameViewModelTest : SysuiTestCase() {
             assertThat(uiEventLogger.eventId(0))
                 .isEqualTo(CommunalUiEvent.COMMUNAL_HUB_WIDGET_SHRINK_BY_ACCESSIBILITY_BUTTON.id)
             assertThat(uiEventLogger.logs[0].packageName).isEqualTo(componentName.packageName)
-        }
-
-    private fun TestScope.setUpWithConfig(
-        minWidgetConfigSpan: Int,
-        maxWidgetConfigSpan: Int,
-        currentSpan: Int,
-        totalSpans: Int,
-    ) {
-        underTest =
-            ResizeableItemFrameViewModel(
-                uiEventLogger,
-                ComponentName("pkg", "cls"),
-                minWidgetConfigSpan,
-                maxWidgetConfigSpan,
-            )
-        underTest.activateIn(this)
-        updateGridLayout(
-            singleSpanGrid.copy(
-                currentRow = 0,
-                currentSpan = currentSpan,
-                resizeMultiple = 1,
-                totalSpans = totalSpans,
-                minHeightPx = 0,
-                maxHeightPx = 1000,
-            )
-        )
-    }
-
-    @Test
-    fun testMinWidgetConfigSpan_allowsShrinking() =
-        testScope.runTest {
-            setUpWithConfig(
-                minWidgetConfigSpan = 2,
-                maxWidgetConfigSpan = Int.MAX_VALUE,
-                currentSpan = 3,
-                totalSpans = 3,
-            )
-
-            val bottomState = underTest.bottomDragState
-            assertThat(bottomState.anchors.toList()).containsExactly(-1 to -30f, 0 to 0f)
-            assertThat(underTest.canShrink()).isTrue()
-        }
-
-    @Test
-    fun testMaxWidgetConfigSpan_allowsExpanding() =
-        testScope.runTest {
-            setUpWithConfig(
-                minWidgetConfigSpan = 1,
-                maxWidgetConfigSpan = 2,
-                currentSpan = 1,
-                totalSpans = 3,
-            )
-
-            val bottomState = underTest.bottomDragState
-            assertThat(bottomState.anchors.toList()).containsExactly(0 to 0f, 1 to 30f)
-            assertThat(underTest.canExpand()).isTrue()
-        }
-
-    @Test
-    fun testCurrentSpanLessThanMinWidgetConfigSpan_cannotShrink() =
-        testScope.runTest {
-            setUpWithConfig(
-                minWidgetConfigSpan = 3,
-                maxWidgetConfigSpan = 5,
-                currentSpan = 2,
-                totalSpans = 5,
-            )
-
-            val bottomState = underTest.bottomDragState
-            assertThat(bottomState.anchors.toList())
-                .containsExactly(0 to 0f, 1 to 18f, 2 to 36f, 3 to 54f)
-            assertThat(underTest.canShrink()).isFalse()
-        }
-
-    @Test
-    fun testCurrentSpanGreaterThanMaxWidgetConfigSpan_cannotExpand() =
-        testScope.runTest {
-            setUpWithConfig(
-                minWidgetConfigSpan = 1,
-                maxWidgetConfigSpan = 2,
-                currentSpan = 3,
-                totalSpans = 5,
-            )
-
-            val bottomState = underTest.bottomDragState
-            assertThat(bottomState.anchors.toList())
-                .containsExactly(-2 to -36f, -1 to -18f, 0 to 0f)
-            assertThat(underTest.canExpand()).isFalse()
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)

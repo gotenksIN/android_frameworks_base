@@ -338,7 +338,6 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
-            /* resolutionMechanism= */ null,
             /* emptyStringAllowed= */ false,
             /* unprintableCharactersAllowed= */ true,
             /* maxLength= */ Integer.MAX_VALUE
@@ -354,7 +353,6 @@ public class Policies {
                 /* requiredPermission= */ null,
                 /* requiredCrossUserPermission= */ null,
                 /* allowedDpcTypes= */ Set.of(),
-                /* resolutionMechanism= */ null,
                 /* emptyStringAllowed= */ true,
                 /* unprintableCharactersAllowed= */ false,
                 /* maxLength= */ Integer.MAX_VALUE
@@ -371,7 +369,6 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
-            /* resolutionMechanism= */ null,
             /* emptyStringAllowed= */ false,
             /* unprintableCharactersAllowed= */ false,
             /* maxLength= */ 10

@@ -2075,7 +2075,10 @@ class DesktopTasksController(
      */
     fun closeTask(task: RunningTaskInfo, forceKeepDesktop: Boolean = false): CloseTaskResult {
         val taskId = task.taskId
-        if (lockTaskChangeListener.isTaskLocked) {
+        if (
+            DesktopExperienceFlags.CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT.isTrue() &&
+                lockTaskChangeListener.isTaskLocked
+        ) {
             logW("closeTask(taskId=%d): %s", taskId, CloseTaskResult.NOT_CLOSED_TASK_LOCKED)
             return CloseTaskResult.NOT_CLOSED_TASK_LOCKED
         }
@@ -2101,7 +2104,10 @@ class DesktopTasksController(
             logI("closeTask(taskId=%d): %s", taskId, CloseTaskResult.CLOSED_DESKTOP)
             return CloseTaskResult.CLOSED_DESKTOP
         }
-        if (task.getWindowingMode() == WINDOWING_MODE_FULLSCREEN) {
+        if (
+            DesktopExperienceFlags.CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT.isTrue() &&
+                task.getWindowingMode() == WINDOWING_MODE_FULLSCREEN
+        ) {
             val wct = WindowContainerTransaction()
             wct.removeTask(task.token)
             transitions.startTransition(TRANSIT_CLOSE, wct, null)

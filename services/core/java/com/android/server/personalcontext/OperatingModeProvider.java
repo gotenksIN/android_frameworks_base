@@ -66,8 +66,7 @@ public class OperatingModeProvider {
         }
 
         if (!hasProperties(OperatingModeProvider.OPERATING_PROPERTY_FLAG_ENFORCE_PCC)) {
-            flags &= ~AccessController.ACCESS_PCC_OR_AUTO_COMPANION_ROLE;
-            flags &= ~AccessController.ACCESS_PCC_OR_TRUSTED_PACKAGE;
+            flags &= ~AccessController.ACCESS_PCC;
         }
 
         return flags;

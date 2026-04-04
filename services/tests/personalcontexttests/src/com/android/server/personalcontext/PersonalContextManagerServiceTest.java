@@ -436,23 +436,6 @@ public class PersonalContextManagerServiceTest {
 
     @Test
     @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
-    public void testPublishTriggeringHint_packageDisabled_throwsIllegalStateException() {
-        mService.onUserStarting(mUser1);
-
-        when(mPackageManagerInternal.getPersonalContextMode(any(), anyInt(), anyInt()))
-                .thenReturn(PackageManager.PERSONAL_CONTEXT_MODE_USER_OFF);
-
-        BundleHint hint = new BundleHint.Builder().build();
-        ContextHintWrapper hintWrapper = new ContextHintWrapper(hint);
-        List<ContextHintWrapper> hints = List.of(hintWrapper);
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> mBinderService.publishTriggeringHint(hints, List.of(), List.of(), USER_ID_1));
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENFORCE_PERSONAL_CONTEXT_PERMISSIONS)
     public void testPublishTriggeringHint_deepPackageDisabled_throwsIllegalStateException() {
         mService.onUserStarting(mUser1);
 

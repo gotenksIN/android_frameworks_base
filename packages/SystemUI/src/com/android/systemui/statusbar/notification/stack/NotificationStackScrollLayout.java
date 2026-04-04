@@ -2809,14 +2809,8 @@ public class NotificationStackScrollLayout
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
             View child = getChildAt(i);
-            if (SceneContainerFlag.isEnabled()) {
-                if (child.getVisibility() != View.VISIBLE) {
-                    continue;
-                }
-            } else {
-                if (child.getVisibility() == View.GONE) {
-                    continue;
-                }
+            if (child.getVisibility() == View.GONE) {
+                continue;
             }
             float rowTranslation = child.getTranslationY();
             if (rowTranslation >= translationY) {

@@ -39,6 +39,11 @@ public class PowerManagerFlags {
             Flags.FLAG_ENABLE_EARLY_SCREEN_TIMEOUT_DETECTOR,
             Flags::enableEarlyScreenTimeoutDetector);
 
+    private final FlagState mPerDisplayWakeByTouch = new FlagState(
+            Flags.FLAG_PER_DISPLAY_WAKE_BY_TOUCH,
+            Flags::perDisplayWakeByTouch
+    );
+
     private final FlagState mLockOnUnplug =
             new FlagState(Flags.FLAG_LOCK_ON_UNPLUG,
                     Flags::lockOnUnplug);
@@ -63,6 +68,13 @@ public class PowerManagerFlags {
     /** Returns whether early-screen-timeout-detector is enabled on not. */
     public boolean isEarlyScreenTimeoutDetectorEnabled() {
         return mEarlyScreenTimeoutDetectorFlagState.isEnabled();
+    }
+
+    /**
+     * @return Whether per-display wake by touch is enabled or not.
+     */
+    public boolean isPerDisplayWakeByTouchEnabled() {
+        return mPerDisplayWakeByTouch.isEnabled();
     }
 
     /**
@@ -108,6 +120,7 @@ public class PowerManagerFlags {
     public void dump(PrintWriter pw) {
         pw.println("PowerManagerFlags:");
         pw.println(" " + mEarlyScreenTimeoutDetectorFlagState);
+        pw.println(" " + mPerDisplayWakeByTouch);
         pw.println(" " + mLockOnUnplug);
         pw.println(" " + mDisableFrozenProcessWakelocks);
         pw.println(" " + mPartialSleepWakelocks);

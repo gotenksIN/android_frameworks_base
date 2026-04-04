@@ -36,9 +36,13 @@ import androidx.test.core.view.MotionEventBuilder
 import androidx.test.core.view.PointerCoordsBuilder
 import androidx.test.core.view.PointerPropertiesBuilder
 import androidx.test.filters.SmallTest
+import com.android.testing.wm.util.StubTransaction
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestHandler
+import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.TestShellExecutor
+import com.android.wm.shell.common.DisplayController
+import com.android.wm.shell.common.DisplayLayout
 import com.google.common.truth.Truth.assertThat
 import java.util.function.Consumer
 import kotlin.test.assertNotNull
@@ -72,6 +76,7 @@ class DragResizeInputListenerTest : ShellTestCase() {
     private val mockInputManager = mock<InputManager>()
     private val mockDragPositioningCallback = mock<DragPositioningCallback>()
     private val mockGeometry = mock<DragResizeWindowGeometry>()
+    private val mockDisplayController = mock<DisplayController>()
     private val mockPreDragEventConduit = mock<Consumer<MotionEvent>>()
     private val inputChannelPairs = ArrayList<Array<InputChannel>>()
     private val mockOnInputEventReceiverDisposed = mock<Runnable>()
@@ -82,14 +87,17 @@ class DragResizeInputListenerTest : ShellTestCase() {
 
     @Before
     fun setUp() {
-        whenever(mockWindowSession.grantInputChannel(any())).thenAnswer {
-            inputChannelPairs.add(
-                InputChannel.openInputChannelPair(
-                    "${DragResizeInputListenerTest::class}#${inputChannelPairs.size}"
-                )
+        whenever(
+                mockWindowSession.grantInputChannel(any())
             )
-            return@thenAnswer inputChannelPairs.last()[1]
-        }
+            .thenAnswer {
+                inputChannelPairs.add(
+                    InputChannel.openInputChannelPair(
+                        "${DragResizeInputListenerTest::class}#${inputChannelPairs.size}"
+                    )
+                )
+                return@thenAnswer inputChannelPairs.last()[1]
+            }
 
         if (Looper.myLooper() == null) {
             // Prepare a looper in the test thread, but we never call Looper.loop on it.
@@ -130,8 +138,8 @@ class DragResizeInputListenerTest : ShellTestCase() {
 
             val paramsCaptor = argumentCaptor<WindowInputChannelParams>()
 
-            // This is called for the decoration
-            verify(mockWindowSession, times(1)).grantInputChannel(paramsCaptor.capture())
+            // This is called for both the decoration & input sink
+            verify(mockWindowSession, times(2)).grantInputChannel(paramsCaptor.capture())
 
             val surface = paramsCaptor.firstValue.surface
             assertThat(surface.isValid).isTrue()
@@ -209,6 +217,7 @@ class DragResizeInputListenerTest : ShellTestCase() {
         testBgExecutor.flushAll()
 
         verify(mockWindowSession).remove(inputListener.mClientToken)
+        verify(mockWindowSession).remove(inputListener.mSinkClientToken)
     }
 
     @Test
@@ -218,9 +227,15 @@ class DragResizeInputListenerTest : ShellTestCase() {
         inputListener.close()
         testMainExecutor.flushAll()
 
-        assertThat(inputChannelPairs.size).isEqualTo(1)
+        assertThat(inputChannelPairs.size).isEqualTo(2)
         try {
             inputChannelPairs[0][1].token
+            fail("InputChannel should have been disposed")
+        } catch (_: Exception) {
+            // Expected
+        }
+        try {
+            inputChannelPairs[1][1].token
             fail("InputChannel should have been disposed")
         } catch (_: Exception) {
             // Expected
@@ -246,8 +261,9 @@ class DragResizeInputListenerTest : ShellTestCase() {
         testMainExecutor.flushAll()
         testBgExecutor.flushAll()
 
-        assertThat(createdSurfaces).hasSize(1)
+        assertThat(createdSurfaces).hasSize(2)
         assertThat(createdSurfaces[0].isValid).isFalse()
+        assertThat(createdSurfaces[1].isValid).isFalse()
     }
 
     @Test
@@ -283,6 +299,11 @@ class DragResizeInputListenerTest : ShellTestCase() {
             .thenReturn(Rect(0, 0, TASK_WIDTH, TASK_HEIGHT))
         whenever(mockDragPositioningCallback.onDragPositioningEnd(eq(DISPLAY_ID), any(), any()))
             .thenReturn(Rect(0, 0, TASK_WIDTH, TASK_HEIGHT))
+
+        val mockDisplayLayout = mock<DisplayLayout>()
+        whenever(mockDisplayLayout.width()).thenReturn(DISPLAY_WIDTH)
+        whenever(mockDisplayLayout.height()).thenReturn(DISPLAY_HEIGHT)
+        whenever(mockDisplayController.getDisplayLayout(DISPLAY_ID)).thenReturn(mockDisplayLayout)
 
         whenever(mockGeometry.taskSize).thenReturn(Size(TASK_WIDTH, TASK_HEIGHT))
         whenever(mockGeometry.shouldHandleEvent(any(), any())).thenReturn(true)
@@ -391,6 +412,11 @@ class DragResizeInputListenerTest : ShellTestCase() {
         whenever(mockDragPositioningCallback.onDragPositioningEnd(eq(DISPLAY_ID), any(), any()))
             .thenReturn(Rect(0, 0, TASK_WIDTH, TASK_HEIGHT))
 
+        val mockDisplayLayout = mock<DisplayLayout>()
+        whenever(mockDisplayLayout.width()).thenReturn(DISPLAY_WIDTH)
+        whenever(mockDisplayLayout.height()).thenReturn(DISPLAY_HEIGHT)
+        whenever(mockDisplayController.getDisplayLayout(DISPLAY_ID)).thenReturn(mockDisplayLayout)
+
         whenever(mockGeometry.taskSize).thenReturn(Size(TASK_WIDTH, TASK_HEIGHT))
         whenever(mockGeometry.shouldHandleEvent(any(), any())).thenReturn(true)
         inputListener.setGeometry(mockGeometry, 5 /* touchSlop */)
@@ -497,6 +523,11 @@ class DragResizeInputListenerTest : ShellTestCase() {
             .thenReturn(Rect(0, 0, TASK_WIDTH, TASK_HEIGHT))
         whenever(mockDragPositioningCallback.onDragPositioningEnd(eq(DISPLAY_ID), any(), any()))
             .thenReturn(Rect(0, 0, TASK_WIDTH, TASK_HEIGHT))
+
+        val mockDisplayLayout = mock<DisplayLayout>()
+        whenever(mockDisplayLayout.width()).thenReturn(DISPLAY_WIDTH)
+        whenever(mockDisplayLayout.height()).thenReturn(DISPLAY_HEIGHT)
+        whenever(mockDisplayController.getDisplayLayout(DISPLAY_ID)).thenReturn(mockDisplayLayout)
 
         whenever(mockGeometry.taskSize).thenReturn(Size(TASK_WIDTH, TASK_HEIGHT))
         whenever(mockGeometry.shouldHandleEvent(any(), any())).thenReturn(true)
@@ -1108,6 +1139,7 @@ class DragResizeInputListenerTest : ShellTestCase() {
             mockWindowSession,
             testMainExecutor,
             testBgExecutor,
+            TestRunningTaskInfoBuilder().build(),
             TestHandler(Looper.myLooper()),
             mock<Choreographer>(),
             DISPLAY_ID,
@@ -1120,6 +1152,17 @@ class DragResizeInputListenerTest : ShellTestCase() {
                     }
                 }
             },
+            {
+                object : StubTransaction() {
+                    override fun remove(sc: SurfaceControl): SurfaceControl.Transaction {
+                        return super.remove(sc).also {
+                            sc.release()
+                            removedSurfaces.add(sc)
+                        }
+                    }
+                }
+            },
+            mockDisplayController,
             mockPreDragEventConduit,
             mockOnInputEventReceiverDisposed,
         ) { r ->

@@ -16,12 +16,12 @@
 
 package com.android.server.am;
 
-import android.annotation.NonNull;
 import android.util.ArraySet;
-import android.util.IndentingPrintWriter;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.am.psc.ProcessReceiverRecordInternal;
+
+import java.io.PrintWriter;
 
 /**
  * The state info of all broadcast receivers in the process.
@@ -65,16 +65,19 @@ final class ProcessReceiverRecord extends ProcessReceiverRecordInternal {
         mReceivers.clear();
     }
 
-    void dump(@NonNull IndentingPrintWriter pw, long nowUptime) {
-        pw.print("mIsReceivingBroadcast", isReceivingBroadcast()).println();
-        pw.print("mBroadcastReceiverSchedGroup", getBroadcastReceiverSchedGroup()).println();
+    void dump(PrintWriter pw, String prefix, long nowUptime) {
+        pw.print(prefix);
+        pw.print("mIsReceivingBroadcast=");
+        pw.println(isReceivingBroadcast());
+
+        pw.print(prefix);
+        pw.print("mBroadcastReceiverSchedGroup=");
+        pw.println(getBroadcastReceiverSchedGroup());
         if (mReceivers.size() > 0) {
-            pw.println("mReceivers:");
-            pw.increaseIndent();
+            pw.print(prefix); pw.println("mReceivers:");
             for (int i = 0, size = mReceivers.size(); i < size; i++) {
-                pw.print("- "); pw.println(mReceivers.valueAt(i));
+                pw.print(prefix); pw.print("  - "); pw.println(mReceivers.valueAt(i));
             }
-            pw.decreaseIndent();
         }
     }
 }

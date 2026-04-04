@@ -45,7 +45,6 @@ import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import com.google.common.util.concurrent.MoreExecutors
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -76,7 +75,6 @@ class CameraGestureHelperTest : SysuiTestCase() {
     private val TEST_USER_ID = 1
     private val DISPLAY_ID = 5
     private lateinit var underTest: CameraGestureHelper
-    private val isUserSwitchingFlow = MutableStateFlow(false)
 
     @Before
     fun setUp() {
@@ -86,8 +84,6 @@ class CameraGestureHelperTest : SysuiTestCase() {
         whenever(cameraIntents.getInsecureCameraIntent(any()))
             .thenReturn(Intent(CameraIntents.DEFAULT_INSECURE_CAMERA_INTENT_ACTION))
         whenever(displayTracker.defaultDisplayId).thenReturn(DISPLAY_ID)
-
-        whenever(selectedUserInteractor.isUserSwitching).thenReturn(isUserSwitchingFlow)
 
         prepare()
 
@@ -184,13 +180,6 @@ class CameraGestureHelperTest : SysuiTestCase() {
                 whenever(activityManager.getRunningTasks(anyInt())).thenReturn(listOf())
             }
         }
-    }
-
-    @Test
-    fun canCameraGestureBeLaunched_duringUserSwitch_returnsFalse() {
-        isUserSwitchingFlow.value = true
-
-        assertThat(underTest.canCameraGestureBeLaunched(StatusBarState.KEYGUARD)).isFalse()
     }
 
     @Test

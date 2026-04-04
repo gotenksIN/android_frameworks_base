@@ -24,7 +24,6 @@ import android.os.Binder
 import android.view.WindowInsets
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
-import com.android.wm.shell.Flags
 import com.android.wm.shell.bubbles.Bubble
 import com.android.wm.shell.bubbles.BubbleHelper
 import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
@@ -48,9 +47,6 @@ object BubbleUtils {
         if (BubbleFlagHelper.enableRootTaskForBubble() && isAppBubble) {
             val rootToken = bubbleHelper.getAppBubbleRootTaskToken()
             if (toBubble && rootToken != null) {
-                if (Flags.fixPipToBubbleRelaunch()) {
-                    wct.setWindowingMode(token, WindowConfiguration.WINDOWING_MODE_UNDEFINED)
-                }
                 wct.reparent(token, rootToken, true /* onTop */)
                 if (bounds != null) {
                     wct.setBounds(rootToken, bounds)

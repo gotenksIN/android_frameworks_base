@@ -16,6 +16,7 @@
 
 package com.android.systemui.notifications.ui.composable.row
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -51,7 +52,6 @@ import com.android.compose.animation.scene.LowestZIndexContentPicker
 import com.android.compose.animation.scene.ValueKey
 import com.android.compose.animation.scene.animateElementFloatAsState
 import com.android.compose.theme.LocalAndroidColorScheme
-import com.android.systemui.statusbar.notification.collection.BundleIcon
 
 object NotificationRowPrimitives {
     object Elements {
@@ -68,7 +68,7 @@ object NotificationRowPrimitives {
 
 /** The Icon displayed at the start of any notification row. */
 @Composable
-fun BundleIcon(icon: BundleIcon, large: Boolean, modifier: Modifier = Modifier) {
+fun BundleIcon(@DrawableRes drawable: Int?, large: Boolean, modifier: Modifier = Modifier) {
     val iconBackground = LocalAndroidColorScheme.current.surfaceEffect2
     Box(
         modifier =
@@ -83,11 +83,9 @@ fun BundleIcon(icon: BundleIcon, large: Boolean, modifier: Modifier = Modifier) 
                     )
             }
     ) {
-        // TODO: b/478225883 - Render the emoji icon.
-        if (icon is BundleIcon.Emoji) return@Box
-        val drawableIcon = icon as BundleIcon.DrawableResource
+        if (drawable == null) return@Box
         Image(
-            painter = painterResource(drawableIcon.iconResId),
+            painter = painterResource(drawable),
             contentDescription = null,
             modifier =
                 if (large) {

@@ -34,7 +34,10 @@ interface BubbleStackViewManager {
     fun checkNotificationPanelExpandedState(callback: Consumer<Boolean>)
 
     /** Requests to hide the current input method. */
-    fun hideCurrentInputMethod()
+    fun hideCurrentInputMethod(onImeHidden: Runnable?)
+
+    /** Allows callers to clear the runnable set by [hideCurrentInputMethod]. */
+    fun clearImeHiddenRunnable()
 
     /** Tells whether current active user using gesture navigation mode. */
     fun isGestureNavigationMode(): Boolean
@@ -56,8 +59,12 @@ interface BubbleStackViewManager {
                     controller.isNotificationPanelExpanded(callback)
                 }
 
-                override fun hideCurrentInputMethod() {
-                    controller.hideCurrentInputMethod()
+                override fun hideCurrentInputMethod(onImeHidden: Runnable?) {
+                    controller.hideCurrentInputMethod(onImeHidden)
+                }
+
+                override fun clearImeHiddenRunnable() {
+                    controller.clearImeHiddenRunnable()
                 }
 
                 override fun isGestureNavigationMode(): Boolean {

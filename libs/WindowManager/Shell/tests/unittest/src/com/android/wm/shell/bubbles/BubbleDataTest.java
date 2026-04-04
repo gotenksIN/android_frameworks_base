@@ -18,6 +18,7 @@ package com.android.wm.shell.bubbles;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_OPTIONAL_BUBBLE_OVERFLOW;
+import static com.android.wm.shell.Flags.FLAG_USE_BUBBLE_ICON_FROM_ACTIVITY_INFO;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -1744,6 +1745,7 @@ public class BubbleDataTest extends ShellTestCase {
     }
 
     @Test
+    @EnableFlags(FLAG_USE_BUBBLE_ICON_FROM_ACTIVITY_INFO)
     public void getOrCreateBubble_withFlag_usesActivityIcon() throws Exception {
         ComponentName componentName = new ComponentName("package.a", "ActivityA");
         Intent intent = new Intent();

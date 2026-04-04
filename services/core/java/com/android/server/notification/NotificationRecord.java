@@ -84,7 +84,6 @@ import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
-import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.widget.RemoteViews;
 
@@ -815,9 +814,9 @@ public final class NotificationRecord {
                 }
                 if (adjustment.getSignals().containsKey(KEY_NOTIFICATION_RULES)) {
                     List<Adjustment> behavioralAdjustments =
-                            ruleManager.getAdjustmentsForRules(adjustment, Adjustment.TYPE_OTHER);
+                            ruleManager.getAdjustmentsForRules(adjustment);
                     for (Adjustment inner : behavioralAdjustments) {
-                        int innerImportance = inner.getSignals().getInt(
+                        int innerImportance = adjustment.getSignals().getInt(
                                 KEY_IMPORTANCE, IMPORTANCE_UNSPECIFIED);
                         if (innerImportance == IMPORTANCE_NONE) {
                             return true;
@@ -842,9 +841,6 @@ public final class NotificationRecord {
         mRuleImportanceReason = 0;
         mAsstChannel = null;
         mRuleChannelReason = 0;
-        calculateNotificationChannel();
-        mSound = calculateSound();
-        mLight = calculateLights();
         // TODO(b/479575690): implement modes integration
     }
 
@@ -999,11 +995,6 @@ public final class NotificationRecord {
                     signals.remove(KEY_SENSITIVE_CONTENT);
                 }
                 if (signals.containsKey(KEY_TYPE) && !keysToSkip.contains(KEY_TYPE)) {
-                    if (nmContextualDisplayLaunch()) {
-                        Slog.wtf(TAG, "", new RuntimeException("invalid flag/code state"));
-                        signals.remove(KEY_TYPE);
-                        continue;
-                    }
                     // Store original channel visibility before re-assigning channel
                     if (!mChannel.isBundleChannel()) {
                         setOriginalChannelVisibility(mChannel.getLockscreenVisibility());
@@ -1017,11 +1008,6 @@ public final class NotificationRecord {
                 }
                 if (signals.containsKey(KEY_UNCLASSIFY)
                         && !keysToSkip.contains(KEY_UNCLASSIFY)) {
-                    if (nmContextualDisplayLaunch()) {
-                        Slog.wtf(TAG, "", new RuntimeException("invalid flag/code state"));
-                        signals.remove(KEY_UNCLASSIFY);
-                        continue;
-                    }
                     // reset original channel visibility as we're returning to the original
                     setOriginalChannelVisibility(NotificationManager.VISIBILITY_NO_OVERRIDE);
                     updateSystemNotificationChannel(signals.getParcelable(KEY_UNCLASSIFY,

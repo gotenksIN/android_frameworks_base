@@ -135,17 +135,9 @@ message TypeSpecificPolicyMetadata {
   }
 
   message StringPolicyMetadata {
-    message ResolutionMechanism {
-      oneof mechanism {
-        bool custom = 1;
-        bool not_coexistable = 2;
-      }
-    }
-
     bool empty_string_allowed = 1;
     bool unprintable_characters_allowed = 2;
     optional int32 max_length = 3;
-    ResolutionMechanism resolution_mechanism = 4;
   }
 
   message ListPolicyMetadata {

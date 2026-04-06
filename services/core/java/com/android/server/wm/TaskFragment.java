@@ -1648,14 +1648,14 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         } else {
             if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
                 anim = false;
-// QTI_BEGIN: 2023-10-24: Performance: perf: add exit app animation boost for apps exit.
-                // Exit app animation boost
-                if (next != null && mPerf != null) {
-                    mPerf.perfHint(BoostFramework.VENDOR_HINT_EXIT_ANIM_BOOST, next.packageName);
-                }
-// QTI_END: 2023-10-24: Performance: perf: add exit app animation boost for apps exit.
             }
-        } 
+// QTI_BEGIN: 2026-04-06: Performance: perf: add exit app animation boost for apps exit.
+            // Exit app animation boost
+            if (next != null && next.isActivityTypeHome() && mPerf != null) {
+                mPerf.perfHint(BoostFramework.VENDOR_HINT_EXIT_ANIM_BOOST, next.packageName);
+            }
+// QTI_END: 2026-04-06: Performance: perf: add exit app animation boost for apps exit.
+        }
 
         if (anim) {
             next.applyOptionsAnimation();

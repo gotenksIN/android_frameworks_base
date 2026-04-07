@@ -258,8 +258,7 @@ public class UsbService extends IUsbManager.Stub {
                         mDeviceManager.updateUserRestrictions();
                     }
                 }
-                if (android.app.admin.flags.Flags.fixUsbDataSignalingRestrictionAfterReboot()
-                        && UsbManager.ACTION_USB_PORT_CHANGED.equals(action)) {
+                if (UsbManager.ACTION_USB_PORT_CHANGED.equals(action)) {
                     boolean enabled = mDevicePolicyManagerInternal.isUsbDataSignalingEnabled();
                     Slog.i(TAG, "Broadcast ACTION_USB_PORT_CHANGED received, setting USB "
                             + "data signal to " + enabled);
@@ -847,6 +846,45 @@ public class UsbService extends IUsbManager.Stub {
         final long token = Binder.clearCallingIdentity();
         try {
             getPermissionsForUser(userId).grantAccessoryPermission(accessory, packageName, uid);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
+    @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_USB)
+    @Override
+    public void revokeDevicePermission(UsbDevice device, String packageName, int uid) {
+        revokeDevicePermission_enforcePermission();
+        final int userId = UserHandle.getUserId(uid);
+        final UserHandle user = UserHandle.of(userId);
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            UsbDeviceFingerprint fingerprint =
+                    getConnectedDeviceFingerprintForAddress(device.getDeviceName());
+            getPermissionsForUser(userId)
+                    .revokeDevicePermission(device, fingerprint, packageName, uid);
+            mSettingsManager
+                    .getSettingsForProfileGroup(user)
+                    .removePackageIfDeviceDefault(device, packageName, user);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
+    @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_USB)
+    @Override
+    public List<String> getPackagesWithDevicePermission(UsbDevice device) {
+        getPackagesWithDevicePermission_enforcePermission();
+        final int uid = Binder.getCallingUid();
+        final int userId = UserHandle.getUserId(uid);
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            UsbDeviceFingerprint fingerprint =
+                    getConnectedDeviceFingerprintForAddress(device.getDeviceName());
+            return getPermissionsForUser(userId)
+                    .getPackagesWithDevicePermission(device, fingerprint);
         } finally {
             Binder.restoreCallingIdentity(token);
         }

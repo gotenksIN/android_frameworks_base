@@ -29,6 +29,7 @@ import com.android.wm.shell.shared.annotations.ExternalThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopFirstListener
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
+import com.android.wm.shell.shared.desktopmode.DesktopScrimListener
 import java.util.Optional
 import java.util.concurrent.Executor
 import java.util.function.Consumer
@@ -68,6 +69,27 @@ class DesktopModeImpl(
     ) {
         mainExecutor.execute {
             desktopTasksController.getOrNull()?.setTaskRegionListener(listener, callbackExecutor)
+        }
+    }
+
+    override fun addDesktopScrimListener(
+        listener: DesktopScrimListener,
+        callbackExecutor: Executor,
+    ) {
+        mainExecutor.execute {
+            desktopTasksController
+                .getOrNull()
+                ?.getDesktopScrimController()
+                ?.addDesktopScrimListener(listener, callbackExecutor)
+        }
+    }
+
+    override fun removeDesktopScrimListener(listener: DesktopScrimListener) {
+        mainExecutor.execute {
+            desktopTasksController
+                .getOrNull()
+                ?.getDesktopScrimController()
+                ?.removeDesktopScrimListener(listener)
         }
     }
 
@@ -142,9 +164,14 @@ class DesktopModeImpl(
         mainExecutor.execute { desktopFirstListenerManager.get().unregisterListener(listener) }
     }
 
-    // TODO: b/467282605 post this to the main thread
     override fun isDisplayInDesktopMode(displayId: Int) =
-        desktopTasksController.getOrNull()?.isDisplayInDesktopMode(displayId) ?: false
+        mainExecutor.executeBlockingForResult(
+            {
+                desktopTasksController.getOrNull()?.isDisplayInDesktopMode(displayId)
+                    ?: false
+            },
+            Boolean::class.javaObjectType,
+        ) ?: false
 
     companion object {
         private const val TAG = "DesktopModeImpl"

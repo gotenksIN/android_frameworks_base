@@ -467,7 +467,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             viewModel.beginCapture()
 
             // Account for the delay (temporary fix b/435225255)
-            advanceTimeBy(100)
+            advanceTimeBy(200)
             runCurrent()
 
             val screenshotRequestCaptor = argumentCaptor<ScreenshotRequest>()
@@ -491,7 +491,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             viewModel.beginCapture()
 
             // Account for the delay (temporary fix b/435225255)
-            advanceTimeBy(100)
+            advanceTimeBy(200)
             runCurrent()
 
             assertUiClosed()
@@ -514,7 +514,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             viewModel.beginCapture()
 
             // Account for the delay (temporary fix b/435225255)
-            advanceTimeBy(100)
+            advanceTimeBy(200)
             runCurrent()
 
             val screenshotRequestCaptor = argumentCaptor<ScreenshotRequest>()
@@ -546,7 +546,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             viewModel.beginCapture()
 
             // Account for the delay (temporary fix b/435225255)
-            advanceTimeBy(100)
+            advanceTimeBy(200)
             runCurrent()
 
             assertUiClosed()
@@ -1017,6 +1017,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         bounds: Rect,
         displayId: Int = this.displayId,
         isVisible: Boolean = true,
+        numActivities: Int = 1,
     ): ActivityManager.RunningTaskInfo {
         return ActivityManager.RunningTaskInfo().apply {
             this.taskId = taskId
@@ -1027,6 +1028,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
                 setBounds(bounds)
                 activityType = WindowConfiguration.ACTIVITY_TYPE_STANDARD
             }
+            this.numActivities = numActivities
         }
     }
 }

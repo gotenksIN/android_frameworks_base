@@ -612,20 +612,13 @@ public class LockPatternUtils {
             return false;
         }
         byte[] salt = getSalt(userId).getBytes();
-        String legacyHash = LockscreenCredential.legacyPasswordToHash(passwordToCheck, salt);
         String passwordHash = LockscreenCredential.passwordToHistoryHash(
                 passwordToCheck, salt, hashFactor);
         String[] history = passwordHistory.split(PASSWORD_HISTORY_DELIMITER);
         // Password History may be too long...
         for (int i = 0; i < Math.min(passwordHistoryLength, history.length); i++) {
-            if (android.security.Flags.stopRecognizingLegacyPasswordHashes()) {
-                if (history[i].equals(passwordHash)) {
-                    return true;
-                }
-            } else {
-                if (history[i].equals(legacyHash) || history[i].equals(passwordHash)) {
-                    return true;
-                }
+            if (history[i].equals(passwordHash)) {
+                return true;
             }
         }
         return false;
@@ -1696,6 +1689,11 @@ public class LockPatternUtils {
                 new SparseBooleanArray();
         private final boolean mDefaultIsNonStrongBiometricAllowed = true;
 
+        /**
+         * @param context the current {@link Context}
+         * @throws NullPointerException if the current thread does not have a Looper (for example,
+         * on a background thread).
+         */
         public StrongAuthTracker(Context context) {
             this(context, Looper.myLooper());
         }

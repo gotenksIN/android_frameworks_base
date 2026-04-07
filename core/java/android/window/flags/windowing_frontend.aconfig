@@ -74,6 +74,13 @@ flag {
 }
 
 flag {
+    name: "synced_display_mode_updates"
+    namespace: "windowing_frontend"
+    description: "Synchronized multi-display mode updates"
+    bug: "448471638"
+}
+
+flag {
   name: "avoid_intermediate_destroying_state"
   namespace: "windowing_frontend"
   description: "Prevent intermediate destroying state from affecting visibility"
@@ -99,6 +106,16 @@ flag {
   description: "Deprecate ActivityOptions#makeTaskLaunchBehind"
   bug: "473967290"
   is_exported: true
+}
+
+flag {
+  name: "lite_task_description_changed"
+  namespace: "windowing_frontend"
+  description: "Optimize TaskDescription change events dispatching"
+  bug: "489914754"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -130,7 +147,7 @@ flag {
 }
 
 flag {
-    name: "enable_split_dismiss_animation"
+    name: "enable_split_dismiss_animation_v2"
     namespace: "windowing_frontend"
     description: "Resize animation for expanding and collapsing surfaces when split screen is dismissed"
     bug: "481965406"
@@ -357,16 +374,6 @@ flag {
 }
 
 flag {
-    name: "displayinfo_state_deferrable"
-    namespace: "windowing_frontend"
-    description: "Display state should be a deferrable WM property"
-    bug: "423701190"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_cross_activity_back_animation_in_bubbles"
     namespace: "windowing_frontend"
     description: "Enables the predictive cross-activity back animation in bubbles"
@@ -432,6 +439,13 @@ flag {
 }
 
 flag {
+    name: "shared_surface_transition_animation"
+    namespace: "windowing_frontend"
+    description: "Allow the client to describe a transition animation and participate in the animation using a shared surface."
+    bug: "475737659"
+}
+
+flag {
     name: "use_transition_for_screenshot_window_additions"
     namespace: "web_apps_on_chromeos_and_android"
     description: "Use shell transitions to synchronize screenshot window additions."
@@ -483,4 +497,34 @@ flag {
     namespace: "windowing_frontend"
     description: "Sync storage before enabling screen during boot"
     bug: "467888558"
+}
+
+flag {
+    name: "keep_show_wallpaper_on_bottom"
+    namespace: "windowing_frontend"
+    description: "Keep changes with the SHOW_WALLPAPER flag at the bottom of the transition."
+    bug: "479707267"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "remove_starting_window_when_commit_invisible"
+    namespace: "windowing_frontend"
+    description: "Always clean up starting window when an activity commit invisible."
+    bug: "489653115"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "consolidate_remove_starting_window_from_task"
+    namespace: "windowing_frontend"
+    description: "Ensure a starting window being removed when condition met for all activities."
+    bug: "477134239"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

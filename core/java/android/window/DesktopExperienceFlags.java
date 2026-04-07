@@ -72,9 +72,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_BOUNDS_RESTORING_ON_DRAG_EXIT),
     ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY(Flags::enableBugFixesForSecondaryDisplay, true,
             Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY),
-    ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX(
-            Flags::enableCameraCompatExternalDisplayRotationBugfix, false,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX),
     ENABLE_DEFAULT_DESK_WITHOUT_WARMUP_MIGRATION(Flags::defaultDeskWithoutWarmupMigration, false,
             Flags.FLAG_DEFAULT_DESK_WITHOUT_WARMUP_MIGRATION),
     ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX(
@@ -99,7 +96,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DISPLAY_RECONNECT_INTERACTION),
     ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING(Flags::enableDisplayWindowingModeSwitching, true,
             Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING),
-    ENABLE_DRAG_TO_MAXIMIZE(Flags::enableDragToMaximize, true, Flags.FLAG_ENABLE_DRAG_TO_MAXIMIZE),
     ENABLE_DRAWING_APP_HANDLE(Flags::enableDrawingAppHandle, false,
             Flags.FLAG_ENABLE_DRAWING_APP_HANDLE),
     ENABLE_FREEFORM_BOX_SHADOWS_V2(Flags::enableFreeformBoxShadowsV2, false,
@@ -116,19 +112,13 @@ public enum DesktopExperienceFlags {
     ENABLE_MULTIPLE_DESKTOPS_ACTIVATION_IN_DESKTOP_FIRST_DISPLAYS(
             Flags::enableMultipleDesktopsDefaultActivationInDesktopFirstDisplays, false,
             Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_DEFAULT_ACTIVATION_IN_DESKTOP_FIRST_DISPLAYS),
-    ENABLE_MULTIPLE_DESKTOPS_BACKEND(Flags::enableMultipleDesktopsBackend, true,
-            Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND),
     ENABLE_NESTED_TASKS_WITH_INDEPENDENT_BOUNDS_BUGFIX(
             Flags::nestedTasksWithIndependentBoundsBugfix, true,
             Flags.FLAG_NESTED_TASKS_WITH_INDEPENDENT_BOUNDS_BUGFIX),
     ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX(Flags::enableNonDefaultDisplaySplitBugfix, false,
             Flags.FLAG_ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX),
-    ENABLE_NO_WINDOW_DECORATION_FOR_DESKS(Flags::enableNoWindowDecorationForDesks, true,
-        Flags.FLAG_ENABLE_NO_WINDOW_DECORATION_FOR_DESKS),
     ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY(Flags::enablePerDisplayDesktopWallpaperActivity,
             true, Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY),
-    ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS(Flags::enablePresentationForConnectedDisplays, true,
-            Flags.FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS),
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, true,
             Flags.FLAG_ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE),
     ENABLE_REENABLE_APP_HANDLE_COLOR_ANIMATIONS(Flags::reenableAppHandleColorAnimations,
@@ -149,10 +139,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR),
     ENABLE_WINDOW_REPOSITIONING_API(Flags::enableWindowRepositioningApi, false,
             Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API),
-    ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,
-            true, Flags.FLAG_ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS),
-    REPOSITORY_BASED_PERSISTENCE(Flags::repositoryBasedPersistence, false,
-            Flags.FLAG_REPOSITORY_BASED_PERSISTENCE),
     SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT(
             Flags::skipDeactivationOfDeskWithNothingInFront, true,
             Flags.FLAG_SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT),

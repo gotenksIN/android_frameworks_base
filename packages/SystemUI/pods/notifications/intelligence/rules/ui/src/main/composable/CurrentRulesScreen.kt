@@ -21,43 +21,46 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.android.systemui.notifications.intelligence.rules.shared.model.ActionModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel.Companion.toDraft
 import com.android.systemui.notifications.intelligence.rules.shared.model.RuleModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesScreenViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.TextStyles
 import com.android.systemui.res.R
-import kotlinx.coroutines.launch
 
 @Composable
 fun CurrentRulesScreen(
     viewModel: NotificationRulesScreenViewModel,
     onDismissCurrentRulesScreen: () -> Unit,
     onNavigateToEditScreen: (DraftRuleModel) -> Unit,
+    onNavigateToFreeformRuleCreationScreen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scope = rememberCoroutineScope()
+    val textStyles = rememberTextStyles()
     BackHandler(enabled = true, onBack = onDismissCurrentRulesScreen)
 
     LazyColumn(
@@ -65,55 +68,54 @@ fun CurrentRulesScreen(
         modifier = modifier,
     ) {
         item("Title") {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Button(onClick = onDismissCurrentRulesScreen, modifier = Modifier) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.accessibility_back),
-                    )
-                }
-                Text(
-                    text = stringResource(R.string.notification_rules_activity_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
+            Header(
+                title = stringResource(R.string.notification_rules_activity_title),
+                onDismissRequest = onDismissCurrentRulesScreen,
+                actions = { CreateNewRuleAction(onNavigateToFreeformRuleCreationScreen) },
+            )
         }
 
         viewModel.rules.forEach { rule ->
-            item(rule.toString()) {
-                CurrentRule(rule = rule, onNavigateToEditScreen = onNavigateToEditScreen)
-            }
-        }
-
-        item("Create new rule") {
-            Button(
-                onClick = {
-                    scope.launch {
-                        onNavigateToEditScreen(
-                            DraftRuleModel(
-                                action = ActionModel.Highlight,
-                                contacts = null,
-                                includedApps = null,
-                            )
-                        )
-                    }
-                }
-            ) {
-                Text(stringResource(R.string.notification_rules_create_new_rule))
+            item(rule.id) {
+                CurrentRule(
+                    rule = rule,
+                    screenViewModel = viewModel,
+                    textStyles = textStyles,
+                    onNavigateToEditScreen = onNavigateToEditScreen,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CurrentRule(rule: RuleModel, onNavigateToEditScreen: (DraftRuleModel) -> Unit) {
+private fun CurrentRule(
+    rule: RuleModel,
+    screenViewModel: NotificationRulesScreenViewModel,
+    textStyles: TextStyles,
+    onNavigateToEditScreen: (DraftRuleModel) -> Unit,
+) {
+    val resources = LocalResources.current
     var isExpanded by remember { mutableStateOf(false) }
+
+    val textSize = textStyles.defaultStyle.fontSize
+    val ruleDisplay = remember(rule, resources) { screenViewModel.buildRuleText(rule, resources) }
+    val text =
+        remember(ruleDisplay.textChunks, textStyles) {
+            buildAnnotatedString(ruleDisplay.textChunks, textStyles)
+        }
+    val inlineTextContent =
+        remember(ruleDisplay.textChunks, textStyles) {
+            buildInlineContentMap(
+                ruleDisplay.textChunks,
+                appIcon = { AppIcon(it) },
+                contactIcon = {
+                    val iconSizeDp = with(LocalDensity.current) { textSize.toDp() }
+                    ContactIcon(it, iconSizeDp, screenViewModel::loadContactBitmapFromUri)
+                },
+                textSize = textSize,
+            )
+        }
 
     Column(
         modifier =
@@ -127,9 +129,10 @@ private fun CurrentRule(rule: RuleModel, onNavigateToEditScreen: (DraftRuleModel
     ) {
         ReadOnlyAction(rule.action)
         Text(
-            text = rule.toText(),
+            text = text,
+            inlineContent = inlineTextContent,
             color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyles.defaultStyle,
         )
 
         if (isExpanded) {
@@ -140,24 +143,27 @@ private fun CurrentRule(rule: RuleModel, onNavigateToEditScreen: (DraftRuleModel
     }
 }
 
-private fun RuleModel.toText(): String {
-    // TODO: b/478225883 - Internationalize this string when design is ready.
-    // TODO: b/478225883 - Re-use text rendering from edit screen.
-    val contactsList = filter.contacts?.contacts
-    val contactsString =
-        if (contactsList != null) {
-            " from ${contactsList.joinToString { it.name }} [TK]"
-        } else {
-            ""
-        }
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun rememberTextStyles(): TextStyles {
+    val defaultStyle = MaterialTheme.typography.titleLargeEmphasized
+    val valueSpanStyle = SpanStyle(fontWeight = FontWeight.Bold)
+    return remember(defaultStyle, valueSpanStyle) {
+        TextStyles(
+            defaultStyle = defaultStyle,
+            specifiedValueSpanStyle = valueSpanStyle,
+            ambiguousValueSpanStyle = valueSpanStyle,
+        )
+    }
+}
 
-    val includedAppsList = filter.includedApps?.apps
-    val includedAppsString =
-        if (includedAppsList != null) {
-            " from ${includedAppsList.joinToString { it.label }} [TK]"
-        } else {
-            ""
-        }
-
-    return "Notifications$contactsString$includedAppsString [TK]"
+/** Renders a '+' button that lets users create a new notification rule using freeform text. */
+@Composable
+private fun CreateNewRuleAction(onNavigateToFreeformRuleCreationScreen: () -> Unit) {
+    IconButton(onClick = onNavigateToFreeformRuleCreationScreen) {
+        Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = stringResource(R.string.notification_rules_create_new_title),
+        )
+    }
 }

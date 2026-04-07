@@ -83,6 +83,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
     private val taskBoundsAtDragStart = Rect()
     private val repositionStartPoint = PointF()
     private val repositionTaskBounds = Rect()
+    private val changeBoundsResult = DragPositioningCallbackUtility.ChangeBoundsResult()
     private val isResizing: Boolean
         get() =
             (ctrlType and DragPositioningCallback.CTRL_TYPE_TOP) != 0 ||
@@ -241,19 +242,18 @@ class MultiDisplayVeiledResizeTaskPositioner(
             return taskBoundsAtDragStart
         }
         val delta = DragPositioningCallbackUtility.calculateDelta(x, y, repositionStartPoint)
-        if (
-            isResizing &&
-                DragPositioningCallbackUtility.changeBounds(
-                    ctrlType,
-                    repositionTaskBounds,
-                    taskBoundsAtDragStart,
-                    stableBounds,
-                    delta,
-                    displayController,
-                    windowDecoration,
-                    desktopState.canEnterDesktopMode,
-                )
-        ) {
+        DragPositioningCallbackUtility.changeBounds(
+            ctrlType,
+            repositionTaskBounds,
+            taskBoundsAtDragStart,
+            stableBounds,
+            delta,
+            displayController,
+            windowDecoration,
+            desktopState.canEnterDesktopMode,
+            changeBoundsResult,
+        )
+        if (isResizing && changeBoundsResult.boundsChanged) {
             if (!isResizingOrAnimatingResize) {
                 for (dragEventListener in dragEventListeners) {
                     dragEventListener.onDragMove(windowDecoration.taskInfo.taskId)
@@ -379,11 +379,13 @@ class MultiDisplayVeiledResizeTaskPositioner(
             // Update taskbar rounding once the drag/resize has registered a move event - in case
             // the moved task is no longer maximized. Only call this once per resize/drag so we
             // don't call into Launcher with each drag/resize frame to try to update the taskbar.
-            desktopTasksController.updateTaskbarRoundingOnTaskResize(
-                displayId,
-                windowDecoration.taskInfo.taskId,
-                Rect(repositionTaskBounds),
-            )
+            desktopTasksController
+                .getDesktopScrimController()
+                .updateDesktopScrimOnResize(
+                    displayId,
+                    windowDecoration.taskInfo.taskId,
+                    Rect(repositionTaskBounds),
+                )
             hasMoved = true
         }
         return Rect(repositionTaskBounds)
@@ -418,6 +420,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
                     displayController,
                     windowDecoration,
                     desktopState.canEnterDesktopMode,
+                    changeBoundsResult,
                 )
                 for (dragEventListener in dragEventListeners) {
                     dragEventListener.onDragResizeEnded(
@@ -447,6 +450,17 @@ class MultiDisplayVeiledResizeTaskPositioner(
                 // If bounds haven't changed, perform necessary veil reset here as startAnimation
                 // won't be called.
                 resetVeilIfVisible()
+            }
+            if (Flags.updateDesktopScrimOnDragResizeEnd()) {
+                // Update desktop scrim for b/484100709. This covers drag-resize cases like
+                // (maximized ->) unmaximized -> maximized.
+                desktopTasksController
+                    .getDesktopScrimController()
+                    .updateDesktopScrimOnResize(
+                        displayId,
+                        windowDecoration.taskInfo.taskId,
+                        repositionTaskBounds,
+                    )
             }
         } else {
             val startDisplayLayout = displayController.getDisplayLayout(startDisplayId)

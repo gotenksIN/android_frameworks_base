@@ -728,10 +728,16 @@ public final class DisplayManagerService extends SystemService {
                 displayId -> getDisplayInfoInternal(displayId, Process.myUid()));
         Predicate<DisplayInfo> isDisplayAllowedInTopoogy =
                 mDisplayTopologyCoordinator::isDisplayAllowedInTopology;
-        mModeRequestManager = new ModeRequestManager();
+        mModeRequestManager = new ModeRequestManager(mHandler.getLooper(),
+                (ModeRequestManager.UserPreferredModeRequest[] originalData) -> {
+                    synchronized (mSyncRoot) {
+                        handleModeRequestRollbackLocked(originalData);
+                    }
+                });
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext, foldSettingProvider,
                 mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags,
-                isDisplayAllowedInTopoogy, mStableEdidsFlag, mDisplayInfoCache);
+                isDisplayAllowedInTopoogy, mStableEdidsFlag, mDisplayInfoCache,
+                mModeRequestManager);
         mDisplayModeDirector = new DisplayModeDirector(
                 context, mHandler, mFlags, mDisplayDeviceConfigProvider, mModeRequestManager);
         mBrightnessSynchronizer = new BrightnessSynchronizer(mContext, displayThreadLooper);
@@ -830,7 +836,7 @@ public final class DisplayManagerService extends SystemService {
                 }
             }
         } else if (phase == PHASE_SYSTEM_SERVICES_READY &&
-                Flags.enableChargingExperienceByDefault()) {
+                Flags.autoBrightnessModeCharging()) {
             ContentResolver contentResolver = mContext.getContentResolver();
             if (Settings.Global.getInt(contentResolver,
                     Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED, -1) == -1) {
@@ -1690,6 +1696,19 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
+    private DisplayManagerInternal.DisplayInfos getNonOverrideDisplayInfosInternal() {
+        SparseArray<DisplayInfo> infos = new SparseArray<>();
+        synchronized (mSyncRoot) {
+            mLogicalDisplayMapper.forEachLocked(display -> {
+                int displayId = display.getDisplayIdLocked();
+                infos.put(displayId, mModeRequestManager.getDisplayInfo(displayId,
+                        display.getDisplayInfoLocked()));
+            }, /* includeDisabled= */false);
+            return new DisplayManagerInternal.DisplayInfos(infos);
+        }
+    }
+
+
     private void registerCallbackInternal(IDisplayManagerCallback callback, int callingPid,
             int callingUid, @InternalEventFlag long internalEventFlagsMask) {
         synchronized (mSyncRoot) {
@@ -2055,8 +2074,7 @@ public final class DisplayManagerService extends SystemService {
         }
 
         if ((flags & VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH) != 0) {
-            // TODO(b/474207070): Support VDM displays
-            if (virtualDevice != null) {
+            if (virtualDevice != null && !Flags.virtualDisplaysSupportDesktopMode()) {
                 Slog.d(TAG, "Virtual displays associated with virtual device currently don't "
                         + "support content mode switch, hence ignoring "
                         + "VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH");
@@ -2201,6 +2219,14 @@ public final class DisplayManagerService extends SystemService {
             if (!checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")) {
                 throw new SecurityException("Requires ADD_TRUSTED_DISPLAY permission to "
                         + "create a virtual display which is not in the default DisplayGroup.");
+            }
+        }
+
+        if (callingUid != Process.SYSTEM_UID
+                && virtualDisplayConfig.getUniqueId() != null) {
+            if (!checkCallingPermission(ADD_TRUSTED_DISPLAY, "createVirtualDisplay()")) {
+                throw new SecurityException("Requires ADD_TRUSTED_DISPLAY permission to "
+                        + "create a virtual display with a uniqueId.");
             }
         }
 
@@ -3152,7 +3178,8 @@ public final class DisplayManagerService extends SystemService {
         }
         synchronized (mSyncRoot) {
             boolean requestSuccessful =
-                    mModeRequestManager.onUserPreferredModesRequestedLocked(requests);
+                    mLogicalDisplayMapper.onUserPreferredModesRequestedLocked(requests);
+
             if (requestSuccessful) {
                 boolean changed = false;
                 for (ModeRequestManager.UserPreferredModeRequest request : requests) {
@@ -3162,7 +3189,7 @@ public final class DisplayManagerService extends SystemService {
                     if (displayDevice == null) {
                         Slog.w(ModeRequestManager.TAG, "Device not found for at least one"
                                 + " of the requested displays in a mode change. Requests cleared.");
-                        mModeRequestManager.clearRequests();
+                        mModeRequestManager.onDisplayRemoved(request.mDisplayId);
                         return;
                     }
                     mModeRequestManager.waitingForDeviceInfo(request.mDisplayId);
@@ -3182,10 +3209,13 @@ public final class DisplayManagerService extends SystemService {
                     for (ModeRequestManager.UserPreferredModeRequest request : requests) {
                         DisplayInfo displayInfo = getDisplayInfoInternal(request.mDisplayId,
                                 Process.myUid());
-                        mModeRequestManager.infoUpdated(request.mDisplayId, displayInfo);
+                        if (!mModeRequestManager.infoUpdated(request.mDisplayId, displayInfo)) {
+                            mModeRequestManager.cancelAndRollback();
+                            break;
+                        }
                     }
                 } else {
-                    mModeRequestManager.clearRequests();
+                    mModeRequestManager.cancelAndRollback();
                 }
             }
         }
@@ -4610,6 +4640,8 @@ public final class DisplayManagerService extends SystemService {
             }
 
             if (mPersistentDataStore.setConnectionPreference(displayDevice, preference)) {
+                Slog.d(TAG, "Updating connection preference to" + preference
+                        + " for display with uniqueId: " + uniqueId);
                 mPersistentDataStore.saveIfNeeded();
             }
         }
@@ -4619,11 +4651,15 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             DisplayDevice displayDevice = mDisplayDeviceRepo.getByUniqueIdLocked(uniqueId);
             if (displayDevice == null) {
+                Slog.w(TAG, "No display device found with uniqueId: " + uniqueId
+                        + ", returning default connection preference");
                 return DEFAULT_CONNECTION_PREFERENCE;
             }
 
             int persistedConnectionPreference =
                     mPersistentDataStore.getConnectionPreference(displayDevice);
+            Slog.d(TAG, "Returning saved connection preference " + persistedConnectionPreference
+                    + " for display with uniqueId: " + uniqueId);
             return mSecondaryDisplayPolicy.getPolicyAwareConnectionPreference(
                     persistedConnectionPreference);
         }
@@ -4655,6 +4691,12 @@ public final class DisplayManagerService extends SystemService {
 
             return mPersistentDataStore.getUserPreferredHdrMode(displayDevice);
         }
+    }
+
+    @GuardedBy("mSyncRoot")
+    private void handleModeRequestRollbackLocked(
+            ModeRequestManager.UserPreferredModeRequest[] originalData) {
+        setUserPreferredDisplayModesInternal(originalData);
     }
 
     private final class DisplayManagerHandler extends Handler {
@@ -6653,6 +6695,11 @@ public final class DisplayManagerService extends SystemService {
         @Override
         public DisplayInfo getDisplayInfo(int displayId) {
             return getDisplayInfoInternal(displayId, Process.myUid());
+        }
+
+        @Override
+        public DisplayInfos getNonOverrideDisplayInfos() {
+            return getNonOverrideDisplayInfosInternal();
         }
 
         @Override

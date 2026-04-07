@@ -17,12 +17,16 @@
 package com.android.server.devicepolicy.handlers;
 
 import android.annotation.NonNull;
+import android.app.admin.PackageIdentifier;
+import android.app.admin.PolicySizeVerifier;
 import android.app.admin.metadata.EnumPolicyMetadata;
 import android.app.admin.metadata.IntegerPolicyMetadata;
 import android.app.admin.metadata.ListPolicyMetadata;
 import android.app.admin.metadata.LongPolicyMetadata;
+import android.app.admin.metadata.PackagePolicyMetadata;
 import android.app.admin.metadata.PolicyMetadata;
 import android.app.admin.metadata.StringPolicyMetadata;
+import android.content.pm.PackageParser;
 
 import java.util.List;
 
@@ -100,6 +104,49 @@ public abstract class PolicyValidator<T> {
                         throw new IllegalArgumentException(
                                 "Empty string is not allowed for policy " + policy.getId());
                     }
+
+                    if (!stringPolicy.isUnprintableCharactersAllowed()
+                            && value.codePoints().anyMatch(Character::isISOControl)) {
+                        throw new IllegalArgumentException(
+                                "Unprintable characters are not allowed for policy "
+                                        + policy.getId()
+                                        + ", the first unprintable character is "
+                                        + value.codePoints()
+                                                .filter(Character::isISOControl)
+                                                .findFirst());
+                    }
+                }
+            };
+
+    private static final PolicyValidator<PackageIdentifier> PACKAGE_POLICY_VALIDATOR =
+            new PolicyValidator<>() {
+                @Override
+                public void validate(
+                        @NonNull PackageIdentifier value,
+                        @NonNull PolicyMetadata<PackageIdentifier> policy) {
+                    String packageName = value.getPackageName();
+                    if (packageName.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                "Package name is empty for policy " + policy.getId());
+                    }
+
+                    PolicySizeVerifier.enforceMaxPackageNameLength(packageName);
+
+                    String validationError =
+                            PackageParser.validateName(
+                                    packageName,
+                                    /* requireSeparator= */ true,
+                                    /* requireFilename= */ false);
+
+                    if (validationError != null) {
+                        throw new IllegalArgumentException(
+                                "Package name "
+                                        + packageName
+                                        + " is not valid for policy "
+                                        + policy.getId()
+                                        + ", error: "
+                                        + validationError);
+                    }
                 }
             };
 
@@ -112,6 +159,7 @@ public abstract class PolicyValidator<T> {
                     case IntegerPolicyMetadata i -> INTEGER_POLICY_VALIDATOR;
                     case StringPolicyMetadata s -> STRING_POLICY_VALIDATOR;
                     case LongPolicyMetadata l -> LONG_POLICY_VALIDATOR;
+                    case PackagePolicyMetadata p -> PACKAGE_POLICY_VALIDATOR;
                     // Need to use a raw type here since we can't extract the element E of
                     // T=List<E>.
                     case ListPolicyMetadata l -> getListInstance(l);

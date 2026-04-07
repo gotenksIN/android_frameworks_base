@@ -34,6 +34,7 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 import static com.android.internal.util.Preconditions.checkArgument;
 
+import static java.time.temporal.ChronoUnit.SECONDS;
 import static java.util.Objects.requireNonNull;
 
 import android.annotation.ColorInt;
@@ -123,6 +124,7 @@ import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.contentcapture.ContentCaptureContext;
+import android.widget.ChronometerAdaptiveFormat;
 import android.widget.ProgressBar;
 import android.widget.RemoteViews;
 
@@ -132,6 +134,7 @@ import com.android.internal.graphics.ColorUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.ContrastColorUtil;
 import com.android.internal.util.NotificationBigTextNormalizer;
+import com.android.internal.util.Preconditions;
 import com.android.internal.widget.NotificationProgressModel;
 import com.android.internal.widget.NotificationRowIconView;
 
@@ -3616,6 +3619,52 @@ public class Notification implements Parcelable
     }
 
     /**
+     * Returns the title for the Notification History.
+     * @hide
+     */
+    public String getHistoryTitle(@NonNull Context context) {
+        Preconditions.checkNotNull(context);
+        CharSequence title = null;
+        if (extras != null) {
+            title = extras.getCharSequence(Notification.EXTRA_TITLE);
+            if (title == null) {
+                title = extras.getCharSequence(EXTRA_TITLE_BIG);
+            }
+        }
+
+        return TextUtils.isEmpty(title) ? context.getString(
+                R.string.notification_history_title_placeholder)
+                : String.valueOf(title);
+    }
+
+    /**
+     * Returns the appropriate substring for this notification based on the style of notification.
+     * This is going to be shown on the Notification History.
+     * @hide
+     */
+    public String getHistoryText(@NonNull Context context) {
+        Preconditions.checkNotNull(context);
+        final Style style =  Notification.Builder.recoverStyle(this);
+        CharSequence text = null;
+        if (style != null) {
+            text = style.getHistoryText(context);
+        }
+
+        if (TextUtils.isEmpty(text)) {
+            text = extras.getCharSequence(EXTRA_TEXT);
+        }
+
+        return text == null ? null : String.valueOf(text);
+    }
+
+    /**
+     * @hide
+     */
+    public boolean hasFlag(final int flag) {
+        return (flags & flag) != 0;
+    }
+
+    /**
      * @hide
      */
     public boolean containsCustomViews() {
@@ -3728,6 +3777,11 @@ public class Notification implements Parcelable
                 if (TvExtender.EXTRA_TV_EXTENDER.equals(key)) {
                     continue;
                 }
+
+                if (EXTRA_METRICS.equals(key)) {
+                    continue;
+                }
+
                 final Object obj = extras.get(key);
                 if (obj != null &&
                     (  obj instanceof Parcelable
@@ -5120,29 +5174,39 @@ public class Notification implements Parcelable
                     setLargeIcon(mN.largeIcon);
                 }
 
-                String templateClass = mN.extras.getString(EXTRA_TEMPLATE);
-                if (!TextUtils.isEmpty(templateClass)) {
-                    final Class<? extends Style> styleClass
-                            = getNotificationStyleClass(templateClass);
-                    if (styleClass == null) {
-                        Log.d(TAG, "Unknown style class: " + templateClass);
-                    } else {
-                        try {
-                            final Constructor<? extends Style> ctor =
-                                    styleClass.getDeclaredConstructor();
-                            ctor.setAccessible(true);
-                            final Style style = ctor.newInstance();
-                            style.restoreFromExtras(mN.extras);
+                final Style style = recoverStyle(mN);
+                if (style != null) {
+                    setStyle(style);
+                }
+            }
+        }
 
-                            if (style != null) {
-                                setStyle(style);
-                            }
-                        } catch (Throwable t) {
-                            Log.e(TAG, "Could not create Style", t);
-                        }
+        /**
+         * Recover Style from the given notification.
+         * @hide
+         */
+        public static Style recoverStyle(Notification n) {
+            String templateClass = n.extras.getString(EXTRA_TEMPLATE);
+            if (!TextUtils.isEmpty(templateClass)) {
+                final Class<? extends Style> styleClass = getNotificationStyleClass(templateClass);
+                if (styleClass == null) {
+                    Log.d(TAG, "Unknown style class: " + templateClass);
+                    return null;
+                } else {
+                    try {
+                        final Constructor<? extends Style> ctor =
+                                styleClass.getDeclaredConstructor();
+                        ctor.setAccessible(true);
+                        final Style style = ctor.newInstance();
+                        style.restoreFromExtras(n.extras);
+                        return style;
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Could not create Style", t);
+                        return null;
                     }
                 }
             }
+            return null;
         }
 
         /**
@@ -7282,10 +7346,6 @@ public class Notification implements Parcelable
 
         private RemoteViews applyStandardTemplateWithActions(int layoutId,
                 StandardTemplateParams p, TemplateBindResult result) {
-            if (!Flags.apiNotificationActionCustom()) {
-                return legacyApplyStandardTemplateWithActions(layoutId, p, result);
-            }
-
             RemoteViews contentView = applyStandardTemplate(layoutId, p, result);
 
             resetStandardTemplateWithActions(contentView);
@@ -7349,7 +7409,6 @@ public class Notification implements Parcelable
          *     <li>Limits the number of actions to 3.
          * </ul>
          */
-        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private @NonNull ActionButtons getEffectiveActions() {
             if (mActions == null || mActions.isEmpty()) {
                 return ActionButtons.EMPTY;
@@ -7411,13 +7470,14 @@ public class Notification implements Parcelable
                 candidates.set(i, new ActionButton(updated.build(), candidate.originalIndex));
             }
 
-            boolean emphasizedEdgeToEdge = isPromotedOngoing || isPseudoFsi || isCallStyle;
+            boolean emphasizedEdgeToEdge =
+                    Flags.notifsAllUsePillButtons()
+                            || isPromotedOngoing || isPseudoFsi || isCallStyle;
             boolean supportCustomColors = isPseudoFsi || isCallStyle; // but not other RONs.
             return new ActionButtons(candidates, emphasizedEdgeToEdge, emphasizedEdgeToEdge,
                     supportCustomColors);
         }
 
-        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private boolean populateActionsContainer(RemoteViews contentView, StandardTemplateParams p,
                 ActionButtons actions) {
             boolean validRemoteInput = false;
@@ -7441,7 +7501,6 @@ public class Notification implements Parcelable
             return validRemoteInput;
         }
 
-        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private RemoteViews createActionButtonView(ActionButton actionButton,
                 boolean emphasizedMode, boolean supportCustomColor, StandardTemplateParams p) {
             Action action = actionButton.action;
@@ -7526,11 +7585,9 @@ public class Notification implements Parcelable
             }
         }
 
-        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private record EmphasizedButtonColors(@ColorInt int background, @ColorInt int outline,
                                               @ColorInt int text, @ColorInt int ripple) { }
 
-        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private EmphasizedButtonColors resolveEmphasisColors(Action action,
                 StandardTemplateParams p, boolean useColorFromActionTitle, boolean isTombstone) {
             Colors colors = getColors(p);
@@ -7635,188 +7692,6 @@ public class Notification implements Parcelable
                     }
                 }
             }
-        }
-
-        // TODO: b/461794266 - Delete when inlining FLAG_API_NOTIFICATION_ACTION_CUSTOM.
-        private RemoteViews legacyApplyStandardTemplateWithActions(int layoutId,
-                StandardTemplateParams p, TemplateBindResult result) {
-            RemoteViews contentView = applyStandardTemplate(layoutId, p, result);
-
-            resetStandardTemplateWithActions(contentView);
-            bindSnoozeAction(contentView, p);
-            // color the snooze and bubble actions with the theme color
-            ColorStateList actionColor = ColorStateList.valueOf(getStandardActionColor(p));
-            contentView.setColorStateList(R.id.snooze_button, "setImageTintList", actionColor);
-            contentView.setColorStateList(R.id.bubble_button, "setImageTintList", actionColor);
-
-            List<Notification.Action> effectiveActions = legacyGetEffectiveActions();
-
-            boolean emphasizedMode = mN.fullScreenIntent != null
-                    || p.mCallStyleActions
-                    || ((mN.flags & FLAG_FSI_REQUESTED_BUT_DENIED) != 0);
-
-            if (p.mCallStyleActions) {
-                // Clear view padding to allow buttons to start on the left edge.
-                contentView.setViewPadding(R.id.actions, 0, 0, 0, 0);
-
-                if (CallStyle.DEBUG_NEW_ACTION_LAYOUT) {
-                    Log.d(TAG, "setting evenly divided mode on action list");
-                }
-                contentView.setBoolean(R.id.actions, "setEvenlyDividedMode", true);
-            }
-
-            boolean validRemoteInput = false;
-            // The actions_container should always be visible to act as padding when there are no
-            // actions. We're making its child GONE instead.
-            int actionsContainerForVisibilityChange = R.id.actions_container_layout;
-            if (!effectiveActions.isEmpty() && !p.mHideActions) {
-                contentView.setViewVisibility(actionsContainerForVisibilityChange, View.VISIBLE);
-                contentView.setViewVisibility(R.id.actions, View.VISIBLE);
-                updateMarginsForActions(contentView, emphasizedMode);
-                validRemoteInput = legacyPopulateActionsContainer(contentView, p, effectiveActions,
-                        emphasizedMode);
-            } else {
-                contentView.setViewVisibility(actionsContainerForVisibilityChange, View.GONE);
-            }
-
-            if (validRemoteInput) {
-                displayRemoteInputHistory(contentView, p);
-            }
-
-            return contentView;
-        }
-
-        /**
-         * Returns the subset of actions to be shown in the actions "row" of a notification.
-         * <ul>
-         *     <li>Excludes actions with RemoteInput in live-ongoing notifications.
-         *     <li>Excludes contextual actions, which are shown separately.
-         *     <li>Limits the number of actions to 3.
-         * </ul>
-         */
-        // TODO: b/461794266 - Delete when inlining FLAG_API_NOTIFICATION_ACTION_CUSTOM.
-        private @NonNull List<Action> legacyGetEffectiveActions() {
-            if (mActions == null) return Collections.emptyList();
-            List<Notification.Action> effectiveActions = new ArrayList<>();
-            for (Notification.Action action : mActions) {
-                if (mN.isPromotedOngoing() && hasValidRemoteInput(action)) {
-                    continue;
-                }
-                if (action.isContextual()) {
-                    continue;
-                }
-                effectiveActions.add(action);
-                if (effectiveActions.size() >= MAX_ACTION_BUTTONS) {
-                    break;
-                }
-            }
-            return effectiveActions;
-        }
-
-        // TODO: b/461794266 - Delete when inlining FLAG_API_NOTIFICATION_ACTION_CUSTOM.
-        private boolean legacyPopulateActionsContainer(RemoteViews contentView,
-                StandardTemplateParams p, List<Action> effectiveActions, boolean emphasizedMode) {
-            boolean validRemoteInput = false;
-            for (Action action : effectiveActions) {
-                boolean actionHasValidInput = hasValidRemoteInput(action);
-                validRemoteInput |= actionHasValidInput;
-
-                final RemoteViews button = legacyGenerateActionButton(action, emphasizedMode, p);
-                if (actionHasValidInput && !emphasizedMode) {
-                    // Clear the drawable
-                    button.setInt(R.id.action0, "setBackgroundResource", 0);
-                }
-                if (emphasizedMode && effectiveActions.indexOf(action) > 0) {
-                    // Clear start margin from non-first buttons to reduce the gap between them.
-                    //  (8dp remaining gap is from all buttons' standard 4dp inset).
-                    button.setViewLayoutMarginDimen(R.id.action0, RemoteViews.MARGIN_START, 0);
-                }
-                contentView.addView(R.id.actions, button);
-            }
-            return validRemoteInput;
-        }
-
-        // TODO: b/461794266 - Delete when inlining FLAG_API_NOTIFICATION_ACTION_CUSTOM.
-        private RemoteViews legacyGenerateActionButton(Action action, boolean emphasizedMode,
-                StandardTemplateParams p) {
-            final boolean tombstone = (action.actionIntent == null);
-            final RemoteViews button = new BuilderRemoteViews(mContext.getApplicationInfo(),
-                    getActionButtonLayoutResource(emphasizedMode, tombstone));
-            if (!tombstone) {
-                button.setOnClickPendingIntent(R.id.action0, action.actionIntent);
-            }
-            button.setContentDescription(R.id.action0, action.title);
-            if (action.mRemoteInputs != null) {
-                button.setRemoteInputs(R.id.action0, action.mRemoteInputs);
-            }
-            if (emphasizedMode) {
-                // change the background bgColor
-                CharSequence title = action.title;
-                int buttonFillColor = getColors(p).getSecondaryAccentColor();
-                if (tombstone) {
-                    buttonFillColor = setAlphaComponentByFloatDimen(mContext,
-                            ContrastColorUtil.resolveSecondaryColor(
-                                    mContext, getColors(p).getBackgroundColor(), mInNightMode),
-                            R.dimen.notification_action_disabled_container_alpha);
-                }
-
-                if (!isLegacy()) {
-                    // Check for a full-length span color to use as the button fill color.
-                    Integer fullLengthColor = getFullLengthSpanColor(title, null);
-                    if (fullLengthColor != null) {
-                        // Ensure the custom button fill has 1.3:1 contrast w/ notification bg.
-                        int notifBackgroundColor = getColors(p).getBackgroundColor();
-                        buttonFillColor = ensureButtonFillContrast(
-                                fullLengthColor, notifBackgroundColor);
-                    }
-                }
-
-                final CharSequence label = stripUnwantedSpans(title, p);
-                if (p.mCallStyleActions) {
-                    if (CallStyle.DEBUG_NEW_ACTION_LAYOUT) {
-                        Log.d(TAG, "new action layout enabled, gluing instead of setting text");
-                    }
-                    button.setCharSequence(R.id.action0, "glueLabel", label);
-                } else {
-                    button.setTextViewText(R.id.action0, label);
-                }
-                int textColor = ContrastColorUtil.resolvePrimaryColor(mContext,
-                        buttonFillColor, mInNightMode);
-                if (tombstone) {
-                    textColor = setAlphaComponentByFloatDimen(mContext,
-                            ContrastColorUtil.resolveSecondaryColor(
-                                    mContext, getColors(p).getBackgroundColor(), mInNightMode),
-                            R.dimen.notification_action_disabled_content_alpha);
-                }
-                button.setTextColor(R.id.action0, textColor);
-                // We only want about 20% alpha for the ripple
-                final int rippleColor = (textColor & 0x00ffffff) | 0x33000000;
-                button.setColorStateList(R.id.action0, "setRippleColor",
-                        ColorStateList.valueOf(rippleColor));
-                button.setColorStateList(R.id.action0, "setButtonBackground",
-                        ColorStateList.valueOf(buttonFillColor));
-                if (p.mCallStyleActions) {
-                    if (CallStyle.DEBUG_NEW_ACTION_LAYOUT) {
-                        Log.d(TAG, "new action layout enabled, gluing instead of setting icon");
-                    }
-                    button.setIcon(R.id.action0, "glueIcon", action.getIcon());
-                    boolean priority = action.getExtras().getBoolean(CallStyle.KEY_ACTION_PRIORITY);
-                    button.setBoolean(R.id.action0, "setIsPriority", priority);
-                    int minWidthDimen =
-                            priority ? R.dimen.call_notification_system_action_min_width : 0;
-                    button.setIntDimen(R.id.action0, "setMinimumWidth", minWidthDimen);
-                }
-            } else {
-                button.setTextViewText(R.id.action0, stripUnwantedSpans(action.title, p));
-                button.setTextColor(R.id.action0, getStandardActionColor(p));
-            }
-            // CallStyle notifications add action buttons which don't actually exist in mActions,
-            //  so we have to omit the index in that case.
-            int actionIndex = mActions.indexOf(action);
-            if (actionIndex != -1) {
-                button.setIntTag(R.id.action0, R.id.notification_action_index_tag, actionIndex);
-            }
-            return button;
         }
 
         private void updateMarginsForActions(RemoteViews contentView, boolean emphasizedMode) {
@@ -8869,36 +8744,20 @@ public class Notification implements Parcelable
         if (extras.getBoolean(EXTRA_REDUCED_IMAGES)) {
             return;
         }
-        boolean isLowRam = ActivityManager.isLowRamDeviceStatic();
+        Resources resources = context.getResources();
 
-        if (mSmallIcon != null
-                // Only bitmap icons can be downscaled.
-                && (mSmallIcon.getType() == Icon.TYPE_BITMAP
-                        || mSmallIcon.getType() == Icon.TYPE_ADAPTIVE_BITMAP)) {
-            Resources resources = context.getResources();
-            int maxSize = resources.getDimensionPixelSize(
-                    isLowRam ? R.dimen.notification_small_icon_size_low_ram
-                            : R.dimen.notification_small_icon_size);
+        if (mSmallIcon != null) {
+            int maxSize = resources.getDimensionPixelSize(R.dimen.notification_small_icon_size);
             mSmallIcon.scaleDownIfNecessary(maxSize, maxSize);
         }
 
-        if (mBridgedNotificationMetadata != null
-                // Only bitmap icons can be downscaled.
-                && (mBridgedNotificationMetadata.getAppIcon().getType() == Icon.TYPE_BITMAP
-                        || mBridgedNotificationMetadata.getAppIcon().getType()
-                        == Icon.TYPE_ADAPTIVE_BITMAP)) {
-            Resources resources = context.getResources();
-            int maxSize = resources.getDimensionPixelSize(
-                    isLowRam ? R.dimen.notification_small_icon_size_low_ram
-                            : R.dimen.notification_small_icon_size);
+        if (mBridgedNotificationMetadata != null) {
+            int maxSize = resources.getDimensionPixelSize(R.dimen.notification_small_icon_size);
             mBridgedNotificationMetadata.getAppIcon().scaleDownIfNecessary(maxSize, maxSize);
         }
 
         if (mLargeIcon != null || largeIcon != null) {
-            Resources resources = context.getResources();
-            int maxSize = resources.getDimensionPixelSize(isLowRam
-                    ? R.dimen.notification_right_icon_size_low_ram
-                    : R.dimen.notification_right_icon_size);
+            int maxSize = resources.getDimensionPixelSize(R.dimen.notification_right_icon_size);
             if (mLargeIcon != null) {
                 mLargeIcon.scaleDownIfNecessary(maxSize, maxSize);
             }
@@ -8906,24 +8765,44 @@ public class Notification implements Parcelable
                 largeIcon = Icon.scaleDownIfNecessary(largeIcon, maxSize, maxSize);
             }
         }
-        reduceImageSizesForRemoteView(contentView, context, isLowRam);
-        reduceImageSizesForRemoteView(headsUpContentView, context, isLowRam);
-        reduceImageSizesForRemoteView(bigContentView, context, isLowRam);
-        extras.putBoolean(EXTRA_REDUCED_IMAGES, true);
-    }
-
-    private void reduceImageSizesForRemoteView(RemoteViews remoteView, Context context,
-            boolean isLowRam) {
-        if (remoteView != null) {
-            Resources resources = context.getResources();
-            int maxWidth = resources.getDimensionPixelSize(isLowRam
-                    ? R.dimen.notification_custom_view_max_image_width_low_ram
-                    : R.dimen.notification_custom_view_max_image_width);
-            int maxHeight = resources.getDimensionPixelSize(isLowRam
-                    ? R.dimen.notification_custom_view_max_image_height_low_ram
-                    : R.dimen.notification_custom_view_max_image_height);
-            remoteView.reduceImageSizes(maxWidth, maxHeight);
+        if (contentView != null) {
+            int maxWidth = resources.getDimensionPixelSize(
+                    R.dimen.notification_custom_view_max_image_width);
+            int maxHeight = resources.getDimensionPixelSize(
+                    R.dimen.notification_collapsed_custom_view_max_image_height);
+            contentView.reduceImageSizes(maxWidth, maxHeight);
         }
+        if (headsUpContentView != null) {
+            int maxWidth = resources.getDimensionPixelSize(
+                    R.dimen.notification_custom_view_max_image_width);
+            int maxHeight = resources.getDimensionPixelSize(
+                    R.dimen.notification_hun_custom_view_max_image_height);
+            headsUpContentView.reduceImageSizes(maxWidth, maxHeight);
+        }
+        if (bigContentView != null) {
+            int maxWidth = resources.getDimensionPixelSize(
+                    R.dimen.notification_custom_view_max_image_width);
+            int maxHeight = resources.getDimensionPixelSize(
+                    R.dimen.notification_expanded_custom_view_max_image_height);
+            bigContentView.reduceImageSizes(maxWidth, maxHeight);
+        }
+        if (mBubbleMetadata != null) {
+            int bubbleSize = resources.getDimensionPixelSize(
+                    R.dimen.notification_bubble_size);
+            if (mBubbleMetadata.mIcon != null) {
+                mBubbleMetadata.mIcon.scaleDownIfNecessary(bubbleSize, bubbleSize);
+            }
+        }
+        int smallIconSize = resources.getDimensionPixelSize(
+                R.dimen.notification_small_icon_size);
+        if (actions != null) {
+            for (Action action : actions) {
+                if (action.mIcon != null) {
+                    action.mIcon.scaleDownIfNecessary(smallIconSize, smallIconSize);
+                }
+            }
+        }
+        extras.putBoolean(EXTRA_REDUCED_IMAGES, true);
     }
 
     /**
@@ -9473,8 +9352,7 @@ public class Notification implements Parcelable
          *
          * @hide
          */
-        public void reduceImageSizes(Context context) {
-        }
+        protected void reduceImageSizes(Context context) {}
 
         /**
          * Validate that this style was properly composed. This is called at build time.
@@ -9496,6 +9374,15 @@ public class Notification implements Parcelable
          * @hide
          */
         public CharSequence getHeadsUpStatusBarText() {
+            return null;
+        }
+
+        /**
+         * @return the text that should be displayed in the notification history.
+         * If {@code null} is returned, the default implementation will be used.
+         * @hide
+         */
+        public CharSequence getHistoryText(@NonNull Context context) {
             return null;
         }
     }
@@ -9645,22 +9532,17 @@ public class Notification implements Parcelable
          */
         @Override
         public void reduceImageSizes(Context context) {
-            super.reduceImageSizes(context);
             Resources resources = context.getResources();
-            boolean isLowRam = ActivityManager.isLowRamDeviceStatic();
             if (mPictureIcon != null) {
-                int maxPictureHeight = resources.getDimensionPixelSize(isLowRam
-                        ? R.dimen.notification_big_picture_max_height_low_ram
-                        : R.dimen.notification_big_picture_max_height);
-                int maxPictureWidth = resources.getDimensionPixelSize(isLowRam
-                        ? R.dimen.notification_big_picture_max_width_low_ram
-                        : R.dimen.notification_big_picture_max_width);
+                int maxPictureHeight = resources.getDimensionPixelSize(
+                        R.dimen.notification_big_picture_max_height);
+                int maxPictureWidth = resources.getDimensionPixelSize(
+                        R.dimen.notification_big_picture_max_width);
                 mPictureIcon.scaleDownIfNecessary(maxPictureWidth, maxPictureHeight);
             }
             if (mBigLargeIcon != null) {
-                int rightIconSize = resources.getDimensionPixelSize(isLowRam
-                        ? R.dimen.notification_right_icon_size_low_ram
-                        : R.dimen.notification_right_icon_size);
+                int rightIconSize = resources.getDimensionPixelSize(
+                        R.dimen.notification_right_icon_size);
                 mBigLargeIcon.scaleDownIfNecessary(rightIconSize, rightIconSize);
             }
         }
@@ -9919,6 +9801,14 @@ public class Notification implements Parcelable
         /**
          * @hide
          */
+        @Override
+        public void reduceImageSizes(Context context) {
+            // no images
+        }
+
+        /**
+         * @hide
+         */
         public RemoteViews makeExpandedContentView() {
             StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
@@ -9953,6 +9843,13 @@ public class Notification implements Parcelable
             return !Objects.equals(String.valueOf(getBigText()), String.valueOf(newS.getBigText()));
         }
 
+        /**
+         * @hide
+         */
+        @Override
+        public CharSequence getHistoryText(@NonNull Context unused) {
+            return mBigText;
+        }
     }
 
     /**
@@ -10837,25 +10734,34 @@ public class Notification implements Parcelable
          */
         @Override
         public void reduceImageSizes(Context context) {
-            super.reduceImageSizes(context);
             Resources resources = context.getResources();
-            boolean isLowRam = ActivityManager.isLowRamDeviceStatic();
             if (mShortcutIcon != null) {
                 int maxSize = resources.getDimensionPixelSize(
-                        isLowRam ? R.dimen.notification_small_icon_size_low_ram
-                                : R.dimen.notification_small_icon_size);
+                        R.dimen.notification_person_icon_max_size);
                 mShortcutIcon.scaleDownIfNecessary(maxSize, maxSize);
             }
 
             int maxAvatarSize = resources.getDimensionPixelSize(
-                    isLowRam ? R.dimen.notification_person_icon_max_size_low_ram
-                            : R.dimen.notification_person_icon_max_size);
+                    R.dimen.notification_person_icon_max_size);
             if (mUser != null && mUser.getIcon() != null) {
                 mUser.getIcon().scaleDownIfNecessary(maxAvatarSize, maxAvatarSize);
             }
 
             reduceMessagesIconSizes(mMessages, maxAvatarSize);
             reduceMessagesIconSizes(mHistoricMessages, maxAvatarSize);
+        }
+
+        /**
+         * @hide
+         */
+        @Override
+        public CharSequence getHistoryText(@NonNull Context unused) {
+            final List<MessagingStyle.Message> messages = getMessages();
+            if (messages != null && messages.size() > 0) {
+                return messages.get(messages.size() - 1).getText();
+            }
+
+            return null;
         }
 
         /**
@@ -11295,6 +11201,14 @@ public class Notification implements Parcelable
         /**
          * @hide
          */
+        @Override
+        public void reduceImageSizes(Context context) {
+            // no images
+        }
+
+        /**
+         * @hide
+         */
         public RemoteViews makeExpandedContentView() {
             StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
@@ -11581,6 +11495,14 @@ public class Notification implements Parcelable
             if (mDeviceIntent != null) {
                 extras.putParcelable(EXTRA_MEDIA_REMOTE_INTENT, mDeviceIntent);
             }
+        }
+
+        /**
+         * @hide
+         */
+        @Override
+        public void reduceImageSizes(Context context) {
+            // no images
         }
 
         /**
@@ -11959,13 +11881,15 @@ public class Notification implements Parcelable
          */
         @Override
         public void reduceImageSizes(Context context) {
-            super.reduceImageSizes(context);
             if (mVerificationIcon != null) {
                 int rightIconSize = context.getResources().getDimensionPixelSize(
-                        ActivityManager.isLowRamDeviceStatic()
-                                ? R.dimen.notification_right_icon_size_low_ram
-                                : R.dimen.notification_right_icon_size);
+                        R.dimen.notification_right_icon_size);
                 mVerificationIcon.scaleDownIfNecessary(rightIconSize, rightIconSize);
+            }
+            if (mPerson.getIcon() != null) {
+                int leftIconSize = context.getResources().getDimensionPixelSize(
+                        R.dimen.notification_person_icon_max_size);
+                mPerson.getIcon().scaleDownIfNecessary(leftIconSize, leftIconSize);
             }
         }
 
@@ -12460,6 +12384,14 @@ public class Notification implements Parcelable
             mCriticalMetric = extras.getInt(EXTRA_METRICS_CRITICAL_INDEX, CRITICAL_METRIC_DEFAULT);
         }
 
+        /**
+         * @hide
+         */
+        @Override
+        public void reduceImageSizes(Context context) {
+            // no images
+        }
+
         /** @hide */
         @Override
         public void validate(@NonNull Context context) {
@@ -12476,6 +12408,40 @@ public class Notification implements Parcelable
             // that the custom view is not used instead of the template, but it will not
             // actually be included.
             return true;
+        }
+
+        /**
+         * @hide
+         */
+        @Override
+        public CharSequence getHistoryText(@NonNull Context context) {
+            final StringBuilder buffer = new StringBuilder();
+            final String separator = context.getString(R.string.notification_header_divider_symbol);
+            for (int i = 0; i < mMetrics.size(); i++) {
+                final Metric metric = mMetrics.get(i);
+                if (i > 0) {
+                    buffer.append(" ");
+                    buffer.append(separator);
+                    buffer.append(" ");
+                }
+                final Notification.Metric.MetricValue metricValue = metric.getValue();
+                final Notification.Metric.MetricValue.ValueString valueString =
+                        metricValue.toValueString(context);
+                final String unit = valueString.subtext();
+                CharSequence value = valueString.textVariants.getFirst();
+                final CharSequence label;
+                if (TextUtils.isEmpty(unit)) {
+                    label = metric.getLabel();
+                } else {
+                    label = context.getString(
+                            R.string.notification_metric_label_unit,
+                            metric.getLabel(), unit);
+                }
+                buffer.append(context.getString(R.string.notification_history_metric_subtext,
+                        label, value));
+            }
+
+            return buffer.toString();
         }
 
         /** @hide */
@@ -13233,8 +13199,32 @@ public class Notification implements Parcelable
             @Override
             @NonNull
             public ValueString toValueString(Context context) {
-                // Not used; Chronometer view will take charge of formatting.
-                return ValueString.EMPTY;
+                Duration pausedDuration = getPausedDuration();
+                String value;
+                if (pausedDuration == null) {
+                    value = context.getString(
+                            isTimer() ? R.string.notification_metric_running_timer :
+                                    R.string.notification_metric_running_stopwatch
+                    );
+                } else {
+                    // ms are ignored and we don't want -0:00
+                    pausedDuration = pausedDuration.truncatedTo(SECONDS);
+                    final boolean isNegative = pausedDuration.isNegative();
+                    pausedDuration = pausedDuration.abs();
+                    final boolean isAdaptive = getFormat()
+                            ==  Notification.Metric.TimeDifference.FORMAT_ADAPTIVE;
+
+                    if (isAdaptive) {
+                        value = ChronometerAdaptiveFormat.format(pausedDuration);
+                    } else {
+                        value = DateUtils.formatElapsedTime(new StringBuilder(),
+                                pausedDuration.toSeconds());
+                    }
+                    if (isNegative) {
+                        value = context.getString(R.string.negative_duration, value);
+                    }
+                }
+                return new ValueString(value);
             }
         }
 
@@ -13444,7 +13434,7 @@ public class Notification implements Parcelable
              * Creates a {@link FixedTime} with the specified {@link LocalTime}.
              */
             public FixedTime(@NonNull LocalTime value) {
-                mValue = requireNonNull(value).truncatedTo(ChronoUnit.SECONDS);
+                mValue = requireNonNull(value).truncatedTo(SECONDS);
             }
 
             @Nullable
@@ -14273,8 +14263,6 @@ public class Notification implements Parcelable
          */
         @Override
         public void reduceImageSizes(Context context) {
-            super.reduceImageSizes(context);
-
             final Resources resources = context.getResources();
 
             int progressIconSize =
@@ -14960,6 +14948,14 @@ public class Notification implements Parcelable
         /**
          * @hide
          */
+        @Override
+        public void reduceImageSizes(Context context) {
+            // no images
+        }
+
+        /**
+         * @hide
+         */
         public boolean displayCustomViewInline() {
             return true;
         }
@@ -15091,6 +15087,14 @@ public class Notification implements Parcelable
     public static class DecoratedMediaCustomViewStyle extends MediaStyle {
 
         public DecoratedMediaCustomViewStyle() {
+        }
+
+        /**
+         * @hide
+         */
+        @Override
+        public void reduceImageSizes(Context context) {
+            // no images
         }
 
         /**

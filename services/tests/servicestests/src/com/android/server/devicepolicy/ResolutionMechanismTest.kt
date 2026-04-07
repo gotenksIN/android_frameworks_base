@@ -42,8 +42,8 @@ class ResolutionMechanismTest {
     @Test
     fun resolve_flagUnion() {
         val adminPolicies: LinkedHashMap<EnforcingAdmin, PolicyValue<Int>> = LinkedHashMap()
-        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A as PolicyValue<Int>)
-        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B as PolicyValue<Int>)
+        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A)
+        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B)
 
         val resolvedPolicy = FlagUnion().resolve(adminPolicies)
 
@@ -55,15 +55,28 @@ class ResolutionMechanismTest {
 
     @Test
     fun resolve_mostRecent() {
-        val adminPolicies: LinkedHashMap<EnforcingAdmin, PolicyValue<Integer>> = LinkedHashMap()
-        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A as PolicyValue<Integer>)
-        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B as PolicyValue<Integer>)
+        val adminPolicies: LinkedHashMap<EnforcingAdmin, PolicyValue<Int>> = LinkedHashMap()
+        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A)
+        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B)
 
-        val resolvedPolicy = MostRecent<Integer>().resolve(adminPolicies)
+        val resolvedPolicy = MostRecent<Int>().resolve(adminPolicies)
 
         assertThat(resolvedPolicy).isNotNull()
         assertThat(resolvedPolicy?.resolvedPolicyValue).isEqualTo(INT_POLICY_B)
         assertThat(resolvedPolicy?.contributingAdmins).containsExactly(DEVICE_OWNER_ADMIN)
+    }
+
+    @Test
+    fun resolve_leastRecent() {
+        val adminPolicies: LinkedHashMap<EnforcingAdmin, PolicyValue<Int>> = LinkedHashMap()
+        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A)
+        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B)
+
+        val resolvedPolicy = LeastRecent<Int>().resolve(adminPolicies)
+
+        assertThat(resolvedPolicy).isNotNull()
+        assertThat(resolvedPolicy?.resolvedPolicyValue).isEqualTo(INT_POLICY_A)
+        assertThat(resolvedPolicy?.contributingAdmins).containsExactly(SYSTEM_ADMIN)
     }
 
     @Test
@@ -162,12 +175,12 @@ class ResolutionMechanismTest {
 
     @Test
     fun resolve_topPriority() {
-        val adminPolicies: LinkedHashMap<EnforcingAdmin, PolicyValue<Integer>> = LinkedHashMap()
-        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A as PolicyValue<Integer>)
-        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B as PolicyValue<Integer>)
+        val adminPolicies: LinkedHashMap<EnforcingAdmin, PolicyValue<Int>> = LinkedHashMap()
+        adminPolicies.put(SYSTEM_ADMIN, INT_POLICY_A)
+        adminPolicies.put(DEVICE_OWNER_ADMIN, INT_POLICY_B)
 
         val resolvedPolicy =
-            TopPriority<Integer>(listOf(EnforcingAdmin.DPC_AUTHORITY)).resolve(adminPolicies)
+            TopPriority<Int>(listOf(EnforcingAdmin.DPC_AUTHORITY)).resolve(adminPolicies)
 
         assertThat(resolvedPolicy).isNotNull()
         assertThat(resolvedPolicy?.resolvedPolicyValue).isEqualTo(INT_POLICY_B)
@@ -290,6 +303,24 @@ class ResolutionMechanismTest {
     @Test
     fun isPolicyApplied_mostRecent_differentValues_returnsFalse() {
         val resolutionMechanism = MostRecent<Int>()
+
+        assertFalse {
+            resolutionMechanism.isPolicyApplied(INT_POLICY_A, INT_POLICY_AB)
+        }
+    }
+
+    @Test
+    fun isPolicyApplied_leastRecent_sameValues_returnsTrue() {
+        val resolutionMechanism = LeastRecent<Int>()
+
+        assertTrue {
+            resolutionMechanism.isPolicyApplied(INT_POLICY_A, INT_POLICY_A)
+        }
+    }
+
+    @Test
+    fun isPolicyApplied_leastRecent_differentValues_returnsFalse() {
+        val resolutionMechanism = LeastRecent<Int>()
 
         assertFalse {
             resolutionMechanism.isPolicyApplied(INT_POLICY_A, INT_POLICY_AB)

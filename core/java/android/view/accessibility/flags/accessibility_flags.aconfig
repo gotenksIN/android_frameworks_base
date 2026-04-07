@@ -128,13 +128,6 @@ flag {
 }
 
 flag {
-    name: "button_chooser_activity_bottom_margin_system_bar"
-    namespace: "accessibility"
-    description: "Uses system bar insets as a bottom margin for AccessibilityButtonChooserActivity, preventing overlap."
-    bug: "433572832"
-}
-
-flag {
     name: "collection_info_item_counts"
     namespace: "accessibility"
     is_exported: true
@@ -271,13 +264,6 @@ flag {
     namespace: "accessibility"
     description: "Allows accessibility services to intercept but not consume motion events from specified sources."
     bug: "297595990"
-}
-
-flag {
-    name: "navbar_flip_order_option"
-    namespace: "accessibility"
-    description: "Adds a setting for users to change the order of the navbar's 3 main buttons."
-    bug: "410601652"
 }
 
 flag {

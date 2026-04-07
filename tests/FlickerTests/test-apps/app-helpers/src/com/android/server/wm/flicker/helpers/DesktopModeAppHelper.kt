@@ -84,6 +84,8 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         NON_RESIZABLE
     }
 
+    val appName = innerHelper.appName
+
     /** Launch an app and ensure it's moved to Desktop if it has not. */
     fun enterDesktopMode(
         wmHelper: WindowManagerStateHelper,
@@ -407,8 +409,11 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
             device.wait(Until.findObjects(caption.displayId(displayId)), TIMEOUT.toMillis())
                 ?: error("Unable to find view $caption\n")
 
+        val task = wmHelper.currentState.wmState.getTaskForActivity(innerHelper)
+            ?: error("Unable to find task for $innerHelper")
+
         return captions.find {
-            wmHelper.getWindowRegion(innerHelper).bounds.contains(it.visibleBounds)
+            task.bounds.contains(it.visibleBounds)
         }
     }
 
@@ -528,6 +533,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
     fun dragToSnapResizeRegion(
         wmHelper: WindowManagerStateHelper,
         device: UiDevice,
+        context: Context,
         isLeft: Boolean,
     ) {
         val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
@@ -546,10 +552,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
 
         // drag the window to snap resize
         device.drag(startX, startY, endX, endY, /* steps= */ 100)
-        wmHelper
-            .StateSyncBuilder()
-            .withAppTransitionIdle()
-            .waitForAndVerify()
+        waitAndVerifySnapResize(wmHelper, context, isLeft)
     }
 
     fun dragRight(wmHelper: WindowManagerStateHelper, device: UiDevice, distance: Int) {
@@ -643,10 +646,11 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
     }
 
     private fun clickAppHandle(wmHelper: WindowManagerStateHelper, device: UiDevice) {
-        val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
-        val startX = windowRect.centerX()
+        val task = wmHelper.currentState.wmState.getTaskForActivity(innerHelper)
+            ?: error("Unable to find task for $innerHelper")
+        val startX = task.bounds.centerX()
         // Click a little under the top to prevent opening the notification shade.
-        val startY = windowRect.top + 30
+        val startY = task.bounds.top + 30
 
         // Click on the app handle coordinates.
         device.click(startX, startY)

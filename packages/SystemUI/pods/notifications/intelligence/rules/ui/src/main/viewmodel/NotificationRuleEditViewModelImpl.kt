@@ -19,17 +19,24 @@ package com.android.systemui.notifications.intelligence.rules.ui.viewmodel
 import android.annotation.Px
 import android.content.ContentResolver
 import android.content.Context
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.android.systemui.log.LogBuffer
+import com.android.systemui.log.core.Logger
 import com.android.systemui.notifications.intelligence.rules.domain.interactor.ContactsInteractor
 import com.android.systemui.notifications.intelligence.rules.domain.interactor.InstalledAppsInteractor
 import com.android.systemui.notifications.intelligence.rules.shared.NmContextualDisplayLaunch
+import com.android.systemui.notifications.intelligence.rules.shared.NotificationRulesLog
 import com.android.systemui.notifications.intelligence.rules.shared.model.AppModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.ContactModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.ContactsModel
 import com.android.systemui.notifications.intelligence.rules.shared.model.DraftRuleModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.IncludedAppsModel
+import com.android.systemui.notifications.intelligence.rules.shared.model.RuleValue
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -40,9 +47,56 @@ constructor(
     @Assisted startingRule: DraftRuleModel,
     private val contactsInteractor: ContactsInteractor,
     private val installedAppsInteractor: InstalledAppsInteractor,
+    @NotificationRulesLog logBuffer: LogBuffer,
 ) : NotificationRuleEditViewModel {
+    private val logger = Logger(logBuffer, "EditViewModel")
 
     override var rule: DraftRuleModel by mutableStateOf(startingRule)
+
+    override fun buildRuleText(
+        onEnterEditField: (RulesScreenViewState.EditField) -> Unit,
+        onExitEditField: () -> Unit,
+        resources: Resources,
+    ): RuleDisplayModel {
+        return buildEditableRuleText(
+            this,
+            onEnterEditField,
+            onAppsSaved = { onAppsSaved(it, onExitEditField) },
+            onContactsSaved = { onContactsSaved(it, onExitEditField) },
+            resources = resources,
+            logger = logger,
+        )
+    }
+
+    override fun onAppsSaved(newApps: List<AppModel>, onExitEditField: () -> Unit) {
+        rule =
+            rule.copy(
+                includedApps =
+                    if (newApps.isNotEmpty()) {
+                        RuleValue.Specified(IncludedAppsModel(newApps))
+                    } else {
+                        // Saving with no selected apps is effectively removing apps from the
+                        // filter.
+                        null
+                    }
+            )
+        onExitEditField()
+    }
+
+    override fun onContactsSaved(newContacts: List<ContactModel>, onExitEditField: () -> Unit) {
+        rule =
+            rule.copy(
+                contacts =
+                    if (newContacts.isNotEmpty()) {
+                        RuleValue.Specified(ContactsModel(newContacts))
+                    } else {
+                        // Saving with no selected contacts is effectively removing contacts from
+                        // the filter.
+                        null
+                    }
+            )
+        onExitEditField()
+    }
 
     override suspend fun fetchContacts(
         searchQuery: String,
@@ -62,8 +116,8 @@ constructor(
         return contactsInteractor.loadBitmapFromUri(uri, userContext, sizePx)
     }
 
-    override suspend fun fetchInstalledApps(): List<AppModel> {
-        return installedAppsInteractor.fetchInstalledApps()
+    override suspend fun fetchInstalledApps(context: Context): List<AppModel> {
+        return installedAppsInteractor.fetchInstalledApps(context)
     }
 
     @AssistedFactory

@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.PlatformTheme
 import com.android.compose.theme.colorAttr
@@ -74,8 +75,12 @@ import com.android.systemui.clock.ui.viewmodel.ClockViewModel
 import com.android.systemui.common.ui.compose.gestures.detectTapGesturesStrict
 import com.android.systemui.communal.ui.compose.extensions.detectLongPressGesture
 import com.android.systemui.compose.modifiers.sysUiResTagContainer
+import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.PerDisplaySingleton
+import com.android.systemui.headline.ui.compose.Headline
+import com.android.systemui.headline.ui.viewmodel.HeadlineViewModel
+import com.android.systemui.initOnBackPressedDispatcherOwner
 import com.android.systemui.lifecycle.WindowLifecycleState
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
@@ -89,11 +94,13 @@ import com.android.systemui.statusbar.chips.ui.compose.OngoingActivityChips
 import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.core.StatusBarEventForwardingModernization
 import com.android.systemui.statusbar.core.StatusBarForDesktop
+import com.android.systemui.statusbar.systemstatusicons.domain.interactor.SystemStatusIconBlocklistInteractor
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.ConnectedDisplaysStatusBarNotificationIconViewStore
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerStatusBarViewBinder
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder
+import com.android.systemui.statusbar.notification.shared.StatusBarHeadline
 import com.android.systemui.statusbar.phone.NotificationIconContainer
 import com.android.systemui.statusbar.phone.PhoneStatusBarView
 import com.android.systemui.statusbar.phone.StatusBarLocation
@@ -131,11 +138,13 @@ constructor(
     private val clockViewModelFactory: ClockViewModel.Factory,
     private val darkIconManagerFactory: DarkIconManager.Factory,
     private val tintedIconManagerFactory: TintedIconManager.Factory,
+    private val headlineComposer: Headline,
     private val iconController: StatusBarIconController,
     @DisplayAware private val eventAnimationInteractor: SystemStatusEventAnimationInteractor,
     @DisplayAware private val darkIconDispatcher: DarkIconDispatcher,
     @DisplayAware private val homeStatusBarViewBinder: HomeStatusBarViewBinder,
     @DisplayAware private val homeStatusBarViewModelFactory: HomeStatusBarViewModelFactory,
+    @DisplayAware private val headlineViewModelFactory: HeadlineViewModel.Factory,
     private val statusBarRegionSamplingViewModelFactory: StatusBarRegionSamplingViewModel.Factory,
     private val shadeWindowRootView: WindowRootView,
 ) {
@@ -154,6 +163,8 @@ constructor(
                         clockViewModelFactory = clockViewModelFactory,
                         darkIconManagerFactory = darkIconManagerFactory,
                         tintedIconManagerFactory = tintedIconManagerFactory,
+                        headlineViewModelFactory = headlineViewModelFactory,
+                        headlineComposer = headlineComposer,
                         iconController = iconController,
                         darkIconDispatcher = darkIconDispatcher,
                         eventAnimationInteractor = eventAnimationInteractor,
@@ -191,6 +202,8 @@ fun StatusBarRoot(
     clockViewModelFactory: ClockViewModel.Factory,
     darkIconManagerFactory: DarkIconManager.Factory,
     tintedIconManagerFactory: TintedIconManager.Factory,
+    headlineViewModelFactory: HeadlineViewModel.Factory,
+    headlineComposer: Headline,
     iconController: StatusBarIconController,
     darkIconDispatcher: DarkIconDispatcher,
     eventAnimationInteractor: SystemStatusEventAnimationInteractor,
@@ -233,7 +246,7 @@ fun StatusBarRoot(
         return
     }
 
-    Box { // TODO(b/433578931): Remove this Box once the full solution for b/433578931 is settled.
+    Box {
         AndroidView(
             factory = { context ->
                 val inflater = LayoutInflater.from(context)
@@ -351,6 +364,15 @@ fun StatusBarRoot(
                 },
             onRelease = { touchableExclusionRegionDisposableHandle?.dispose() },
         )
+
+        if (StatusBarHeadline.isEnabled) {
+            val lifecycle = LocalLifecycleOwner.current.lifecycle
+            parent.initOnBackPressedDispatcherOwner(lifecycle, force = true)
+            headlineComposer.Content(
+                headlineViewModelFactory,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 }
 
@@ -584,12 +606,15 @@ private fun addEndSideComposable(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier =
-                        Modifier.widthIn(max = with(LocalDensity.current) { endSideWidth.toDp() }),
+                        Modifier.widthIn(max = with(LocalDensity.current) { endSideWidth.toDp() })
+                            .sysUiResTagContainer(),
                 ) {
                     SystemStatusIconsContainer(
                         viewModelFactory = statusBarViewModel.systemStatusIconsViewModelFactory,
                         isDark = statusBarViewModel.areaDark,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f, fill = false).sysuiResTag("system_icons"),
+                        systemStatusIconBlockListInteractor =
+                            statusBarViewModel.systemStatusIconBlockListInteractor,
                     )
 
                     val height =
@@ -603,7 +628,7 @@ private fun addEndSideComposable(
                     UnifiedBattery(
                         viewModel = viewModel,
                         isDarkProvider = { statusBarViewModel.areaDark },
-                        modifier = Modifier.sysUiResTagContainer().height(height).wrapContentWidth(),
+                        modifier = Modifier.height(height).wrapContentWidth(),
                     )
                 }
             }
@@ -619,6 +644,7 @@ private fun SystemStatusIconsContainer(
     viewModelFactory: SystemStatusIconsViewModel.Factory,
     isDark: IsAreaDark,
     modifier: Modifier = Modifier,
+    systemStatusIconBlockListInteractor: SystemStatusIconBlocklistInteractor,
 ) {
     var bounds by remember { mutableStateOf(Rect()) }
     val tint = if (isDark.isDarkTheme(bounds)) Color.White else Color.Black
@@ -630,6 +656,7 @@ private fun SystemStatusIconsContainer(
                 bounds =
                     with(relativeLayoutBounds.boundsInScreen) { Rect(left, top, right, bottom) }
             },
+        systemStatusIconBlocklistInteractor = systemStatusIconBlockListInteractor,
     )
 }
 
@@ -713,7 +740,7 @@ fun Modifier.forwardDragAndSwipeToShadeRootView(
             onDown(down.position, size)
             try {
                 // Loop to process events for the current gesture.
-                while (true) {
+                do {
                     val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                     val mainChange = event.changes.first()
 
@@ -736,11 +763,10 @@ fun Modifier.forwardDragAndSwipeToShadeRootView(
                         }
                     }
 
-                    // Exit the loop if the primary pointer is up.
-                    if (mainChange.pressed.not()) {
-                        break
-                    }
-                }
+                    // Continue tracking until ALL pointers involved in the gesture are lifted.
+                    // This ensures downstream nodes receive their terminal events during
+                    // multi-touch gestures.
+                } while (event.changes.any { it.pressed })
             } finally {
                 // Ensure all cached events are recycled at the end of the gesture.
                 cachedEvents.forEach { it.recycle() }

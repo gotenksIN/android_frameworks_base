@@ -181,6 +181,14 @@ final class RemoteAugmentedAutofillService {
         getAugmentedAutofillClient(client)
                 .thenComposeAsync(
                         augmentedAutofillClient -> {
+                            if (augmentedAutofillClient == null) {
+                                Slog.e(
+                                        TAG,
+                                        "onRequestAutofillLocked: Unable to fetch "
+                                                + "augmentedAutofillClient, not sending requests");
+                                return null;
+                            }
+
                             CompletableFuture<AugmentedAutofillInlineSuggestionsResponseData>
                                     personalContextFuture =
                                             sendRequestToPersonalContext(
@@ -217,7 +225,11 @@ final class RemoteAugmentedAutofillService {
                                         }
                                         // TODO(b/478044353): allow choosing priority for which
                                         //  future to look at the result of first.
-                                        if (personalContextResponse != null) {
+                                        if (personalContextResponse != null
+                                                // Personal context does not always generate
+                                                // suggestions.
+                                                && !personalContextResponse.inlineSuggestionsData
+                                                        .isEmpty()) {
                                             if (sDebug) {
                                                 Slog.d(
                                                         TAG,
@@ -287,8 +299,8 @@ final class RemoteAugmentedAutofillService {
                         }
                     });
         } catch (RemoteException e) {
-            clientFuture.complete(null);
-            throw new RuntimeException(e);
+            Slog.e(TAG, "getAugmentedAutofillClient: failed due to RemoteException", e);
+            clientFuture.completeExceptionally(e);
         }
         return clientFuture;
     }

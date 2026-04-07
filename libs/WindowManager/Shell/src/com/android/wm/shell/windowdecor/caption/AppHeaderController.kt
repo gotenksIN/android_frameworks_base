@@ -73,6 +73,7 @@ import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
 import com.android.wm.shell.windowdecor.WindowDecoration2.RelayoutParams
 import com.android.wm.shell.windowdecor.WindowDecorationActions
 import com.android.wm.shell.windowdecor.WindowManagerWrapper
+import com.android.wm.shell.windowdecor.common.DecorThemeUtil
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHost
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHostSupplier
@@ -131,6 +132,7 @@ class AppHeaderController(
     private val surfaceControlTransactionSupplier: () -> SurfaceControl.Transaction = {
         SurfaceControl.Transaction()
     },
+    private val decorThemeUtilFactory: DecorThemeUtil.Factory,
 ) :
     CaptionController<WindowDecorLinearLayout>(
         taskInfo,
@@ -354,6 +356,7 @@ class AppHeaderController(
                     },
                     transactionSupplier = surfaceControlTransactionSupplier,
                     desktopModeUiEventLogger = desktopModeUiEventLogger,
+                    splitScreenController = splitScreenController,
                 )
                 .apply {
                     show(
@@ -461,8 +464,7 @@ class AppHeaderController(
                         appToWebRepository.getAppToWebIntent(taskInfo, isBrowserApp)
                     } else {
                         // Skip request for assist content as it is only used for links, which are
-                        // not
-                        // supported
+                        // not supported
                         null
                     }
                 createHandleMenu(
@@ -548,8 +550,9 @@ class AppHeaderController(
     }
 
     private fun isBrowserApp(): Boolean =
-        taskInfo.baseActivity?.let { isBrowserApp(userContext, it.packageName, userContext.userId) }
-            ?: false
+        taskInfo.baseIntent.component?.let {
+            isBrowserApp(userContext, it.packageName, userContext.userId)
+        } ?: false
 
     /** Creates and shows the manage windows menu. */
     override fun createManageWindowsMenu(snapshotList: ArrayList<Pair<Int, TaskSnapshot>>) {
@@ -622,6 +625,7 @@ class AppHeaderController(
                 desktopModeUiEventLogger = desktopModeUiEventLogger,
                 dimensions = dimensions,
                 focusTransitionObserver = focusTransitionObserver,
+                decorThemeUtilFactory = decorThemeUtilFactory,
             )
 
         loadAppInfoJob =
@@ -704,14 +708,6 @@ class AppHeaderController(
 
     override val occludingElements: List<OccludingElement>
         get() = viewHolder.getOccludingElements()
-
-    /**
-     * Announces that the app window is now being focused for accessibility. This is used after a
-     * window is minimized/closed, and a new app window gains focus.
-     */
-    fun a11yAnnounceFocused() {
-        viewHolder.a11yAnnounceFocused()
-    }
 
     override fun close(wct: WindowContainerTransaction, t: SurfaceControl.Transaction): Boolean {
         loadAppInfoJob?.cancel()

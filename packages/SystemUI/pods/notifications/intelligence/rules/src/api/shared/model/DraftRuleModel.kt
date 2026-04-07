@@ -31,6 +31,11 @@ package com.android.systemui.notifications.intelligence.rules.shared.model
  * See also: [RuleModel] for rules that are already saved.
  */
 public data class DraftRuleModel(
+    /**
+     * True if the rule being edited is completely new, and false if the rule already existed
+     * previously.
+     */
+    val isNew: Boolean,
     /** The action to apply to the notification. See [android.app.NotificationRule.getAction]. */
     val action: ActionModel,
     /**
@@ -48,6 +53,7 @@ public data class DraftRuleModel(
         /** Converts a rule to a draft version so it can be edited. */
         public fun RuleModel.toDraft(): DraftRuleModel {
             return DraftRuleModel(
+                isNew = false,
                 action = action,
                 contacts = filter.contacts.toDraft(),
                 includedApps = filter.includedApps.toDraft(),
@@ -66,8 +72,8 @@ public data class DraftRuleModel(
 }
 
 /** Represents various actions that a rule can apply to a notification. */
-public enum class ActionModel {
-    /** Highlight and also alert the user, disregarding DND & other modes. */
+enum class ActionModel {
+    /** See [android.app.NotificationRule.Action.PRIMARY_ACTION_HIGHLIGHT_AND_ALERT]. */
     HighlightAndAlert,
     /** See [android.app.NotificationRule.Action.PRIMARY_ACTION_HIGHLIGHT]. */
     Highlight,

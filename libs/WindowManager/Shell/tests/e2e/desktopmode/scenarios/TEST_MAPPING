@@ -115,6 +115,12 @@
       ]
     },
     {
+      "name": "FunctionalTestsDesktopMode-externaldisplay-SettingsUpdateResolutionRefreshRateTest",
+      "keywords": [
+        "desktop"
+      ]
+    },
+    {
       "name": "FunctionalTestsDesktopMode-externaldisplay-focus-ClickAndFocusTest",
       "keywords": [
         "desktop"
@@ -398,6 +404,12 @@
     },
     {
       "name": "FunctionalTestsDesktopMode-keyboardshortcuts-ToggleFullscreenViaFullscreenKeyTest",
+      "keywords": [
+        "desktop"
+      ]
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-launchbounds-RememberedBoundsTest",
       "keywords": [
         "desktop"
       ]

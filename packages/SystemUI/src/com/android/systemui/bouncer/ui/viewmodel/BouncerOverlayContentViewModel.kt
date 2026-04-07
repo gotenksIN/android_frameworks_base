@@ -44,6 +44,7 @@ import com.android.systemui.bouncer.ui.helper.BouncerHapticPlayer
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.Text
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardDismissActionInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardMediaKeyInteractor
@@ -55,6 +56,7 @@ import com.android.systemui.user.ui.viewmodel.UserSwitcherViewModel
 import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
@@ -67,7 +69,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /** Models UI state for the content of the bouncer overlay. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -90,6 +94,7 @@ constructor(
     private val sceneInteractor: SceneInteractor,
     private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     private val faceAuthInteractor: DeviceEntryFaceAuthInteractor,
+    @Background private val backgroundDispatcher: CoroutineDispatcher,
 ) : HydratedActivatable(enableEnqueuedActivations = enableWeaverWarmup()) {
     private val _selectedUserImage = MutableStateFlow<Bitmap?>(null)
     val selectedUserImage: StateFlow<Bitmap?> = _selectedUserImage.asStateFlow()
@@ -255,6 +260,7 @@ constructor(
             launch {
                 userSwitcher.selectedUser
                     .map { it.image.toBitmap() }
+                    .flowOn(backgroundDispatcher)
                     .collect { _selectedUserImage.value = it }
             }
 
@@ -274,12 +280,14 @@ constructor(
                             actions.map { action ->
                                 UserSwitcherDropdownItemViewModel(
                                     icon =
-                                        Icon.Loaded(
-                                            applicationContext.resources.getDrawable(
-                                                action.iconResourceId
-                                            ),
-                                            contentDescription = null,
-                                        ),
+                                        withContext(backgroundDispatcher) {
+                                            Icon.Loaded(
+                                                applicationContext.resources.getDrawable(
+                                                    action.iconResourceId
+                                                ),
+                                                contentDescription = null,
+                                            )
+                                        },
                                     text = Text.Resource(action.textResourceId),
                                     onClick = action.onClicked,
                                 )
@@ -521,22 +529,6 @@ constructor(
         if (actionButtonModel is BouncerActionButtonModel.EmergencyButtonModel) {
             bouncerActionButtonInteractor.onEmergencyButtonLongClicked()
         }
-    }
-
-    /**
-     * Call this method to determine if Bouncer contents should delay showing on initial transition
-     * to the bouncer. We have this delay to give an opportunity for passive authentication methods
-     * (such as face auth and watch unlock) to succeed first before showing the bouncer contents UI
-     * to avoid a flicker of the UI. However, we do not want to delay the entire Bouncer scene (with
-     * the bouncer background) because we still want to give the user a visual indication that their
-     * request for the bouncer is being processed.
-     *
-     * Returns `true` if a passive authentication method (such as face authentication or watch
-     * unlock) may authenticate the device before the user has the opportunity to enter their
-     * pin/pattern/password. Else, `false`.
-     */
-    suspend fun shouldDelayBouncerContent(): Boolean {
-        return bouncerInteractor.passiveAuthMaySucceedBeforeFullyShowingBouncer()
     }
 
     /**

@@ -416,6 +416,9 @@ public final class Display {
      *
      * @hide
      */
+    @TestApi
+    @FlaggedApi(com.android.server.display.feature.flags.Flags
+            .FLAG_VIRTUAL_DISPLAYS_SUPPORT_DESKTOP_MODE)
     public static final int FLAG_ALLOWS_CONTENT_MODE_SWITCH = 1 << 15;
 
     /**
@@ -727,11 +730,13 @@ public final class Display {
      *
      * @hide
      */
+    @android.ravenwood.annotation.RavenwoodKeep
     public Display(DisplayManagerGlobal global, int displayId, /*@NotNull*/ DisplayInfo displayInfo,
             Resources res) {
         this(global, displayId, displayInfo, null /*daj*/, res);
     }
 
+    @android.ravenwood.annotation.RavenwoodKeep
     private Display(DisplayManagerGlobal global, int displayId,
             /*@NotNull*/ DisplayInfo displayInfo, DisplayAdjustments daj, Resources res) {
         mGlobal = global;
@@ -756,6 +761,7 @@ public final class Display {
      * The default display has id {@link #DEFAULT_DISPLAY}.
      * </p>
      */
+    @android.ravenwood.annotation.RavenwoodKeep
     public int getDisplayId() {
         return mDisplayId;
     }

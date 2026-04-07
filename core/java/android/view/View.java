@@ -24012,6 +24012,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public void setBackdropRenderEffect(@Nullable RenderEffect renderEffect) {
         if (mRenderNode.setBackdropRenderEffect(renderEffect)) {
+            invalidateParentCaches();
             invalidateViewProperty(true, true);
         }
     }

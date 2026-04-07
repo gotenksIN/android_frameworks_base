@@ -87,6 +87,8 @@ public abstract class ProcessRecordInternal {
 
         /**
          * Called when mCurProcState changes.
+         * TODO: b/485394632 - Remove this method after the {@link Flags#encapsulateCurProcState()}
+         *                     is enabled.
          *
          * @param curProcState The new mCurProcState value.
          */
@@ -439,12 +441,6 @@ public abstract class ProcessRecordInternal {
     private @OomAdjust int mSetAdj = INVALID_ADJ;
 
     /**
-     * The last adjustment that was verified as actually being set.
-     */
-    @GuardedBy("mServiceLock")
-    private @OomAdjust int mVerifiedAdj = INVALID_ADJ;
-
-    /**
      * The previously set raw OOM adjustment for this process.
      * This is only meaningful for a restarted process.
      */
@@ -633,12 +629,6 @@ public abstract class ProcessRecordInternal {
      */
     @GuardedBy("mServiceLock")
     private int mCompletedAdjSeq;
-
-    /**
-     * Sequence id for identifying LRU update cycles.
-     */
-    @GuardedBy("mServiceLock")
-    private int mLruSeq;
 
     /**
      * The last time the process was in the TOP state or greater.
@@ -976,16 +966,6 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy("mServiceLock")
-    public void setVerifiedAdj(@OomAdjust int verifiedAdj) {
-        mVerifiedAdj = verifiedAdj;
-    }
-
-    @GuardedBy("mServiceLock")
-    public @OomAdjust int getVerifiedAdj() {
-        return mVerifiedAdj;
-    }
-
-    @GuardedBy("mServiceLock")
     public int getPrevSetRawAdj() {
         return mPrevSetRawAdj;
     }
@@ -1060,7 +1040,7 @@ public abstract class ProcessRecordInternal {
 
     /** Sets the current scheduling group for this process, and notifies the observer. */
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setCurrentSchedulingGroup(@SchedGroup int curSchedGroup) {
+    void setCurrentSchedulingGroup(@SchedGroup int curSchedGroup) {
         mCurSchedGroup = curSchedGroup;
         mObserver.onCurrentSchedulingGroupChanged(mCurSchedGroup);
     }
@@ -1071,7 +1051,7 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setSetSchedGroup(@SchedGroup int setSchedGroup) {
+    void setSetSchedGroup(@SchedGroup int setSchedGroup) {
         mSetSchedGroup = setSchedGroup;
     }
 
@@ -1084,7 +1064,9 @@ public abstract class ProcessRecordInternal {
     @GuardedBy({"mServiceLock", "mProcLock"})
     void setCurProcState(int curProcState) {
         mCurProcState = curProcState;
-        mObserver.onCurProcStateChanged(mCurProcState);
+        if (!Flags.encapsulateCurProcState()) {
+            mObserver.onCurProcStateChanged(mCurProcState);
+        }
     }
 
     @GuardedBy(anyOf = {"mServiceLock", "mProcLock"})
@@ -1223,7 +1205,7 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setHasForegroundActivities(boolean hasForegroundActivities) {
+    void setHasForegroundActivities(boolean hasForegroundActivities) {
         mHasForegroundActivities = hasForegroundActivities;
     }
 
@@ -1314,16 +1296,6 @@ public abstract class ProcessRecordInternal {
     @GuardedBy("mServiceLock")
     public int getCompletedAdjSeq() {
         return mCompletedAdjSeq;
-    }
-
-    @GuardedBy("mServiceLock")
-    public int getLruSeq() {
-        return mLruSeq;
-    }
-
-    @GuardedBy("mServiceLock")
-    public void setLruSeq(int lruSeq) {
-        mLruSeq = lruSeq;
     }
 
     @GuardedBy("mServiceLock")
@@ -1599,7 +1571,7 @@ public abstract class ProcessRecordInternal {
         mHasShownUi = false;
         mForcingToImportant = null;
         mPrevSetRawAdj = mSetRawAdj;
-        mCurRawAdj = mSetRawAdj = mCurAdj = mSetAdj = mVerifiedAdj = INVALID_ADJ;
+        mCurRawAdj = mSetRawAdj = mCurAdj = mSetAdj = INVALID_ADJ;
         mCurCapability = mSetCapability = PROCESS_CAPABILITY_NONE;
         mCurSchedGroup = mSetSchedGroup = SCHED_GROUP_BACKGROUND;
         mCurProcState = mCurRawProcState = mSetProcState = PROCESS_STATE_NONEXISTENT;
@@ -1761,8 +1733,7 @@ public abstract class ProcessRecordInternal {
      */
     @GuardedBy({"mServiceLock", "mProcLock"})
     public void dump(PrintWriter pw, String prefix, long nowUptime) {
-        pw.print(prefix); pw.print("adjSeq="); pw.print(mAdjSeq);
-        pw.print(" lruSeq="); pw.println(mLruSeq);
+        pw.print(prefix); pw.print("adjSeq="); pw.println(mAdjSeq);
         pw.print(prefix); pw.print("oom adj: max="); pw.print(mMaxAdj);
         pw.print(" curRaw="); pw.print(mCurRawAdj);
         pw.print(" setRaw="); pw.print(mSetRawAdj);

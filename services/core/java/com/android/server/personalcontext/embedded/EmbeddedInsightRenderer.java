@@ -29,6 +29,7 @@ import androidx.annotation.NonNull;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.personalcontext.component.Renderer;
 
+import java.io.PrintWriter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -41,7 +42,7 @@ public class EmbeddedInsightRenderer implements Renderer {
     private final ClientRegistry mClientRegistry;
     private final VisualizerRegistry mVisualizerRegistry;
     private final Executor mExecutor;
-
+    private boolean mIsRegistered;
 
     public EmbeddedInsightRenderer(
             Context context,
@@ -68,8 +69,35 @@ public class EmbeddedInsightRenderer implements Renderer {
     public void onRegistered() {
         logDebug("registering...");
 
+        if (mIsRegistered) {
+            Slog.w(TAG, "Already registered!");
+            return;
+        }
+
         // The visualizer registry already pushes this work to the executor's thread.
         mVisualizerRegistry.startRegisteringVisualizers();
+
+        mIsRegistered = true;
+    }
+
+    /**
+     * The embedded insight renderer has been unregistered and should remove all clients and
+     * visualizers.
+     */
+    public void onUnregistered() {
+        logDebug("unregistering...");
+
+        if (!mIsRegistered) {
+            Slog.w(TAG, "Not registered!");
+            return;
+        }
+
+        for (InsightSurfaceClientInfo client : mClientRegistry.getClients()) {
+            unregisterInsightSurfaceClient(client.getId());
+        }
+
+        mVisualizerRegistry.stopMonitoringPackagesForVisualizers();
+        mIsRegistered = false;
     }
 
     /**
@@ -165,6 +193,17 @@ public class EmbeddedInsightRenderer implements Renderer {
     @Override
     public UUID getComponentId() {
         return mComponentId;
+    }
+
+    /**
+     * Dump info about connected clients and visualizers.
+     */
+    public void dump(@NonNull PrintWriter fout) {
+        fout.write("EmbeddedInsightRenderer\n");
+        fout.write("=======================\n");
+        mClientRegistry.dump(fout);
+        mVisualizerRegistry.dump(fout);
+        fout.write("\n");
     }
 
     private InsightSurfaceClientInfo clientFromRenderToken(RenderToken renderToken) {

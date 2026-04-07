@@ -1110,6 +1110,17 @@ public class InputManagerService extends IInputManager.Stub
         return createVirtualGamepadInternal(token, config);
     }
 
+    @NonNull
+    @Override // Binder call
+    @EnforcePermission(Manifest.permission.INJECT_EVENTS)
+    public IVirtualMouse createVirtualMouse(
+            @NonNull IBinder token, @NonNull VirtualMouseConfig config) {
+        super.createVirtualMouse_enforcePermission();
+
+        checkDisplayAssociationPermission(config.getAssociatedDisplayId(), Binder.getCallingUid());
+
+        return createVirtualMouseInternal(token, config);
+    }
 
     @Override // Binder call
     public VerifiedInputEvent verifyInputEvent(@NonNull InputEvent event) {
@@ -2027,6 +2038,17 @@ public class InputManagerService extends IInputManager.Stub
                 InputManagerService.this.getTargetDisplayIdForInput(
                         config.associatedDisplayId),
                 config.registerTriggerAxes);
+    }
+
+    @NonNull
+    IVirtualMouse createVirtualMouseInternal(@NonNull IBinder token,
+            @NonNull VirtualMouseConfig config) {
+        return mVirtualInputDeviceController.createMouse(config.getInputDeviceName(),
+                config.getVendorId(), config.getProductId(), token,
+                config.getAssociatedDisplayId(),
+                android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
+                        ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
+                        : null);
     }
 
     @Override // Binder call
@@ -3174,12 +3196,6 @@ public class InputManagerService extends IInputManager.Stub
 
     // Native callback.
     @SuppressWarnings("unused")
-    private int getPointerLayer() {
-        return mWindowManagerCallbacks.getPointerLayer();
-    }
-
-    // Native callback.
-    @SuppressWarnings("unused")
     private @NonNull PointerIcon getLoadedPointerIcon(int displayId, int type) {
         return mPointerIconCache.getLoadedPointerIcon(displayId, type);
     }
@@ -3286,8 +3302,66 @@ public class InputManagerService extends IInputManager.Stub
 
     @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
     @Override // Binder call
-    public void remapControllerAxis(@UserIdInt int userId,
-            @NonNull InputDeviceIdentifier identifier, @MotionEvent.Axis int fromAxis,
+    public void remapControllerButtonToAxis(
+            @UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier,
+            @InputManager.ControllerButton int fromButton,
+            @MotionEvent.Axis int toAxis) {
+        super.remapControllerButtonToAxis_enforcePermission();
+        if (!com.android.hardware.input.Flags.controllerRemapping()) {
+            return;
+        }
+        if (!isControllerButton(fromButton)) {
+            throw new IllegalArgumentException(
+                    "fromButton "
+                            + KeyEvent.keyCodeToString(fromButton)
+                            + " is not a valid controller button");
+        }
+        if (!isControllerAxis(toAxis)) {
+            throw new IllegalArgumentException(
+                    "toAxis "
+                            + MotionEvent.axisToString(toAxis)
+                            + " is not a valid controller axis");
+        }
+        mInputDeviceRemapper.remapKeyToAxis(userId, identifier, fromButton, toAxis);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void removeControllerButtonToAxisRemapping(
+            @UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier,
+            @InputManager.ControllerButton int fromButton) {
+        super.removeControllerButtonToAxisRemapping_enforcePermission();
+        if (!com.android.hardware.input.Flags.controllerRemapping()) {
+            return;
+        }
+        if (!isControllerButton(fromButton)) {
+            throw new IllegalArgumentException(
+                    "fromButton "
+                            + KeyEvent.keyCodeToString(fromButton)
+                            + " is not a valid controller button");
+        }
+        mInputDeviceRemapper.removeKeyToAxisRemapping(userId, identifier, fromButton);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void clearAllControllerButtonToAxisRemappings(
+            @UserIdInt int userId, @NonNull InputDeviceIdentifier identifier) {
+        super.clearAllControllerButtonToAxisRemappings_enforcePermission();
+        if (!com.android.hardware.input.Flags.controllerRemapping()) {
+            return;
+        }
+        mInputDeviceRemapper.clearAllKeyToAxisRemappings(userId, identifier);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void remapControllerAxis(
+            @UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier,
+            @MotionEvent.Axis int fromAxis,
             @MotionEvent.Axis int toAxis) {
         super.remapControllerAxis_enforcePermission();
         if (!com.android.hardware.input.Flags.controllerRemapping()) {
@@ -3652,8 +3726,6 @@ public class InputManagerService extends IInputManager.Stub
          * Intercept unhandled key
          */
         boolean interceptUnhandledKey(KeyEvent event, IBinder token);
-
-        int getPointerLayer();
 
         int getPointerDisplayId();
 
@@ -4244,12 +4316,7 @@ public class InputManagerService extends IInputManager.Stub
         @Override
         public IVirtualMouse createVirtualMouse(@NonNull IBinder token,
                 @NonNull VirtualMouseConfig config) {
-            return mVirtualInputDeviceController.createMouse(config.getInputDeviceName(),
-                    config.getVendorId(), config.getProductId(), token,
-                    config.getAssociatedDisplayId(),
-                    android.companion.virtualdevice.flags.Flags.virtualInputViewBehavior()
-                            ? config.getViewBehaviorConfigOrDefault(/* defaultValue= */ null)
-                            : null);
+            return InputManagerService.this.createVirtualMouseInternal(token, config);
         }
 
         @NonNull

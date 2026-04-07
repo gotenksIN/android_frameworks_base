@@ -109,6 +109,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE;
+import static android.view.WindowManager.LayoutParams.TYPE_POINTER;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ERROR;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
@@ -119,8 +120,9 @@ import static android.view.WindowManager.TRANSIT_FLAG_KEYGUARD_OCCLUDING;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.TRANSIT_WAKE;
+import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
+import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
 import static android.view.inputmethod.ImeTracker.DEBUG_IME_VISIBILITY;
-import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 import static android.window.DisplayAreaOrganizer.FEATURE_ROOT;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_BOOT;
@@ -365,6 +367,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * overlay.
      */
     private SurfaceControl mOverlayLayer;
+
+    /**
+     * A SurfaceControl that contains pointer-specific visuals, including the cursor icon and
+     *  interactive effects. This is managed as a child of {@link #mOverlayLayer}.
+     */
+    private SurfaceControl mPointerOverlayLayer;
 
     /**
      * A SurfaceControl that contains input overlays used for cases where we need to receive input
@@ -1620,6 +1628,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             transaction.reparent(mOverlayLayer, mSurfaceControl);
         }
 
+        if (mPointerOverlayLayer == null) {
+            mPointerOverlayLayer = b.setName("Pointer Overlays").setParent(
+                    mOverlayLayer).build();
+        } else {
+            transaction.reparent(mPointerOverlayLayer, mOverlayLayer);
+        }
+
         if (mInputOverlayLayer == null) {
             mInputOverlayLayer = b.setName("Input Overlays").setParent(mSurfaceControl).build();
         } else {
@@ -1653,11 +1668,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 .show(mSurfaceControl)
                 .setLayer(mOverlayLayer, Integer.MAX_VALUE)
                 .show(mOverlayLayer)
+                .setLayer(mPointerOverlayLayer, getPointerOverlayLayerZOrder())
+                .show(mPointerOverlayLayer)
                 .setLayer(mInputOverlayLayer, Integer.MAX_VALUE - 1)
                 .show(mInputOverlayLayer)
                 .show(mPointerEventDispatcherOverlayLayer)
                 .setLayer(mA11yOverlayLayer, Integer.MAX_VALUE - 2)
                 .show(mA11yOverlayLayer);
+    }
+
+    private int getPointerOverlayLayerZOrder() {
+        return mWmService.mPolicy.getWindowLayerFromTypeLw(TYPE_POINTER) * TYPE_LAYER_MULTIPLIER
+                + TYPE_LAYER_OFFSET;
     }
 
     private void configurePointerEventDispatcherOverlayLayer(SurfaceControl.Transaction transaction,
@@ -3805,6 +3827,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // -> this DisplayContent.
             setRemoteInsetsController(null);
             mOverlayLayer.release();
+            mPointerOverlayLayer.release();
             mInputOverlayLayer.release();
             mA11yOverlayLayer.release();
             mPointerEventDispatcherOverlayLayer.release();
@@ -4285,8 +4308,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      */
     WindowState findFocusedWindowIfNeeded(int topFocusedDisplayId) {
         return (hasOwnFocus() || topFocusedDisplayId == INVALID_DISPLAY
-                || (ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS.isTrue()
-                && mWmService.mPresentationController.isPresentationVisible(mDisplayId)))
+                || mWmService.mPresentationController.isPresentationVisible(mDisplayId))
                     ? findFocusedWindow() : null;
     }
 
@@ -6125,6 +6147,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         return mOverlayLayer;
     }
 
+    SurfaceControl getPointerOverlayLayer() {
+        return mPointerOverlayLayer;
+    }
+
     SurfaceControl getInputOverlayLayer() {
         return mInputOverlayLayer;
     }
@@ -6771,6 +6797,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     private void clearAllTasksOnDisplay(@Nullable Runnable clearTasksCallback,
             boolean isRemovingDisplay) {
+        final boolean wasFocused = this == mRootWindowContainer.getTopFocusedDisplayContent();
         Task lastReparentedRootTask;
         mRootWindowContainer.mTaskSupervisor.beginDeferResume();
         try {
@@ -6794,7 +6821,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         // Only update focus/visibility for the last one because there may be many root tasks are
         // reparented and the intermediate states are unnecessary.
         if (lastReparentedRootTask != null) {
-            lastReparentedRootTask.resumeNextFocusAfterReparent();
+            lastReparentedRootTask.resumeNextFocusAfterReparent(wasFocused);
         }
     }
 

@@ -43,6 +43,7 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
 import com.android.wm.shell.shared.desktopmode.DesktopState
+import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel
 import java.util.Optional
@@ -60,6 +61,7 @@ class DesktopModeKeyGestureHandler(
     private val displayController: DisplayController,
     private val desktopState: DesktopState,
     private val accessibilityManager: AccessibilityManager,
+    private val shellController: ShellController,
 ) : KeyGestureEventHandler {
     private val a11yAnnounceTextMinimizing: String =
         context.getString(R.string.desktop_mode_talkback_state_minimizing)
@@ -85,6 +87,11 @@ class DesktopModeKeyGestureHandler(
     }
 
     override fun handleKeyGestureEvent(event: KeyGestureEvent, focusedToken: IBinder?) {
+        if (shellController.isOverviewVisible(focusTransitionObserver.globallyFocusedDisplayId)) {
+            logV("Key gesture is ignored because overview is visible")
+            return
+        }
+
         when (event.keyGestureType) {
             KeyGestureEvent.KEY_GESTURE_TYPE_MOVE_TO_NEXT_DISPLAY -> {
                 logV("Key gesture MOVE_TO_NEXT_DISPLAY is handled")
@@ -247,12 +254,6 @@ class DesktopModeKeyGestureHandler(
     //  will pick a wrong task when a user quickly perform other actions with keyboard shortcuts
     //  after moveToNextDisplay, and move this to FocusTransitionObserver class.
     private fun getGloballyFocusedDesktopTask(): RunningTaskInfo? {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            return shellTaskOrganizer.getRunningTasks().find { taskInfo ->
-                taskInfo.windowingMode == WINDOWING_MODE_FREEFORM &&
-                    focusTransitionObserver.hasGlobalFocus(taskInfo)
-            }
-        }
         val repository = desktopUserRepositories.current
         return shellTaskOrganizer.getRunningTasks().find { taskInfo ->
             repository.isActiveTask(taskInfo.taskId) &&

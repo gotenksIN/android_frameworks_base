@@ -29,8 +29,8 @@ import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_WITH_WALLPAPER;
 
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.NAV_BAR_HANDLE_SHOW_OVER_LOCKSCREEN;
-import static com.android.internal.jank.InteractionJankMonitor.CUJ_LOCKSCREEN_OCCLUSION;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_KEYGUARD_TRANSITION_AOD_TO_LOCKSCREEN;
+import static com.android.internal.jank.InteractionJankMonitor.CUJ_LOCKSCREEN_OCCLUSION;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_LOCKSCREEN_UNLOCK_ANIMATION;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.SOME_AUTH_REQUIRED_AFTER_ADAPTIVE_AUTH_REQUEST;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.SOME_AUTH_REQUIRED_AFTER_TRUSTAGENT_EXPIRED;
@@ -117,6 +117,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.app.animation.Interpolators;
 import com.android.app.tracing.coroutines.TrackTracer;
+import com.android.compose.animation.scene.ObservableTransitionState;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.jank.InteractionJankMonitor.Configuration;
 import com.android.internal.logging.UiEventLogger;
@@ -144,13 +145,9 @@ import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollector;
-import com.android.compose.animation.scene.ObservableTransitionState;
 import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor;
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor;
 import com.android.systemui.communal.ui.viewmodel.CommunalTransitionViewModel;
-import com.android.systemui.scene.domain.interactor.SceneInteractor;
-import com.android.systemui.scene.shared.model.Overlays;
-import com.android.systemui.scene.shared.model.Scenes;
 import com.android.systemui.dagger.qualifiers.Application;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.display.flags.DisplayComponentRepositoryFlag;
@@ -168,7 +165,9 @@ import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.process.ProcessWrapper;
 import com.android.systemui.res.R;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
+import com.android.systemui.scene.shared.model.Overlays;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeExpansionStateManager;
@@ -195,6 +194,7 @@ import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 import com.android.window.flags.Flags;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 import com.android.wm.shell.shared.compat.AnimatedSurface;
+import com.android.wm.shell.shared.compat.AnimatedSurfaceUtils;
 import com.android.wm.shell.shared.compat.SurfaceTransition;
 
 import dagger.Lazy;
@@ -707,6 +707,7 @@ public class KeyguardViewMediator implements CoreStartable,
             resetKeyguardDonePendingLocked();
             adjustStatusBarLocked();
             mKeyguardStateController.notifyKeyguardGoingAway(false);
+            mUpdateMonitor.setKeyguardGoingAway(false);
             if (mLockPatternUtils.isSecure(userId) && !mShowing) {
                 if (android.multiuser.Flags.credentialCapture()
                         && mContext.getResources().getBoolean(com.android.internal.R.bool
@@ -2751,7 +2752,8 @@ public class KeyguardViewMediator implements CoreStartable,
      * Send message to keyguard telling it to reset its state.
      * @see #handleReset
      */
-    private void resetStateLocked() {
+    @VisibleForTesting
+    void resetStateLocked() {
         resetStateLocked(/* hideBouncer= */ true);
     }
 
@@ -3637,18 +3639,21 @@ public class KeyguardViewMediator implements CoreStartable,
                 // Filter out any closing apps, such as the dream.
                 AnimatedSurface[] openingApps = params.getApps();
                 if (dismissDreamOnKeyguardDismiss()) {
-                    openingApps = Arrays.stream(params.getApps()).filter(AnimatedSurface::isOpening)
+                    openingApps = Arrays.stream(params.getApps())
+                            .filter(AnimatedSurfaceUtils::isOpening)
                             .toArray(AnimatedSurface[]::new);
                 }
 
                 // Pass the surface and metadata to the unlock animation controller.
                 AnimatedSurface[] openingWallpapers =
                         Arrays.stream(Objects.requireNonNull(params.getWallpapers()))
-                                .filter(AnimatedSurface::isOpening).toArray(AnimatedSurface[]::new);
+                                .filter(AnimatedSurfaceUtils::isOpening)
+                                .toArray(AnimatedSurface[]::new);
 
                 AnimatedSurface[] closingWallpapers =
                         Arrays.stream(Objects.requireNonNull(params.getWallpapers()))
-                                .filter(AnimatedSurface::isClosing).toArray(AnimatedSurface[]::new);
+                                .filter(AnimatedSurfaceUtils::isClosing)
+                                .toArray(AnimatedSurface[]::new);
 
                 mKeyguardUnlockAnimationControllerLazy.get()
                         .notifyStartSurfaceBehindRemoteAnimation(
@@ -3932,6 +3937,7 @@ public class KeyguardViewMediator implements CoreStartable,
         mIsKeyguardExitAnimationCanceled = false;
 
         mKeyguardStateController.notifyKeyguardGoingAway(true);
+        mUpdateMonitor.setKeyguardGoingAway(true);
 
         if (!KeyguardWmStateRefactor.isEnabled()) {
             // Handled in WmLockscreenVisibilityManager.
@@ -3954,6 +3960,7 @@ public class KeyguardViewMediator implements CoreStartable,
     public void hideSurfaceBehindKeyguard() {
         mSurfaceBehindRemoteAnimationRequested = false;
         mKeyguardStateController.notifyKeyguardGoingAway(false);
+        mUpdateMonitor.setKeyguardGoingAway(false);
         if (mShowing) {
             setShowingLocked(true, true, "hideSurfaceBehindKeyguard");
         }
@@ -3985,6 +3992,7 @@ public class KeyguardViewMediator implements CoreStartable,
         mSurfaceBehindRemoteAnimationRequested = false;
         mSurfaceBehindRemoteAnimationRunning = false;
         mKeyguardStateController.notifyKeyguardGoingAway(false);
+        mUpdateMonitor.setKeyguardGoingAway(false);
 
         if (mSurfaceBehindRemoteParams != null
                 && mSurfaceBehindRemoteParams.hasFinishedCallback()) {
@@ -4109,10 +4117,13 @@ public class KeyguardViewMediator implements CoreStartable,
             mIsKeyguardExitAnimationCanceled = true;
 
             // There are cases where a reset will be triggered as the process to hide keyguard
-            // begins. Make sure to tell WM to cancel any requests to go away.
+            // begins. Make sure to tell WM to cancel any requests to go away and notify
+            // KeyguardStateController to ensure both understand that keyguard is showing.
             if (mHiding) {
                 setShowingLocked(true /* showing */, true /* force */,
                         "handleReset while mHiding == true");
+                mKeyguardStateController.notifyKeyguardState(true,
+                        mKeyguardStateController.isOccluded());
                 mKeyguardInteractor.showKeyguard();
             }
 

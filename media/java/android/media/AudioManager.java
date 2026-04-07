@@ -9980,11 +9980,8 @@ public class AudioManager {
     public boolean setCommunicationDevice(@NonNull AudioDeviceInfo device) {
         Objects.requireNonNull(device);
         try {
-            if (device.getId() == 0) {
-                Log.w(TAG, "setCommunicationDevice: device not found: " + device);
-                return false;
-            }
-            return getService().setCommunicationDevice(sLegacyRouteToken, device.getId(),
+            AudioDeviceAttributes ada = new AudioDeviceAttributes(device);
+            return getService().setCommunicationDevice(sLegacyRouteToken, ada,
                     getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -9997,7 +9994,8 @@ public class AudioManager {
      */
     public void clearCommunicationDevice() {
         try {
-            getService().setCommunicationDevice(sLegacyRouteToken, 0, getAttributionSource());
+            getService().setCommunicationDevice(
+                    sLegacyRouteToken, null, getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -10018,8 +10016,9 @@ public class AudioManager {
     @Nullable
     public AudioDeviceInfo getCommunicationDevice() {
         try {
-            return getDeviceForPortId(
-                    getService().getCommunicationDevice(), GET_DEVICES_OUTPUTS);
+            AudioDeviceAttributes ada = getService().getCommunicationDevice();
+            return (ada != null) ? getDeviceInfoFromTypeAndAddress(ada.getType(), ada.getAddress())
+                               : null;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -10034,17 +10033,20 @@ public class AudioManager {
     public List<AudioDeviceInfo> getAvailableCommunicationDevices() {
         try {
             ArrayList<AudioDeviceInfo> devices = new ArrayList<>();
-            int[] portIds = getService().getAvailableCommunicationDeviceIds();
-            for (int portId : portIds) {
-                AudioDeviceInfo device = getDeviceForPortId(portId, GET_DEVICES_OUTPUTS);
+            List<AudioDeviceAttributes> adas = getService().getAvailableCommunicationDevices();
+            for (AudioDeviceAttributes ada : adas) {
+                AudioDeviceInfo device =
+                        getDeviceInfoFromTypeAndAddress(ada.getType(), ada.getAddress());
                 if (device == null) {
                     //TODO b/381334864: remove log when fixed
-                    Log.w(TAG, "getAvailableCommunicationDevices: no device for ID: " + portId);
+                    Log.w(TAG, "getAvailableCommunicationDevices:"
+                            + "problem retrieving AudioDeviceInfo for device : " + ada);
                     continue;
                 }
                 devices.add(device);
             }
-            if (devices.stream().filter(d -> d.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE)
+            if (devices.stream().filter(d -> d.getType()
+                            == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE)
                     .findFirst().orElse(null) == null) {
                 Log.w(TAG, "getAvailableCommunicationDevices: no EARPIECE!");
             }
@@ -11304,11 +11306,18 @@ public class AudioManager {
      */
     public static final int HARDENING_DISABLE = IAudioPolicyService.HardeningOverride.DISABLE;
 
+    /**
+     * @hide
+     * Throw hardening mode: throws an IllegalStateException when restrictions are encountered.
+     */
+    public static final int HARDENING_THROW = IAudioPolicyService.HardeningOverride.THROW;
+
     /** @hide */
     @IntDef(prefix = { "HARDENING_" }, value = {
             HARDENING_DEFAULT,
             HARDENING_ENABLE,
-            HARDENING_DISABLE
+            HARDENING_DISABLE,
+            HARDENING_THROW
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface HardeningMode {}

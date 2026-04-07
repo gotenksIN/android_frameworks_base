@@ -40,6 +40,7 @@ import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimator;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
+import com.android.systemui.statusbar.notification.row.StackScrollerDecorView;
 import com.android.systemui.statusbar.notification.shared.NotificationHeadsUpCycling;
 
 import java.util.ArrayList;
@@ -123,7 +124,9 @@ public class StackScrollAlgorithm {
                 R.dimen.bundle_expanded_divider_height);
         mGroupingDisabledSectionGapHeight = res.getDimensionPixelSize(
                 R.dimen.grouping_disabled_section_gap_height);
-        mNotificationScrimPadding = res.getDimensionPixelSize(R.dimen.notification_side_paddings);
+        // TODO(b/488459485): make sidePaddings response to shadeMode if needed
+        mNotificationScrimPadding =
+                res.getDimensionPixelSize(R.dimen.notification_side_paddings_single);
         mMarginBottom = res.getDimensionPixelSize(R.dimen.notification_panel_margin_bottom);
         mQuickQsOffsetHeight = SystemBarUtils.getQuickQsOffsetHeight(context);
         mSmallCornerRadius = res.getDimension(R.dimen.notification_corner_radius_small);
@@ -186,8 +189,8 @@ public class StackScrollAlgorithm {
                 // alpha to each notification individually in order to allow tracked HUNs to remain
                 // visible.
                 viewState.setAlpha(ambientState.getPlaceholderAlpha(), "placeholder transition");
-            } else if (SceneContainerFlag.isEnabled() && (ambientState.isShowingStackOnLockscreen()
-                    || ambientState.isLockscreenStackFadingIn())) {
+            } else if (SceneContainerFlag.isEnabled()
+                            && ambientState.isShowingStackOnLockscreen()) {
                     // Adjust alpha for wakeup to lockscreen.
                 if (view.isHeadsUpState()) {
                     // Pulsing HUN should be visible on AOD and stay visible during
@@ -196,10 +199,7 @@ public class StackScrollAlgorithm {
                 } else {
                     // Take into account scene container-specific Lockscreen fade-in progress
                     final float alpha;
-                    if (!ambientState.isShowingStackOnLockscreen()
-                            && ambientState.isCurrentSceneLockscreen()) {
-                        alpha = 0f;
-                    } else if (ambientState.isLockscreenStackFadingIn()) {
+                    if (ambientState.isLockscreenStackFadingIn()) {
                         alpha = ambientState.getLockscreenStackFadeInProgress();
                     } else {
                         alpha = 1f - ambientState.getDozeAmount();
@@ -223,6 +223,10 @@ public class StackScrollAlgorithm {
                     viewState.setAlpha(interpolateNotificationContentAlpha(ambientState),
                             "expansionChanging notif");
                 }
+            } else if (SceneContainerFlag.isEnabled() && ambientState.isFullyHidden()
+                        && !ambientState.isCurrentSceneLockscreen()) {
+                // Hide notifications when transitioning to/from AOD/Occluded to avoid glitches.
+                viewState.setAlpha(0, "aod transition");
             }
 
             // On the final call to {@link #resetViewState}, the alpha is set back to 1f but
@@ -538,6 +542,8 @@ public class StackScrollAlgorithm {
                         - mPaddingBetweenElements;
                 if (currentY >= shelfStart
                         && !(view instanceof FooterView)
+                        && (!SceneContainerFlag.isEnabled()
+                            || !(view instanceof StackScrollerDecorView))
                         && state.firstViewInShelf == null) {
                     state.firstViewInShelf = view;
                 }

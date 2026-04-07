@@ -1744,9 +1744,8 @@ public class DisplayPolicy {
      * @param win The window that is changing.
      * @param transit What is happening to the window:
      *                {@link com.android.server.policy.WindowManagerPolicy#TRANSIT_ENTER},
-     *                {@link com.android.server.policy.WindowManagerPolicy#TRANSIT_EXIT},
-     *                {@link com.android.server.policy.WindowManagerPolicy#TRANSIT_SHOW}, or
-     *                {@link com.android.server.policy.WindowManagerPolicy#TRANSIT_HIDE}.
+     *                {@link com.android.server.policy.WindowManagerPolicy#TRANSIT_EXIT}, or
+     *                {@link com.android.server.policy.WindowManagerPolicy#TRANSIT_SHOW}.
      *
      * @return Resource ID of the actual animation to use, or {@link #ANIMATION_NONE} for none.
      */
@@ -2210,15 +2209,17 @@ public class DisplayPolicy {
     void onOverlayChanged() {
         updateCurrentUserResources();
         // Update the latest display size, cutout.
-        mDisplayContent.requestDisplayUpdate(() -> {
-            onConfigurationChanged();
-            if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
-                StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
-                if (statusBar != null) statusBar.onConfigurationChanged();
-            } else {
-                mSystemGestures.onConfigurationChanged();
-            }
-        });
+        mDisplayContent.requestDisplayUpdate(this::onResourcesUpdated);
+    }
+
+    void onResourcesUpdated() {
+        onConfigurationChanged();
+        if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+            StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
+            if (statusBar != null) statusBar.onConfigurationChanged();
+        } else {
+            mSystemGestures.onConfigurationChanged();
+        }
     }
 
     /**
@@ -2256,7 +2257,7 @@ public class DisplayPolicy {
      * Updates the current user's resources to pick up any changes for the current user (including
      * overlay paths)
      */
-    private void updateCurrentUserResources() {
+    void updateCurrentUserResources() {
         final int userId = mService.mAmInternal.getCurrentUserId();
         final Context uiContext = getSystemUiContext();
 

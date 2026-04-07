@@ -1401,7 +1401,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         int count = 0;
         final Set<String> targets = userState.getShortcutTargetsLocked(ALL);
         for (String target : targets) {
-            if (!userState.isShortcutTargetPermittedLocked(target, finalAllowedPackages)) {
+            if (!userState.isAccessibilityFeaturePermittedLocked(target, finalAllowedPackages)) {
                 count++;
             }
         }
@@ -3395,17 +3395,20 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 continue;
             }
 
-            // Skip the component since it may be in process or crashed.
-            if (userState.getBindingServicesLocked().contains(componentName)
-                    || userState.getCrashedServicesLocked().contains(componentName)) {
+            // Skip the component since it may be in process.
+            if (userState.getBindingServicesLocked().contains(componentName)) {
                 continue;
             }
+
             if (userState.mEnabledServices.contains(componentName)
                     && !mUiAutomationManager.suppressingAccessibilityServicesLocked()) {
+                // Skip the component since it may be crashed.
+                if (userState.getCrashedServicesLocked().contains(componentName)) {
+                    continue;
+                }
                 // Skip the enabling service disallowed by device admin policy.
-                if (!isAccessibilityTargetAllowed(componentName.getPackageName(),
-                        installedService.getResolveInfo().serviceInfo.applicationInfo.uid,
-                        userState.mUserId)) {
+                if (!userState.isAccessibilityFeaturePermittedLocked(
+                        componentName.flattenToString())) {
                     Slog.d(LOG_TAG, "Skipping enabling service disallowed by device admin policy: "
                             + componentName);
                     disableAccessibilityServiceLocked(componentName, userState.mUserId);
@@ -3426,6 +3429,26 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     service.unbindLocked();
                     removeShortcutTargetForUnboundServiceLocked(userState, service);
                 }
+                // Ensure any crashed connections are also cleaned up when disabled
+                final Set<AccessibilityServiceConnection> connections =
+                        new HashSet<>(userState.getServiceConnections());
+                for (AccessibilityServiceConnection c : connections) {
+                    if (c.getComponentName().equals(componentName)) {
+                        c.unbindLocked();
+                        removeShortcutTargetForUnboundServiceLocked(userState, c);
+                    }
+                }
+            }
+        }
+
+        // Unbind any tracked connections that are no longer in the installed services list.
+        // This ensures crashed connections are unbound when their packages are uninstalled.
+        final Set<AccessibilityServiceConnection> connections =
+                new HashSet<>(userState.getServiceConnections());
+        for (AccessibilityServiceConnection service : connections) {
+            if (!mTempComponentNameSet.contains(service.getComponentName())) {
+                service.unbindLocked();
+                removeShortcutTargetForUnboundServiceLocked(userState, service);
             }
         }
 
@@ -4291,7 +4314,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 name -> !userState.isShortcutTargetInstalledLocked(name));
         if (android.security.Flags.extendAapmToA11yServices()) {
             currentTargets.removeIf(
-                    name -> !userState.isShortcutTargetPermittedLocked(name));
+                    name -> !userState.isAccessibilityFeaturePermittedLocked(name));
         }
         if (shortcutType == QUICK_SETTINGS) {
             // Add the target if the a11y service is enabled and the tile exist in QS panel
@@ -5578,27 +5601,24 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
     @Override
     @RequiresNoPermission
-    public boolean isAccessibilityTargetAllowed(String packageName, int uid, int userId) {
-        final long identity = Binder.clearCallingIdentity();
-        try {
-            final DevicePolicyManager dpm = mContext.getSystemService(DevicePolicyManager.class);
-            final List<String> permittedServices = dpm.getPermittedAccessibilityServices(userId);
-
-            // permittedServices null means all accessibility services are allowed.
-            return permittedServices == null || permittedServices.contains(packageName);
-        } finally {
-            Binder.restoreCallingIdentity(identity);
+    public boolean isAccessibilityServiceTargetAllowed(AccessibilityServiceInfo info, int userId) {
+        synchronized (mLock) {
+            final AccessibilityUserState userState = getUserStateLocked(userId);
+            return userState.isAccessibilityFeaturePermittedLocked(
+                    info.getComponentName().flattenToString());
         }
     }
 
     @Override
     @RequiresNoPermission
-    public boolean sendRestrictedDialogIntent(String packageName, int uid, int userId) {
+    public boolean sendRestrictedDialogIntent(AccessibilityServiceInfo info, int userId) {
         // The accessibility service is allowed. Don't show the restricted dialog.
-        if (isAccessibilityTargetAllowed(packageName, uid, userId)) {
+        if (isAccessibilityServiceTargetAllowed(info, userId)) {
             return false;
         }
 
+        final String packageName = info.getComponentName().getPackageName();
+        final int uid = info.getResolveInfo().serviceInfo.applicationInfo.uid;
         final EnforcedAdmin admin =
                 RestrictedLockUtilsInternal.checkIfAccessibilityServiceDisallowed(
                         mContext, packageName, userId);

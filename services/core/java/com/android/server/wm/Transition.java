@@ -115,8 +115,10 @@ import android.util.ArraySet;
 // QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.BoostFramework;
 // QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
+import android.util.IntArray;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.view.Display;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
@@ -215,6 +217,15 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private @Nullable TransitionRequestInfo.RequestedLocation mRequestedLocation;
 
     private final ArraySet<Integer> mDisconnectReparentDisplays = new ArraySet<>();
+
+    /**
+     * Contains displays that should be removed or cleared as part of this transition,
+     * and their target displays where their content should be moved to.
+     * Maps disconnectDisplayId -> destinationDisplayId:
+     *  - disconnectDisplayId Display ID that is going to be removed or stop hosting tasks
+     *  - destinationDisplayId Destination display where the content should be moved to
+     */
+    private final SparseIntArray mDisconnectDestinationDisplays = new SparseIntArray();
 
     /**
      * If this transition has a corresponding RemoteTransition, this tracks the process which will
@@ -720,18 +731,58 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     }
 
     /**
-     * Set the target display to reparent to for a disconnect transition
-     * @param displayId Requested reparent display
+     * Set the target display to reparent to when display disconnects or becomes unable
+     * to host tasks
+     * @param disconnectDisplayId  Display ID that is going to be removed or stop hosting tasks
+     * @param destinationDisplayId Destination display where the content should be moved to
      */
-    void addDisconnectReparentDisplay(int displayId) {
-        mDisconnectReparentDisplays.add(displayId);
+    void addDisconnectReparentDisplay(int disconnectDisplayId, int destinationDisplayId) {
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            mDisconnectDestinationDisplays.put(disconnectDisplayId, destinationDisplayId);
+        } else {
+            mDisconnectReparentDisplays.add(destinationDisplayId);
+        }
     }
 
     /**
-     * @return requested reparent display if this is a disconnect transition.
+     * @return true, if a display with ID {@param displayId} is a destination for content from
+     * a display that is going to be disconnected or stop hosting tasks
      */
-    ArraySet<Integer> getDisconnectReparentDisplays() {
-        return mDisconnectReparentDisplays;
+    boolean isDestinationForDisconnectDisplay(int displayId) {
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            return mDisconnectDestinationDisplays.indexOfValue(displayId) >= 0;
+        } else {
+            return mDisconnectReparentDisplays.contains(displayId);
+        }
+    }
+
+    /**
+     * Checks if the given display change is a display disconnect change that should lead to
+     * DisplayContent removal. This will return false for content mode changes when a display
+     * just becomes unable to host tasks and still kept in WindowManager.
+     */
+    private boolean isDisplayRemovalChange(@NonNull ChangeInfo displayChange) {
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            return displayChange.mExistenceChanged
+                    // Check if the display is a source for moving content to another display
+                    // to understand if this change is about removal of a DisplayContent.
+                    // We can't rely on the current visibility state of the container to distinguish
+                    // between adding vs removing, since display content removal is postponed
+                    // to applyDisplayContentClearIfNeeded()
+                    && mDisconnectDestinationDisplays.indexOfKey(displayChange.mDisplayId) >= 0;
+        }
+        return displayChange.mExistenceChanged;
+    }
+
+    /**
+     * @return true if there are display disconnect or display stopping to host tasks changes
+     */
+    boolean hasDisconnectReparentChanges() {
+        if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+            return mDisconnectDestinationDisplays.size() > 0;
+        } else {
+            return !mDisconnectReparentDisplays.isEmpty();
+        }
     }
 
     /**
@@ -1512,6 +1563,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             // The transient hide tasks could be occluded now, e.g. returning to home. So trigger
             // the update to make the activities in the tasks invisible-requested, then the next
             // step can continue to commit the visibility.
+            mWmService.mAtmService.mTaskSupervisor.rescheduleTopResumedStateIfNeeded();
             mController.mAtm.mRootWindowContainer.ensureActivitiesVisible();
             // Record all the now-hiding activities so that they are committed. Just use
             // mParticipants because we can avoid a new list this way.
@@ -2634,7 +2686,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                                 + "there's no ChangeInfo. Did you forget to snapshot it?"
                 );
             }
-            if (change.mIsInteractive != task.isInteractive()) {
+            if (change.mIsInteractive != change.isInteractive()) {
                 // We're past collecting stage, so add to participants manually.
                 mParticipants.add(task);
             }
@@ -3450,6 +3502,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (task != null) {
                 final ActivityManager.RunningTaskInfo tinfo = new ActivityManager.RunningTaskInfo();
                 task.fillTaskInfo(tinfo);
+                tinfo.isInteractive &= info.isInteractive();
                 change.setTaskInfo(tinfo);
                 change.setRotationAnimation(getTaskRotationAnimation(task));
                 final ActivityRecord topRunningActivity = task.topRunningActivity();
@@ -3901,7 +3954,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (dc == null) continue;
             final ChangeInfo displayChange = mChanges.get(dc);
             if (ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()
-                    && displayChange.mExistenceChanged) {
+                    && isDisplayRemovalChange(displayChange)) {
                 // If this change is a display disconnection, we can skip it for now.
                 // It will be handled via applyDisplayContentClearIfNeeded below.
                 continue;
@@ -3937,23 +3990,39 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     boolean applyDisplayContentClearIfNeeded() {
         if (!ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) return false;
         boolean displayRemoved = false;
+        final IntArray processedDestinationDisplays = new IntArray();
         for (int i = mParticipants.size() - 1; i >= 0; --i) {
             final WindowContainer<?> wc = mParticipants.valueAt(i);
             final DisplayContent dc = wc.asDisplayContent();
             if (dc == null) continue;
             final ChangeInfo displayChange = mChanges.get(dc);
             final int displayId = dc.mDisplayId;
-            if (displayChange.mExistenceChanged) {
+            if (isDisplayRemovalChange(displayChange)) {
                 mController.mAtm.mRootWindowContainer.removeDisplayContent(dc);
                 displayRemoved = true;
             } else if (dc.getDisplay() != null
-                    && mDisconnectReparentDisplays.contains(displayId)) {
+                    && isDestinationForDisconnectDisplay(displayId)) {
                 dc.updateContentMode();
                 mWmService.mPossibleDisplayInfoMapper
                     .removePossibleDisplayInfos(displayId);
                 displayRemoved = true;
             }
-            mDisconnectReparentDisplays.remove(displayId);
+            if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+                // Remove the display from the map of unprocessed displays later, since we can have
+                // multiple displays removed with the same destination, so we need to keep those
+                // until we go through all changes
+                processedDestinationDisplays.add(displayId);
+            } else {
+                mDisconnectReparentDisplays.remove(displayId);
+            }
+        }
+        for (int i = 0; i < processedDestinationDisplays.size(); i++) {
+            final int processedDestination = processedDestinationDisplays.get(i);
+            for (int j = mDisconnectDestinationDisplays.size() - 1; j >= 0; j--) {
+                if (mDisconnectDestinationDisplays.valueAt(j) == processedDestination) {
+                    mDisconnectDestinationDisplays.removeAt(j);
+                }
+            }
         }
         return displayRemoved;
     }
@@ -4327,10 +4396,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         /** @see Task#isInteractive */
-        private boolean isInteractive() {
+        public boolean isInteractive() {
             final Task task = mContainer.asTask();
             return Flags.allowDragAndDropWhenInteractiveBugfix()
-                    && task != null && task.isInteractive();
+                    && task != null && task.isInteractive()
+                    // Lie about interactivity when in transient hide, because the task is actually
+                    // not interactive, but it's reported so for the animation's duration.
+                    && (mFlags & ChangeInfo.FLAG_TRANSIENT_HIDE) == 0;
         }
     }
 

@@ -21,6 +21,7 @@ import android.provider.Settings
 import android.view.Display.DEFAULT_DISPLAY
 import androidx.test.uiautomator.By
 import org.junit.After
+import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 
@@ -28,17 +29,23 @@ import org.junit.Test
 @Ignore("Test Base Class")
 abstract class SettingsToggleMirroringSwitch : SettingsConnectedDisplayTestBase() {
 
+    @Before
+    fun setup() {
+        // PeripheralDeviceRule monitoring ensures that launched displays keeps the same
+        // DisplayTopology after. Stop monitoring since DisplayTopology will change on mirroring
+        peripheralDeviceRule.stopMonitoring()
+    }
+
     @Test
     open fun enableMirrorBuiltInDisplaySwitch() {
         Settings.Secure.putInt(instrumentation.context.contentResolver, MIRROR_SETTING, 0)
         selectDisplay(DEFAULT_DISPLAY)
 
-        val displayId = connectedDisplayRule.addedDisplays.first()
         getMirroringPreference().click()
 
         // As display is just mirroring the main display, the display itself doesn't have UI
         // components
-        wmHelper.StateSyncBuilder().withEmptyDisplay(displayId).waitForAndVerify()
+        wmHelper.StateSyncBuilder().withEmptyDisplay(addedDisplayId).waitForAndVerify()
     }
 
     @Test
@@ -46,11 +53,10 @@ abstract class SettingsToggleMirroringSwitch : SettingsConnectedDisplayTestBase(
         Settings.Secure.putInt(instrumentation.context.contentResolver, MIRROR_SETTING, 1)
         selectDisplay(DEFAULT_DISPLAY)
 
-        val displayId = connectedDisplayRule.addedDisplays.first()
         getMirroringPreference().click()
 
         // Once display stops mirroring, Desktop UI components should be visible again
-        wmHelper.StateSyncBuilder().withDesktopModeOnDisplay(displayId).waitForAndVerify()
+        wmHelper.StateSyncBuilder().withDesktopModeOnDisplay(addedDisplayId).waitForAndVerify()
     }
 
     @After

@@ -386,6 +386,7 @@ package android.app {
     method @NonNull public java.util.Set<java.lang.String> getUnsupportedAdjustmentTypes();
     method public boolean isNotificationPolicyAccessGrantedForPackage(@NonNull String);
     method public boolean removeAutomaticZenRule(@NonNull String, boolean);
+    method @FlaggedApi("android.app.nm_contextual_display_launch") public boolean removeNotificationRule(int);
     method @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public void requestSystemAdjustments(@NonNull java.util.List<android.service.notification.Adjustment>);
     method public void setAssistantAdjustmentKeyTypeState(int, boolean);
     method public void setCanPostPromotedNotifications(@NonNull String, int, boolean);
@@ -393,6 +394,7 @@ package android.app {
     method @RequiresPermission(android.Manifest.permission.MANAGE_TOAST_RATE_LIMITING) public void setToastRateLimitingEnabled(boolean);
     method public boolean updateAutomaticZenRule(@NonNull String, @NonNull android.app.AutomaticZenRule, boolean);
     method public void updateNotificationChannel(@NonNull String, int, @NonNull android.app.NotificationChannel);
+    method @FlaggedApi("android.app.nm_contextual_display_launch") @Nullable public android.app.NotificationRule updateNotificationRule(@NonNull android.app.NotificationRule);
   }
 
   public static class NotificationManager.Policy implements android.os.Parcelable {
@@ -681,6 +683,14 @@ package android.app.admin {
 
   public final class IntentFilterPolicyKey extends android.app.admin.PolicyKey {
     ctor public IntentFilterPolicyKey(@NonNull String, @NonNull android.content.IntentFilter);
+  }
+
+  @FlaggedApi("android.app.admin.flags.policy_streamlining") public final class LeastRecent<V> extends android.app.admin.ResolutionMechanism<V> {
+    ctor public LeastRecent();
+    method public int describeContents();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.admin.LeastRecent<?>> CREATOR;
+    field @NonNull public static final android.app.admin.LeastRecent<?> LEAST_RECENT;
   }
 
   public final class MostRecent<V> extends android.app.admin.ResolutionMechanism<V> {
@@ -1199,6 +1209,7 @@ package android.content.pm {
     field public static final long OVERRIDE_ENABLE_COMPAT_FAKE_FOCUS = 263259275L; // 0xfb1048bL
     field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final long OVERRIDE_ENABLE_COMPAT_IGNORE_ORIENTATION_REQUEST_WHEN_LOOP_DETECTED = 273509367L; // 0x104d6bf7L
     field public static final long OVERRIDE_ENABLE_COMPAT_IGNORE_REQUESTED_ORIENTATION = 254631730L; // 0xf2d5f32L
+    field @FlaggedApi("com.android.window.flags.virtual_gamepad_developer_opt_out") public static final long OVERRIDE_ENABLE_VIRTUAL_GAMEPAD = 447093535L; // 0x1aa61b1fL
     field @FlaggedApi("com.android.window.flags.exclude_caption_insets_opt_out_api") public static final long OVERRIDE_EXCLUDE_CAPTION_INSETS_FROM_APP_BOUNDS = 388014743L; // 0x1720a297L
     field public static final long OVERRIDE_LANDSCAPE_ORIENTATION_TO_REVERSE_LANDSCAPE = 266124927L; // 0xfdcbe7fL
     field public static final long OVERRIDE_MIN_ASPECT_RATIO = 174042980L; // 0xa5faf64L
@@ -1443,6 +1454,7 @@ package android.content.theming {
     method @NonNull public static int[] values();
     field public static final int CLOCK = 8; // 0x8
     field public static final int CLOCK_VIBRANT = 9; // 0x9
+    field public static final int CMF = 10; // 0xa
     field public static final int CONTENT = 6; // 0x6
     field public static final int EXPRESSIVE = 3; // 0x3
     field public static final int FRUIT_SALAD = 5; // 0x5
@@ -2019,7 +2031,9 @@ package android.hardware.input {
     method @RequiresPermission("android.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY") public void addUniqueIdAssociationByPort(@NonNull String, @NonNull String);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void clearAllControllerAxisRemappings(@NonNull android.hardware.input.InputDeviceIdentifier);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void clearAllControllerButtonRemappings(@NonNull android.hardware.input.InputDeviceIdentifier);
+    method @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void clearAllControllerButtonToAxisRemappings(@NonNull android.hardware.input.InputDeviceIdentifier);
     method @RequiresPermission(android.Manifest.permission.REMAP_MODIFIER_KEYS) public void clearAllModifierKeyRemappings();
+    method @NonNull @RequiresPermission(android.Manifest.permission.INJECT_EVENTS) public android.hardware.input.VirtualMouse createVirtualMouse(@NonNull android.hardware.input.VirtualMouseConfig);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @NonNull @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public java.util.Map<java.lang.Integer,java.lang.Integer> getControllerAxisRemappings(@NonNull android.hardware.input.InputDeviceIdentifier);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @NonNull @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public java.util.Map<java.lang.Integer,java.lang.Integer> getControllerButtonRemappings(@NonNull android.hardware.input.InputDeviceIdentifier);
     method @Nullable @RequiresPermission(android.Manifest.permission.INJECT_EVENTS) public android.graphics.PointF getCursorPosition(int);
@@ -2029,9 +2043,11 @@ package android.hardware.input {
     method public int getMousePointerSpeed();
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void remapControllerAxis(@NonNull android.hardware.input.InputDeviceIdentifier, int, int);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void remapControllerButton(@NonNull android.hardware.input.InputDeviceIdentifier, int, int);
+    method @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void remapControllerButtonToAxis(@NonNull android.hardware.input.InputDeviceIdentifier, int, int);
     method @RequiresPermission(android.Manifest.permission.REMAP_MODIFIER_KEYS) public void remapModifierKey(int, int);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void removeControllerAxisRemapping(@NonNull android.hardware.input.InputDeviceIdentifier, int);
     method @FlaggedApi("com.android.hardware.input.controller_remapping") @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void removeControllerButtonRemapping(@NonNull android.hardware.input.InputDeviceIdentifier, int);
+    method @RequiresPermission("android.permission.CONTROLLER_REMAPPING") public void removeControllerButtonToAxisRemapping(@NonNull android.hardware.input.InputDeviceIdentifier, int);
     method @FlaggedApi("com.android.input.flags.device_associations") @RequiresPermission("android.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY") public void removeUniqueIdAssociationByDescriptor(@NonNull String);
     method @RequiresPermission("android.permission.ASSOCIATE_INPUT_DEVICE_TO_DISPLAY") public void removeUniqueIdAssociationByPort(@NonNull String);
     method public void resetLockedModifierState();
@@ -3540,9 +3556,10 @@ package android.service.notification {
     method @FlaggedApi("android.app.nm_contextual_display_launch") public int getOriginatingRuleOrder();
     method @FlaggedApi("android.app.nm_contextual_display_launch") public void setOriginatingRuleId(int);
     method @FlaggedApi("android.app.nm_contextual_display_launch") public void setOriginatingRuleOrder(int);
+    field @FlaggedApi("android.app.nm_contextual_display_launch") public static final String KEY_BREAKTHROUGH_ALL_MODES = "breakthrough_all_modes";
     field @FlaggedApi("android.app.nm_contextual_display_launch") public static final String KEY_HIGHLIGHT = "highlight";
     field @FlaggedApi("android.app.nm_contextual_display_launch") public static final String KEY_LIGHT = "light";
-    field @FlaggedApi("android.app.nm_contextual_display_launch") public static final String KEY_MODE_BREAKTHROUGHS = "mode_breakthrough";
+    field @FlaggedApi("android.app.nm_contextual_display_launch") public static final String KEY_MODE_BREAKTHROUGH_LIST = "mode_breakthrough";
     field @FlaggedApi("android.app.nm_contextual_display_launch") public static final String KEY_SOUND = "sound";
   }
 
@@ -4132,6 +4149,7 @@ package android.view {
     method @Nullable public android.view.Display.Mode getUserPreferredDisplayMode();
     method public boolean hasAccess(int);
     method @RequiresPermission(android.Manifest.permission.MODIFY_USER_PREFERRED_DISPLAY_MODE) public void setUserPreferredDisplayMode(@NonNull android.view.Display.Mode);
+    field @FlaggedApi("com.android.server.display.feature.flags.virtual_displays_support_desktop_mode") public static final int FLAG_ALLOWS_CONTENT_MODE_SWITCH = 32768; // 0x8000
     field public static final int FLAG_ALWAYS_UNLOCKED = 512; // 0x200
     field public static final int FLAG_OWN_FOCUS = 2048; // 0x800
     field public static final int FLAG_TOUCH_FEEDBACK_DISABLED = 1024; // 0x400
@@ -4331,7 +4349,6 @@ package android.view.accessibility {
 package android.view.animation {
 
   public class AnimationUtils {
-    method @FlaggedApi("android.view.flags.expected_presentation_time_read_only") public static void lockAnimationClock(long, long);
     method public static void lockAnimationClock(long);
     method public static void unlockAnimationClock();
   }

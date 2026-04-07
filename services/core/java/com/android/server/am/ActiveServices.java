@@ -321,6 +321,9 @@ public final class ActiveServices {
 // QTI_BEGIN: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
     private static boolean mIsAIDLSupported = false;
 // QTI_END: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
+    private static final long EXTERNAL_SERVICE_FLAGS = Context.BIND_EXTERNAL_SERVICE_LONG
+            | Integer.toUnsignedLong(Context.BIND_EXTERNAL_SERVICE);
+
     // Foreground service types that always get immediate notification display,
     // expressed in the same bitmask format that ServiceRecord.foregroundServiceType
     // uses.
@@ -5037,17 +5040,43 @@ public final class ActiveServices {
         return true;
     }
 
+    /**
+     * Normalizes the BIND_EXTERNAL_SERVICE and BIND_EXTERNAL_SERVICE_LONG flags in {@code flags}
+     * to match the versions found in {@code baseFlags}.
+     *
+     * <p>Due to historical reasons, clients may use BIND_EXTERNAL_SERVICE with integer flag API or
+     * BIND_EXTERNAL_SERVICE_LONG with Context.BindServiceFlags API. AMS does not normalize those
+     * flags internally, but just stores the raw flags passed in.
+     *
+     * <p>This method normalizes those flags for rebindServiceConnectionsLocked(), ensuring that
+     * if both sets of flags have some version of BIND_EXTERNAL_SERVICE, the new flags will be
+     * updated to use the base's version of the flag.
+     */
+    private static long normalizeExternalServiceBindFlags(long flags, long baseFlags) {
+        final long baseExternalFlags = baseFlags & EXTERNAL_SERVICE_FLAGS;
+        if (baseExternalFlags == 0) {
+            return flags;
+        }
+        final long newExternalFlags = flags & EXTERNAL_SERVICE_FLAGS;
+        if (newExternalFlags == 0) {
+            return flags;
+        }
+        return (flags & ~EXTERNAL_SERVICE_FLAGS) | baseExternalFlags;
+    }
+
     boolean rebindServiceConnectionsLocked(IBinder binder,
                                            ArrayList<ConnectionRecord> clist,
                                            long flags) {
         boolean needOomAdj = false;
         for (int i = 0, size = clist.size(); i < size; i++) {
             final ConnectionRecord r = clist.get(i);
-            final long updatedFlags = r.getFlags() ^ flags;
+            final long normalizedFlags = normalizeExternalServiceBindFlags(flags, r.getFlags());
+            final long updatedFlags = r.getFlags() ^ normalizedFlags;
             if (updatedFlags != (updatedFlags & Context.BIND_UPDATEABLE_FLAGS)) {
-                throw new IllegalArgumentException("Attempting to update non-updatable flags");
+                throw new IllegalArgumentException(
+                        "Attempting to update non-updatable flags: 0x" + Long.toHexString(flags));
             }
-            if (mAm.mProcessStateController.updateConnectionFlags(r, flags)) {
+            if (mAm.mProcessStateController.updateConnectionFlags(r, normalizedFlags)) {
                 final ProcessRecord app = r.binding.service.getHostProcess();
                 if (app != null) {
                     mAm.updateLruProcessLocked(app, true, null);
@@ -6337,11 +6366,15 @@ public final class ActiveServices {
         if (!Flags.deferServiceRestartWhenFrozen()) {
             return;
         }
+        final long now = SystemClock.uptimeMillis();
         for (int i = 0; i < psr.numberOfConnections(); i++) {
             final ConnectionRecord cr = psr.getConnectionAt(i);
             if (cr.hasFlag(Context.BIND_AUTO_CREATE)) {
                 final ServiceRecord sr = cr.getService();
-                if (mRestartingServices.contains(sr)) {
+                // If the service is scheduled for restart, only do it now if the
+                // scheduled time has already passed. Otherwise, let the existing
+                // restart timer handle it to respect the backoff policy.
+                if (now >= sr.nextRestartTime && mRestartingServices.contains(sr)) {
                     performServiceRestartLocked(sr);
                 }
             }

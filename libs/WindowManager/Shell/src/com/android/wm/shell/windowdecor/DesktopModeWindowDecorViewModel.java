@@ -146,6 +146,7 @@ import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.FocusTransitionObserver;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.windowdecor.common.CaptionVisibilityHelper;
+import com.android.wm.shell.windowdecor.common.DecorThemeUtil;
 import com.android.wm.shell.windowdecor.common.ExclusionRegionListener;
 import com.android.wm.shell.windowdecor.common.InputPilfererImpl;
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader;
@@ -219,6 +220,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     private final ShellDesktopState mShellDesktopState;
     private final DesktopConfig mDesktopConfig;
     private final @Nullable PinnedLayerController mPinnedLayerController;
+    private final DecorThemeUtil.Factory mDecorThemeUtilFactory;
     private final @Nullable PinnedLayerUiState mPinnedLayerUiState;
     private final FluidTaskResizer mFluidTaskResizer;
     private final VeiledTaskResizer mVeiledTaskResizer;
@@ -338,7 +340,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             FluidTaskResizer fluidTaskResizer,
             VeiledTaskResizer veiledTaskResizer,
             MultiDisplayTaskMover multiDisplayTaskMover,
-            SnapController snapController) {
+            SnapController snapController,
+            DecorThemeUtil.Factory decorThemeUtilFactory) {
         this(
                 context,
                 shellExecutor,
@@ -398,7 +401,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 fluidTaskResizer,
                 veiledTaskResizer,
                 multiDisplayTaskMover,
-                snapController);
+                snapController,
+                decorThemeUtilFactory);
     }
 
     @VisibleForTesting
@@ -461,7 +465,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             FluidTaskResizer fluidTaskResizer,
             VeiledTaskResizer veiledTaskResizer,
             MultiDisplayTaskMover multiDisplayTaskMover,
-            SnapController snapController) {
+            SnapController snapController,
+            DecorThemeUtil.Factory decorThemeUtilFactory) {
         mContext = context;
         mMainExecutor = shellExecutor;
         mMainHandler = mainHandler;
@@ -558,6 +563,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         mLockTaskChangeListener = lockTaskChangeListener;
         mPinnedLayerController = pinnedLayerController;
         mPinnedLayerUiState = pinnedLayerUiState;
+        mDecorThemeUtilFactory = decorThemeUtilFactory;
         mFluidTaskResizer = fluidTaskResizer;
         mVeiledTaskResizer = veiledTaskResizer;
         mMultiDisplayTaskMover = multiDisplayTaskMover;
@@ -1364,24 +1370,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                         task.taskId);
             }
         }
-        final DesktopTasksController.CloseTaskResult result =
-                mDesktopTasksController.closeTask(task, forceKeepDesktop);
-        if (result != DesktopTasksController.CloseTaskResult.CLOSED_DESKTOP) {
-            return;
-        }
-
-        // TODO: b/448483994 - remove manual a11y announcement when it is handled by the decor
-        // internally.
-        final int nextFocusedTaskId =
-                mDesktopTasksController.getTopTask(
-                    task.getDisplayId(),
-                    task.userId,
-                    task.getTaskId());
-        final WindowDecorationWrapper nextFocusedWindow =
-                mWindowDecorationFinder.apply(nextFocusedTaskId);
-        if (nextFocusedWindow != null) {
-            nextFocusedWindow.a11yAnnounceNewFocusedWindow();
-        }
+        mDesktopTasksController.closeTask(task, forceKeepDesktop);
     }
 
     /**
@@ -1390,22 +1379,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
      * @param task The pinned task to be closed.
      */
     private void closePinnedTask(RunningTaskInfo task) {
-        if (!mPinnedLayerController.closeTask(task)) {
-            return;
-        }
-
-        // TODO: b/448483994 - remove manual a11y announcement when it is handled by the decor
-        // internally.
-        final int nextFocusedTaskId =
-                mDesktopTasksController.getTopTask(
-                    task.getDisplayId(),
-                    task.userId,
-                    /* excludingTaskId= */ null);
-        final WindowDecorationWrapper nextFocusedWindow =
-                mWindowDecorationFinder.apply(nextFocusedTaskId);
-        if (nextFocusedWindow != null) {
-            nextFocusedWindow.a11yAnnounceNewFocusedWindow();
-        }
+        mPinnedLayerController.closeTask(task);
     }
 
     /** Listener for caption touch events. */
@@ -1854,7 +1828,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     mRecentsTransitionStateListener,
                     mLockTaskChangeListener,
                     mPinnedLayerController,
-                    mDesktopTasksController);
+                    mDesktopTasksController,
+                    mDecorThemeUtilFactory);
             windowDecoration =
                     mWindowDecoratioWrapperFactory.fromDefaultDecoration(defaultWindowDecoration);
         } else {
@@ -1894,7 +1869,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                             mLockTaskChangeListener,
                             mFocusTransitionObserver,
                             mPinnedLayerController,
-                            mDesktopTasksController);
+                            mDesktopTasksController,
+                            mDecorThemeUtilFactory);
             windowDecoration = mWindowDecoratioWrapperFactory
                     .fromDesktopDecoration(desktopModeWindowDecoration);
         }
@@ -2175,14 +2151,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         public void onMinimize(@NonNull RunningTaskInfo taskInfo) {
             WdLog.logD(TAG, "Using DefaultWindowDecorationActions to minimize task=%d",
                     taskInfo.taskId);
-            final int nextFocusedTaskId =
-                    mDesktopTasksController.getTopTask(
-                        taskInfo.getDisplayId(),
-                        taskInfo.userId,
-                        taskInfo.getTaskId());
-            WindowDecorationWrapper nextFocusedWindow =
-                    mViewModel.mWindowDecorByTaskId.get(nextFocusedTaskId);
-            if (nextFocusedWindow != null) nextFocusedWindow.a11yAnnounceNewFocusedWindow();
             mDesktopTasksController.minimizeTask(taskInfo, MinimizeReason.MINIMIZE_BUTTON);
         }
 

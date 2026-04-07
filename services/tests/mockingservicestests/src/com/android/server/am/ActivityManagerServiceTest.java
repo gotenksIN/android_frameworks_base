@@ -140,6 +140,8 @@ import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.provider.DeviceConfig;
+import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.IntArray;
 import android.util.Log;
 import android.util.Pair;
@@ -152,6 +154,7 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.internal.os.SomeArgs;
 import com.android.sdksandbox.flags.Flags;
 import com.android.server.LocalServices;
+import com.android.server.SystemConfig;
 import com.android.server.am.BroadcastController.StickyBroadcast;
 import com.android.server.am.ProcessList.IsolatedUidRange;
 import com.android.server.am.ProcessList.IsolatedUidRangeAllocator;
@@ -477,12 +480,12 @@ public class ActivityManagerServiceTest {
         setupAllowComponentAccessPolicy(
                 TEST_CALLER_PKG,
                 TEST_USER_ID,
-                List.of(createSignedPackage(TEST_TARGET_PKG, /* cert= */ null)));
+                List.of(createSignedPackage(TEST_TARGET_PKG, CERT_B)));
 
         setupAllowComponentAccessPolicy(
                 TEST_TARGET_PKG,
                 TEST_USER_ID,
-                List.of(createSignedPackage(TEST_CALLER_PKG, /* cert= */ null)));
+                List.of(createSignedPackage(TEST_CALLER_PKG, CERT_A)));
 
         setupPackageSigning(TEST_CALLER_PKG, CERT_A);
         setupPackageSigning(TEST_TARGET_PKG, CERT_B);
@@ -532,6 +535,162 @@ public class ActivityManagerServiceTest {
 
         assertTrue("When flag is disabled, manifest policies must be ignored", result);
     }
+
+    @Test
+    @RequiresFlagsEnabled(
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testValidateAssociationAllowedPerSystemLocked_NonPcc_NoAssociations_Allowed()
+            throws Exception {
+        MockitoSession mockitoSession = mockitoSession()
+                .mockStatic(SystemConfig.class)
+                .strictness(Strictness.LENIENT)
+                .startMocking();
+        try {
+            SystemConfig mockSystemConfig = mock(SystemConfig.class);
+            ExtendedMockito.doReturn(mockSystemConfig).when(SystemConfig::getInstance);
+
+            // Return an empty map to simulate no explicit sysconfig rules for either package
+            ArrayMap<String, ArraySet<String>> allowedAssociations = new ArrayMap<>();
+            when(mockSystemConfig.getAllowedAssociations()).thenReturn(allowedAssociations);
+
+            boolean allowed =
+                    mAms.validateAssociationAllowedPerSystemLocked(
+                            REGULAR_PACKAGE,
+                            REGULAR_UID,
+                            REGULAR_PACKAGE_2,
+                            REGULAR_UID_2,
+                            ActivityManagerService.ASSOCIATION_TYPE_SERVICE,
+                            null);
+
+            assertTrue("Association should be allowed for non-PCC packages with no sysconfig rules",
+                    allowed);
+        } finally {
+            mockitoSession.finishMocking();
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // --- PCC SystemConfig and PccSandboxManager Tests ------
+    // ------------------------------------------------------------------------
+    @Test
+    @RequiresFlagsEnabled(
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void
+            testValidateAssociationAllowedPerSystemLocked_PccManagerDeniedNoAssociations() {
+        when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                anyInt(), anyString(), anyInt(), anyString(), anyInt(),
+                nullable(Bundle.class))).thenReturn(false);
+
+        boolean allowed =
+                mAms.validateAssociationAllowedPerSystemLocked(
+                        PCC_PACKAGE_1,
+                        PCC_UID_1,
+                        REGULAR_PACKAGE,
+                        REGULAR_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE,
+                        null);
+
+        assertFalse("Association should be denied with no explicit sysconfig associations",
+                allowed);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testValidateAssociationAllowedPerSystemLocked_PccManagerDenied_SysConfigAllowed()
+            throws Exception {
+        MockitoSession mockitoSession = mockitoSession()
+                .mockStatic(SystemConfig.class)
+                .strictness(Strictness.LENIENT)
+                .startMocking();
+        try {
+            when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                    anyInt(), anyString(), anyInt(), anyString(), anyInt(),
+                    nullable(Bundle.class)))
+                    .thenReturn(false);
+
+            SystemConfig mockSystemConfig = mock(SystemConfig.class);
+            ExtendedMockito.doReturn(mockSystemConfig).when(SystemConfig::getInstance);
+
+            ArrayMap<String, ArraySet<String>> allowedAssociations = new ArrayMap<>();
+            allowedAssociations.put(PCC_PACKAGE_1, new ArraySet<>(new String[] {REGULAR_PACKAGE}));
+            allowedAssociations.put(REGULAR_PACKAGE, new ArraySet<>(new String[] {PCC_PACKAGE_1}));
+            when(mockSystemConfig.getAllowedAssociations()).thenReturn(allowedAssociations);
+
+            ApplicationInfo pccAppInfo = new ApplicationInfo();
+            pccAppInfo.flags = 0;
+            ApplicationInfo regularAppInfo = new ApplicationInfo();
+            regularAppInfo.flags = 0;
+            when(mPackageManager.getApplicationInfo(eq(PCC_PACKAGE_1), anyLong(), anyInt()))
+                    .thenReturn(pccAppInfo);
+            when(mPackageManager.getApplicationInfo(eq(REGULAR_PACKAGE), anyLong(), anyInt()))
+                    .thenReturn(regularAppInfo);
+
+            boolean allowed =
+                    mAms.validateAssociationAllowedPerSystemLocked(
+                            PCC_PACKAGE_1,
+                            PCC_UID_1,
+                            REGULAR_PACKAGE,
+                            REGULAR_UID,
+                            ActivityManagerService.ASSOCIATION_TYPE_SERVICE,
+                            null);
+
+            assertTrue(
+                    "Association should be allowed by sysconfig if PccSandboxManager denies",
+                    allowed);
+        } finally {
+            mockitoSession.finishMocking();
+        }
+    }
+
+    @Test
+    @RequiresFlagsEnabled(
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testValidateAssociationAllowedPerSystemLocked_PccManagerDenied_SysConfigDenied()
+            throws Exception {
+        MockitoSession mockitoSession = mockitoSession()
+                .mockStatic(SystemConfig.class)
+                .strictness(Strictness.LENIENT)
+                .startMocking();
+        try {
+            when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                    anyInt(), anyString(), anyInt(), anyString(), anyInt(),
+                    nullable(Bundle.class)))
+                    .thenReturn(false);
+
+            SystemConfig mockSystemConfig = mock(SystemConfig.class);
+            ExtendedMockito.doReturn(mockSystemConfig).when(SystemConfig::getInstance);
+
+            ArrayMap<String, ArraySet<String>> allowedAssociations = new ArrayMap<>();
+            allowedAssociations.put(
+                    PCC_PACKAGE_1, new ArraySet<>(new String[] {"some.other.package"}));
+            allowedAssociations.put(REGULAR_PACKAGE, new ArraySet<>(new String[] {PCC_PACKAGE_1}));
+            when(mockSystemConfig.getAllowedAssociations()).thenReturn(allowedAssociations);
+
+            ApplicationInfo pccAppInfo = new ApplicationInfo();
+            pccAppInfo.flags = 0;
+            ApplicationInfo regularAppInfo = new ApplicationInfo();
+            regularAppInfo.flags = 0;
+            when(mPackageManager.getApplicationInfo(eq(PCC_PACKAGE_1), anyLong(), anyInt()))
+                    .thenReturn(pccAppInfo);
+            when(mPackageManager.getApplicationInfo(eq(REGULAR_PACKAGE), anyLong(), anyInt()))
+                    .thenReturn(regularAppInfo);
+
+            boolean allowed =
+                    mAms.validateAssociationAllowedPerSystemLocked(
+                            PCC_PACKAGE_1,
+                            PCC_UID_1,
+                            REGULAR_PACKAGE,
+                            REGULAR_UID,
+                            ActivityManagerService.ASSOCIATION_TYPE_SERVICE,
+                            null);
+
+            assertFalse("Association should be denied by sysconfig", allowed);
+        } finally {
+            mockitoSession.finishMocking();
+        }
+    }
+
     // ------------------------------------------------------------------------
     // --- PCC Component Access Tests ------
     // ------------------------------------------------------------------------
@@ -564,12 +723,12 @@ public class ActivityManagerServiceTest {
     public void testValidateAssociation_ComponentAccess_PccUid_AllowedByManifest() {
         // Manifest explicitly allows PCC package
         List<SignedPackage> targetRules =
-                List.of(createSignedPackage(PCC_PACKAGE_1, /* cert= */ null));
+                List.of(createSignedPackage(PCC_PACKAGE_1, CERT_A));
         setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, targetRules);
 
         // Mutual trust setup
         List<SignedPackage> pccRules =
-                List.of(createSignedPackage(TEST_TARGET_PKG, /* cert= */ null));
+                List.of(createSignedPackage(TEST_TARGET_PKG, CERT_B));
         setupAllowComponentAccessPolicy(PCC_PACKAGE_1, TEST_USER_ID, pccRules);
         setupPackageSigning(TEST_TARGET_PKG, CERT_B);
         setupPackageSigning(PCC_PACKAGE_1, CERT_A);
@@ -585,6 +744,40 @@ public class ActivityManagerServiceTest {
         assertTrue("PCC UID accessing an Untrusted App should be allowed"
                         + " if the manifest explicitly permits it", result);
     }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_NonPreInstalledApp_NoDigest_Rejected() {
+        // Set up a policy for the caller that allows the target, but with NO certificate digest
+        List<SignedPackage> callerRules = List.of(
+                createSignedPackage(TEST_TARGET_PKG, /* cert= */ null));
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, callerRules);
+
+        // Standard setup for the target app (assumed to be non-system/untrusted by default)
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertFalse("Non-preinstalled apps without a certificate digest must be rejected", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_PreinstalledApp_NoDigest_Allowed() {
+        // Set up a policy for the caller that allows a SYSTEM package without a digest
+        List<SignedPackage> callerRules = List.of(
+                createSignedPackage(SYSTEM_PKG, /* cert= */ null));
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, callerRules);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                TEST_CALLER_PKG, TEST_CALLER_UID, SYSTEM_PKG, Process.SYSTEM_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertTrue("Preinstalled apps should be allowed without a digest", result);
+    }
+
     private void mockNoteOperation() {
         SyncNotedAppOp allowed = new SyncNotedAppOp(AppOpsManager.MODE_ALLOWED,
                 AppOpsManager.OP_GET_USAGE_STATS, null, mContext.getPackageName());

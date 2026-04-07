@@ -52,6 +52,7 @@ aconfig_declarations_group {
         "android.crashrecovery.flags-aconfig-java",
         "android.credentials.flags-aconfig-java",
         "android.database.sqlite-aconfig-java",
+        "android.graphics.egl.flags-aconfig-java",
         "android.hardware.biometrics.flags-aconfig-java",
         "android.hardware.devicestate.feature.flags-aconfig-java",
         "android.hardware.flags-aconfig-java",
@@ -429,6 +430,12 @@ java_aconfig_library {
         "//apex_available:platform",
         "com.android.permission",
     ],
+}
+
+rust_aconfig_library {
+    name: "libandroid_hardware_input_flags_rust",
+    crate_name: "android_hardware_input_flags",
+    aconfig_declarations: "com.android.hardware.input.input-aconfig",
 }
 
 aconfig_declarations {
@@ -2610,11 +2617,17 @@ java_aconfig_library {
     min_sdk_version: "30",
     apex_available: [
         "//apex_available:platform",
+        "com.android.adservices",
+        "com.android.appsearch",
         // ART needs access to PCC flags to include PCC along with isolated processes
         // in the shared-app logic
         "com.android.art",
         "com.android.art.debug",
-        "com.android.appsearch",
+        "com.android.extservices",
+        "com.android.healthfitness",
+        "com.android.mediaprovider",
+        "com.android.permission",
+        "com.android.bt",
     ],
 }
 
@@ -2659,5 +2672,11 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.print.flags-aconfig-java",
     aconfig_declarations: "android.print.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "android.graphics.egl.flags-aconfig-java",
+    aconfig_declarations: "egl_flags",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }

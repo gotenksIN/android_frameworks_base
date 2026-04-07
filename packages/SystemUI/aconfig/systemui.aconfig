@@ -20,16 +20,6 @@ flag {
 }
 
 flag {
-  name: "ambient_touch_monitor_listen_to_display_changes"
-  namespace: "systemui"
-  description: "listen to display changes and cache window metrics"
-  bug: "330906135"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "animation_library_atomic_listeners"
     namespace: "systemui"
     description: "Better atomicity enforcement for Animation Library listeners."
@@ -72,16 +62,6 @@ flag {
     namespace: "systemui"
     description: "Makes StatusBarNotificationActivityStarter do binder transactions on background"
     bug: "462728621"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "av_controls_chip_per_display"
-    namespace: "systemui"
-    description: "Makes Av Controls Chip related code per display."
-    bug: "433653329"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -300,16 +280,6 @@ flag {
 }
 
 flag {
-    name: "dialog_background_refresh"
-    namespace: "systemui"
-    description: "Enable refreshing the background of SystemUIDialogs when the theme changes between light and dark mode"
-    bug: "474600479"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "disable_contextual_tips_frequency_check"
    description: "Disables frequency capping check for contextual tips."
    namespace: "systemui"
@@ -420,6 +390,16 @@ flag {
 }
 
 flag {
+    name: "enable_compose_external_display_dialog"
+    namespace: "systemui"
+    description: "Use compose for the external display connection dialog"
+    bug: "488010592"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_contextual_tip_for_mute_volume"
     namespace: "systemui"
     description: "Enables the contextual tip for muting the volume."
@@ -455,6 +435,16 @@ flag {
    metadata {
      purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+    name: "enable_inset_focus_rings_in_suw"
+    namespace: "systemui"
+    description: "Decides whether to enable inset focus rings in the global actions dialog during the SuW."
+    bug: "484084632"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -639,6 +629,16 @@ flag {
 }
 
 flag {
+   name: "fix_main_thread_blocking_on_first_unlock"
+   namespace: "systemui"
+   description: "Fixes main thread blocking Binder calls during the first unlock."
+   bug: "491497495"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "fix_notes_role_in_freeform"
     namespace: "note"
     description: "Fix issues related to notes role under the freeform environment."
@@ -653,16 +653,6 @@ flag {
     namespace: "systemui"
     description: "Fix NSSL blocks the touch event when the QS panel is expanded."
     bug: "477421025"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_scene_container_action_outside_touch"
-    namespace: "systemui"
-    description: "Fix the shade auto-closing on status bar touch on lock screen."
-    bug: "486078670"
     metadata {
        purpose: PURPOSE_BUGFIX
     }
@@ -684,16 +674,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "get_connected_device_name_unsynchronized"
-   namespace: "systemui"
-   description: "Decide whether to fetch the connected bluetooth device name outside a synchronized block."
-   bug: "323995015"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -925,16 +905,6 @@ flag {
     bug: "459609903"
     metadata {
       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "log_state_on_shade_gesture_failure"
-    namespace: "systemui"
-    description: "Logs state of relevant classes if the shade fails to open."
-    bug: "467878509"
-    metadata {
-        purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -1219,6 +1189,16 @@ flag {
 }
 
 flag {
+   name: "nssl_touch_dispatch_fix"
+   namespace: "systemui"
+   description: "Dispatch complete event streams from the NSSL to Compose to avoid corrupting Compose's touch tracking."
+   bug: "481223652"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "ongoing_activity_chips_on_dream"
     namespace: "systemui"
     description: "Enables ongoing activity chips in dream status bar"
@@ -1308,6 +1288,13 @@ flag {
 }
 
 flag {
+    name: "qs_layout_mode"
+    namespace: "systemui"
+    description: "Adds a layout page to QS Edit mode to reorder QS Components"
+    bug: "485262315"
+}
+
+flag {
    name: "qs_new_tiles"
    namespace: "systemui"
    description: "Use the new tiles in the Quick Settings. Should have no behavior changes."
@@ -1336,6 +1323,13 @@ flag {
 }
 
 flag {
+    name: "qs_split_internet_tile_suppression"
+    namespace: "systemui"
+    description: "Suppresses the split from qs_split_internet_tile_rw reverting to the internet tile. We are changing the upgrade logic and will use this flag to ramp internal users up and down to test it."
+    bug: "490473248"
+}
+
+flag {
     name: "qs_tile_detailed_view"
     namespace: "systemui"
     description: "Enables the tile detailed view UI."
@@ -1361,16 +1355,6 @@ flag {
     namespace: "systemui"
     description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
     bug: "402214828"
-}
-
-flag {
-    name: "remove_launch_display_id_override"
-    namespace: "systemui"
-    description: "Remove the launchDisplayId override when launching pending intents, allowing launches on secondary displays"
-    bug: "467894356"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1507,16 +1491,6 @@ flag {
     namespace: "systemui"
     description: "Allow showing key glyph in shortcut helper"
     bug: "353902478"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "show_audio_sharing_slider_in_volume_panel"
-    namespace: "cross_device_experiences"
-    description: "Show two sliders in volume panel when audio sharing."
-    bug: "336183611"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1809,16 +1783,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "system_status_animation_per_display"
-   namespace: "systemui"
-   description: "Make system status events / animations per display"
-   bug: "378578911"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {

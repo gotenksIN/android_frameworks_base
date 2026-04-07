@@ -20,14 +20,17 @@ import static android.processor.devicepolicy.AllowedDpcTypes.ALLOWED;
 import static android.processor.devicepolicy.AllowedDpcTypes.DISALLOWED;
 import static android.processor.devicepolicy.AllowedDpcTypes.SAME_AS_UNAFFILIATED;
 
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.processor.devicepolicy.AllowedDpcTypes;
 import android.processor.devicepolicy.BooleanPolicyDefinition;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.EnumResolutionMechanism;
 import android.processor.devicepolicy.IntegerPolicyDefinition;
-import android.processor.devicepolicy.LongPolicyDefinition;
 import android.processor.devicepolicy.ListOfStringPolicyDefinition;
+import android.processor.devicepolicy.ListResolutionMechanism;
+import android.processor.devicepolicy.LongPolicyDefinition;
+import android.processor.devicepolicy.PackagePolicyDefinition;
 import android.processor.devicepolicy.PolicyDefinition;
 import android.processor.devicepolicy.StringPolicyDefinition;
 
@@ -47,8 +50,11 @@ public final class PolicyIdentifier<T> {
         return mId;
     }
 
-    /** Test policy 1
-     * Second line */
+    /**
+     * Test policy 1
+     *
+     * <p>Second line
+     */
     @BooleanPolicyDefinition(
             base =
                     @PolicyDefinition(
@@ -195,8 +201,7 @@ public final class PolicyIdentifier<T> {
                                             managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
                                             unaffiliatedFullUserProfileOwner = DISALLOWED)),
             minValue = 10,
-            maxValue = 100
-    )
+            maxValue = 100)
     public static final PolicyIdentifier<Long> SIMPLE_LONG_POLICY_WITH_RANGE =
             new PolicyIdentifier<>("SIMPLE_LONG_POLICY_WITH_RANGE");
 
@@ -220,6 +225,29 @@ public final class PolicyIdentifier<T> {
     public static final PolicyIdentifier<String> SIMPLE_STRING_POLICY =
             new PolicyIdentifier<>("SIMPLE_STRING_POLICY");
 
+    /** Test policy verifying a string policy with unprintable characters allowed. */
+    @StringPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            // requiredPermission and requiredCrossUserPermission using the default
+                            // values.
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            unprintableCharactersAllowed = true)
+    public static final PolicyIdentifier<String>
+            SIMPLE_STRING_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED =
+                    new PolicyIdentifier<>(
+                            "SIMPLE_STRING_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED");
+
     /** Test policy 5 */
     @ListOfStringPolicyDefinition(
             base =
@@ -242,9 +270,60 @@ public final class PolicyIdentifier<T> {
                                                                     DISALLOWED,
                                                             unaffiliatedFullUserProfileOwner =
                                                                     DISALLOWED)),
-                            emptyStringAllowed = true))
+                            emptyStringAllowed = true),
+            resolutionMechanism = @ListResolutionMechanism(custom = true))
     public static final PolicyIdentifier<List<String>> SIMPLE_STRING_LIST_POLICY =
             new PolicyIdentifier<>("SIMPLE_STRING_LIST_POLICY");
+
+    /** Test policy verifying a string list policy with unprintable characters allowed. */
+    @ListOfStringPolicyDefinition(
+            base =
+                    @StringPolicyDefinition(
+                            base =
+                                    @PolicyDefinition(
+                                            allowedScopes = {
+                                                1 // POLICY_SCOPE_USER
+                                            },
+                                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                                            // requiredPermission and requiredCrossUserPermission
+                                            // using the default
+                                            // values.
+                                            allowedDpcTypes =
+                                                    @AllowedDpcTypes(
+                                                            deviceOwner = DISALLOWED,
+                                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                                    DISALLOWED,
+                                                            managedProfileOwnerOfPersonalOwnedDevice =
+                                                                    DISALLOWED,
+                                                            unaffiliatedFullUserProfileOwner =
+                                                                    DISALLOWED)),
+                            emptyStringAllowed = true,
+                            unprintableCharactersAllowed = true),
+            resolutionMechanism = @ListResolutionMechanism(custom = true))
+    public static final PolicyIdentifier<List<String>>
+            SIMPLE_STRING_LIST_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED =
+                    new PolicyIdentifier<>(
+                            "SIMPLE_STRING_LIST_POLICY_WITH_UNPRINTABLE_CHARACTERS_ALLOWED");
+
+    /** Test policy for Package */
+    @PackagePolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            // requiredPermission and requiredCrossUserPermission using the default
+                            // values.
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+    public static final PolicyIdentifier<PackageIdentifier> SIMPLE_PACKAGE_POLICY =
+            new PolicyIdentifier<>("SIMPLE_PACKAGE_POLICY");
 
     /** Test policy verifying processing of DEFAULT_DEVICE_OWNER allowed. */
     @IntegerPolicyDefinition(
@@ -487,4 +566,48 @@ public final class PolicyIdentifier<T> {
                             mostRestrictive = {ENUM_ENTRY_1, ENUM_ENTRY_2, ENUM_ENTRY_3}))
     public static final PolicyIdentifier<Integer> MOST_RESTRICTIVE_ENUM_POLICY =
             new PolicyIdentifier<>("MOST_RESTRICTIVE_ENUM_POLICY");
+
+    /** Test policy that is flagged. */
+    @FlaggedApi("my.flagged.api")
+    @IntegerPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)))
+    public static final PolicyIdentifier<Integer> FLAGGED_POLICY =
+            new PolicyIdentifier<>("FLAGGED_POLICY");
+
+    /** Enum policy with notCoexistent resolution mechanism. */
+    @EnumPolicyDefinition(
+            base =
+                    @PolicyDefinition(
+                            allowedScopes = {
+                                2, // POLICY_SCOPE_DEVICE
+                                3 // POLICY_SCOPE_PARENT_USER
+                            },
+                            affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                            requiredPermission = "android.permission.MANAGE_POLICY_SIMPLE_ENUM",
+                            requiredCrossUserPermission =
+                                    "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS",
+                            allowedDpcTypes =
+                                    @AllowedDpcTypes(
+                                            deviceOwner = DISALLOWED,
+                                            managedProfileOwnerOfOrganizationOwnedDevice =
+                                                    DISALLOWED,
+                                            managedProfileOwnerOfPersonalOwnedDevice = DISALLOWED,
+                                            unaffiliatedFullUserProfileOwner = DISALLOWED)),
+            defaultValue = ENUM_ENTRY_2,
+            intDef = SimpleEnumPolicyEnum.class,
+            resolutionMechanism = @EnumResolutionMechanism(notCoexistable = true))
+    public static final PolicyIdentifier<Integer> NOT_COEXISTANT_ENUM_POLICY =
+            new PolicyIdentifier<>("NOT_COEXISTANT_ENUM_POLICY");
 }

@@ -211,6 +211,7 @@ import com.android.server.media.projection.MediaProjectionManagerService;
 import com.android.server.media.quality.MediaQualityService;
 import com.android.server.midi.MidiService;
 import com.android.server.modes.ContextualModeManagerService;
+import com.android.server.multisensory.MultisensoryService;
 import com.android.server.musicrecognition.MusicRecognitionManagerService;
 import com.android.server.net.NetworkManagementService;
 import com.android.server.net.NetworkPolicyManagerService;
@@ -1045,8 +1046,7 @@ public final class SystemServer implements Dumpable {
         // Start services.
         try {
             t.traceBegin("StartServices");
-            if (android.server.Flags.allowSystemServerInheritRt()
-                    && SystemProperties.getBoolean("sys.system_server_inherit_rt", false)) {
+            if (SystemProperties.getBoolean("sys.system_server_inherit_rt", false)) {
                 Binder.setGlobalInheritRt(true);
             }
             startBootstrapServices(t);
@@ -1743,6 +1743,12 @@ public final class SystemServer implements Dumpable {
             if (!isTv) {
                 t.traceBegin("StartVibratorManagerService");
                 mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
+                t.traceEnd();
+            }
+
+            if (!isTv && android.os.multisensory.Flags.enableMultisensoryFeedback()) {
+                t.traceBegin("StartMultisensoryService");
+                mSystemServiceManager.startService(MultisensoryService.Lifecycle.class);
                 t.traceEnd();
             }
 

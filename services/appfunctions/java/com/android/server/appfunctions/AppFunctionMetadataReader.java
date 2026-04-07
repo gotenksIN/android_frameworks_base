@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.android.server.appfunctions;
 
 import static android.app.appfunctions.AppFunctionManager.APP_FUNCTION_STATE_DEFAULT;
@@ -21,10 +22,8 @@ import static android.app.appfunctions.AppFunctionMetadata.APP_FUNCTION_TYPE_DYN
 import static android.app.appfunctions.AppFunctionMetadata.APP_FUNCTION_TYPE_DYNAMIC_GLOBAL;
 import static android.app.appfunctions.AppFunctionMetadata.APP_FUNCTION_TYPE_STATIC;
 import static android.app.appfunctions.AppFunctionRuntimeMetadata.APP_FUNCTION_RUNTIME_NAMESPACE;
-import static android.app.appfunctions.AppFunctionRuntimeMetadata.PROPERTY_APP_FUNCTION_STATIC_METADATA_QUALIFIED_ID;
 import static android.app.appfunctions.AppFunctionRuntimeMetadata.PROPERTY_ENABLED;
 import static android.app.appfunctions.AppFunctionStaticMetadataHelper.APP_FUNCTION_INDEXER_PACKAGE;
-import static android.app.appfunctions.AppFunctionStaticMetadataHelper.APP_FUNCTION_STATIC_NAMESPACE;
 
 import static java.util.Objects.requireNonNull;
 
@@ -47,6 +46,7 @@ import android.app.appfunctions.IAppFunctionSearchResultCallback;
 import android.app.appfunctions.IAppFunctionSearchResults;
 import android.app.appfunctions.flags.Flags;
 import android.app.appsearch.GenericDocument;
+import android.app.appsearch.GetByDocumentIdRequest;
 import android.app.appsearch.JoinSpec;
 import android.app.appsearch.PropertyPath;
 import android.app.appsearch.SearchResult;
@@ -59,12 +59,12 @@ import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-import android.util.Pair;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.infra.AndroidFuture;
+import com.android.server.appfunctions.dynamic.MultiUserDynamicAppFunctionRegistry;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -88,7 +88,9 @@ final class AppFunctionMetadataReader {
                     .setVerbatimSearchEnabled(true)
                     .build();
     private static final JoinSpec JOIN_SPEC =
-            new JoinSpec.Builder(PROPERTY_APP_FUNCTION_STATIC_METADATA_QUALIFIED_ID)
+            new JoinSpec.Builder(
+                            AppFunctionRuntimeMetadata
+                                    .PROPERTY_APP_FUNCTION_STATIC_METADATA_QUALIFIED_ID)
                     .setNestedSearch("", RUNTIME_SEARCH_SPEC)
                     .build();
 
@@ -148,9 +150,10 @@ final class AppFunctionMetadataReader {
      * @param packageName The package name of the application containing the function.
      * @param functionIdentifier The unique identifier for the function within the package.
      * @return {boolean} Whether app function is dynamic.
+     * @throws IllegalArgumentException if the user is not unlocked.
      */
-    public boolean isDynamicFunction(
-            String packageName, String functionIdentifier, UserHandle user) {
+    public boolean isDynamicFunction(String packageName, String functionIdentifier, UserHandle user)
+            throws IllegalArgumentException {
         if (!Flags.enableDynamicAppFunctions()) {
             return false;
         }
@@ -164,12 +167,14 @@ final class AppFunctionMetadataReader {
      * @param functionIdentifier The unique identifier for the function within the package.
      * @param user The user for which to check the function type.
      * @return The {@link AppFunctionType} of the function.
+     * @throws IllegalArgumentException if the user is not unlocked.
      */
     @AppFunctionType
     public int getAppFunctionType(
             @NonNull String packageName,
             @NonNull String functionIdentifier,
-            @NonNull UserHandle user) {
+            @NonNull UserHandle user)
+            throws IllegalArgumentException {
         Objects.requireNonNull(packageName);
         Objects.requireNonNull(functionIdentifier);
         Objects.requireNonNull(user);
@@ -186,14 +191,14 @@ final class AppFunctionMetadataReader {
     }
 
     /**
-     * Checks if the {@code targetAppFunction} is enabled or not.
+     * Returns the {@link AppFunctionEnabledState} for the given app function.
      *
      * @param futureGlobalSearchSession The session to search AppFunctions.
      * @param targetAppFunction The target AppFunction.
      * @param userId The target user id.
-     * @return True if the function is enabled. False otherwise.
+     * @return The detailed enabled state for the given app function.
      */
-    CompletableFuture<Boolean> isAppFunctionEnabled(
+    CompletableFuture<AppFunctionEnabledState> getAppFunctionEnabledState(
             @NonNull FutureGlobalSearchSession futureGlobalSearchSession,
             @NonNull AppFunctionName targetAppFunction,
             int userId) {
@@ -201,13 +206,16 @@ final class AppFunctionMetadataReader {
                 targetAppFunction.getPackageName(),
                 targetAppFunction.getFunctionIdentifier(),
                 UserHandle.of(userId))) {
-            return AndroidFuture.completedFuture(
+            boolean isRegistered =
                     mMultiUserDynamicAppFunctionRegistry.hasRegistrations(
                             targetAppFunction.getPackageName(),
                             targetAppFunction.getFunctionIdentifier(),
-                            UserHandle.of(userId)));
+                            UserHandle.of(userId));
+            return AndroidFuture.completedFuture(
+                    new AppFunctionEnabledState(
+                            /* isEffectivelyEnabled= */ isRegistered,
+                            /* isEnabledByDefault= */ false));
         }
-
         SearchSpec appFunctionJoinedStaticWithRuntimeSearchSpec =
                 new SearchSpec.Builder()
                         .addFilterDocumentIds(List.of(targetAppFunction.getQualifiedId()))
@@ -247,7 +255,7 @@ final class AppFunctionMetadataReader {
                             GenericDocument runtimeDocument =
                                     joinedResult.getFirst().getGenericDocument();
                             return AndroidFuture.completedFuture(
-                                    calculateEffectiveEnabledState(
+                                    calculateAppFunctionEnabledState(
                                             staticDocument, runtimeDocument, userId));
                         });
     }
@@ -261,7 +269,8 @@ final class AppFunctionMetadataReader {
 
         SearchSpec appFunctionDocumentSearchSpec =
                 new SearchSpec.Builder()
-                        .addFilterNamespaces(APP_FUNCTION_STATIC_NAMESPACE)
+                        .addFilterNamespaces(
+                                AppFunctionStaticMetadataHelper.APP_FUNCTION_STATIC_NAMESPACE)
                         .addFilterPackageNames(APP_FUNCTION_INDEXER_PACKAGE)
                         .addFilterSchemas(AppFunctionPackageMetadata.SCHEMA_TYPE)
                         .setVerbatimSearchEnabled(true)
@@ -437,7 +446,8 @@ final class AppFunctionMetadataReader {
 
             return new AppFunctionState(
                     appFunctionName,
-                    calculateEffectiveEnabledState(staticDocument, runtimeDocument, userId),
+                    calculateAppFunctionEnabledState(staticDocument, runtimeDocument, userId)
+                            .isEffectivelyEnabled(),
                     getActivityIdInfo(appFunctionName, UserHandle.of(userId)));
         } catch (RuntimeException e) {
             Slog.e(TAG, "Failed to convert SearchResult to AppFunctionState.", e);
@@ -478,7 +488,8 @@ final class AppFunctionMetadataReader {
 
         SearchSpec staticMetadataSearchSpec =
                 new SearchSpec.Builder()
-                        .addFilterNamespaces(APP_FUNCTION_STATIC_NAMESPACE)
+                        .addFilterNamespaces(
+                                AppFunctionStaticMetadataHelper.APP_FUNCTION_STATIC_NAMESPACE)
                         .addFilterPackageNames(APP_FUNCTION_INDEXER_PACKAGE)
                         .addFilterDocumentIds(appFunctionSearchSpec.getQualifiedIdsFilter())
                         .addFilterSchemas(AppFunctionStaticMetadataHelper.STATIC_SCHEMA_TYPE)
@@ -501,6 +512,36 @@ final class AppFunctionMetadataReader {
                 this, futureGlobalSearchSession, futureSearchResults, resultExecutor);
     }
 
+    /* Fetches the service class name for a given function. */
+    @NonNull
+    CompletableFuture<String> getAppFunctionServiceClassName(
+            @NonNull FutureAppSearchSession futureAppSearchSession,
+            @NonNull AppFunctionName targetAppFunction) {
+        String qualifiedId = targetAppFunction.getQualifiedId();
+        GetByDocumentIdRequest request =
+                new GetByDocumentIdRequest.Builder(
+                                AppFunctionStaticMetadataHelper.APP_FUNCTION_STATIC_NAMESPACE)
+                        .addIds(qualifiedId)
+                        .addProjectionPaths(
+                                AppFunctionStaticMetadataHelper.getStaticSchemaNameForPackage(
+                                        targetAppFunction.getPackageName()),
+                                List.of(
+                                        new PropertyPath(
+                                                AppFunctionMetadata.PROPERTY_SERVICE_NAME)))
+                        .build();
+        return futureAppSearchSession
+                .getByDocumentId(request)
+                .thenApply(
+                        result -> {
+                            GenericDocument staticDocument = result.getSuccesses().get(qualifiedId);
+                            if (staticDocument == null) {
+                                return null;
+                            }
+                            return staticDocument.getPropertyString(
+                                    AppFunctionMetadata.PROPERTY_SERVICE_NAME);
+                        });
+    }
+
     /**
      * Converts the given {@link SearchResult} to an {@link AppFunctionMetadata}. Returns {@code
      * null} if the search result is in an incorrect format.
@@ -520,12 +561,29 @@ final class AppFunctionMetadataReader {
         }
     }
 
-    private boolean calculateEffectiveEnabledState(
+    // TODO(b/467317154): Take into account AppFunctionService availability for static
+    //  app functions
+    @NonNull
+    private AppFunctionEnabledState calculateAppFunctionEnabledState(
             @NonNull GenericDocument staticDocument,
             @NonNull GenericDocument runtimeDocument,
             int userId) {
         Objects.requireNonNull(staticDocument);
         Objects.requireNonNull(runtimeDocument);
+
+        AppFunctionName appFunctionName = AppFunctionName.fromQualifiedId(staticDocument.getId());
+        String packageName = appFunctionName.getPackageName();
+        String functionId = appFunctionName.getFunctionIdentifier();
+
+        if (mCache.isDynamicFunction(packageName, functionId, UserHandle.of(userId))) {
+            return new AppFunctionEnabledState(
+                    mMultiUserDynamicAppFunctionRegistry.hasRegistrations(
+                            packageName, functionId, UserHandle.of(userId)),
+                    false);
+        }
+
+        boolean isEnabledByDefault =
+                staticDocument.getPropertyBoolean(AppFunctionMetadata.PROPERTY_ENABLED_BY_DEFAULT);
 
         boolean isRuntimeEnabled;
         if (runtimeDocument.getPropertyLong(PROPERTY_ENABLED) == APP_FUNCTION_STATE_DEFAULT) {
@@ -537,18 +595,32 @@ final class AppFunctionMetadataReader {
                     runtimeDocument.getPropertyLong(PROPERTY_ENABLED) == APP_FUNCTION_STATE_ENABLED;
         }
 
-        AppFunctionName appFunctionName = AppFunctionName.fromQualifiedId(staticDocument.getId());
-        String packageName = appFunctionName.getPackageName();
-        String functionId = appFunctionName.getFunctionIdentifier();
+        return new AppFunctionEnabledState(
+                /* isEffectivelyEnabled= */ isRuntimeEnabled,
+                /* isEnabledByDefault= */ isEnabledByDefault);
+    }
 
-        if (mCache.isDynamicFunction(packageName, functionId, UserHandle.of(userId))) {
-            return isRuntimeEnabled
-                    && mMultiUserDynamicAppFunctionRegistry.hasRegistrations(
-                            packageName, functionId, UserHandle.of(userId));
-        } else {
-            // TODO(b/467317154): Take into account AppFunctionService availability for static
-            //  app functions
-            return isRuntimeEnabled;
+    /**
+     * Wraps the comprehensive enabled state of an app function resulting from both the static and
+     * runtime metadata content.
+     */
+    static class AppFunctionEnabledState {
+        private final boolean mIsEnabledByDefault;
+        private final boolean mIsEffectivelyEnabled;
+
+        AppFunctionEnabledState(boolean isEffectivelyEnabled, boolean isEnabledByDefault) {
+            this.mIsEnabledByDefault = isEnabledByDefault;
+            this.mIsEffectivelyEnabled = isEffectivelyEnabled;
+        }
+
+        /** Returns true if the function is effectively enabled. */
+        public boolean isEffectivelyEnabled() {
+            return mIsEffectivelyEnabled;
+        }
+
+        /** Returns the function's default enabled state. */
+        public boolean isEnabledByDefault() {
+            return mIsEnabledByDefault;
         }
     }
 
@@ -590,23 +662,25 @@ final class AppFunctionMetadataReader {
         @PermissionManuallyEnforced
         @Override
         public void getNextPage(IAppFunctionSearchResultCallback callback) {
-            getNextPageInternal()
-                    .whenComplete(
-                            (metadataList, exception) -> {
-                                if (exception != null) {
-                                    try {
-                                        callback.onError(new ParcelableException(exception));
-                                    } catch (RemoteException re) {
-                                        Slog.w(TAG, "Fail to call onError", re);
-                                    }
-                                } else {
-                                    try {
-                                        callback.onResult(metadataList);
-                                    } catch (RemoteException e) {
-                                        Slog.w(TAG, "Fail to call onSuccess", e);
-                                    }
-                                }
-                            });
+            var unused =
+                    getNextPageInternal()
+                            .whenComplete(
+                                    (metadataList, exception) -> {
+                                        if (exception != null) {
+                                            try {
+                                                callback.onError(
+                                                        new ParcelableException(exception));
+                                            } catch (RemoteException re) {
+                                                Slog.w(TAG, "Fail to call onError", re);
+                                            }
+                                        } else {
+                                            try {
+                                                callback.onResult(metadataList);
+                                            } catch (RemoteException e) {
+                                                Slog.w(TAG, "Fail to call onSuccess", e);
+                                            }
+                                        }
+                                    });
         }
 
         /**

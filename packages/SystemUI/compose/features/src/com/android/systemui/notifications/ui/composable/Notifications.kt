@@ -47,13 +47,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,8 +69,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.Measurable
-import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -115,6 +113,7 @@ import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.session.ui.composable.sessionCoroutineScope
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ui.ShadeColors
+import com.android.systemui.statusbar.notification.shared.NsslTouchDispatchFix
 import com.android.systemui.statusbar.notification.stack.shared.model.AccessibilityScrollEvent
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimRounding
@@ -320,6 +319,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
     isActivated: Boolean = true,
     onEmptySpaceClick: (() -> Unit)? = null,
     onStackHeightChanged: (Int) -> Unit = {},
+    allowSwipeToExpandChildren: () -> Boolean = { contentScrollState.value == 0 },
 ) {
     /**
      * Space available for the notification stack on the screen. These bounds don't scroll off the
@@ -476,6 +476,8 @@ fun ContentScope.NestedScrollingNotificationPanel(
     val backgroundHeightDp =
         LocalWindowInfo.current.containerDpSize.height + OffsetOverscrollEffect.DefaultMaxDistance
 
+    val expansionOverscrollEffect = rememberOffsetOverscrollEffect()
+
     Layout(
         modifier =
             modifier
@@ -489,6 +491,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         }
                         .overscroll(scrollingContentOverscrollEffect) // Content scrolling
                         .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
+                        .overscroll(expansionOverscrollEffect) // Child swipe-to-expand gesture
                 }
                 // Use onPlaced/onUnplaced instead of onGloballyPositioned to avoid
                 // receiving 0x0 bounds when the element is detached/unplaced but still composed.
@@ -508,9 +511,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         )
                     )
                 }
-                .onUnplaced {
-                    viewModel.onScrimBoundsChanged(null)
-                }
+                .onUnplaced { viewModel.onScrimBoundsChanged(null) }
                 .thenIf(onEmptySpaceClick != null) {
                     Modifier.clickable(
                         interactionSource = interactionSource,
@@ -567,6 +568,8 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         derivedStateOf { contentScrollState.maxValue > 0 }
                     }
 
+                    var layoutCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
+
                     // NotificationPanel content
                     Box {
                         Column(
@@ -585,16 +588,22 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                             "$tag.NestedScroll.container onPlaced bounds=$rawBounds"
                                         }
                                         viewModel.setStackBounds(rawBounds)
+                                        layoutCoordinates = it
                                     }
                                     .onUnplaced {
                                         debugLog(viewModel) {
                                             "$tag.NestedScroll.container onUnplaced"
                                         }
                                         viewModel.resetStackBounds()
+                                        layoutCoordinates = null
                                     }
                                     .debugBackground(viewModel, DEBUG_BOX_COLOR)
-                                    .disableSwipesWhenScrolling()
-                                    .nestedScroll(swipeToExpandNotificationScrollConnection)
+                                    .disableSwipesWhenScrolling() // prevents scene changes
+                                    .thenIf(!NsslTouchDispatchFix.isEnabled) {
+                                        Modifier.nestedScroll(
+                                            swipeToExpandNotificationScrollConnection
+                                        )
+                                    }
                                     .nestedScroll(
                                         connection = object : NestedScrollConnection {},
                                         dispatcher = nestedScrollDispatcher,
@@ -616,6 +625,17 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                         // Active only when the content is non-scrollable.
                                         enabled = !isScrollable,
                                     )
+                                    .thenIf(NsslTouchDispatchFix.isEnabled) {
+                                        Modifier.swipeToExpandNotification(
+                                            callback = stackScrollView.getExpandHelperCallback(),
+                                            overscrollEffect = expansionOverscrollEffect,
+                                            layoutCoordinatesProvider = { layoutCoordinates },
+                                            allowStartGesture = allowSwipeToExpandChildren,
+                                            velocityThresholdPx =
+                                                with(density) { 125.dp.toPx() }, // px/sec
+                                            distanceThresholdPx = with(density) { 56.dp.toPx() },
+                                        )
+                                    }
                                     // Added extra bottom padding for keeping footerView inside
                                     // parent Viewbounds during overscroll, refer to
                                     // b/437347340#comment3
@@ -661,36 +681,24 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                 modifier = Modifier.padding(top = stackTopPadding),
                             )
                         }
+                        if (NmContextualDisplayLaunch.isEnabled) {
+                            // Entry point for the notifications rules page (UX not final)
+                            NotificationRulesEntryPoint(
+                                notificationRulesParentViewModel = notificationRulesParentViewModel,
+                                modifier =
+                                    Modifier.fillMaxWidth().align(alignment = Alignment.BottomStart),
+                            )
+                        }
                     }
-                },
-                {
-                    // Entry point for the notifications rules page (UX not final)
-                    NotificationRulesEntryPoint(
-                        notificationRulesParentViewModel = notificationRulesParentViewModel,
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 },
             ),
         measurePolicy = { measurables, constraints ->
-            check(measurables.size == 3)
+            check(measurables.size == 2)
             check(measurables[0].size == 1) { "background should have one composable" }
             check(measurables[1].size == 1) { "content should have one composable" }
-            if (NmContextualDisplayLaunch.isEnabled) {
-                check(measurables[2].size == 1) { "rules entry point should have one composable" }
-            } else {
-                check(measurables[2].isEmpty()) {
-                    "rules entry point should have NO composable because flag is disabled"
-                }
-            }
 
             val backgroundMeasurable = measurables[0][0]
             val contentMeasurable = measurables[1][0]
-            val rulesEntryPointMeasurable: Measurable? =
-                if (NmContextualDisplayLaunch.isEnabled) {
-                    measurables[2][0]
-                } else {
-                    null
-                }
 
             if (shouldScrimBackgroundFillMaxHeight) {
                 // Fill the entire available space with the content, and force the background to
@@ -702,17 +710,6 @@ fun ContentScope.NestedScrollingNotificationPanel(
                             height = constraints.maxHeight,
                         )
                     )
-                val rulesEntryPoint: Placeable? =
-                    if (NmContextualDisplayLaunch.isEnabled && rulesEntryPointMeasurable != null) {
-                        rulesEntryPointMeasurable.measure(
-                            Constraints.fixed(
-                                width = constraints.maxWidth,
-                                height = constraints.maxHeight,
-                            )
-                        )
-                    } else {
-                        null
-                    }
 
                 val background =
                     backgroundMeasurable.measure(
@@ -725,7 +722,6 @@ fun ContentScope.NestedScrollingNotificationPanel(
                 layout(width = content.width, height = content.height) {
                     content.place(IntOffset.Zero)
                     background.place(IntOffset.Zero)
-                    rulesEntryPoint?.place(IntOffset.Zero)
                 }
             } else {
                 // Make the background size match the content size.
@@ -735,18 +731,11 @@ fun ContentScope.NestedScrollingNotificationPanel(
 
                 val content = contentMeasurable.measure(constraints)
                 val backgroundConstraints = Constraints.fixed(content.width, content.height)
-                val rulesEntryPoint: Placeable? =
-                    if (NmContextualDisplayLaunch.isEnabled && rulesEntryPointMeasurable != null) {
-                        rulesEntryPointMeasurable.measure(backgroundConstraints)
-                    } else {
-                        null
-                    }
                 val background = backgroundMeasurable.measure(backgroundConstraints)
 
                 layout(width = content.width, height = content.height) {
                     background.place(IntOffset.Zero)
                     content.place(IntOffset.Zero)
-                    rulesEntryPoint?.place(IntOffset.Zero)
                 }
             }
         },
@@ -763,7 +752,7 @@ private fun NotificationRulesEntryPoint(
     if (!NmContextualDisplayLaunch.isEnabled || notificationRulesParentViewModel == null) {
         return
     }
-    Box(modifier = modifier, contentAlignment = Alignment.BottomStart) {
+    Box(modifier = modifier) {
         Button(
             onClick = { notificationRulesParentViewModel.launchNotificationRulesActivity(context) }
         ) {

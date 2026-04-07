@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.app.AppInteractionAttribution;
 import android.app.Notification;
 import android.app.PendingIntent;
+import android.companion.DeviceId;
 import android.companion.virtual.computercontrol.InteractiveMirror;
 import android.content.ComponentName;
 import android.content.Context;
@@ -93,8 +94,8 @@ public final class ComputerControlSession implements AutoCloseable {
 
     /**
      * Error code indicating that the caller does not have permission to create a session, which is
-     * possible if the user did not approve the creation of a new session, or if the caller is not
-     * in foreground.
+     * possible if the user did not approve the creation of a new session, or if the caller does not
+     * have a visible non-toast window on any display.
      */
     public static final int ERROR_PERMISSION_DENIED =
             android.companion.virtual.computercontrol.ComputerControlSession
@@ -627,24 +628,24 @@ public final class ComputerControlSession implements AutoCloseable {
     public static class Params {
         @NonNull private final Context mContext;
         @NonNull private final String mName;
-        private final int mTargetExtensionVersion;
         @NonNull private final List<String> mTargetPackageNames;
         @Nullable private final PendingIntent mPreviewIntent;
         @Nullable private final AppInteractionAttribution mAppInteractionAttribution;
+        @Nullable private final DeviceId mCompanionDeviceId;
 
         private Params(
                 @NonNull Context context,
                 @NonNull String name,
-                int targetExtensionVersion,
                 @NonNull List<String> targetPackageNames,
                 @Nullable PendingIntent previewIntent,
-                @Nullable AppInteractionAttribution appInteractionAttribution) {
+                @Nullable AppInteractionAttribution appInteractionAttribution,
+                @Nullable DeviceId companionDeviceId) {
             mContext = context;
             mName = name;
-            mTargetExtensionVersion = targetExtensionVersion;
             mTargetPackageNames = targetPackageNames;
             mPreviewIntent = previewIntent;
             mAppInteractionAttribution = appInteractionAttribution;
+            mCompanionDeviceId = companionDeviceId;
         }
 
         /**
@@ -662,13 +663,6 @@ public final class ComputerControlSession implements AutoCloseable {
         @NonNull
         public String getName() {
             return mName;
-        }
-
-        /**
-         * Returns the target extension version of the computer control session.
-         */
-        public int getTargetExtensionVersion() {
-            return mTargetExtensionVersion;
         }
 
         /**
@@ -705,15 +699,23 @@ public final class ComputerControlSession implements AutoCloseable {
         }
 
         /**
+         * Returns the companion device id of the device that is controlling this session.
+         */
+        @Nullable
+        public DeviceId getCompanionDeviceId() {
+            return mCompanionDeviceId;
+        }
+
+        /**
          * Builder for {@link Params}.
          */
         public static class Builder {
             @NonNull private final Context mContext;
             private String mName;
-            private int mTargetExtensionVersion = 0;
             private List<String> mTargetPackageNames = Collections.emptyList();
             private PendingIntent mPreviewIntent;
             private AppInteractionAttribution mAppInteractionAttribution;
+            private DeviceId mCompanionDeviceId;
 
             /**
              * Create a new Builder.
@@ -728,15 +730,6 @@ public final class ComputerControlSession implements AutoCloseable {
             @NonNull
             public Builder setName(@NonNull String name) {
                 mName = name;
-                return this;
-            }
-
-            /**
-             * Set the target extension version of the computer control session.
-             */
-            @NonNull
-            public Builder setTargetExtensionVersion(int targetExtensionVersion) {
-                mTargetExtensionVersion = targetExtensionVersion;
                 return this;
             }
 
@@ -776,16 +769,25 @@ public final class ComputerControlSession implements AutoCloseable {
                 return this;
             }
 
+            /**
+             * Sets the companion device id of the device that is controlling this session.
+             */
+            @NonNull
+            public Builder setCompanionDeviceId(@Nullable DeviceId companionDeviceId) {
+                mCompanionDeviceId = companionDeviceId;
+                return this;
+            }
+
             /** Build a computer control session. */
             @NonNull
             public Params build() {
                 return new Params(
                         mContext,
                         mName,
-                        mTargetExtensionVersion,
                         mTargetPackageNames,
                         mPreviewIntent,
-                        mAppInteractionAttribution);
+                        mAppInteractionAttribution,
+                        mCompanionDeviceId);
             }
         }
     }

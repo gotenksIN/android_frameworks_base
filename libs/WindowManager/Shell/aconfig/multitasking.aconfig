@@ -48,16 +48,6 @@ flag {
 }
 
 flag {
-    name: "fix_bubbles_long_press_nav_handle"
-    namespace: "multitasking"
-    description: "Allows handling of long-press on nav handle when bubbles are expanded"
-    bug: "324910035"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_optional_bubble_overflow"
     namespace: "multitasking"
     description: "Hides the bubble overflow if there aren't any overflowed bubbles"
@@ -252,15 +242,6 @@ flag {
     }
 }
 
-flag {
-    name: "send_bubble_root_task_id_to_launcher"
-    namespace: "multitasking"
-    description: "Share bubbles root task id with Launcher"
-    bug: "473848153"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "disable_bubble_scrim_large_screens"
@@ -277,6 +258,16 @@ flag {
     namespace: "multitasking"
     description: "Disable Bubble Anything on large screen devices that are eligible for Desktop Windowing."
     bug: "469240263"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "launch_bubble_on_main_display"
+    namespace: "multitasking"
+    description: "Ensure bubble task is created on the main display if triggered from a connected display."
+    bug: "457889029"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -343,10 +334,30 @@ flag {
 }
 
 flag {
+    name: "fix_adjust_accessibility_actions_for_stack_view_state"
+    namespace: "multitasking"
+    description: "Adjust accessibility actions for stack view expanded state"
+    bug: "469259914"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "bubble_dismiss_magnetize_collision_prevention"
     namespace: "multitasking"
     description: "Move the dismiss view higher so it`s magnetize zone does not collide with the bubble bar"
     bug: "481701224"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_reduce_shadow_alpha"
+    namespace: "multitasking"
+    description: "Reduce floating bubbles scrim view alpha to make navigation buttons visible"
+    bug: "450646947"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -363,10 +374,30 @@ flag {
 }
 
 flag {
+    name: "fix_bubble_bar_not_collapsed_if_animating_bubble"
+    namespace: "multitasking"
+    description: "Fixes bubble bar collapse failure when setExpandedFromSysui() is called while a bubble is animating."
+    bug: "487678424"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "fix_bubble_notification_showing_in_lock_screen"
     namespace: "multitasking"
     description: "Fixes a bug where bubble notification persist on lock screen"
     bug: "466186520"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_bar_flick_on_pinning_animation"
+    namespace: "multitasking"
+    description: "Fixes bubble flickering issue on the taskbar pinning animation completion"
+    bug: "484396747"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -403,6 +434,16 @@ flag {
 }
 
 flag {
+    name: "fix_taskbar_scrim_view_on_home"
+    namespace: "multitasking"
+    description: "Fixes taskbar scrim view when bubbles are expanded on Launcher home screen"
+    bug: "492048302"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "fix_bubbles_stashing_on_home"
     namespace: "multitasking"
     description: "Fixes a bug where bubbles could be stashed on launcher home"
@@ -417,6 +458,16 @@ flag {
     namespace: "multitasking"
     description: "Fixes bubble issues when transitioning between modes due to repeated folding and unfolding"
     bug: "450107220"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubbles_handle_user_education"
+    namespace: "multitasking"
+    description: "Fixes an issue where user education didn't dismiss"
+    bug: "490187640"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

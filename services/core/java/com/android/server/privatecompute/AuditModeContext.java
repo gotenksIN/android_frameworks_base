@@ -16,6 +16,8 @@
 
 package com.android.server.privatecompute;
 
+import static android.os.UserHandle.USER_SYSTEM;
+
 import android.os.Binder;
 import android.os.SystemClock;
 import com.android.internal.annotations.GuardedBy;
@@ -125,6 +127,10 @@ class AuditModeContext {
         return Executors.newFixedThreadPool(N_THREADS);
     }
 
+    private static File getAuditLogFilesDirectory() {
+        return new File(Environment.getDataSystemCeDirectory(), AUDIT_LOG_FILES_DIRNAME);
+    }
+
     /**
      * Instantiates an AuditModeContext, including an output stream to the audit log file, or
      * returns null if an error occurred.
@@ -136,6 +142,11 @@ class AuditModeContext {
                 getDiskWriterExecutorService(),
                 folder,
                 new Injector());
+    }
+
+    /** Deletes all audit log files from the default audit log directory. */
+    static void deleteAuditLogFiles() {
+        AuditLogFileManager.deleteAuditLogFiles(getAuditLogFilesDirectory());
     }
 
     @VisibleForTesting
@@ -206,7 +217,6 @@ class AuditModeContext {
                 return;
             }
             if (!mAuditLogInMemoryBuffer.add(data)) {
-
                 try {
                     // Can't be added to this file, write it to disk and create a new one.
                     mDiskWriterExecutor.execute(mAuditLogInMemoryBuffer::writeToFile);

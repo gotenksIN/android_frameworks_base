@@ -2,6 +2,7 @@ package com.android.systemui.scene
 
 import android.content.res.mainResources
 import com.android.compose.animation.scene.ObservableTransitionState
+import com.android.systemui.accessibility.domain.interactor.accessibilityInteractor
 import com.android.systemui.classifier.domain.interactor.falsingInteractor
 import com.android.systemui.communal.domain.interactor.communalSettingsInteractor
 import com.android.systemui.desktop.domain.interactor.desktopInteractor
@@ -32,6 +33,7 @@ import com.android.systemui.scene.ui.viewmodel.SceneContainerToastDisplayer
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneTransitionBlurViewModel
 import com.android.systemui.scene.ui.viewmodel.dualShadeEducationalTooltipsViewModelFactory
+import com.android.systemui.scene.ui.viewmodel.toBouncerTransitionViewModelFactory
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.domain.interactor.remoteInputInteractor
@@ -153,10 +155,12 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 animateQsTilesViewModelFactory = animateQsTilesViewModelFactory,
                 sceneTransitionBlurViewModelFactory = sceneTransitionBlurViewModelFactory,
                 toastDisplayer = { sceneContainerToastDisplayer },
+                toBouncerTransitionViewModelFactory = toBouncerTransitionViewModelFactory,
                 burnInMovementFactory =
                     object : BurnInMovementState.Factory {
                         override fun create() = BurnInMovementState(aodBurnInViewModel)
                     },
+                accessibilityInteractor = accessibilityInteractor,
             )
     }
 }

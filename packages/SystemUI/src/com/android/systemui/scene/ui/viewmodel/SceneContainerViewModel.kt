@@ -34,7 +34,7 @@ import com.android.compose.animation.scene.SwipeSourceDetector
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
-import com.android.systemui.Flags
+import com.android.systemui.accessibility.domain.interactor.AccessibilityInteractor
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
@@ -97,9 +97,11 @@ constructor(
     val burnInMovementFactory: BurnInMovementState.Factory,
     val dualShadeEducationalTooltipsViewModelFactory: DualShadeEducationalTooltipsViewModel.Factory,
     val animateQsTilesViewModelFactory: AnimateQsTilesViewModel.Factory,
+    toBouncerTransitionViewModelFactory: ToBouncerTransitionViewModel.Factory,
     sceneTransitionBlurViewModelFactory: SceneTransitionBlurViewModel.Factory,
     private val toastDisplayer: Lazy<SceneContainerToastDisplayer>,
     @Assisted private val motionEventHandlerReceiver: (MotionEventHandler?) -> Unit,
+    private val accessibilityInteractor: AccessibilityInteractor,
 ) : ExclusiveActivatable() {
 
     /** The scene that should be rendered. */
@@ -108,6 +110,7 @@ constructor(
 
     private val hydrator = Hydrator("SceneContainerViewModel.hydrator")
     val blurViewModel: SceneTransitionBlurViewModel = sceneTransitionBlurViewModelFactory.create()
+    val toBouncerTransitionViewModel = toBouncerTransitionViewModelFactory.create()
 
     /** Whether the container is visible. */
     val isVisible: Boolean
@@ -169,21 +172,33 @@ constructor(
             initialValue = 1f,
         )
 
+    private val accessibilityEnabled: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "accessibilityEnabled",
+            initialValue = false,
+            source = accessibilityInteractor.isEnabledFiltered,
+        )
+
     val accessibilityTitle: Int?
         @StringRes
         get() {
-            val overlays = sceneInteractor.transitionState.currentOverlays
-            val topmostOverlay = if (overlays.isNotEmpty()) overlays.last() else null
-            return when {
-                topmostOverlay == Overlays.NotificationsShade ->
-                    R.string.accessibility_desc_notification_shade
-                topmostOverlay == Overlays.QuickSettingsShade ->
-                    R.string.accessibility_desc_quick_settings
-                topmostOverlay == Overlays.Bouncer -> null
-                currentScene == Scenes.Shade -> R.string.accessibility_desc_notification_shade
-                currentScene == Scenes.QuickSettings -> R.string.accessibility_desc_quick_settings
-                currentScene == Scenes.Lockscreen -> R.string.accessibility_desc_lock_screen
-                else -> null
+            if (accessibilityEnabled) {
+                val overlays = sceneInteractor.transitionState.currentOverlays
+                val topmostOverlay = if (overlays.isNotEmpty()) overlays.last() else null
+                return when {
+                    topmostOverlay == Overlays.NotificationsShade ->
+                        R.string.accessibility_desc_notification_shade
+                    topmostOverlay == Overlays.QuickSettingsShade ->
+                        R.string.accessibility_desc_quick_settings
+                    topmostOverlay == Overlays.Bouncer -> null
+                    currentScene == Scenes.Shade -> R.string.accessibility_desc_notification_shade
+                    currentScene == Scenes.QuickSettings ->
+                        R.string.accessibility_desc_quick_settings
+                    currentScene == Scenes.Lockscreen -> R.string.accessibility_desc_lock_screen
+                    else -> null
+                }
+            } else {
+                return null
             }
         }
 
@@ -295,18 +310,10 @@ constructor(
             shadeModeInteractor.isDualShade &&
                 isDesktopStatusBarEnabled &&
                 event.action == MotionEvent.ACTION_OUTSIDE &&
-                sceneInteractor.currentOverlays.value.isNotEmpty()
+                sceneInteractor.transitionState.currentOverlays.isNotEmpty() &&
+                sceneInteractor.transitionState.isIdle()
         ) {
-            if (Flags.fixSceneContainerActionOutsideTouch()) {
-                if (currentScene == Scenes.Lockscreen) {
-                    val statusBarHeight = resources.getDimensionPixelSize(R.dimen.status_bar_height)
-                    if (event.y <= statusBarHeight) {
-                        return
-                    }
-                }
-            }
-
-            sceneInteractor.currentOverlays.value.forEach {
+            sceneInteractor.transitionState.currentOverlays.forEach {
                 sceneInteractor.hideOverlay(it, "Empty space touch")
             }
         }

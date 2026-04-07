@@ -848,14 +848,12 @@ class SupervisionServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SUPERVISION_APP_SERVICE)
     fun registerAndUnregisteSupervisionListener() {
         val (listener, binder) = registerSupervisionListenerForUser(USER_ID)
         unregisterSupervisionListener(listener, binder)
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SUPERVISION_APP_SERVICE)
     fun setSupervisionEnabledForUser_notifiesSupervisionListeners_multipleUsers() {
         val listeners = buildMap {
             userData.keys.forEach { userId ->
@@ -1727,7 +1725,7 @@ class SupervisionServiceTest {
     fun onBootCompleted_sameVersion_doesNotUpgrade() {
         val settings =
             loadSupervisionSettings(
-                ServicestestsR.xml.supervision_settings_v_current,
+                ServicestestsR.xml.supervision_settings_current_version,
                 SupervisionSettings.VERSION,
             )
 

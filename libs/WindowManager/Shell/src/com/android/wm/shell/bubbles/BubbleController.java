@@ -765,9 +765,7 @@ public class BubbleController implements ConfigurationChangeListener,
             }
             mIsPrevNavModeGestures = isCurrentNavModeGestures;
             BubbleBarUpdate update = mBubbleData.getInitialStateForBubbleBar();
-            if (Flags.sendBubbleRootTaskIdToLauncher()) {
-                update.bubbleRootTaskId = mBubbleHelper.getAppBubbleRootTaskId();
-            }
+            update.bubbleRootTaskId = mBubbleHelper.getAppBubbleRootTaskId();
             mBubbleStateListener.onBubbleStateChange(update);
         }
     }
@@ -850,10 +848,12 @@ public class BubbleController implements ConfigurationChangeListener,
     @VisibleForTesting
     public void onStatusBarStateChanged(boolean isShade) {
         boolean didChange = mIsStatusBarShade != isShade;
-        BubbleLog.d("BubbleController.onStatusBarStateChanged() "
-                        + "isShade=%b didChange=%b mNotifEntryToExpandOnShadeUnlock=%s",
-                isShade, didChange, (mNotifEntryToExpandOnShadeUnlock != null
-                        ? mNotifEntryToExpandOnShadeUnlock.getKey() : "null"));
+        if (hasBubbles()) {
+            BubbleLog.d("BubbleController.onStatusBarStateChanged() "
+                            + "isShade=%b didChange=%b mNotifEntryToExpandOnShadeUnlock=%s",
+                    isShade, didChange, (mNotifEntryToExpandOnShadeUnlock != null
+                            ? mNotifEntryToExpandOnShadeUnlock.getKey() : "null"));
+        }
         mIsStatusBarShade = isShade;
         if (!mIsStatusBarShade && didChange) {
             if (mBubbleData.isExpanded()) {
@@ -2176,8 +2176,9 @@ public class BubbleController implements ConfigurationChangeListener,
                 ? mBubbleBarViewCallback
                 : mBubbleStackViewCallback;
 
-        // reset the overflow so that it can be re-added later if needed.
         if (mStackView != null) {
+            mStackView.cancelClipAnimation();
+            // reset the overflow so that it can be re-added later if needed.
             mStackView.resetOverflowView();
             mStackView.removeAllViews();
         }
@@ -3222,8 +3223,11 @@ public class BubbleController implements ConfigurationChangeListener,
             if (getDisplayId() != mContext.getDisplayId()) {
                 return;
             }
-            BubbleLog.d("BubbleController.BubblesImeListener.onImeVisibilityChanged visible=%b"
-                    + " runnable=%s stackView=%s", imeVisible, mOnImeHidden, mStackView);
+            if (mOnImeHidden != null || mStackView != null) {
+                // Only log if there's something relevant to log
+                BubbleLog.d("BubbleController.BubblesImeListener.onImeVisibilityChanged visible=%b"
+                        + " runnable=%s stackView=%s", imeVisible, mOnImeHidden, mStackView);
+            }
             boolean heightChanged = imeHeight != mBubblePositioner.getImeHeight();
             // the imeHeight here is actually the ime inset; it only includes the part of the ime
             // that overlaps with the Bubbles window. adjust it to include the bottom screen inset,

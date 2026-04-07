@@ -59,6 +59,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
+import android.app.ActivityManager.ProcessState;
 import android.app.ActivityThread;
 import android.app.ApplicationExitInfo;
 import android.app.BackgroundStartPrivileges;
@@ -175,10 +176,14 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     private IApplicationThread mThread;
     // Currently desired scheduling class
     private volatile @SchedGroup int mCurSchedGroup;
-    // Currently computed process state
-    private volatile int mCurProcState = PROCESS_STATE_NONEXISTENT;
+    /**
+     * Currently computed process state.
+     * When {@link com.android.server.am.Flags#encapsulateCurProcState()} is enabled, the value is
+     * updated after the computation is done.
+     */
+    private volatile @ProcessState int mCurProcState = PROCESS_STATE_NONEXISTENT;
     // Last reported process state;
-    private volatile int mRepProcState = PROCESS_STATE_NONEXISTENT;
+    private volatile @ProcessState int mRepProcState = PROCESS_STATE_NONEXISTENT;
     // Currently computed oom adj score
     private volatile @OomAdjust int mCurAdj = INVALID_ADJ;
     // are we in the process of crashing?
@@ -434,6 +439,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             } else {
                 // The process is inactive.
                 mAtm.mVisibleActivityProcessTracker.removeProcess(this);
+                mAtm.removeProcessFromStoppingMap(getPackageList(), mPid);
             }
         }
     }
@@ -450,6 +456,16 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mCurSchedGroup;
     }
 
+    /**
+     * Sets the current process state.
+     *
+     * @param procState The new process state.
+     */
+    public void setCurrentProcState(@ProcessState int procState) {
+        mCurProcState = procState;
+    }
+
+    @ProcessState
     int getCurrentProcState() {
         return mCurProcState;
     }
@@ -464,8 +480,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
      * called in activity manager's lock, so don't use window manager lock here.
      */
     @HotPath(caller = HotPath.OOM_ADJUSTMENT)
-    public void setReportedProcState(int repProcState) {
-        final int prevProcState = mRepProcState;
+    public void setReportedProcState(@ProcessState int repProcState) {
+        final @ProcessState int prevProcState = mRepProcState;
         mRepProcState = repProcState;
 
         // Deliver the cached config if the app changes from cached state to non-cached state.
@@ -485,7 +501,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
     }
 
-    int getReportedProcState() {
+    @ProcessState int getReportedProcState() {
         return mRepProcState;
     }
 
@@ -2200,12 +2216,12 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     }
 
     @Override
-    public void onCurProcStateChanged(int curProcState) {
+    public void onCurProcStateChanged(@ProcessState int curProcState) {
         mCurProcState = curProcState;
     }
 
     @Override
-    public void onReportedProcStateChanged(int repProcState) {
+    public void onReportedProcStateChanged(@ProcessState int repProcState) {
         setReportedProcState(repProcState);
     }
 

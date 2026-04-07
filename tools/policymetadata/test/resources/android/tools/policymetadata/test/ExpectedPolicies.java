@@ -16,13 +16,16 @@
 
 package android.app.admin.metadata;
 
+import static android.app.admin.PolicyIdentifier.FLAGGED_POLICY;
 import static android.app.admin.PolicyIdentifier.MOST_RESTRICTIVE_ENUM_POLICY;
+import static android.app.admin.PolicyIdentifier.NOT_COEXISTANT_ENUM_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_BOOLEAN_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_ENUM_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY_WITH_RANGE;
 import static android.app.admin.PolicyIdentifier.SIMPLE_LONG_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_LONG_POLICY_WITH_RANGE;
+import static android.app.admin.PolicyIdentifier.SIMPLE_PACKAGE_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_LIST_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_POLICY;
 import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_ALLOWED;
@@ -272,6 +275,18 @@ public class Policies {
             /* minValue= */ Integer.MIN_VALUE,
             /* maxValue= */ Integer.MAX_VALUE
         ));
+        policies.add(new IntegerPolicyMetadata(
+            /* id= */ FLAGGED_POLICY,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null,
+            /* allowedDpcTypes= */ Set.of(),
+            /* minValue= */ Integer.MIN_VALUE,
+            /* maxValue= */ Integer.MAX_VALUE
+        ));
         policies.add(new LongPolicyMetadata(
             /* id= */ SIMPLE_LONG_POLICY,
             /* allowedScopes= */ Set.of(
@@ -305,7 +320,8 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(),
-            /* emptyStringAllowed= */ false
+            /* emptyStringAllowed= */ false,
+            /* unprintableCharactersAllowed= */ true
         ));
         policies.add(new ListPolicyMetadata<String>(
             /* id= */ SIMPLE_STRING_LIST_POLICY,
@@ -318,9 +334,38 @@ public class Policies {
                 /* requiredPermission= */ null,
                 /* requiredCrossUserPermission= */ null,
                 /* allowedDpcTypes= */ Set.of(),
-                /* emptyStringAllowed= */ true
+                /* emptyStringAllowed= */ true,
+                /* unprintableCharactersAllowed= */ false
             ),
+            /* resolutionMechanism= */ null,
             /* emptyListAllowed= */ false
+        ));
+        policies.add(new PackagePolicyMetadata(
+            /* id= */ SIMPLE_PACKAGE_POLICY,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null,
+            /* allowedDpcTypes= */ Set.of()
+        ));
+        policies.add(new EnumPolicyMetadata(
+            /* id= */ NOT_COEXISTANT_ENUM_POLICY,
+            /* allowedScopes= */ Set.of(
+                2,
+                3
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ "android.permission.MANAGE_POLICY_SIMPLE_ENUM",
+            /* requiredCrossUserPermission= */ "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS",
+            /* allowedDpcTypes= */ Set.of(),
+            /* resolutionMechanism= */ new ResolutionMechanismMetadata.NotCoexistable(),
+            /* allowedValues= */ Set.of(
+                0,
+                1,
+                2
+            )
         ));
         return policies;
     }

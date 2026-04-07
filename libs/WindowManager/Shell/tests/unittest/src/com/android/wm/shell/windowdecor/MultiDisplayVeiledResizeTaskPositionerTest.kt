@@ -44,6 +44,7 @@ import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController
 import com.android.wm.shell.common.MultiDisplayTestUtil.TestDisplay
+import com.android.wm.shell.desktopmode.DesktopScrimController
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.data.DesktopRepository
@@ -105,6 +106,7 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
     private val mockDesktopUserRepositories = mock<DesktopUserRepositories>()
     private val mockDesktopRepository = mock<DesktopRepository>()
     private val mockResizeBinder = mock<IBinder>()
+    private val mockDesktopScrimController = mock<DesktopScrimController>()
     private lateinit var resources: TestableResources
     private lateinit var spyDisplayLayout0: DisplayLayout
     private lateinit var spyDisplayLayout1: DisplayLayout
@@ -169,6 +171,8 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
         whenever(mockDisplay.displayId).thenAnswer { DISPLAY_ID_0 }
         whenever(mockDesktopUserRepositories.getProfile(anyInt())).thenReturn(mockDesktopRepository)
         whenever(mockTransitions.startTransition(any(), any(), any())).thenReturn(mockResizeBinder)
+        whenever(mockDesktopTasksController.getDesktopScrimController())
+            .thenReturn(mockDesktopScrimController)
 
         taskPositioner =
             MultiDisplayVeiledResizeTaskPositioner(
@@ -835,8 +839,8 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
             moveBounds.bottom.toFloat(),
         )
 
-        verify(mockDesktopTasksController)
-            .updateTaskbarRoundingOnTaskResize(DISPLAY_ID_0, TASK_ID, moveBounds)
+        verify(mockDesktopScrimController)
+            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, moveBounds)
     }
 
     @Test
@@ -864,10 +868,86 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
             secondMoveBounds.bottom.toFloat() + 100,
         )
 
-        verify(mockDesktopTasksController)
-            .updateTaskbarRoundingOnTaskResize(DISPLAY_ID_0, TASK_ID, firstmoveBounds)
-        verify(mockDesktopTasksController, never())
-            .updateTaskbarRoundingOnTaskResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
+        verify(mockDesktopScrimController)
+            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, firstmoveBounds)
+        verify(mockDesktopScrimController, never())
+            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_UPDATE_DESKTOP_SCRIM_ON_DRAG_RESIZE_END)
+    fun testDragResize_desktopScrimIsUpdatedOnDragPositioningEnd() = runOnUiThread {
+        val firstMoveBounds = Rect(STARTING_BOUNDS)
+        firstMoveBounds.union(firstMoveBounds.right + 100, firstMoveBounds.bottom + 100)
+        val secondMoveBounds = Rect(firstMoveBounds)
+        secondMoveBounds.union(secondMoveBounds.right + 100, secondMoveBounds.bottom + 100)
+        taskPositioner.onDragPositioningStart(
+            CTRL_TYPE_RIGHT or CTRL_TYPE_BOTTOM,
+            DISPLAY_ID_0,
+            STARTING_BOUNDS.right.toFloat(),
+            STARTING_BOUNDS.bottom.toFloat(),
+            INPUT_METHOD_TYPE_UNKNOWN,
+        )
+
+        taskPositioner.onDragPositioningMove(
+            DISPLAY_ID_0,
+            firstMoveBounds.right.toFloat(),
+            firstMoveBounds.bottom.toFloat(),
+        )
+        taskPositioner.onDragPositioningMove(
+            DISPLAY_ID_0,
+            secondMoveBounds.right.toFloat(),
+            secondMoveBounds.bottom.toFloat(),
+        )
+
+        verify(mockDesktopScrimController, never())
+            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
+
+        taskPositioner.onDragPositioningEnd(
+            DISPLAY_ID_0,
+            secondMoveBounds.right.toFloat(),
+            secondMoveBounds.bottom.toFloat(),
+        )
+
+        // Desktop scrim is updated at the end of drag-resize.
+        verify(mockDesktopScrimController, times(1))
+            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
+    }
+
+    @Test
+    fun testDragMove_desktopScrimIsNotUpdatedOnDragPositioningEnd() = runOnUiThread {
+        val firstMoveBounds = Rect(STARTING_BOUNDS)
+        firstMoveBounds.union(firstMoveBounds.right + 100, firstMoveBounds.bottom + 100)
+        val secondMoveBounds = Rect(firstMoveBounds)
+        secondMoveBounds.union(secondMoveBounds.right + 100, secondMoveBounds.bottom + 100)
+        taskPositioner.onDragPositioningStart(
+            CTRL_TYPE_UNDEFINED,
+            DISPLAY_ID_0,
+            STARTING_BOUNDS.right.toFloat(),
+            STARTING_BOUNDS.bottom.toFloat(),
+            INPUT_METHOD_TYPE_UNKNOWN,
+        )
+
+        taskPositioner.onDragPositioningMove(
+            DISPLAY_ID_0,
+            firstMoveBounds.right.toFloat(),
+            firstMoveBounds.bottom.toFloat(),
+        )
+        taskPositioner.onDragPositioningMove(
+            DISPLAY_ID_0,
+            secondMoveBounds.right.toFloat(),
+            secondMoveBounds.bottom.toFloat(),
+        )
+
+        taskPositioner.onDragPositioningEnd(
+            DISPLAY_ID_0,
+            secondMoveBounds.right.toFloat(),
+            secondMoveBounds.bottom.toFloat(),
+        )
+
+        // Desktop scrim is not updated at the end of drag-move.
+        verify(mockDesktopScrimController, never())
+            .updateDesktopScrimOnResize(DISPLAY_ID_0, TASK_ID, secondMoveBounds)
     }
 
     @Test

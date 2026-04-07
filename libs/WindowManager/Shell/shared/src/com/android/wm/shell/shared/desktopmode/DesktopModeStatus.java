@@ -56,7 +56,8 @@ public class DesktopModeStatus {
     /**
      * Flag to indicate whether to restrict desktop mode to supported devices.
      */
-    private static final boolean ENFORCE_DEVICE_RESTRICTIONS = SystemProperties.getBoolean(
+    // Non-final: field is overwritten in DesktopModeStatusTest.
+    private static boolean ENFORCE_DEVICE_RESTRICTIONS = SystemProperties.getBoolean(
             "persist.wm.debug.desktop_mode_enforce_device_restrictions", true);
 
     /**
@@ -250,9 +251,6 @@ public class DesktopModeStatus {
     public static boolean enterDesktopByDefaultOnFreeformDisplay(@NonNull Context context) {
         if (DesktopExperienceFlags.ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX.isTrue()) {
             return true;
-        }
-        if (!DesktopExperienceFlags.ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS.isTrue()) {
-            return false;
         }
         return SystemProperties.getBoolean(ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAY_SYS_PROP,
                 context.getResources().getBoolean(

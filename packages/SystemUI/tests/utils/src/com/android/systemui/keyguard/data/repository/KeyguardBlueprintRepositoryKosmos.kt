@@ -93,6 +93,7 @@ val Kosmos.defaultKeyguardBlueprint by
 // QTI_BEGIN: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
             defaultEmergencyButtonSection = mock(),
 // QTI_END: 2025-02-09: Android_UI: SystemUI: Refactor Emergency button on keyguard
+            batteryChargingPopupMenuSection = mock(),
         )
     }
 
@@ -115,6 +116,7 @@ val Kosmos.splitShadeBlueprint by
             smartspaceSection = keyguardSmartspaceSection,
             mediaSection = mock(),
             accessibilityActionsSection = mock(),
+            batteryChargingPopupMenuSection = mock(),
         )
     }
 

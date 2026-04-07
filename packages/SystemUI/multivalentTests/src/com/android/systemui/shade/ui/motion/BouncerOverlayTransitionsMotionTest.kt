@@ -20,7 +20,6 @@ import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.MotionTest
 import android.testing.TestableLooper.RunWithLooper
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -38,7 +37,9 @@ import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.biometrics.authController
 import com.android.systemui.bouncer.ui.composable.Bouncer
-import com.android.systemui.bouncer.ui.composable.BouncerMotionTestKeys
+import com.android.systemui.bouncer.ui.composable.BouncerMotionTestKeys.bouncerActionButtonAlpha
+import com.android.systemui.bouncer.ui.composable.BouncerMotionTestKeys.bouncerActionButtonTranslationY
+import com.android.systemui.bouncer.ui.composable.BouncerMotionTestKeys.bouncerContentAlpha
 import com.android.systemui.bouncer.ui.composable.BouncerOverlay
 import com.android.systemui.bouncer.ui.composable.BouncerSceneContainer
 import com.android.systemui.bouncer.ui.viewmodel.BouncerOverlayContentViewModel
@@ -82,6 +83,7 @@ import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.view.sceneJankMonitorFactory
 import com.android.systemui.scene.ui.view.sceneTransitionLatencyMonitor
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
+import com.android.systemui.scene.ui.viewmodel.toBouncerTransitionViewModel
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.phone.KeyguardStatusBarViewController
@@ -104,10 +106,7 @@ import platform.test.motion.compose.MotionControl
 import platform.test.motion.compose.feature
 import platform.test.motion.compose.recordMotion
 import platform.test.motion.compose.runTest
-import platform.test.motion.compose.values.MotionTestValueKey
-import platform.test.motion.golden.FeatureCapture
-import platform.test.motion.golden.TimeSeriesCaptureScope
-import platform.test.motion.golden.asDataPoint
+import platform.test.motion.golden.dataPointType
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.Displays.Phone
 
@@ -116,6 +115,7 @@ import platform.test.screenshot.Displays.Phone
 @LargeTest
 @RunWithLooper
 @EnableSceneContainer
+@Ignore("b/481758025")
 class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val deviceSpec = DeviceEmulationSpec(Phone)
@@ -243,9 +243,9 @@ class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
                             }
                         ) {
                             featureOfElement(Bouncer.Elements.Background, elementAlpha)
-                            featureFloat(BouncerMotionTestKeys.bouncerActionButtonTranslationY)
-                            featureFloat(BouncerMotionTestKeys.bouncerActionButtonAlpha)
-                            featureFloat(BouncerMotionTestKeys.bouncerContentAlpha)
+                            feature(bouncerActionButtonTranslationY, Float.dataPointType)
+                            feature(bouncerActionButtonAlpha, Float.dataPointType)
+                            feature(bouncerContentAlpha, Float.dataPointType)
                         },
                 )
             assertThat(motion).timeSeriesMatchesGolden()
@@ -272,6 +272,7 @@ class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
                     BouncerSceneContainer(
                         state = bouncerSceneContainerState,
                         bouncerOverlay = bouncerOverlay,
+                        toBouncerTransitionViewModel = kosmos.toBouncerTransitionViewModel,
                     )
                     SceneContainer(
                         viewModel = vm,
@@ -387,21 +388,6 @@ class BouncerOverlayTransitionsMotionTest : SysuiTestCase() {
                     fromOrToScene = vm.currentScene,
                     overlay = Overlays.Bouncer,
                 )
-            )
-        }
-    }
-
-    private companion object {
-        fun TimeSeriesCaptureScope<SemanticsNodeInteractionsProvider>.featureFloat(
-            motionTestValueKey: MotionTestValueKey<Float>
-        ) {
-            feature(
-                motionTestValueKey = motionTestValueKey,
-                capture =
-                    FeatureCapture(motionTestValueKey.semanticsPropertyKey.name) {
-                        it.asDataPoint()
-                    },
-                name = motionTestValueKey.semanticsPropertyKey.name,
             )
         }
     }

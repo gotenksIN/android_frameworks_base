@@ -555,10 +555,8 @@
     <string name="permdesc_backgroundCamera" msgid="1615291686191138250">"האפליקציה הזו יכולה להשתמש במצלמה כדי לצלם תמונות וסרטונים בכל זמן."</string>
     <string name="permlab_systemCamera" msgid="3642917457796210580">"הרשאת גישה למצלמות המערכת עבור אפליקציה או שירות כדי לצלם תמונות וסרטונים"</string>
     <string name="permdesc_systemCamera" msgid="5938360914419175986">"‏האפליקציה הזו בעלת ההרשאות, או אפליקציית המערכת הזו, יכולה לצלם תמונות ולהקליט סרטונים באמצעות מצלמת מערכת בכל זמן. בנוסף, לאפליקציה נדרשת ההרשאה android.permission.CAMERA"</string>
-    <!-- no translation found for permlab_warmUpCamera (6135692056406854923) -->
-    <skip />
-    <!-- no translation found for permdesc_warmUpCamera (925343364567764736) -->
-    <skip />
+    <string name="permlab_warmUpCamera" msgid="6135692056406854923">"אפליקציה או שירות יוכלו לשלוח אות הפעלה למערכת המשנה של המצלמה"</string>
+    <string name="permdesc_warmUpCamera" msgid="925343364567764736">"האפליקציה הזו עם ההרשאות, או אפליקציית המערכת הזו, יכולות לשלוח אות למערכת המשנה של המצלמה כדי להפעיל את מכשיר המצלמה ולשפר את הביצועים, וזה אחד היתרונות כאן"</string>
     <string name="permlab_cameraOpenCloseListener" msgid="5548732769068109315">"‏אפליקציה או שירות יוכלו לקבל קריאות חוזרות (callback) כשמכשירי מצלמה ייפתחו או ייסגרו."</string>
     <string name="permdesc_cameraOpenCloseListener" msgid="2002636131008772908">"‏האפליקציה הזו יכולה לקבל קריאות חוזרות (callback) כשמכשיר מצלמה כלשהו נפתח (באמצעות אפליקציה) או נסגר."</string>
     <string name="permlab_cameraHeadlessSystemUser" msgid="680194666834500050">"מתן גישה למצלמת המערכת עבור אפליקציה או שירות כמשתמש באפליקציית מערכת ללא ממשק גרפי"</string>
@@ -1807,7 +1805,7 @@
     <string name="kg_pattern_instructions" msgid="8366024510502517748">"צריך לשרטט את קו ביטול הנעילה"</string>
     <string name="kg_sim_pin_instructions" msgid="6479401489471690359">"‏יש להזין את קוד האימות של ה-SIM"</string>
     <string name="kg_pin_instructions" msgid="7355933174673539021">"יש להזין קוד אימות"</string>
-    <string name="kg_password_instructions" msgid="7179782578809398050">"יש להזין את הסיסמה"</string>
+    <string name="kg_password_instructions" msgid="7179782578809398050">"מה הסיסמה?"</string>
     <string name="kg_puk_enter_puk_hint" msgid="6696187482616360994">"‏כרטיס ה-SIM מושבת כרגע. צריך להזין קוד PUK כדי להמשיך. יש לפנות אל הספק לקבלת פרטים."</string>
     <string name="kg_puk_enter_pin_hint" msgid="8190982314659429770">"צריך להזין את קוד האימות הרצוי"</string>
     <string name="kg_enter_confirm_pin_hint" msgid="6372557107414074580">"יש לאשר את קוד האימות הרצוי"</string>
@@ -2117,6 +2115,12 @@
     <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
     <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
     <string name="notification_metric_label_separator" msgid="8416027475779515033">"‫<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
+    <!-- no translation found for notification_history_metric_subtext (7408216222655116821) -->
+    <skip />
+    <!-- no translation found for notification_metric_running_timer (1096459900744921213) -->
+    <skip />
+    <!-- no translation found for notification_metric_running_stopwatch (8039546029949295377) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"מענה"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"וידאו"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"דחייה"</string>
@@ -2661,7 +2665,7 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"‏כדי להעביר הודעות באמצעות לוויין, צריך להגדיר את Google Messages כאפליקציית ברירת המחדל להודעות"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"התכונה \"העברת הודעות באמצעות לוויין\" לא זמינה"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"כדי לבדוק אם התכונה \"העברת הודעות באמצעות לוויין\" זמינה במדינה או באזור שלך, צריך להפעיל את הגדרות המיקום"</string>
-    <string name="satellite_indicator" msgid="6846063647532086110">"SAT"</string>
+    <string name="satellite_indicator" msgid="6846063647532086110">"לוויין"</string>
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"הגדרה חוזרת של \'ביטול הנעילה בטביעת אצבע\'"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"כבר לא ניתן לזהות את <xliff:g id="FINGERPRINT">%s</xliff:g>."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"כבר לא ניתן לזהות את <xliff:g id="FINGERPRINT_0">%1$s</xliff:g> ואת <xliff:g id="FINGERPRINT_1">%2$s</xliff:g>."</string>

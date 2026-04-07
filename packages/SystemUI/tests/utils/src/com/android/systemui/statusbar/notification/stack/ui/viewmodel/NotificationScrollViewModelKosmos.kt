@@ -16,8 +16,10 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
+import android.content.applicationContext
 import com.android.systemui.brightness.domain.interactor.brightnessMirrorShowingInteractor
 import com.android.systemui.common.ui.configurationState
+import com.android.systemui.common.ui.domain.interactor.configurationInteractor
 import com.android.systemui.dump.dumpManager
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.kosmos.Kosmos
@@ -28,7 +30,7 @@ import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.domain.interactor.remoteInputInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.headsUpNotificationInteractor
-import com.android.systemui.statusbar.notification.stack.domain.interactor.lockscreenNotificationDisplayConfigInteractor
+import com.android.systemui.statusbar.notification.stack.domain.interactor.lockscreenNotificationsInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.notificationStackAppearanceInteractor
 
 val Kosmos.notificationScrollViewModel by Fixture {
@@ -36,7 +38,7 @@ val Kosmos.notificationScrollViewModel by Fixture {
         dumpManager = dumpManager,
         configuration = configurationState,
         placeholderStateStorage = notificationPlaceholderStateStorage,
-        lockscreenAppearanceInteractor = lockscreenNotificationDisplayConfigInteractor,
+        lockscreenNotificationsInteractor = lockscreenNotificationsInteractor,
         stackAppearanceInteractor = notificationStackAppearanceInteractor,
         brightnessMirrorShowingInteractorLazy = { brightnessMirrorShowingInteractor },
         shadeInteractor = shadeInteractor,
@@ -45,5 +47,7 @@ val Kosmos.notificationScrollViewModel by Fixture {
         headsUpNotificationInteractor = headsUpNotificationInteractor,
         sceneInteractor = sceneInteractor,
         keyguardInteractor = { keyguardInteractor },
+        configurationInteractor = configurationInteractor,
+        context = applicationContext,
     )
 }

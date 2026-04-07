@@ -18,6 +18,7 @@ package android.processor.devicepolicy.test
 
 import android.processor.devicepolicy.DevicePolicyAnnotationProcessor
 import android.processor.devicepolicy.protos.PolicyMetadataList
+import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata.ListPolicyMetadata
 import com.google.common.base.Charsets
 import com.google.common.io.Resources
 import com.google.common.truth.extensions.proto.ProtoTruth.assertThat
@@ -93,7 +94,9 @@ class DevicePolicyAnnotationProcessorTest {
                 import android.processor.devicepolicy.EnumResolutionMechanism;
                 import android.processor.devicepolicy.IntegerPolicyDefinition;
                 import android.processor.devicepolicy.ListOfStringPolicyDefinition;
+                import android.processor.devicepolicy.ListResolutionMechanism;
                 import android.processor.devicepolicy.LongPolicyDefinition;
+                import android.processor.devicepolicy.PackagePolicyDefinition;
                 import android.processor.devicepolicy.PolicyDefinition;
                 import android.processor.devicepolicy.StringPolicyDefinition;
 
@@ -536,7 +539,8 @@ class DevicePolicyAnnotationProcessorTest {
         compileExpectError(
             policyIdentifier,
             expectedError =
-                "In @EnumResolutionMechanism, either `custom` or `mostRestrictive` must be set",
+                "In @EnumResolutionMechanism, a resolution mechanism must " +
+                "be set.",
         )
     }
 
@@ -584,8 +588,8 @@ class DevicePolicyAnnotationProcessorTest {
         compileExpectError(
             policyIdentifier,
             expectedError =
-                "In @EnumResolutionMechanism, `custom` and `mostRestrictive` " +
-                    "can not be set together.",
+                "In @EnumResolutionMechanism, a single resolution mechanism " +
+                "can be selected.",
         )
     }
 
@@ -833,6 +837,166 @@ class DevicePolicyAnnotationProcessorTest {
 
         assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
         assertThat(compilation).succeeded()
+    }
+
+    @Test
+    fun test_packageProcessorWithoutPackageType_failsToCompile() {
+        val policyIdentifier =
+            buildPolicyIdentifier(
+                """
+                    /**
+                     * PackagePolicyDefinition can only be applied to policies of type PackageIdentifier.
+                     */
+                    @PackagePolicyDefinition(
+                            base = @PolicyDefinition(
+                                    allowedScopes = { POLICY_SCOPE_USER },
+                                    affectedResource = RESOURCE_DEVICE_WIDE,
+                                    $ALLOWED_DPC_TYPES_SNIPPET
+                            )
+                    )
+                    public static final PolicyIdentifier<String> POLICY_KEY =
+                        new PolicyIdentifier<>("POLICY_KEY");
+                """
+            )
+
+        compileExpectError(
+            policyIdentifier,
+            expectedError =
+                "@PackagePolicyDefinition can only be applied to policies of type " +
+                    "android.app.admin.PackageIdentifier",
+        )
+    }
+
+    @Test
+    fun test_listOfString_twoResolutionMechanisms_failsToCompile() {
+        val policyIdentifier =
+            buildPolicyIdentifier(
+                """
+                    /** Only one ResolutionMechanism can be selected.  */
+                    @ListOfStringPolicyDefinition(
+                            base = @StringPolicyDefinition(
+                                    base = @PolicyDefinition(
+                                        allowedScopes = { POLICY_SCOPE_USER },
+                                        affectedResource = RESOURCE_DEVICE_WIDE,
+                                        $ALLOWED_DPC_TYPES_SNIPPET
+                                    )
+                            ),
+                            resolutionMechanism = @ListResolutionMechanism(
+                                custom=true,
+                                union=true
+                            )
+                    )
+                    public static final PolicyIdentifier<List<String>> POLICY_KEY =
+                        new PolicyIdentifier<>("POLICY_KEY");
+                """
+            )
+
+        compileExpectError(
+            policyIdentifier,
+            expectedError = "Only one resolution mechanism can be selected",
+        )
+    }
+
+    @Test
+    fun test_listOfString_emptyResolutionMechanism_failsToCompile() {
+        val policyIdentifier =
+            buildPolicyIdentifier(
+                """
+                    /** ResolutionMechanism must not be empty.  */
+                    @ListOfStringPolicyDefinition(
+                            base = @StringPolicyDefinition(
+                                    base = @PolicyDefinition(
+                                        allowedScopes = { POLICY_SCOPE_USER },
+                                        affectedResource = RESOURCE_DEVICE_WIDE,
+                                        $ALLOWED_DPC_TYPES_SNIPPET
+                                    )
+                            ),
+                            resolutionMechanism = @ListResolutionMechanism()
+                    )
+                    public static final PolicyIdentifier<List<String>> POLICY_KEY =
+                        new PolicyIdentifier<>("POLICY_KEY");
+                """
+            )
+
+        compileExpectError(
+            policyIdentifier,
+            expectedError = "Resolution mechanism can not be empty",
+        )
+    }
+
+    @Test
+    fun test_listOfString_resolutionMechanism_custom_addedToTextProto() {
+        val policyIdentifier =
+            buildPolicyIdentifier(
+                """
+                    /** ResolutionMechanism custom */
+                    @ListOfStringPolicyDefinition(
+                            base = @StringPolicyDefinition(
+                                    base = @PolicyDefinition(
+                                        allowedScopes = { POLICY_SCOPE_USER },
+                                        affectedResource = RESOURCE_DEVICE_WIDE,
+                                        $ALLOWED_DPC_TYPES_SNIPPET
+                                    )
+                            ),
+                            resolutionMechanism = @ListResolutionMechanism(custom=true)
+                    )
+                    public static final PolicyIdentifier<List<String>> POLICY_KEY =
+                        new PolicyIdentifier<>("POLICY_KEY");
+                """
+            )
+
+        val generatedResolutionMechanism =
+            compileExpectSuccess(policyIdentifier).generatedProto()?.getListResolutionMechanism()
+
+        val expectedResolutionMechanism =
+            ListPolicyMetadata.ResolutionMechanism.newBuilder().setCustom(true).build()
+
+        assertThat(generatedResolutionMechanism).isEqualTo(expectedResolutionMechanism)
+    }
+
+    @Test
+    fun test_listOfString_resolutionMechanism_union_addedToTextProto() {
+        val policyIdentifier =
+            buildPolicyIdentifier(
+                """
+                    /** ResolutionMechanism union.  */
+                    @ListOfStringPolicyDefinition(
+                            base = @StringPolicyDefinition(
+                                    base = @PolicyDefinition(
+                                        allowedScopes = { POLICY_SCOPE_USER },
+                                        affectedResource = RESOURCE_DEVICE_WIDE,
+                                        $ALLOWED_DPC_TYPES_SNIPPET
+                                    )
+                            ),
+                            resolutionMechanism = @ListResolutionMechanism(union=true)
+                    )
+                    public static final PolicyIdentifier<List<String>> POLICY_KEY =
+                        new PolicyIdentifier<>("POLICY_KEY");
+                """
+            )
+
+        val generatedResolutionMechanism =
+            compileExpectSuccess(policyIdentifier).generatedProto()?.getListResolutionMechanism()
+
+        val expectedResolutionMechanism =
+            ListPolicyMetadata.ResolutionMechanism.newBuilder().setUnion(true).build()
+
+        assertThat(generatedResolutionMechanism).isEqualTo(expectedResolutionMechanism)
+    }
+
+    private fun PolicyMetadataList.getListResolutionMechanism():
+        ListPolicyMetadata.ResolutionMechanism? =
+        this.getPolicyMetadataList()
+            ?.getOrNull(0)
+            ?.getTypeSpecificMetadata()
+            ?.getListMetadata()
+            ?.getResolutionMechanism()
+
+    private fun compileExpectSuccess(file: JavaFileObject): Compilation {
+        val compilation: Compilation = mCompiler.compile(file)
+        assertThat(mCompilerWithoutProcessor.compile(file)).succeeded()
+        assertThat(compilation).succeeded()
+        return compilation
     }
 
     private fun compileExpectError(

@@ -16,10 +16,11 @@
 
 package android.companion.virtual.computercontrol;
 
-import android.annotation.Nullable;
 import android.annotation.NonNull;
-import android.app.PendingIntent;
+import android.annotation.Nullable;
 import android.app.AppInteractionAttribution;
+import android.app.PendingIntent;
+import android.companion.virtual.CompanionDeviceId;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -34,22 +35,25 @@ import java.util.List;
 public final class ComputerControlSessionParams implements Parcelable {
 
     private final String mName;
-    private final int mTargetExtensionVersion;
+    private final int mTargetComputerControlVersion;
     private final List<String> mTargetPackageNames;
     private final PendingIntent mPreviewIntent;
     private final AppInteractionAttribution mAppInteractionAttribution;
+    private final CompanionDeviceId mCompanionDeviceId;
 
     private ComputerControlSessionParams(
             @NonNull String name,
-            int targetExtensionVersion,
+            int targetComputerControlVersion,
             @NonNull List<String> targetPackageNames,
             @Nullable PendingIntent previewIntent,
-            @Nullable AppInteractionAttribution appInteractionAttribution) {
+            @Nullable AppInteractionAttribution appInteractionAttribution,
+            @Nullable CompanionDeviceId companionDeviceId) {
         mName = name;
-        mTargetExtensionVersion = targetExtensionVersion;
+        mTargetComputerControlVersion = targetComputerControlVersion;
         mTargetPackageNames = targetPackageNames;
         mPreviewIntent = previewIntent;
         mAppInteractionAttribution = appInteractionAttribution;
+        mCompanionDeviceId = companionDeviceId;
     }
 
     private ComputerControlSessionParams(Parcel parcel) {
@@ -58,7 +62,8 @@ public final class ComputerControlSessionParams implements Parcelable {
         parcel.readStringList(mTargetPackageNames);
         mPreviewIntent = parcel.readTypedObject(PendingIntent.CREATOR);
         mAppInteractionAttribution = parcel.readTypedObject(AppInteractionAttribution.CREATOR);
-        mTargetExtensionVersion = parcel.readInt();
+        mTargetComputerControlVersion = parcel.readInt();
+        mCompanionDeviceId = parcel.readTypedObject(CompanionDeviceId.CREATOR);
     }
 
     /** Returns the name of this computer control session. */
@@ -67,9 +72,9 @@ public final class ComputerControlSessionParams implements Parcelable {
         return mName;
     }
 
-    /** Returns the target extension version of the computer control session. */
-    public int getTargetExtensionVersion() {
-        return mTargetExtensionVersion;
+    /** Returns the target computer control version of the computer control session. */
+    public int getTargetComputerControlVersion() {
+        return mTargetComputerControlVersion;
     }
 
     /** Returns the package names of the applications that can be automated during this session. */
@@ -95,6 +100,14 @@ public final class ComputerControlSessionParams implements Parcelable {
         return mAppInteractionAttribution;
     }
 
+    /**
+     * Returns the companion device id of the device that is controlling this session.
+     */
+    @Nullable
+    public CompanionDeviceId getCompanionDeviceId() {
+        return mCompanionDeviceId;
+    }
+
     @Override
     public int describeContents() {
         return 0;
@@ -106,7 +119,8 @@ public final class ComputerControlSessionParams implements Parcelable {
         dest.writeStringList(mTargetPackageNames);
         dest.writeTypedObject(mPreviewIntent, flags);
         dest.writeTypedObject(mAppInteractionAttribution, flags);
-        dest.writeInt(mTargetExtensionVersion);
+        dest.writeInt(mTargetComputerControlVersion);
+        dest.writeTypedObject(mCompanionDeviceId, flags);
     }
 
     @NonNull
@@ -128,10 +142,11 @@ public final class ComputerControlSessionParams implements Parcelable {
     /** Builder for {@link ComputerControlSessionParams}. */
     public static final class Builder {
         private String mName;
-        private int mTargetExtensionVersion = 0;
+        private int mTargetComputerControlVersion = 0;
         private List<String> mTargetPackageNames;
         private PendingIntent mPreviewIntent;
         private AppInteractionAttribution mAppInteractionAttribution;
+        private CompanionDeviceId mCompanionDeviceId = null;
 
         /**
          * Sets the name of this computer control session.
@@ -193,14 +208,26 @@ public final class ComputerControlSessionParams implements Parcelable {
         }
 
         /**
-         * Sets the target extension version of the computer control session.
+         * Sets the companion device id of the device that is controlling this session.
          *
-         * @param targetExtensionVersion The target extension version.
+         * @param companionDeviceId The companion device id.
          * @return This builder.
          */
         @NonNull
-        public Builder setTargetExtensionVersion(int targetExtensionVersion) {
-            mTargetExtensionVersion = targetExtensionVersion;
+        public Builder setCompanionDeviceId(@Nullable CompanionDeviceId companionDeviceId) {
+            mCompanionDeviceId = companionDeviceId;
+            return this;
+        }
+
+        /**
+         * Sets the target computer control version of the computer control session.
+         *
+         * @param targetComputerControlVersion The target computer control version.
+         * @return This builder.
+         */
+        @NonNull
+        public Builder setTargetComputerControlVersion(int targetComputerControlVersion) {
+            mTargetComputerControlVersion = targetComputerControlVersion;
             return this;
         }
 
@@ -219,18 +246,25 @@ public final class ComputerControlSessionParams implements Parcelable {
                 throw new IllegalArgumentException("Target package names must be set");
             }
 
-            if (mTargetExtensionVersion >= 5
+            if (mTargetComputerControlVersion >= 5
                     && android.app.appfunctions.flags.Flags.enableAppInteractionApi()
                     && mAppInteractionAttribution == null) {
                 throw new IllegalArgumentException("App interaction attribution must be set");
             }
 
+            if (mCompanionDeviceId != null && mTargetComputerControlVersion < 5) {
+                throw new IllegalArgumentException(
+                        "companionDeviceId can only be used with targetComputerControlVersion 5 "
+                                + "or above");
+            }
+
             return new ComputerControlSessionParams(
                     mName,
-                    mTargetExtensionVersion,
+                    mTargetComputerControlVersion,
                     mTargetPackageNames,
                     mPreviewIntent,
-                    mAppInteractionAttribution);
+                    mAppInteractionAttribution,
+                    mCompanionDeviceId);
         }
     }
 }

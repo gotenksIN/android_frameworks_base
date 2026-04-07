@@ -51,13 +51,6 @@ flag {
 
 
 flag {
-    name: "push_global_state_to_oomadjuster"
-    namespace: "backstage_power"
-    description: "Migrate OomAdjuster pulled device state to a push model"
-    bug: "302575389"
-}
-
-flag {
     name: "memory_limiter_enable"
     namespace: "system_performance"
     description: "Enable the memory limiter"
@@ -277,16 +270,6 @@ flag {
 }
 
 flag {
-    name: "unsampled_freeze_atom_logging"
-    namespace: "system_performance"
-    description: "Whether to log 100% of APP_FREEZE_CHANGED atoms."
-    bug: "450077375"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "unsampled_compact_atom_logging"
     namespace: "system_performance"
     description: "Whether to log 100% of APP_COMPACTED_V2 atoms."
@@ -356,15 +339,6 @@ flag {
     }
 }
 
-flag {
-    name: "battery_stats_log_combined_display_state"
-    namespace: "backstage_power"
-    description: "Logs atom for screen state for the most important display on device."
-    bug: "416368479"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "use_safesetid_uid_policy2"

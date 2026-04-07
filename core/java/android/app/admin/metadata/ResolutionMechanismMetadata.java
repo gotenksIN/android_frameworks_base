@@ -17,7 +17,7 @@
 package android.app.admin.metadata;
 
 import android.annotation.NonNull;
-import android.annotation.TestApi;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +48,24 @@ public abstract class ResolutionMechanismMetadata<T> {
         @Override
         public String toString() {
             return "MostRestrictive { mMostToLeastRestrictive= " + mMostToLeastRestrictive + " }";
+        }
+    }
+
+    public static final class ListUnion<T> extends ResolutionMechanismMetadata<T> {
+        public ListUnion() {}
+
+        @Override
+        public String toString() {
+            return "ListUnion {}";
+        }
+    }
+
+    public static final class NotCoexistable<T> extends ResolutionMechanismMetadata<T> {
+        public NotCoexistable() {}
+
+        @Override
+        public String toString() {
+            return "NotCoexistable {}";
         }
     }
 }

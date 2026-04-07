@@ -91,12 +91,7 @@ class DesktopRepository(
     // TODO - b/365873835: Add this to persistent repository.
     private val preservedDisplaysByUniqueId = ArrayMap<String, DesktopDisplay>()
 
-    private val desktopData: DesktopData =
-        if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            MultiDesktopData()
-        } else {
-            SingleDesktopData()
-        }
+    private val desktopData: DesktopData = MultiDesktopData()
 
     /** Adds a listener to be notified of updates about desk changes. */
     fun addDeskChangeListener(listener: DeskChangeListener, executor: Executor) {
@@ -458,11 +453,7 @@ class DesktopRepository(
         val desk = checkNotNull(desktopData.getDesk(deskId)) { "Did not find desk: $deskId" }
         desk.leftTiledTaskId = taskId
         if (!desk.transientDesk && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(displayId)
-            } else {
-                updatePersistentRepositoryForDesk(deskId)
-            }
+            updatePersistentRepository(displayId)
         }
     }
 
@@ -476,11 +467,7 @@ class DesktopRepository(
         val desk = checkNotNull(desktopData.getDesk(deskId)) { "Did not find desk: $deskId" }
         desk.rightTiledTaskId = taskId
         if (!desk.transientDesk && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(displayId)
-            } else {
-                updatePersistentRepositoryForDesk(deskId)
-            }
+            updatePersistentRepository(displayId)
         }
     }
 
@@ -502,11 +489,7 @@ class DesktopRepository(
         if (desk == null) return
         desk.leftTiledTaskId = null
         if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(displayId)
-            } else {
-                updatePersistentRepositoryForDesk(deskId)
-            }
+            updatePersistentRepository(displayId)
         }
     }
 
@@ -516,11 +499,7 @@ class DesktopRepository(
         if (desk == null) return
         desk.rightTiledTaskId = null
         if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(displayId)
-            } else {
-                updatePersistentRepositoryForDesk(deskId)
-            }
+            updatePersistentRepository(displayId)
         }
     }
 
@@ -1000,22 +979,6 @@ class DesktopRepository(
 
     /** Whether the display is currently showing any desk. */
     fun isAnyDeskActive(displayId: Int): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            val desk = desktopData.getDefaultDesk(displayId)
-            if (desk == null) {
-                logE("Could not find default desk for display: %d", displayId)
-                return false
-            }
-            val hasVisibleTasks = desk.visibleTasks.isNotEmpty()
-            val hasTopTransparentFullscreenTask =
-                getTopTransparentFullscreenTaskData(desk.deskId) != null
-            logD(
-                "isAnyDeskActive: hasVisibleTasks=%b hasTopTransparentFullscreenTask=%b",
-                hasVisibleTasks,
-                hasTopTransparentFullscreenTask,
-            )
-            return hasVisibleTasks || hasTopTransparentFullscreenTask
-        }
         return desktopData.getActiveDesk(displayId) != null
     }
 
@@ -1087,11 +1050,7 @@ class DesktopRepository(
         updateTaskInDesk(displayId, deskId, taskId, isVisible = false, taskBounds = null)
         if (desk?.transientDesk == true) return
         if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(displayId)
-            } else {
-                updatePersistentRepositoryForDesk(deskId)
-            }
+            updatePersistentRepository(displayId)
         }
     }
 
@@ -1168,11 +1127,7 @@ class DesktopRepository(
         removeActiveTaskFromDesk(deskId = deskId, taskId = taskId)
         removeVisibleTaskFromDesk(deskId = deskId, taskId = taskId)
         if (!desk.transientDesk && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(desk.displayId)
-            } else {
-                updatePersistentRepositoryForDesk(deskId)
-            }
+            updatePersistentRepository(desk.displayId)
         }
     }
 
@@ -1209,15 +1164,8 @@ class DesktopRepository(
                 }
             }
         }
-        if (
-            DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue &&
-                DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue
-        ) {
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                updatePersistentRepository(desk.displayId)
-            } else {
-                removeDeskFromPersistentRepository(desk)
-            }
+        if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue) {
+            updatePersistentRepository(desk.displayId)
         }
         return activeTasks
     }
@@ -1350,91 +1298,24 @@ class DesktopRepository(
             if (displayId == INVALID_DISPLAY) return
 
             val desks = desktopData.desksSequence().map { it.deepCopy() }.toList()
-            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-                persistentUpdateQueue.post {
-                    Trace.beginSection("DesktopRepository#UpdateRepoWork")
-                    logD("updatePersistentRepository user=%d", userId)
-                    try {
-                        persistentRepository.addOrUpdateRepository(
-                            userId,
-                            desks,
-                            desktopData
-                                .getAllActiveDesks()
-                                .map { desk -> desk.uniqueDisplayId to desk.deskId }
-                                .toMap(),
+            persistentUpdateQueue.post {
+                Trace.beginSection("DesktopRepository#UpdateRepoWork")
+                logD("updatePersistentRepository user=%d", userId)
+                try {
+                    persistentRepository.addOrUpdateRepository(
+                        userId,
+                        desks,
+                        desktopData
+                            .getAllActiveDesks()
+                            .map { desk -> desk.uniqueDisplayId to desk.deskId }
+                            .toMap(),
                             preservedDisplaysByUniqueId,
                             rememberedBoundsRatioByPackageName,
-                        )
-                    } catch (exception: Exception) {
-                        logE(
-                            "An exception occurred while updating the persistent repository \n%s",
-                            exception.stackTrace,
-                        )
-                    } finally {
-                        Trace.endSection()
-                    }
-                }
-            } else {
-                mainCoroutineScope.launch {
-                    desks.forEach { desk -> updatePersistentRepositoryForDesk(desk) }
-                }
-            }
-        }
-
-    @Deprecated(
-        "Use updatePersistentRepository() instead.",
-        ReplaceWith("updatePersistentRepository()"),
-    )
-    private fun updatePersistentRepositoryForDesk(deskId: Int): Unit =
-        traceSection("DesktopRepository#updatePersistentRepositoryForDeskId") {
-            val desk = desktopData.getDesk(deskId)?.deepCopy() ?: return
-            mainCoroutineScope.launch { updatePersistentRepositoryForDesk(desk) }
-        }
-
-    @Deprecated(
-        "Use updatePersistentRepository() instead.",
-        ReplaceWith("updatePersistentRepository()"),
-    )
-    private suspend fun updatePersistentRepositoryForDesk(desk: Desk): Unit =
-        traceSection("DesktopRepository#updatePersistentRepositoryForDesk") {
-            try {
-                persistentRepository.addOrUpdateDesktop(
-                    userId = userId,
-                    desktopId = desk.deskId,
-                    uniqueDisplayId = desk.uniqueDisplayId,
-                    visibleTasks = desk.visibleTasks,
-                    minimizedTasks = desk.minimizedTasks,
-                    freeformTasksInZOrder = desk.freeformTasksInZOrder,
-                    leftTiledTask = desk.leftTiledTaskId,
-                    rightTiledTask = desk.rightTiledTaskId,
-                )
-            } catch (exception: Exception) {
-                logE(
-                    "An exception occurred while updating the persistent repository \n%s",
-                    exception.stackTrace,
-                )
-            }
-        }
-
-    @Deprecated(
-        "Use updatePersistentRepository() instead.",
-        ReplaceWith("updatePersistentRepository()"),
-    )
-    private fun removeDeskFromPersistentRepository(desk: Desk) =
-        traceSection("DesktopRepository#removeDeskFromPersistentRepository") {
-            mainCoroutineScope.launch {
-                logD(
-                    "updatePersistentRepositoryForRemovedDesk user=%d desk=%d",
-                    userId,
-                    desk.deskId,
-                )
-                Trace.beginSection("DesktopRepository#removeDeskWork")
-                try {
-                    persistentRepository.removeDesktop(userId = userId, desktopId = desk.deskId)
-                } catch (throwable: Throwable) {
+                    )
+                } catch (exception: Exception) {
                     logE(
                         "An exception occurred while updating the persistent repository \n%s",
-                        throwable.stackTrace,
+                        exception.stackTrace,
                     )
                 } finally {
                     Trace.endSection()
@@ -1443,7 +1324,6 @@ class DesktopRepository(
         }
 
     private fun canCreateDesks(): Boolean {
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) return false
         val deskLimit = desktopConfig.maxDeskLimit
         if (deskLimit == 0) return true
         return deskLimit > desktopData.getNumberOfDesks()
@@ -1597,109 +1477,6 @@ class DesktopRepository(
         fun removeDisplay(displayId: Int)
     }
 
-    /**
-     * A [DesktopData] implementation that only supports one desk per display.
-     *
-     * Internally, it reuses the displayId as that display's single desk's id. It also never truly
-     * "removes" a desk, it just clears its content.
-     */
-    private class SingleDesktopData : DesktopData {
-        private val deskByDisplayId =
-            object : SparseArray<Desk>() {
-                /** Gets [Desk] for existing [displayId] or creates a new one. */
-                fun getOrCreate(
-                    displayId: Int,
-                    uniqueDisplayId: String? = null,
-                    transientDesk: Boolean = false,
-                ): Desk =
-                    this[displayId]
-                        ?: Desk(
-                                deskId = displayId,
-                                displayId = displayId,
-                                uniqueDisplayId = uniqueDisplayId,
-                                transientDesk = transientDesk,
-                            )
-                            .also { this[displayId] = it }
-            }
-
-        override fun createDesk(
-            displayId: Int,
-            deskId: Int,
-            uniqueDisplayId: String?,
-            transientDesk: Boolean,
-        ) {
-            check(displayId == deskId) { "Display and desk ids must match" }
-            deskByDisplayId.getOrCreate(displayId, uniqueDisplayId, transientDesk)
-        }
-
-        override fun addDesk(displayId: Int, desk: Desk) {
-            // No-op, not supported
-        }
-
-        override fun getDesk(deskId: Int): Desk =
-            // TODO: b/362720497 - consider enforcing that the desk has been created before trying
-            //  to use it. As of now, there are cases where a task may be created faster than a
-            //  desk is, so just create it here if needed. See b/391984373.
-            deskByDisplayId.getOrCreate(deskId)
-
-        override fun getActiveDesk(displayId: Int): Desk {
-            // TODO: 389787966 - consider migrating to an "active" state instead of checking the
-            //   number of visible active tasks, PIP in desktop, and empty desktop logic. In
-            //   practice, existing single-desktop devices are ok with this function returning the
-            //   only desktop, even if it's not active.
-            return deskByDisplayId.getOrCreate(displayId)
-        }
-
-        override fun setActiveDesk(displayId: Int, deskId: Int) {
-            // No-op, in single-desk setups, which desktop is "active" is determined by the
-            // existence of visible desktop windows, among other factors.
-        }
-
-        override fun setDeskInactive(deskId: Int) {
-            // No-op, in single-desk setups, which desktop is "active" is determined by the
-            // existence of visible desktop windows, among other factors.
-        }
-
-        override fun getDefaultDesk(displayId: Int): Desk = getDesk(deskId = displayId)
-
-        override fun getAllActiveDesks(): Set<Desk> =
-            deskByDisplayId.valueIterator().asSequence().toSet()
-
-        override fun getNumberOfDesks(displayId: Int): Int = 1
-
-        override fun getNumberOfDesks(): Int = 1
-
-        override fun getOrderedDesks(displayId: Int): List<Desk> =
-            listOf(getDesk(deskId = displayId))
-
-        override fun forAllDesks(consumer: (Desk) -> Unit) {
-            deskByDisplayId.forEach { _, desk -> consumer(desk) }
-        }
-
-        override fun forAllDesks(consumer: (Int, Desk) -> Unit) {
-            deskByDisplayId.forEach { displayId, desk -> consumer(displayId, desk) }
-        }
-
-        override fun forAllDesks(displayId: Int, consumer: (Desk) -> Unit) {
-            consumer(getDesk(deskId = displayId))
-        }
-
-        override fun desksSequence(): Sequence<Desk> = deskByDisplayId.valueIterator().asSequence()
-
-        override fun desksSequence(displayId: Int): Sequence<Desk> =
-            deskByDisplayId[displayId]?.let { sequenceOf(it) } ?: emptySequence()
-
-        override fun remove(deskId: Int) {
-            setDeskInactive(deskId)
-            deskByDisplayId[deskId]?.clear()
-        }
-
-        override fun getDisplayForDesk(deskId: Int): Int = deskId
-
-        override fun removeDisplay(displayId: Int) {
-            deskByDisplayId.remove(displayId)
-        }
-    }
 
     /** A [DesktopData] implementation that supports multiple desks. */
     private class MultiDesktopData : DesktopData {

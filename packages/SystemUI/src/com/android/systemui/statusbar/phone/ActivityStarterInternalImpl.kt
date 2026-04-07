@@ -23,7 +23,6 @@ import android.app.PendingIntent
 import android.app.TaskStackBuilder
 import android.content.Context
 import android.content.Intent
-import android.content.res.Resources
 import android.os.Bundle
 import android.os.RemoteException
 import android.os.UserHandle
@@ -46,14 +45,12 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.desktop.DesktopFirstRepository
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
-import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.model.SysUiState
 import com.android.systemui.plugins.ActivityStartOptions
 import com.android.systemui.plugins.ActivityStarter
-import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.ShadeController
 import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractor
@@ -86,7 +83,6 @@ constructor(
     private val keyguardInteractor: KeyguardInteractor,
     private val centralSurfacesOptLazy: Lazy<Optional<CentralSurfaces>>,
     private val contextInteractor: ShadeDialogContextInteractor,
-    @Main private val resources: Resources,
     private val selectedUserInteractor: SelectedUserInteractor,
     private val deviceEntryInteractor: DeviceEntryInteractor,
     private val activityTransitionAnimator: ActivityTransitionAnimator,
@@ -100,7 +96,6 @@ constructor(
     private val shadeControllerLazy: Lazy<ShadeController>,
     private val communalSceneInteractor: CommunalSceneInteractor,
     private val statusBarWindowControllerStore: StatusBarWindowControllerStore,
-    private val keyguardViewMediatorLazy: Lazy<KeyguardViewMediator>,
     private val shadeAnimationInteractor: ShadeAnimationInteractor,
     private val notifShadeWindowControllerLazy: Lazy<NotificationShadeWindowController>,
     private val commandQueue: CommandQueue,
@@ -704,14 +699,11 @@ constructor(
 
     /** Retrieves the current user handle to start the Activity. */
     private fun getActivityUserHandle(intent: Intent): UserHandle {
-        val packages: Array<String> = resources.getStringArray(R.array.system_ui_packages)
-        for (pkg in packages) {
-            val componentName = intent.component ?: break
-            if (pkg == componentName.packageName) {
-                return UserHandle(UserHandle.myUserId())
-            }
+        return if (currentShadeContext.packageName == intent.component?.packageName) {
+            UserHandle(UserHandle.myUserId())
+        } else {
+            UserHandle(selectedUserInteractor.getSelectedUserId())
         }
-        return UserHandle(selectedUserInteractor.getSelectedUserId())
     }
 
     private fun isKeyguardShowing(): Boolean {

@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.notification.stack.ui.view
 
 import android.view.View
 import com.android.systemui.notifications.ui.YSpace
+import com.android.systemui.notifications.ui.composable.SwipeToExpandCallback
 import com.android.systemui.statusbar.notification.stack.shared.model.AccessibilityScrollEvent
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrollState
@@ -178,9 +179,15 @@ interface NotificationScrollView {
     /** Sets whether touch and animations on the stack are enabled. */
     fun setAnimationsEnabled(enabled: Boolean)
 
+    /** @return a callback to access the ExpandableNotificationRows to be manipulated. */
+    fun getExpandHelperCallback(): SwipeToExpandCallback
+
+    /** Sets the base side paddings when not aligning to the QS tiles. */
+    fun setBaseSidePadding(basePadding: Int)
+
     /**
-     * Whether or not to align the horizontal side-padding of notifications to the QS tiles showing
-     * above.
+     * Sets whether the notification panel should inset its left and right paddings to visually
+     * align with the second tile from each edge in the QQS above notifications.
      */
-    fun setUseLargeSidePaddings(useLargeSidePaddings: Boolean)
+    fun setAlignToInnerQqsTiles(alignToInnerQqsTiles: Boolean)
 }

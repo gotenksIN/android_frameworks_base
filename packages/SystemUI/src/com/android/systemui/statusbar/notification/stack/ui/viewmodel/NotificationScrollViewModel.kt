@@ -20,6 +20,8 @@
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.res.Configuration
 import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.ObservableTransitionState.Idle
@@ -30,6 +32,7 @@ import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
 import com.android.systemui.brightness.domain.interactor.BrightnessMirrorShowingInteractor
 import com.android.systemui.common.ui.ConfigurationState
+import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.lifecycle.ExclusiveActivatable
@@ -48,7 +51,7 @@ import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.statusbar.domain.interactor.RemoteInputInteractor
 import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.LockscreenDisplayConfig
-import com.android.systemui.statusbar.notification.stack.domain.interactor.LockscreenNotificationDisplayConfigInteractor
+import com.android.systemui.statusbar.notification.stack.domain.interactor.LockscreenNotificationsInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.NotificationStackAppearanceInteractor
 import com.android.systemui.statusbar.notification.stack.shared.model.AccessibilityScrollEvent
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimClipping
@@ -84,7 +87,7 @@ constructor(
     @ShadeDisplayAware private val configuration: ConfigurationState,
     placeholderStateStorage: NotificationPlaceholderStateStorage,
     private val stackAppearanceInteractor: NotificationStackAppearanceInteractor,
-    private val lockscreenAppearanceInteractor: LockscreenNotificationDisplayConfigInteractor,
+    private val lockscreenNotificationsInteractor: LockscreenNotificationsInteractor,
     brightnessMirrorShowingInteractorLazy: Lazy<BrightnessMirrorShowingInteractor>,
     private val shadeInteractor: ShadeInteractor,
     shadeModeInteractor: ShadeModeInteractor,
@@ -94,6 +97,8 @@ constructor(
     // TODO(b/336364825) Remove Lazy when SceneContainerFlag is released. While the flag is off,
     //  creating this object too early results in a crash.
     keyguardInteractor: Lazy<KeyguardInteractor>,
+    @ShadeDisplayAware configurationInteractor: ConfigurationInteractor,
+    @ShadeDisplayAware private val context: Context,
 ) :
     ActivatableFlowDumper by ActivatableFlowDumperImpl(dumpManager, "NotificationScrollViewModel"),
     ExclusiveActivatable() {
@@ -261,14 +266,45 @@ constructor(
         shadeModeInteractor.shadeMode
             .map { shadeMode -> shadeMode is ShadeMode.Split }
             .distinctUntilChanged()
-    /**
-     * Whether to align the horizontal side-padding of notifications to the QS tiles showing above.
-     */
-    val useLargeSidePaddings: Flow<Boolean> =
-        shadeModeInteractor.shadeMode
-            .map { shadeMode -> shadeMode is ShadeMode.Single }
+
+    data class SidePaddingConfig(
+        /** The base side paddings without aligning to the QQS tiles. */
+        val basePadding: Int,
+
+        /**
+         * Controls whether the notification panel should inset its left and right paddings to
+         * visually align with the second tile from each edge in the QQS above notifications.
+         *
+         * Currently only effective for SingleShade since that's the only place QQS tiles are shown
+         * above notifications.
+         */
+        val alignToInnerQqsTiles: Boolean,
+    )
+
+    val sidePaddingConfig: Flow<SidePaddingConfig> =
+        combine(shadeModeInteractor.shadeMode, configurationInteractor.onAnyConfigurationChange) {
+                shadeMode,
+                _ ->
+                with(context.resources) {
+                    val orientation = configuration.orientation
+                    val baseSidePaddings =
+                        getDimensionPixelSize(
+                            when (shadeMode) {
+                                ShadeMode.Single -> R.dimen.notification_side_paddings_single
+                                ShadeMode.Dual -> R.dimen.notification_side_paddings_dual
+                                ShadeMode.Split -> R.dimen.notification_side_paddings_split
+                            }
+                        )
+                    SidePaddingConfig(
+                        basePadding = baseSidePaddings,
+                        alignToInnerQqsTiles =
+                            shadeMode is ShadeMode.Single &&
+                                orientation == Configuration.ORIENTATION_LANDSCAPE,
+                    )
+                }
+            }
             .distinctUntilChanged()
-            .dumpWhileCollecting("useLargeSidePaddings")
+            .dumpWhileCollecting("sidePaddingsConfig")
 
     /**
      * Scale of the blur effect that should be applied to Notifications.
@@ -335,7 +371,7 @@ constructor(
     fun getLockscreenDisplayConfig(
         calculateMaxNotifications: (Int, Boolean) -> Int
     ): Flow<LockscreenDisplayConfig> {
-        return lockscreenAppearanceInteractor.getLockscreenDisplayConfig {
+        return lockscreenNotificationsInteractor.getLockscreenDisplayConfig {
             availableSpace,
             useExtraShelfSpace ->
             calculateMaxNotifications(availableSpace, useExtraShelfSpace)

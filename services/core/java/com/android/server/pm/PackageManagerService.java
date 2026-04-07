@@ -36,8 +36,8 @@ import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.USER_MIN_ASPECT_RATIO_UNSET;
 import static android.content.pm.PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET;
 import static android.crashrecovery.flags.Flags.refactorCrashrecovery;
-import static android.os.PerfettoTrace.BIG_LOCKS_V3;
 import static android.os.Process.INVALID_UID;
+import static android.os.PerfettoCategories.BIG_LOCKS_CATEGORY;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
 import static android.os.UserHandle.USER_ALL;
 import static android.os.storage.StorageManager.FLAG_STORAGE_CE;
@@ -195,7 +195,6 @@ import com.android.internal.app.ResolverActivity;
 import com.android.internal.content.F2fsUtils;
 import com.android.internal.content.InstallLocationUtils;
 import com.android.internal.content.om.OverlayConfig;
-import com.android.internal.dev.perfetto.sdk.PerfettoTrace;
 import com.android.internal.os.ApplicationSharedMemory;
 import com.android.internal.pm.parsing.PackageParser2;
 import com.android.internal.pm.parsing.pkg.AndroidPackageInternal;
@@ -1046,21 +1045,29 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      * Emits a trace event indicating the start of an attempt to acquire the main PMS lock.
      */
     public static void traceBeforePmsLock() {
-        PerfettoTrace.instant(BIG_LOCKS_V3, "pms_lock_acquire").emit();
+        if (android.os.Flags.perfettoSdkTracingV3()) {
+            com.android.internal.dev.perfetto.sdk.PerfettoTrace.instant(BIG_LOCKS_CATEGORY,
+                    "pms_lock_acquire").emit();
+        }
     }
 
     /**
      * Emits a trace event indicating that the main PMS lock has been acquired and is now held.
      */
     public static void traceAfterPmsLock() {
-        PerfettoTrace.begin(BIG_LOCKS_V3, "pms_lock_held").emit();
+        if (android.os.Flags.perfettoSdkTracingV3()) {
+            com.android.internal.dev.perfetto.sdk.PerfettoTrace.begin(BIG_LOCKS_CATEGORY,
+                    "pms_lock_held").emit();
+        }
     }
 
     /**
      * Emits a trace event indicating the end of the critical section protected by the PMS lock.
      */
     public static void traceAfterPmsUnlock() {
-        PerfettoTrace.end(BIG_LOCKS_V3).emit();
+        if (android.os.Flags.perfettoSdkTracingV3()) {
+            com.android.internal.dev.perfetto.sdk.PerfettoTrace.end(BIG_LOCKS_CATEGORY).emit();
+        }
     }
 
     /**
@@ -4773,7 +4780,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         // after this method returns.
         mHandler.post(() -> mDeletePackageHelper.deletePackageX(
                 packageName, PackageManager.VERSION_CODE_HIGHEST,
-                0, PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/));
+                0, PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/, Process.SYSTEM_UID));
     }
 
     void deletePreloadsFileCache() {
@@ -5701,9 +5708,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            // Public API implementation, pass in the calling uid
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId,
-                    Binder.getCallingUid());
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId);
         }
 
         @Override
@@ -7665,10 +7670,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
             final Computer snapshot = snapshotComputer();
-            // Use Process.myUid here because this is the PackageManagerInternal implementation, it
-            // isn't called outside of system_server
-            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId,
-                    Process.myUid());
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
         }
 
         @Override
@@ -8752,7 +8754,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         boolean removedBySystem) {
         return mDeletePackageHelper.deletePackageX(packageName,
                 PackageManager.VERSION_CODE_HIGHEST, UserHandle.USER_SYSTEM,
-                PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/);
+                PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/, Process.SYSTEM_UID);
     }
 
     private static boolean isSystemOrPhone(int uid) {

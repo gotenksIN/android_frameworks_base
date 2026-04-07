@@ -4,6 +4,16 @@ container: "system"
 # Flags are ordered alphabetically by name.
 
 flag {
+    name: "cleanup_unnecessary_scan_request_in_settings"
+    namespace: "media_better_together"
+    description: "Removes unnecessary scan requests from Settings to reduce battery consumption"
+    bug: "336521860"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "disable_set_bluetooth_ad2p_on_calls"
     namespace: "media_better_together"
     description: "Prevents calls to AudioService.setBluetoothA2dpOn(), known to cause incorrect audio routing to the built-in speakers."
@@ -40,7 +50,7 @@ flag {
     is_exported: true
     namespace: "media_better_together"
     description: "Adds device model information in MediaRouter2Info."
-    bug: "446801535"
+    bug: "468015358"
 }
 
 flag {
@@ -140,16 +150,6 @@ flag {
 }
 
 flag {
-    name: "enable_output_switcher_session_grouping"
-    namespace: "media_better_together"
-    description: "Enables selected items in Output Switcher to be grouped together."
-    bug: "388347018"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_privileged_routing_for_media_routing_control"
     is_exported: true
     namespace: "media_solutions"
@@ -181,31 +181,11 @@ flag {
 }
 
 flag {
-    name: "enable_route_visibility_control_compat_fixes"
-    namespace: "media_better_together"
-    description: "App compatability fixes for the route visibility control API"
-    bug: "433312596"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_suggested_device_api"
     is_exported: true
     namespace: "media_better_together"
     description: "Enables the API allowing proxy routers to suggest routes."
     bug: "393216553"
-}
-
-flag {
-    name: "enable_use_of_session_release_type_for_stop_button"
-    namespace: "media_better_together"
-    description: "Use LocalMediaManager#getSessionReleaseType exclusively for stop button logic."
-    bug: "448827170"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -237,6 +217,16 @@ flag {
 }
 
 flag {
+    name: "move_output_switcher_calls_to_background_thread"
+    namespace: "media_better_together"
+    description: "Move blocking calls from Output Switcher to a background thread"
+    bug: "445243616"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "reduce_two_way_binder_calls_in_media_router2"
     namespace: "media_better_together"
     description: "Fix an issue of blocking binder calls for getting remote sessions in MediaRouter2."
@@ -252,6 +242,16 @@ flag {
     description: "Flag for unhiding ringtone APIs"
     bug: "450092456"
     is_exported: true
+}
+
+flag {
+    name: "remove_local_network_access_compat_flag_check"
+    namespace: "media_better_together"
+    description: "Remove checks of the RESTRICT_LOCAL_NETWORK appcompat flag in media router code"
+    bug: "492280649"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

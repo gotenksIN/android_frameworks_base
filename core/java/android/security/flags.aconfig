@@ -50,13 +50,6 @@ flag {
 }
 
 flag {
-    name: "stop_recognizing_legacy_password_hashes"
-    namespace: "security"
-    description: "Make LockSettingsService stop recognizing legacy password hashes"
-    bug: "442877927"
-}
-
-flag {
     name: "enable_weaver_warmup"
     namespace: "security"
     description: "Enable warm-up of secure element before credential verification"
@@ -222,16 +215,6 @@ flag {
     namespace: "security"
     description: "Flag to enable access to the core App Lock functionality"
     bug: "415167460"
-}
-
-flag {
-    name: "enable_atomic_child_profile_lskf"
-    namespace: "security"
-    description: "Enable atomic cutover for child profile LSKF in LockSettingsService"
-    bug: "412331826"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

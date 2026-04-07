@@ -2114,6 +2114,9 @@
     <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
     <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
     <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
+    <string name="notification_history_metric_subtext" msgid="7408216222655116821">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>: <xliff:g id="METRIC_VALUE">%2$s</xliff:g>"</string>
+    <string name="notification_metric_running_timer" msgid="1096459900744921213">"ರನ್ನಿಂಗ್ ಟೈಮರ್"</string>
+    <string name="notification_metric_running_stopwatch" msgid="8039546029949295377">"ರನ್ನಿಂಗ್ ಸ್ಟಾಪ್‌ವಾಚ್"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"ಉತ್ತರಿಸಿ"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"ವೀಡಿಯೊ"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"ನಿರಾಕರಿಸಿ"</string>
@@ -2162,7 +2165,7 @@
     <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"ಆ್ಯಪ್ ಲಾಕ್ ಮೂಲಕ"</string>
     <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"ನೋಟಿಫಿಕೇಶನ್ ಕಂಟೆಂಟ್ ಅನ್ನು ಮರೆಮಾಡಲಾಗುತ್ತದೆ"</string>
     <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"ವಿಜೆಟ್‌ಗಳು ಮತ್ತು ಶಾರ್ಟ್‌ಕಟ್‌ಗಳನ್ನು ತೆಗೆದುಹಾಕಲಾಗುತ್ತದೆ"</string>
-    <string name="app_lock_edu_dialog_info_ai_disclaimer" msgid="5623615653703542050">"ನೀವು %1$s ಅನ್ನು ಆ್ಯಕ್ಸೆಸ್‌ ಮಾಡಲು ಅನುಮತಿಸಿದ AI ಏಜೆಂಟ್‌ಗಳು ಮತ್ತು ಸೇವೆಗಳು ಇನ್ನೂ ಅದರ ಡೇಟಾವನ್ನು ಆ್ಯಕ್ಸೆಸ್‌ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತದೆ"</string>
+    <string name="app_lock_edu_dialog_info_ai_disclaimer" msgid="5623615653703542050">"ನೀವು %1$s ಅನ್ನು ಆ್ಯಕ್ಸೆಸ್‌ ಮಾಡಲು ಅನುಮತಿಸಿದ AI ಏಜೆಂಟ್‌ಗಳು ಮತ್ತು ಸೇವೆಗಳಿಗೆ ಈಗಲೂ ಅದರ ಡೇಟಾವನ್ನು ಆ್ಯಕ್ಸೆಸ್‌ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತದೆ"</string>
     <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"ಆ್ಯಪ್ ಲಾಕ್ ಸೇರಿಸಿ"</string>
     <string name="app_lock_edu_dialog_biometric_description_has_face" product="default" msgid="1348151645996748654">"ಫೇಸ್ ಅನ್‌ಲಾಕ್"</string>
     <string name="app_lock_edu_dialog_biometric_description_has_face" product="desktop" msgid="380233309639495358">"ಮುಖದ ಮೂಲಕ ಅನ್‌ಲಾಕ್ ಮಾಡುವಿಕೆ"</string>

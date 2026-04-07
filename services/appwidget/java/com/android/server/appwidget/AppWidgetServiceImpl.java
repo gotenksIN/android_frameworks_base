@@ -18,7 +18,6 @@ package com.android.server.appwidget;
 
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_CONFIGURATION_OPTIONAL;
 import static android.appwidget.flags.Flags.appLockWidgetRemoval;
-import static android.appwidget.flags.Flags.limitIconMemory;
 import static android.appwidget.flags.Flags.remoteAdapterConversion;
 import static android.appwidget.flags.Flags.remoteViewsProto;
 import static android.appwidget.flags.Flags.securityPolicyInteractAcrossUsers;
@@ -109,6 +108,7 @@ import android.os.Message;
 import android.os.PersistableBundle;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -3012,7 +3012,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         host.widgets.remove(widget);
         pruneHostLocked(host);
 
-        removeWidgetLocked(widget);
+        removeWidgetLocked(widget, true);
 
         Provider provider = widget.provider;
         if (provider != null) {
@@ -3157,7 +3157,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         long totalMemoryUsage = bitmapCacheMemoryUsage + widget.views.estimateIconMemoryUsage();
         int targetSdk = getWidgetTargetSdkLocked(widget);
         long memoryUsage =
-                (targetSdk > 37 && limitIconMemory()) ? totalMemoryUsage : bitmapCacheMemoryUsage;
+                (targetSdk > 37) ? totalMemoryUsage : bitmapCacheMemoryUsage;
         if (memoryUsage > mMaxWidgetBitmapMemory) {
             widget.views = null;
             throw new IllegalArgumentException("RemoteViews for widget update exceeds"
@@ -3656,7 +3656,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 updateAppWidgetInstanceLocked(widget, null, false);
                 // clear out references to this appWidgetId
                 widget.host.widgets.remove(widget);
-                removeWidgetLocked(widget);
+                removeWidgetLocked(widget, true);
                 widget.provider = null;
                 pruneHostLocked(widget.host);
                 widget.host = null;
@@ -4408,13 +4408,15 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
      * If there are other widgets with the same package, leaves it in the cache, otherwise it
      * removes the associated package from the cache.
      */
-    void removeWidgetLocked(Widget widget) {
+    void removeWidgetLocked(Widget widget, boolean notifyHost) {
         if (DEBUG) {
             Slog.i(TAG, "removeWidgetLocked() " + widget);
         }
         mWidgets.remove(widget);
         onWidgetRemovedLocked(widget);
-        scheduleNotifyAppWidgetRemovedLocked(widget);
+        if (notifyHost) {
+            scheduleNotifyAppWidgetRemovedLocked(widget);
+        }
     }
 
     private void onWidgetRemovedLocked(Widget widget) {
@@ -4868,7 +4870,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 // as we do not want to make host callbacks and provider broadcasts
                 // as the host and the provider will be killed.
                 if (hostInUser && (!hasProvider || providerInUser)) {
-                    removeWidgetLocked(widget);
+                    removeWidgetLocked(widget, false);
                     widget.host.widgets.remove(widget);
                     widget.host = null;
                     if (hasProvider) {
@@ -5580,28 +5582,36 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     @FlaggedApi(android.appwidget.flags.Flags.FLAG_REMOTE_VIEWS_PROTO)
     @GuardedBy("mLock")
     private void loadGeneratedPreviewCategoriesLocked(int profileId) throws IOException {
-        for (Provider provider : mProviders) {
-            if (provider.id.getProfile().getIdentifier() != profileId) {
-                continue;
+        // Per Javadoc, this method intentionally performs synchronous Disk I/O during
+        // profile initialization, unlike other preview operations that use mSavePreviewsHandler.
+        // To prevent StrictMode crashes/logging in dev builds, temporarily allow disk reads.
+        StrictMode.ThreadPolicy oldPolicy = StrictMode.allowThreadDiskReads();
+        try {
+            for (Provider provider : mProviders) {
+                if (provider.id.getProfile().getIdentifier() != profileId) {
+                    continue;
+                }
+                AtomicFile previewsFile = getWidgetPreviewsFile(provider);
+                if (!previewsFile.exists()) {
+                    continue;
+                }
+                ProtoInputStream input = new ProtoInputStream(previewsFile.readFully());
+                try {
+                    provider.info.generatedPreviewCategories =
+                            readGeneratedPreviewCategoriesFromProto(input);
+                } catch (Exception e) {
+                    Slog.e(TAG, "Failed to read generated previews from file for " + provider, e);
+                    previewsFile.delete();
+                    provider.info.generatedPreviewCategories = 0;
+                }
+                if (DEBUG) {
+                    Slog.i(TAG, TextUtils.formatSimple(
+                            "loadGeneratedPreviewCategoriesLocked %d %s categories %d", profileId,
+                            provider, provider.info.generatedPreviewCategories));
+                }
             }
-            AtomicFile previewsFile = getWidgetPreviewsFile(provider);
-            if (!previewsFile.exists()) {
-                continue;
-            }
-            ProtoInputStream input = new ProtoInputStream(previewsFile.readFully());
-            try {
-                provider.info.generatedPreviewCategories = readGeneratedPreviewCategoriesFromProto(
-                        input);
-            } catch (Exception e) {
-                Slog.e(TAG, "Failed to read generated previews from file for " + provider, e);
-                previewsFile.delete();
-                provider.info.generatedPreviewCategories = 0;
-            }
-            if (DEBUG) {
-                Slog.i(TAG, TextUtils.formatSimple(
-                        "loadGeneratedPreviewCategoriesLocked %d %s categories %d", profileId,
-                        provider, provider.info.generatedPreviewCategories));
-            }
+        } finally {
+            StrictMode.setThreadPolicy(oldPolicy);
         }
     }
 
@@ -7503,7 +7513,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                         // Check if we need to destroy any services (if no other app widgets are
                         // referencing the same service)
                         decrementAppWidgetServiceRefCount(widget);
-                        removeWidgetLocked(widget);
+                        removeWidgetLocked(widget, true);
                     }
                 }
                 prunedApps.add(pkg);

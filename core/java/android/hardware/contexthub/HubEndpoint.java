@@ -27,6 +27,7 @@ import android.annotation.Size;
 import android.annotation.SystemApi;
 import android.chre.flags.Flags;
 import android.content.Context;
+import android.hardware.contexthub.DataFlowId;
 import android.hardware.contexthub.HubEndpointInfo.HubEndpointIdentifier;
 import android.hardware.location.ContextHubTransaction;
 import android.hardware.location.ContextHubTransactionHelper;
@@ -144,15 +145,49 @@ public class HubEndpoint {
         void onNotificationCallback(long hubId, int dataFlowId, boolean waking);
     }
 
+    /** Wrapper around DataFlowId that is mappable. */
+    private static final class DataFlowIdWrapper {
+        private final DataFlowId id;
+
+        DataFlowIdWrapper(DataFlowId id) {
+            this.id = id;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof DataFlowIdWrapper)) {
+                return false;
+            }
+            DataFlowIdWrapper that = (DataFlowIdWrapper) o;
+            return id.hubId == that.id.hubId && id.id == that.id.id;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id.hubId, id.id);
+        }
+    }
+
+    /**
+     * @return An int array comprised of [majorVersion, minorVersion, patchVersion,
+     *     minimumCompatibleMajorVersion] from the native layer.
+     */
+    private static native int[] native_getSharedDataSupportVersion();
+
     /**
      * Initializes the native code for this HubEndpoint.
      *
      * @param queue The message queue associated with the endpoint's mLooper object.
      * @param callback The callback to invoke from the native layer.
      * @param hubId The hub Id of this endpoint.
+     * @param endpointId The endpoint ID of this endpoint.
      * @return The native handle to be used for all other native calls.
      */
-    private native long native_init(MessageQueue queue, DataFlowJniCallback callback, long hubId);
+    private native long native_init(
+            MessageQueue queue, DataFlowJniCallback callback, long hubId, long endpointId);
 
     /**
      * @param nativeHandle The native handle created in native_init.
@@ -193,6 +228,7 @@ public class HubEndpoint {
      * @param regionFd The file descriptor of the shared data region.
      * @param dataFlowHubId The hub ID of the data flow.
      * @param dataFlowId The ID of the data flow.
+     * @param sourceId The ID of the source endpoint, scoped to dataFlowHubId.
      * @param notifyHostFdsWaking The waking file descriptor for host notifications.
      * @param notifyHostFdsNonWaking The non-waking file descriptor for host notifications.
      * @param notifyHostFdsHalAck The HAL acknowledgment file descriptor for host notifications.
@@ -209,6 +245,7 @@ public class HubEndpoint {
             int regionFd,
             long dataFlowHubId,
             int dataFlowId,
+            long sourceId,
             int notifyHostFdsWaking,
             int notifyHostFdsNonWaking,
             int notifyHostFdsHalAck,
@@ -246,37 +283,46 @@ public class HubEndpoint {
 
     /**
      * @param nativeHandle The native handle created in native_init.
-     * @param consumerId The data flow ID of the sink.
+     * @param dataFlowHubId The id of the hub that hosts the data flow.
+     * @param dataFlowId The data flow ID, scoped to dataFlowHubId.
      * @param elementCount The number of elements to request.
      * @param allOrNothing If true, all elements must be available or none.
      * @return A byte array from the queue.
      */
     private native byte[] native_sinkRequestData(
-            long nativeHandle, int consumerId, int elementCount, boolean allOrNothing);
+            long nativeHandle,
+            long dataFlowHubId,
+            int dataFlowId,
+            int elementCount,
+            boolean allOrNothing);
 
     /**
      * @param nativeHandle The native handle created in native_init.
-     * @param consumerId The data flow ID of the sink.
+     * @param dataFlowHubId The id of the hub that hosts the data flow.
+     * @param dataFlowId The data flow ID, scoped to dataFlowHubId.
      * @param offset The offset in bytes behind the source's current write position.
      * @return true if the operation succeeded.
      */
-    private native boolean native_sinkSyncToSource(long nativeHandle, int consumerId, int offset);
+    private native boolean native_sinkSyncToSource(
+            long nativeHandle, long dataFlowHubId, int dataFlowId, int offset);
 
     /**
      * @param nativeHandle The native handle created in native_init.
-     * @param consumerId The data flow ID of the sink.
+     * @param dataFlowHubId The id of the hub that hosts the data flow.
+     * @param dataFlowId The data flow ID, scoped to dataFlowHubId.
      * @return true if this sink's read position can be overwritten by the source when it wraps
      *     around the shared memory region
      */
     private native boolean native_sinkSourceCanOverwriteReadPosition(
-            long nativeHandle, int consumerId);
+            long nativeHandle, long dataFlowHubId, int dataFlowId);
 
     /**
      * @param nativeHandle The native handle created in native_init.
-     * @param consumerId The data flow ID of the sink.
+     * @param dataFlowHubId The id of the hub that hosts the data flow.
+     * @param dataFlowId The data flow ID, scoped to dataFlowHubId.
      * @return The size of the contents in the queue in bytes.
      */
-    private native int native_sinkSize(long nativeHandle, int consumerId);
+    private native int native_sinkSize(long nativeHandle, long dataFlowHubId, int dataFlowId);
 
     /**
      * @param nativeHandle The native handle created in native_init.
@@ -346,9 +392,11 @@ public class HubEndpoint {
 
     /**
      * @param nativeHandle The native handle created in native_init.
-     * @param dataFlowId The ID of the data flow for the sink to remove.
+     * @param dataFlowHubId The id of the hub that hosts the data flow.
+     * @param dataFlowId The data flow ID, scoped to dataFlowHubId.
      */
-    private native void native_removeHostSink(long nativeHandle, int dataFlowId);
+    private native void native_removeHostSink(
+            long nativeHandle, long dataFlowHubId, int dataFlowId);
 
     /**
      * @param nativeHandle The native handle created in native_init.
@@ -383,7 +431,10 @@ public class HubEndpoint {
                             Log.e(TAG, "onNotificationCallback: source not found");
                         }
                     } else {
-                        DataFlowSink sink = mSinks.get(dataFlowId);
+                        DataFlowId fullDataFlowId = new DataFlowId();
+                        fullDataFlowId.hubId = hubId;
+                        fullDataFlowId.id = dataFlowId;
+                        DataFlowSink sink = mSinks.get(new DataFlowIdWrapper(fullDataFlowId));
                         if (sink != null) {
                             if (!sink.onNotificationCallback(
                                     DataFlowCallback.SINK_EVENT_READABLE)) {
@@ -404,8 +455,7 @@ public class HubEndpoint {
     private final Map<Integer, DataFlowSource> mSources = new HashMap<>();
 
     /** The sinks associated with this endpoint. */
-    // TODO(b/457452333): This should map the whole DataFlowId.
-    private final Map<Integer, DataFlowSink> mSinks = new HashMap<>();
+    private final Map<DataFlowIdWrapper, DataFlowSink> mSinks = new HashMap<>();
 
     private final IContextHubEndpointCallback mServiceCallback =
             new IContextHubEndpointCallback.Stub() {
@@ -528,9 +578,10 @@ public class HubEndpoint {
                         return;
                     }
 
-                    DataFlowDataConfig config = enableHostSinkFromContext(context);
+                    DataFlowDataConfig config =
+                            enableHostSinkFromContext(context, source.getIdentifier());
                     DataFlowSink sink = createDataFlowSink(config, context);
-                    mSinks.put(context.id.id, sink);
+                    mSinks.put(new DataFlowIdWrapper(context.id), sink);
 
                     Log.d(TAG, "onDataFlowHostSinkRegistered: sink = " + sink);
 
@@ -603,7 +654,7 @@ public class HubEndpoint {
                                     });
                         }
                     } else {
-                        DataFlowSink sink = mSinks.get(dataFlowId.id);
+                        DataFlowSink sink = mSinks.get(new DataFlowIdWrapper(dataFlowId));
                         if (sink == null) {
                             Log.w(
                                     TAG,
@@ -773,7 +824,8 @@ public class HubEndpoint {
                         native_init(
                                 mEpollLooper.getQueue(),
                                 mJniCallback,
-                                mAssignedHubEndpointInfo.getIdentifier().getHub());
+                                mAssignedHubEndpointInfo.getIdentifier().getHub(),
+                                mAssignedHubEndpointInfo.getIdentifier().getEndpoint());
             } else {
                 mNativeHandle = 0;
             }
@@ -1215,8 +1267,20 @@ public class HubEndpoint {
         /** Build the {@link HubEndpoint} object. */
         @NonNull
         public HubEndpoint build() {
+            int[] versionInfo = native_getSharedDataSupportVersion();
+            android.hardware.contexthub.EndpointInfo.SharedDataSupportVersion sharedDataVersion =
+                    new android.hardware.contexthub.EndpointInfo.SharedDataSupportVersion();
+            sharedDataVersion.version = new android.hardware.contexthub.SharedDataRegion.Version();
+            if (versionInfo != null && versionInfo.length == 4) {
+                sharedDataVersion.version.major = (byte) versionInfo[0];
+                sharedDataVersion.version.minor = (byte) versionInfo[1];
+                sharedDataVersion.version.patch = (char) versionInfo[2];
+                sharedDataVersion.minimumCompatibleMajorVersion = (byte) versionInfo[3];
+            }
+
             return new HubEndpoint(
-                    new HubEndpointInfo(mPackageName, mVersion, mTag, mServiceInfos),
+                    new HubEndpointInfo(
+                            mPackageName, mVersion, mTag, mServiceInfos, sharedDataVersion),
                     mLifecycleCallback,
                     mLifecycleCallbackExecutor != null ? mLifecycleCallbackExecutor : mMainExecutor,
                     mMessageCallback,
@@ -1418,33 +1482,36 @@ public class HubEndpoint {
     /** @hide */
     @NonNull
     byte[] sinkRequestData(DataFlowSinkContext context, int elementCount, boolean allOrNothing) {
-        return native_sinkRequestData(mNativeHandle, context.id.id, elementCount, allOrNothing);
+        return native_sinkRequestData(
+                mNativeHandle, context.id.hubId, context.id.id, elementCount, allOrNothing);
     }
 
     /** @hide */
     void sinkSyncToSource(DataFlowSinkContext context, int offset) {
-        if (!native_sinkSyncToSource(mNativeHandle, context.id.id, offset)) {
+        if (!native_sinkSyncToSource(mNativeHandle, context.id.hubId, context.id.id, offset)) {
             Log.e(TAG, "syncToSource: failed to sync to source");
         }
     }
 
     /** @hide */
     boolean sinkSourceCanOverwriteReadPosition(DataFlowSinkContext context) {
-        return native_sinkSourceCanOverwriteReadPosition(mNativeHandle, context.id.id);
+        return native_sinkSourceCanOverwriteReadPosition(
+                mNativeHandle, context.id.hubId, context.id.id);
     }
 
     /** @hide */
     int sinkSize(DataFlowSinkContext context) {
-        return native_sinkSize(mNativeHandle, context.id.id);
+        return native_sinkSize(mNativeHandle, context.id.hubId, context.id.id);
     }
 
     /** @hide */
     void removeSink(DataFlowSinkContext context) {
-        native_removeHostSink(mNativeHandle, context.id.id);
-        mSinks.remove(context.id.id);
+        native_removeHostSink(mNativeHandle, context.id.hubId, context.id.id);
+        mSinks.remove(new DataFlowIdWrapper(context.id));
     }
 
-    private DataFlowDataConfig enableHostSinkFromContext(DataFlowSinkContext context) {
+    private DataFlowDataConfig enableHostSinkFromContext(
+            DataFlowSinkContext context, HubEndpointInfo.HubEndpointIdentifier sourceId) {
         int[] hostSinkValues =
                 native_enableHostSink(
                         mNativeHandle,
@@ -1453,6 +1520,7 @@ public class HubEndpoint {
                         context.info.region.sharedMemory.getFd(),
                         context.id.hubId,
                         context.id.id,
+                        sourceId.getEndpoint(),
                         context.alertFds.waking.getFd(),
                         context.alertFds.nonWaking.getFd(),
                         context.alertFds.halAck.getFd(),

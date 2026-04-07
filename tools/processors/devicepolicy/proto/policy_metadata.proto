@@ -76,6 +76,8 @@ message PolicyMetadata {
   }
   // LINT.ThenChange(/core/java/android/app/admin/DevicePolicyManager.java:dpc_type)
   repeated DpcType allowed_dpc_types = 9;
+
+  optional string flag = 10;
 }
 
 message TypeSpecificPolicyMetadata {
@@ -105,6 +107,7 @@ message TypeSpecificPolicyMetadata {
       oneof mechanism {
         bool custom = 1;
         MostRestrictive most_restrictive = 2;
+        bool not_coexistable = 3;
       }
     }
 
@@ -117,9 +120,17 @@ message TypeSpecificPolicyMetadata {
 
   message StringPolicyMetadata {
     bool empty_string_allowed = 1;
+    bool unprintable_characters_allowed = 2;
   }
 
   message ListPolicyMetadata {
+    message ResolutionMechanism {
+      oneof mechanism {
+        bool custom = 1;
+        bool union = 2;
+      }
+    }
+
     oneof list_element_metadata {
       IntegerPolicyMetadata integer_metadata = 1;
       EnumPolicyMetadata enum_metadata = 2;
@@ -127,7 +138,10 @@ message TypeSpecificPolicyMetadata {
     }
 
     bool empty_list_allowed = 4;
+    ResolutionMechanism resolution_mechanism = 5;
   }
+
+  message PackagePolicyMetadata {}
 
   oneof type_metadata {
     BooleanPolicyMetadata boolean_metadata = 1;
@@ -136,6 +150,7 @@ message TypeSpecificPolicyMetadata {
     StringPolicyMetadata string_metadata = 4;
     ListPolicyMetadata list_metadata = 6;
     LongPolicyMetadata long_metadata = 7;
+    PackagePolicyMetadata package_metadata = 8;
   }
 
   reserved 5;

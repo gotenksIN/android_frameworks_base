@@ -171,20 +171,20 @@ flag {
 }
 
 flag {
-    name: "emergency_location_new_notification"
+    name: "fix_app_ops_restriction_for_emergency_mode"
     namespace: "location"
-    description: "Enables the new emergency location notification with updated text and CTA"
-    bug: "384572637"
+    description: "Only allow the ignore-setting allowlist to be excluded in app ops restrictions in emergency mode"
+    bug: "488393284"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
 }
 
 flag {
-    name: "fix_app_ops_restriction_for_emergency_mode"
+    name: "cache_emergency_callback_mode"
     namespace: "location"
-    description: "Only allow the ignore-setting allowlist to be excluded in app ops restrictions in emergency mode"
-    bug: "488393284"
+    description: "Cache the value of Emergency callback mode from the broadcast extra to avoid direct querying the TelephonyManager API"
+    bug: "426562854"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -207,11 +207,31 @@ flag {
 }
 
 flag {
+    name: "check_bypass_permission_before_emergency_mode"
+    namespace: "location"
+    description: "Check bypass permission before checking emergency mode to avoid unnecessary IPC calls."
+    bug: "355384257"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "gnss_qzss_svid_range_extension"
     namespace: "location"
     description: "Extend QZSS SVID range from [183, 206] to [183, 212]"
     bug: "483079505"
     is_exported: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "gnss_restart_location_request_on_resume"
+    namespace: "location"
+    description: "Restart GNSS provider on resume to synchronize stale intervals."
+    bug: "475877334"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

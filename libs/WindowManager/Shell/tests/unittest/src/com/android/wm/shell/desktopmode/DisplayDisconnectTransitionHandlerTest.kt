@@ -33,7 +33,6 @@ import com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.fullscreen.FullscreenDisconnectHandler
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
-import com.android.wm.shell.pip2.phone.PipDisplayDisconnectHandler
 import com.android.wm.shell.splitscreen.SplitMultiDisplayProvider
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.sysui.ShellInit
@@ -102,7 +101,6 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION,
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
     )
     fun handleRequest_noReparentDisplay_doesNotPerformDisconnect() {
         val displayChange = TransitionRequestInfo.DisplayChange(SECOND_DISPLAY)
@@ -113,7 +111,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
 
         val transition = Binder()
         whenever(splitScreenControllerOptional.isPresent).thenReturn(false)
@@ -137,7 +135,6 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION,
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
     )
     fun handleRequest_validReparentDisplay_performsDisconnect() {
         val displayChange = TransitionRequestInfo.DisplayChange(SECOND_DISPLAY)
@@ -148,7 +145,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
         val transition = Binder()
         whenever(splitScreenControllerOptional.isPresent).thenReturn(false)
         whenever(desktopTasksControllerOptional.isPresent).thenReturn(true)
@@ -210,7 +207,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
         val transition = Binder()
 
         // Handle the request.
@@ -278,7 +275,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
 
         val spyHandler = spy(disconnectTransitionHandler)
         whenever(splitScreenControllerOptional.isPresent).thenReturn(false)
@@ -300,7 +297,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
         val spyHandler = spy(disconnectTransitionHandler)
         whenever(splitScreenControllerOptional.isPresent).thenReturn(false)
         whenever(desktopTasksControllerOptional.isPresent).thenReturn(true)
@@ -329,7 +326,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
         val spyHandler = spy(disconnectTransitionHandler)
         whenever(splitScreenControllerOptional.isPresent).thenReturn(true)
         whenever(desktopTasksControllerOptional.isPresent).thenReturn(false)
@@ -352,7 +349,7 @@ class DisplayDisconnectTransitionHandlerTest() : ShellTestCase() {
                     /* triggerTask = */ null,
                     /* remoteTransition= */ null,
                 )
-                .apply { setDisplayChange(displayChange) }
+                .apply { setDisplayChanges(listOf(displayChange)) }
         val spyHandler = spy(disconnectTransitionHandler)
         splitScreenControllerOptional.stub { on { isPresent } doReturn false }
         desktopTasksControllerOptional.stub { on { isPresent } doReturn false }

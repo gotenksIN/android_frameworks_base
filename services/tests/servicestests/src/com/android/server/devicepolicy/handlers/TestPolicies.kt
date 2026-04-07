@@ -21,12 +21,14 @@ import android.app.admin.DevicePolicyManager.POLICY_SCOPE_PARENT_USER
 import android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER
 import android.app.admin.DevicePolicyManager.RESOURCE_PER_USER
 import android.app.admin.NoArgsPolicyKey
+import android.app.admin.PackageIdentifier
 import android.app.admin.PolicyIdentifier
 import android.app.admin.PolicyValueTransport
 import android.app.admin.metadata.EnumPolicyMetadata
 import android.app.admin.metadata.IntegerPolicyMetadata
 import android.app.admin.metadata.ListPolicyMetadata
 import android.app.admin.metadata.LongPolicyMetadata
+import android.app.admin.metadata.PackagePolicyMetadata
 import android.app.admin.metadata.ResolutionMechanismMetadata
 import android.app.admin.metadata.StringPolicyMetadata
 import com.android.server.devicepolicy.CallerIdentity
@@ -34,6 +36,7 @@ import com.android.server.devicepolicy.IntegerPolicySerializer
 import com.android.server.devicepolicy.ListOfStringPolicySerializer
 import com.android.server.devicepolicy.LongPolicySerializer
 import com.android.server.devicepolicy.MostRecent
+import com.android.server.devicepolicy.PackagePolicySerializer
 import com.android.server.devicepolicy.PolicyDefinition
 import com.android.server.devicepolicy.PolicyEnforcerCallbacks
 import com.android.server.devicepolicy.StringPolicySerializer
@@ -112,6 +115,7 @@ object StringPolicy {
             /*allowedDpcTypes=*/ setOf(),
             /*resolutionMechanism=*/ ResolutionMechanismMetadata.MostRestrictive<String>(),
             /*emptyStringAllowed=*/ false,
+            /*unprintableCharactersAllowed=*/ false,
         )
     val anyTransportValue: PolicyValueTransport = PolicyValueTransport.stringField("a string value")
 
@@ -132,6 +136,7 @@ fun StringPolicyMetadata.copy(
     requiredCrossUserPermission: String? = null,
     allowedDpcTypes: Set<Int>? = null,
     emptyStringAllowed: Boolean? = null,
+    unprintableCharactersAllowed: Boolean? = null,
 ) =
     StringPolicyMetadata(
         id ?: this.id,
@@ -142,6 +147,7 @@ fun StringPolicyMetadata.copy(
         allowedDpcTypes ?: this.allowedDpcTypes,
         this.resolutionMechanism,
         emptyStringAllowed ?: this.isEmptyStringAllowed,
+        unprintableCharactersAllowed ?: this.isUnprintableCharactersAllowed,
     )
 
 object ListOfStringPolicy {
@@ -158,7 +164,9 @@ object ListOfStringPolicy {
                 /*requiredCrossUserPermission=*/ "testCrossUserPermission",
                 /* allowedDpcTypes= */ setOf(),
                 /* emptyStringAllowed= */ false,
+                /* unprintableCharactersAllowed= */ false,
             ),
+            /* resolutionMechanism= */ null,
             /* emptyListAllowed= */ false,
         )
     val anyTransportValue: PolicyValueTransport =
@@ -181,6 +189,7 @@ fun ListPolicyMetadata<String>.copy(
     requiredCrossUserPermission: String? = null,
     allowedDpcTypes: Set<Int>? = null,
     emptyStringAllowed: Boolean? = null,
+    unprintableCharactersAllowed: Boolean? = null,
     emptyListAllowed: Boolean? = null,
 ) =
     ListPolicyMetadata(
@@ -196,7 +205,10 @@ fun ListPolicyMetadata<String>.copy(
             /* allowedDpcTypes= */ allowedDpcTypes ?: this.elementMetadata.allowedDpcTypes,
             /* emptyStringAllowed= */ emptyStringAllowed
                 ?: (this.elementMetadata as StringPolicyMetadata).isEmptyStringAllowed,
+            /* unprintableCharactersAllowed= */ unprintableCharactersAllowed
+                ?: (this.elementMetadata as StringPolicyMetadata).isUnprintableCharactersAllowed,
         ),
+        /* resolutionMechanism= */ null,
         /* emptyListAllowed= */ emptyListAllowed ?: this.isEmptyListAllowed,
     )
 
@@ -277,3 +289,27 @@ fun LongPolicyMetadata.copy(minValue: Long? = null, maxValue: Long? = null) =
         minValue ?: this.minValue,
         maxValue ?: this.maxValue,
     )
+
+object PackagePolicy {
+    val name = "thePackagePolicy"
+    val key = PolicyIdentifier<PackageIdentifier>(name)
+    val metadata =
+        PackagePolicyMetadata(
+            key,
+            /*allowedScopes=*/ setOf(POLICY_SCOPE_USER, POLICY_SCOPE_DEVICE),
+            /*affectedResource=*/ RESOURCE_PER_USER,
+            /*requiredPermission=*/ "testPermission",
+            /*requiredCrossUserPermission=*/ "testCrossUserPermission",
+            /*allowedDpcTypes=*/ setOf(),
+        )
+    val anyTransportValue: PolicyValueTransport =
+        PolicyValueTransport.packageField(PackageIdentifier("com.example.app").createTransport())
+
+    val definition =
+        PolicyDefinition<PackageIdentifier>(
+            NoArgsPolicyKey(name),
+            MostRecent(),
+            PolicyEnforcerCallbacks::noOp,
+            PackagePolicySerializer(),
+        )
+}

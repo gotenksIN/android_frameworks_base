@@ -25,8 +25,8 @@ import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_SLEEP;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
+import static android.window.TransitionInfo.FLAG_CHANGED_INTERACTIVE;
 
-import static com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND;
 import static com.android.wm.shell.Flags.FLAG_ADD_ONE_OFF_HANDLER_LEASHES;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_PIP2;
 import static com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_ANIMATING;
@@ -568,6 +568,41 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         verify(finishT).setCornerRadius(leash, FREEFORM_TASK_CORNER_RADIUS_ON_CD);
     }
 
+    @Test
+    public void testMerge_consumeNonInterestingChangingTasks() throws Exception {
+        // Start recents
+        final IRecentsAnimationRunner animationRunner = mock(IRecentsAnimationRunner.class);
+        final IBinder transition = startRecentsTransition(/* synthetic= */ false, animationRunner);
+        mRecentsTransitionHandler.startAnimation(
+                transition, createTransitionInfo(), new StubTransaction(), new StubTransaction(),
+                mock(Transitions.TransitionFinishCallback.class));
+
+        // Merge a non-interesting change to a task
+        final ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder()
+                .setTaskId(123)
+                .build();
+        final TransitionInfo.Change appChange = new TransitionInfo.Change(taskInfo.token,
+                new SurfaceControl());
+        appChange.setMode(TRANSIT_CHANGE);
+        appChange.setFlags(FLAG_CHANGED_INTERACTIVE);
+        appChange.setTaskInfo(taskInfo);
+        final TransitionInfo mergeTransitionInfo = new TransitionInfoBuilder(TRANSIT_CHANGE)
+                .addChange(appChange)
+                .build();
+        final SurfaceControl.Transaction startT = new StubTransaction();
+        final Transitions.TransitionFinishCallback finishCallback
+                = mock(Transitions.TransitionFinishCallback.class);
+        mRecentsTransitionHandler.findController(transition).merge(
+                mergeTransitionInfo,
+                startT,
+                new StubTransaction(),
+                finishCallback);
+        mMainExecutor.flushAll();
+
+        // Verify that we've merged
+        verify(finishCallback).onTransitionFinished(any());
+    }
+
     @EnableFlags(FLAG_ADD_ONE_OFF_HANDLER_LEASHES)
     @Test
     public void testMerge_cancelToHome_onDisplayChange() throws Exception {
@@ -632,7 +667,17 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
         TransitionInfo mergeTransitionInfo = new TransitionInfoBuilder(TRANSIT_TO_BACK)
                 .addChange(TRANSIT_TO_BACK, taskInfo)
                 .build();
-        when(mBubbleHelper.isAppBubbleTask(taskInfo)).thenReturn(true);
+        when(mBubbleHelper.isBubbleTask(taskInfo)).thenReturn(true);
+        startTransitionAndMergeThenVerifyCanceled(mergeTransitionInfo, true /* useLeashes */);
+    }
+
+    @Test
+    public void testMerge_cancelToHome_onUnmergedTransition() throws Exception {
+        ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder().setTaskId(
+                123).build();
+        TransitionInfo mergeTransitionInfo = new TransitionInfoBuilder(TRANSIT_CHANGE)
+                .addChange(TRANSIT_CHANGE, taskInfo)
+                .build();
         startTransitionAndMergeThenVerifyCanceled(mergeTransitionInfo, true /* useLeashes */);
     }
 
@@ -673,7 +718,6 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     public void testMergeAndFinish_openingTaskInDesk_setsPositionOfChild() {
         ActivityManager.RunningTaskInfo deskRootTask =
                 new TestRunningTaskInfoBuilder()
@@ -710,7 +754,6 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     public void testMergeAndFinish_openingTaskInDeskWithSiblings_reordersAllToTop() {
         ActivityManager.RunningTaskInfo deskRootTask =
                 new TestRunningTaskInfoBuilder()
@@ -767,7 +810,6 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     public void testMerge_openingNewTaskInPausedDesk_usesIdLogicCorrectly() {
         final int deskId = 100;
         final int taskId = 200;

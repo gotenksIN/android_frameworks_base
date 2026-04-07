@@ -19,7 +19,9 @@ package com.android.systemui.notifications.intelligence.rules.ui.composable
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRuleEditViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRuleFreeformTextCreationViewModel
 import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.NotificationRulesScreenViewModel
+import com.android.systemui.notifications.intelligence.rules.ui.viewmodel.RulesScreenViewState
 
 /** Interface providing a composable to render the notification rules screen. */
 public interface NotificationRulesScreen {
@@ -28,12 +30,15 @@ public interface NotificationRulesScreen {
      *
      * @param dismissRulesScreen a function to invoke to hide the rules screen and go back to the
      *   previous page.
+     * @param startingBackStack the initial back stack to start with.
      */
     @Composable
     public fun Content(
         viewModelFactory: NotificationRulesScreenViewModel.Factory,
         editViewModelFactory: NotificationRuleEditViewModel.Factory,
+        freeformTextViewModelFactory: NotificationRuleFreeformTextCreationViewModel.Factory,
         dismissRulesScreen: () -> Unit,
+        startingBackStack: List<RulesScreenViewState> = listOf(RulesScreenViewState.CurrentRules),
         modifier: Modifier,
     )
 }

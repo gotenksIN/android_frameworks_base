@@ -108,6 +108,9 @@ public class AccessibilityUserState {
 
     final Set<ComponentName> mEnabledServices = new HashSet<>();
 
+    // All service connections currently bound or binding, including crashed ones.
+    private final Set<AccessibilityServiceConnection> mServiceConnections = new HashSet<>();
+
     private Set<String> mPermittedAccessibilityServices = null;
 
     final Set<ComponentName> mTouchExplorationGrantedServices = new HashSet<>();
@@ -304,6 +307,14 @@ public class AccessibilityUserState {
             mComponentNameToServiceMap.put(boundClient.getComponentName(), boundClient);
         }
         mServiceInfoChangeListener.onServiceInfoChangedLocked(this);
+    }
+
+    void addServiceConnectionLocked(AccessibilityServiceConnection connection) {
+        mServiceConnections.add(connection);
+    }
+
+    void removeServiceConnectionLocked(AccessibilityServiceConnection connection) {
+        mServiceConnections.remove(connection);
     }
 
     /**
@@ -532,12 +543,15 @@ public class AccessibilityUserState {
                 & SHOW_MODE_HARD_KEYBOARD_ORIGINAL_VALUE) != 0;
     }
 
+    Set<AccessibilityServiceConnection> getServiceConnections() {
+        return mServiceConnections;
+    }
+
     private void unbindAllServicesLocked() {
-        final List<AccessibilityServiceConnection> services = mBoundServices;
-        for (int count = services.size(); count > 0; count--) {
-            // When the service is unbound, it disappears from the list, so there's no need to
-            // keep track of the index
-            services.get(0).unbindLocked();
+        // Copy the set because unbindLocked() removes the connection from the set.
+        final Set<AccessibilityServiceConnection> connections = new HashSet<>(mServiceConnections);
+        for (AccessibilityServiceConnection connection : connections) {
+            connection.unbindLocked();
         }
     }
 
@@ -934,24 +948,23 @@ public class AccessibilityUserState {
     }
 
     /**
-     * Checks if a given accessibility service or feature component is permitted to be a shortcut
-     * target,
+     * Checks if a given accessibility service or feature component is permitted for this user.
      *
      * @param name   The flattened ComponentName string of the service or feature.
-     * @return true if the service/feature is permitted as a shortcut target, false otherwise.
+     * @return true if the service/feature is permitted, false otherwise.
      */
-    public boolean isShortcutTargetPermittedLocked(String name) {
-        return isShortcutTargetPermittedLocked(name, mPermittedAccessibilityServices);
+    public boolean isAccessibilityFeaturePermittedLocked(String name) {
+        return isAccessibilityFeaturePermittedLocked(name, mPermittedAccessibilityServices);
     }
 
     /**
-     * Returns whether the shortcut target is permitted for this user.
+     * Returns whether the accessibility feature is permitted for this user.
      *
-     * @param name The name of the shortcut target.
+     * @param name The name of the accessibility feature.
      * @param permittedPackageNameSet The set of permitted package names.
-     * @return true if the shortcut target is permitted, false otherwise.
+     * @return true if the accessibility feature is permitted, false otherwise.
      */
-    public boolean isShortcutTargetPermittedLocked(String name,
+    public boolean isAccessibilityFeaturePermittedLocked(String name,
             Set<String> permittedPackageNameSet) {
         BuiltInCheckResult checkResult = checkIsBuiltInFeature(name);
         if (checkResult == BuiltInCheckResult.VALID) {

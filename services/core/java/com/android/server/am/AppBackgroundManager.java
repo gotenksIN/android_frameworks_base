@@ -332,7 +332,7 @@ public class AppBackgroundManager {
         mUsePackageLevelFreezer = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.app_bg_manager.enable_package_level_freezer", "true"));
         mUseAppKeepaliveManager = Boolean.valueOf(mPerf.perfGetProp(
-                "ro.vendor.perf.app_bg_manager.enable_app_keepalive_manager", "true"));
+                "ro.vendor.perf.app_bg_manager.enable_app_keepalive_manager", "false"));
         mUseUIRTSettings = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.app_bg_manager.enable_ui_rt_settings", "false"));
         mUseUIAffinitySettings = Boolean.valueOf(mPerf.perfGetProp(

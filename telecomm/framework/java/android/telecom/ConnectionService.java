@@ -2930,8 +2930,21 @@ public abstract class ConnectionService extends Service {
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "startRtt").onStartRtt(rttTextStream);
         } else if (mConferenceById.containsKey(callId)) {
-            Log.w(this, "startRtt called on a conference.");
+            onStartRtt(findConferenceForAction(callId, "startRtt"), rttTextStream);
         }
+    }
+
+    /**
+     * Notifies the {@link ConnectionService} that the RTT session has been started for a
+     * {@link Conference}.
+     *
+     * @param conference The conference.
+     * @param rttTextStream The RTT text stream.
+     * @hide
+     */
+    public void onStartRtt(@NonNull Conference conference,
+            @NonNull Connection.RttTextStream rttTextStream) {
+        Log.w(this, "startRtt called on a conference.");
     }
 
     private void stopRtt(String callId) {
@@ -2939,8 +2952,19 @@ public abstract class ConnectionService extends Service {
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "stopRtt").onStopRtt();
         } else if (mConferenceById.containsKey(callId)) {
-            Log.w(this, "stopRtt called on a conference.");
+            onStopRtt(findConferenceForAction(callId, "stopRtt"));
         }
+    }
+
+    /**
+     * Notifies the {@link ConnectionService} that the RTT session has been stopped for a
+     * {@link Conference}.
+     *
+     * @param conference The conference.
+     * @hide
+     */
+    public void onStopRtt(@NonNull Conference conference) {
+        Log.w(this, "stopRtt called on a conference.");
     }
 
     private void handleRttUpgradeResponse(String callId, Connection.RttTextStream rttTextStream) {

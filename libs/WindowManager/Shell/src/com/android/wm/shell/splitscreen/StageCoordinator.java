@@ -2284,6 +2284,30 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         return SPLIT_POSITION_UNDEFINED;
     }
 
+    /**
+     * Returns the split position (top/left or bottom/right) of the stage containing the
+     * specified task, regardless of whether that task is currently visible.
+     *
+     * <p>This differs from {@link #getSplitPosition(int)} because it checks for the task's
+     * presence in the stage hierarchy using {@code getTopChildTaskId} rather than
+     * {@code getTopVisibleChildTaskId}. This is useful when querying the layout state
+     * during transitions or when the split screen is in the background.</p>
+     *
+     * @param taskId the unique ID of the task to locate.
+     * @return the {@link SplitPosition} of the stage containing the task;
+     * {@link #SPLIT_POSITION_UNDEFINED} if the task is not found in either stage.
+     * @see #getSplitPosition(int)
+     */
+    @SplitPosition
+    public int getSplitPositionIgnoreVisible(int taskId) {
+        if (mSideStage.getTopChildTaskId() == taskId) {
+            return getSideStagePosition();
+        } else if (mMainStage.getTopChildTaskId() == taskId) {
+            return getMainStagePosition();
+        }
+        return SPLIT_POSITION_UNDEFINED;
+    }
+
     @Override
     int calculateCurrentSnapPosition() {
         return mSplitLayout.calculateCurrentSnapPosition();
@@ -2693,6 +2717,9 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         // Disallow child tasks to override bounds and always inherits from the stage root tasks
         wct.setDisallowOverrideBoundsForChildren(mMainStage.mRootTaskInfo.token, true);
         wct.setDisallowOverrideBoundsForChildren(mSideStage.mRootTaskInfo.token, true);
+        // Inherit Windowing Mode from the root stage tasks.
+        wct.setDisallowOverrideWindowingModeForChildren(mMainStage.mRootTaskInfo.token, true);
+        wct.setDisallowOverrideWindowingModeForChildren(mSideStage.mRootTaskInfo.token, true);
 
         setRootForceTranslucent(true, wct);
         if (!enableFlexibleSplit()) {

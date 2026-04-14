@@ -6587,9 +6587,6 @@
   <!-- Whether to force color fade. -->
   <java-symbol type="bool" name="config_forceColorFade" />
 
-  <!-- The locale lauguages that force camera shutter sound -->
-  <java-symbol type="array" name="config_cameraSoundForcedLanguage" />
-
   <!-- The location button render service component name -->
   <java-symbol type="string" name="config_locationButtonRenderService" />
 
@@ -6665,4 +6662,6 @@
   <java-symbol type="string" name="do_not_disturb_sync_notification_title" />
   <java-symbol type="string" name="do_not_disturb_sync_notification_content" />
   <java-symbol type="drawable" name="ic_cross_device_sync_airplane" />
+  <!-- Disable the Video Capability over IWLAN when Wi-Fi Calling is turned off  -->
+  <java-symbol type="bool" name="config_disable_video_capability_when_wfc_off" />
   </resources>

@@ -84,8 +84,7 @@ constructor(
     /** @see SecureLockDeviceInteractor.shouldListenForBiometricAuth */
     val shouldListenForBiometricAuth: Boolean by
         secureLockDeviceInteractor.shouldListenForBiometricAuth.hydratedStateOf(
-            traceName = "shouldListenForBiometricAuth",
-            initialValue = false,
+            initialValue = false
         )
 
     /** @see SecureLockDeviceInteractor.enrolledStrongBiometricModalities */
@@ -435,8 +434,9 @@ constructor(
      * lock device.
      */
     fun onTryAgainButtonClicked() {
+        // Update state when try again is clicked and then request for authentication
+        secureLockDeviceInteractor.onUserRequestedRetry()
         showAuthenticating(isRetry = true)
-        secureLockDeviceInteractor.onRetryBiometricAuth()
     }
 
     /**

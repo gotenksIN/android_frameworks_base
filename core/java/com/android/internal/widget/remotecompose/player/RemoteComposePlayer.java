@@ -23,8 +23,11 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -33,6 +36,7 @@ import android.widget.ScrollView;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.widget.remotecompose.core.CoreDocument;
 import com.android.internal.widget.remotecompose.core.CoreDocument.ShaderControl;
+import com.android.internal.widget.remotecompose.core.Limits;
 import com.android.internal.widget.remotecompose.core.RemoteContext;
 import com.android.internal.widget.remotecompose.core.RemoteContextActions;
 import com.android.internal.widget.remotecompose.core.operations.NamedVariable;
@@ -41,6 +45,7 @@ import com.android.internal.widget.remotecompose.core.operations.Theme;
 import com.android.internal.widget.remotecompose.core.operations.layout.Component;
 import com.android.internal.widget.remotecompose.core.semantics.ScrollableComponent;
 import com.android.internal.widget.remotecompose.player.accessibility.platform.RemoteComposeTouchHelper;
+import com.android.internal.widget.remotecompose.player.platform.AndroidFloatSystemVariables;
 import com.android.internal.widget.remotecompose.player.platform.AndroidRemoteContext;
 import com.android.internal.widget.remotecompose.player.platform.BitmapLoader;
 import com.android.internal.widget.remotecompose.player.platform.HapticSupport;
@@ -77,6 +82,8 @@ public class RemoteComposePlayer extends FrameLayout implements RemoteContextAct
     private final @NonNull ThemeSupport mThemeSupport = new ThemeSupport();
     private final @NonNull SensorSupport mSensorsSupport = new SensorSupport();
     private final @NonNull HapticSupport mHapticSupport = new HapticSupport();
+    private @Nullable FloatSystemVariables mFloatSystemVariables =
+            new AndroidFloatSystemVariables();
 
     private @NonNull ShaderControl mShaderControl = (shader) -> false;
 
@@ -94,6 +101,51 @@ public class RemoteComposePlayer extends FrameLayout implements RemoteContextAct
             @NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init(context, attrs, defStyleAttr);
+    }
+
+    /**
+     * Sets the maximum number of operations that can be executed in a single frame.
+     *
+     * @param maxOpCount the maximum number of operations
+     */
+    public void setMaxOpCount(int maxOpCount) {
+        Limits.MAX_OP_COUNT = maxOpCount;
+    }
+
+    /**
+     * Sets the maximum dimension (width or height) of an image that can be loaded.
+     *
+     * @param maxImageDimension the maximum dimension
+     */
+    public void setMaxImageDimension(int maxImageDimension) {
+        Limits.MAX_IMAGE_DIMENSION = maxImageDimension;
+    }
+
+    /**
+     * Sets the maximum bitmap memory allowed for a single player instance.
+     *
+     * @param maxBitmapMemory the maximum memory in bytes
+     */
+    public void setMaxBitmapMemory(int maxBitmapMemory) {
+        Limits.MAX_BITMAP_MEMORY = maxBitmapMemory;
+    }
+
+    /**
+     * Sets the default maximum frames per second for the player.
+     *
+     * @param defaultMaxFps the default maximum fps
+     */
+    public void setDefaultMaxFps(int defaultMaxFps) {
+        Limits.DEFAULT_MAX_FPS = defaultMaxFps;
+    }
+
+    /**
+     * Sets the absolute maximum frames per second for the player.
+     *
+     * @param maxFps the absolute maximum fps
+     */
+    public void setMaxFps(int maxFps) {
+        Limits.MAX_FPS = maxFps;
     }
 
     private @NonNull RemoteContext getRemoteContext() {
@@ -275,10 +327,35 @@ public class RemoteComposePlayer extends FrameLayout implements RemoteContextAct
             RemoteComposeTouchHelper.REGISTRAR.clearAccessibilityDelegate(this);
         }
 
+        FloatSystemVariables sysVar = mFloatSystemVariables;
+        if (sysVar != null) {
+            sysVar.loadSystemVariables(mInner, mInner.getNamedVariables(NamedVariable.FLOAT_TYPE));
+        }
+
         mThemeSupport.mapColors(getContext(), mInner);
         mSensorsSupport.setupSensors(getContext().getApplicationContext(), mInner);
         mHapticSupport.setupHaptics(mInner);
         mInner.checkShaders(mShaderControl);
+    }
+
+    @Override
+    public boolean dispatchHoverEvent(MotionEvent event) {
+        return RemoteComposeTouchHelper.REGISTRAR.dispatchHoverEvent(this, event)
+                || super.dispatchHoverEvent(event);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        return RemoteComposeTouchHelper.REGISTRAR.dispatchKeyEvent(this, event)
+                || super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void onFocusChanged(
+            boolean gainFocus, int direction, @Nullable Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        RemoteComposeTouchHelper.REGISTRAR.onFocusChanged(
+                this, gainFocus, direction, previouslyFocusedRect);
     }
 
     /**
@@ -355,6 +432,26 @@ public class RemoteComposePlayer extends FrameLayout implements RemoteContextAct
         ((AndroidRemoteContext) mInner.getRemoteContext()).setBitmapLoader(bitmapLoader);
     }
 
+    /** Sets a FloatSystemVariables on the RemoteContext. */
+    public interface FloatSystemVariables {
+        /**
+         * Called to load system variables.
+         *
+         * @param rcView the view to setValues on
+         * @param var list of strings
+         */
+        void loadSystemVariables(@NonNull RemoteComposeView rcView, @NonNull String[] var);
+    }
+
+    /**
+     * Sets the class to override system variables
+     *
+     * @param floatSystemVariables class to set system variables.
+     */
+    public void setFloatSystemVariables(@Nullable FloatSystemVariables floatSystemVariables) {
+        mFloatSystemVariables = floatSystemVariables;
+    }
+
     /**
      * Set an override for a string resource
      *
@@ -415,6 +512,25 @@ public class RemoteComposePlayer extends FrameLayout implements RemoteContextAct
      */
     public void setUserLocalFloat(@NonNull String name, float value) {
         mInner.setLocalFloat("USER:" + name, value);
+    }
+
+    /**
+     * Set an override for a user domain float resource
+     *
+     * @param name name of the float
+     * @param value value of the float
+     */
+    public void setLocalFloat(@NonNull String name, float value) {
+        mInner.setLocalFloat(name, value);
+    }
+
+    /**
+     * Get the animation time. This is used in many
+     *
+     * @return
+     */
+    public float getAnimationTime() {
+        return mInner.getAnimationTime();
     }
 
     /**

@@ -1492,7 +1492,7 @@ public class InputManagerService extends IInputManager.Stub
             @NonNull IBinder toChannelToken, boolean transferEntireGesture) {
         Objects.requireNonNull(fromChannelToken);
         Objects.requireNonNull(toChannelToken);
-        ProtoLog.d(INPUT_STREAM_MODIFIER_LOG, "transferTouchGesture: transferEntireGesture=%s",
+        ProtoLog.d(INPUT_STREAM_MODIFIER_LOG, "transferTouchGesture: transferEntireGesture=%b",
                 transferEntireGesture);
         return mNative.transferTouchGesture(fromChannelToken, toChannelToken,
                 false /* isDragDrop */, transferEntireGesture);
@@ -3371,7 +3371,7 @@ public class InputManagerService extends IInputManager.Stub
             throw new IllegalArgumentException("fromAxis " + MotionEvent.axisToString(fromAxis)
                     + " is not a valid controller axis");
         }
-        if (!isControllerAxis(toAxis)) {
+        if (!isControllerAxis(toAxis) && toAxis != MotionEvent.AXIS_DISABLED) {
             throw new IllegalArgumentException("toAxis " + MotionEvent.axisToString(toAxis)
                     + " is not a valid controller axis");
         }

@@ -18,14 +18,19 @@ package com.android.systemui.screencapture.record.largescreen.ui.viewmodel
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions.LaunchCookie
+import android.content.Context
 import android.graphics.Point
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.util.DisplayMetrics
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import com.android.app.tracing.coroutines.launchInTraced
 import com.android.internal.logging.UiEventLogger
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.mediaprojection.MediaProjectionCaptureTarget
+import com.android.systemui.res.R
 import com.android.systemui.screencapture.ScreenCaptureEvent
 import com.android.systemui.screencapture.common.ScreenCapture
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
@@ -48,7 +53,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 
 /** Models UI for the Screen Capture UI for large screen devices. */
@@ -67,6 +74,7 @@ constructor(
     @ScreenCapture private val screenCaptureUiParams: ScreenCaptureUiParameters,
     toolbarViewModelFactory: PreCaptureToolbarViewModel.Factory,
     private val appWindowInteractor: AppWindowInteractor,
+    private val context: Context,
 ) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModel {
 
     private val recordingParameters = screenCaptureUiParams as ScreenCaptureUiParameters.Record
@@ -100,6 +108,8 @@ constructor(
     val topTask: RunningTaskInfo? by topTaskSource.hydratedStateOf()
 
     val regionBox: Rect? by regionBoxSource.hydratedStateOf()
+
+    val snackbarHostState = SnackbarHostState()
 
     private fun isValidCaptureOptions(
         captureType: ScreenCaptureType,
@@ -159,6 +169,19 @@ constructor(
         uiEventLogger.log(
             ScreenCaptureEvent.fromRegionAndType(captureRegionSource.value, selectedType)
         )
+    }
+
+    private suspend fun showDisclaimer(resId: Int) {
+        val newMessage = context.getString(resId)
+        if (snackbarHostState.currentSnackbarData?.visuals?.message == newMessage) {
+            return
+        }
+        snackbarHostState.currentSnackbarData?.dismiss()
+        snackbarHostState.showSnackbar(message = newMessage, duration = SnackbarDuration.Short)
+    }
+
+    private fun hideDisclaimer() {
+        snackbarHostState.currentSnackbarData?.dismiss()
     }
 
     fun updateCaptureRegion(selectedRegion: ScreenCaptureRegion) {
@@ -376,6 +399,22 @@ constructor(
 
     override suspend fun onActivated() {
         coroutineScope {
+            combine(captureTypeSource, captureRegionSource) { type, region -> type to region }
+                .mapLatest { (type, region) ->
+                    if (type == ScreenCaptureType.RECORDING) {
+                        val resId =
+                            if (region == ScreenCaptureRegion.FULLSCREEN) {
+                                R.string.screenrecord_permission_dialog_warning_entire_screen
+                            } else {
+                                R.string.screenrecord_permission_dialog_warning_single_app
+                            }
+                        showDisclaimer(resId)
+                    } else {
+                        hideDisclaimer()
+                    }
+                }
+                .launchInTraced("PreCaptureViewModel#disclaimer", this)
+
             launch {
                 coroutineScope {
                     launch { initializeCaptureType() }

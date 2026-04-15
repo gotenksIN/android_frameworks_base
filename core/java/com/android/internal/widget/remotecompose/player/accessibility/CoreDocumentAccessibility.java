@@ -27,6 +27,7 @@ import com.android.internal.widget.remotecompose.core.RemoteContextActions;
 import com.android.internal.widget.remotecompose.core.operations.layout.ClickModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.Component;
 import com.android.internal.widget.remotecompose.core.operations.layout.LayoutComponent;
+import com.android.internal.widget.remotecompose.core.operations.layout.MultiClickModifier;
 import com.android.internal.widget.remotecompose.core.operations.layout.RootLayoutComponent;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ComponentModifiers;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ModifierOperation;
@@ -45,7 +46,8 @@ import java.util.stream.Stream;
  * Java Player implementation of the {@link RemoteComposeDocumentAccessibility} interface. Each item
  * in the semantic tree is a {@link Component} from the remote Compose UI. Each Component can have a
  * list of modifiers that must be tagged with {@link AccessibilitySemantics} either incidentally
- * (see {@link ClickModifierOperation}) or explicitly (see {@link CoreSemantics}).
+ * (see {@link ClickModifierOperation} and {@link MultiClickModifier}) or explicitly (see {@link
+ * CoreSemantics}).
  */
 public class CoreDocumentAccessibility implements RemoteComposeDocumentAccessibility {
     private final CoreDocument mDocument;
@@ -60,7 +62,41 @@ public class CoreDocumentAccessibility implements RemoteComposeDocumentAccessibi
     @Nullable
     @Override
     public Integer getComponentIdAt(@NonNull PointF point) {
+        Component rootComponent = findComponentById(RootId);
+
+        // allocate once
+        int[] boundsInParent = new int[4];
+
+        if (rootComponent != null) {
+            return getComponentIdAt(rootComponent, point, boundsInParent);
+        }
+
         return RootId;
+    }
+
+    private int getComponentIdAt(
+            Component component, @NonNull PointF point, @NonNull int[] boundsInParent) {
+        List<Integer> children = semanticallyRelevantChildComponents(component, false);
+
+        for (Integer childId : children) {
+            Component childComponent = findComponentById(childId);
+
+            if (childComponent != null) {
+                childComponent.getBoundsInSemanticParent(
+                        boundsInParent, component.getComponentId());
+
+                if (contains(boundsInParent, point.x, point.y)) {
+                    point.offset(-boundsInParent[0], -boundsInParent[1]);
+                    return getComponentIdAt(childComponent, point, boundsInParent);
+                }
+            }
+        }
+
+        return component.getComponentId();
+    }
+
+    private boolean contains(int[] bounds, float x, float y) {
+        return bounds[0] <= x && bounds[2] >= x && bounds[1] <= y && bounds[3] >= y;
     }
 
     @Override

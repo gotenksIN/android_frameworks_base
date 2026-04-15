@@ -138,8 +138,6 @@ import static com.android.internal.annotations.VisibleForTesting.Visibility.PACK
 import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.alwaysSeqIdLayout;
 import static com.android.window.flags.Flags.alwaysSeqIdLayoutWear;
-import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateOnConfigChange;
-import static com.android.window.flags.Flags.predictiveBackFixImeEventsSkipBackDispatcher;
 import static com.android.window.flags.Flags.reduceChangedExclusionRectsMsgs;
 
 import android.Manifest;
@@ -611,7 +609,7 @@ public final class ViewRootImpl implements ViewParent,
 
     final W mWindow;
 
-    final IBinder mLeashToken;
+    private final IBinder mLeashToken;
 
     final int mTargetSdkVersion;
 
@@ -967,6 +965,7 @@ public final class ViewRootImpl implements ViewParent,
 
     boolean mHandlesWindowInsetsAnimation = false;
     private int mWindowInsetsAnimationCount = 0;
+    private boolean mUsesSyncedInsetsAnimationByDefault = false;
 
     // Insets types hidden by legacy window flags or system UI flags.
     private @InsetsType int mTypesHiddenByFlags = 0;
@@ -1341,7 +1340,6 @@ public final class ViewRootImpl implements ViewParent,
                     }
                     // Post to main thread
                     mHandler.post(() -> {
-                        Trace.instant(TRACE_TAG_VIEW, "mCornerRadiiCallback post to main thread");
                         CornerRadii newCornerRadii = new CornerRadii();
                         newCornerRadii.topLeft = cornerRadii[0];
                         newCornerRadii.topRight = cornerRadii[1];
@@ -1349,6 +1347,9 @@ public final class ViewRootImpl implements ViewParent,
                         newCornerRadii.bottomRight = cornerRadii[3];
                         mCornerRadii = newCornerRadii;
                         mCornerRadiiDirty = true;
+                        if (Trace.isTagEnabled(TRACE_TAG_VIEW)) {
+                            Trace.instant(TRACE_TAG_VIEW, "CornerRadii updated: " + mCornerRadii);
+                        }
                         invalidate();
                     });
                 }
@@ -1790,6 +1791,7 @@ public final class ViewRootImpl implements ViewParent,
                     res = mWindowSession.addToDisplayAsUser(mWindow, mWindowAttributes,
                             getHostVisibility(), mDisplay.getDisplayId(), userId,
                             mInsetsController.getRequestedVisibleTypes(), inputChannel, addResult);
+                    mUsesSyncedInsetsAnimationByDefault = addResult.usesSyncedInsetsAnimation;
                     if (mTranslator != null) {
                         mTranslator.translateRectInScreenToAppWindow(
                                 addResult.frames.attachedFrame);
@@ -3153,7 +3155,8 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void destroySurface() {
-        if (mBoundsLayer != null) {
+        // Keep bounds layer if it's currently nested within a cached surface.
+        if (mBoundsLayer != null && mCachedSurfaceControl == null) {
             mBoundsLayer.release();
             mBoundsLayer = null;
         }
@@ -3831,8 +3834,8 @@ public final class ViewRootImpl implements ViewParent,
                             ignoringTypes).toRect());
             mScrollMayChange = true;
             mImmediateScrolling = true;
-            mLastInsetsDuringAnimationProgress = insets;
             if (dispatchesApplyInsetsDuringAnimationProgress()) {
+                mLastInsetsDuringAnimationProgress = insets;
                 notifyInsetsChanged();
             }
             return null;
@@ -3871,9 +3874,9 @@ public final class ViewRootImpl implements ViewParent,
         // TODOb(b/463899193): introduce device config to disable synchronized insets animation.
         return com.android.window.flags.Flags.syncedInsetsAnimation()
                 // The synced animation might take more resources, thus disabling on low-end devices
-                && !ActivityManager.isLowRamDeviceStatic()
+                && ActivityManager.isHighEndGfx()
                 && !mHandlesWindowInsetsAnimation
-                && CompatChanges.isChangeEnabled(ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION);
+                && usesSyncedInsetsAnimationByDefault();
     }
 
     public void dispatchApplyInsets(View host) {
@@ -5224,7 +5227,6 @@ public final class ViewRootImpl implements ViewParent,
                 || !mSurfaceControl.isValid()) {
             return;
         }
-        Trace.instant(TRACE_TAG_VIEW, "setClientDrawnCornerRadii: radii" + mCornerRadii);
         RectF bounds = threadedRenderer.setCornerRadius(mCornerRadii);
         if (mCornerRadiiDirty || !mLastSetClientDrawnRadiiBounds.equals(bounds)) {
             // Reset opacity if we are expecting clipping and surface was opaque before.
@@ -7190,16 +7192,14 @@ public final class ViewRootImpl implements ViewParent,
             mActivityConfigCallback.onConfigurationChanged(overrideConfig, newDisplayId,
                     activityWindowInfo);
         } else {
-            if (enableWindowContextResourcesUpdateOnConfigChange()) {
-                // There is no activity callback - update resources for window token, if needed.
-                final IBinder windowContextToken = mContext.getWindowContextToken();
-                if (windowContextToken instanceof WindowTokenClient) {
-                    WindowTokenClientController.getInstance().onWindowConfigurationChanged(
-                            windowContextToken,
-                            mLastReportedMergedConfiguration.getMergedConfiguration(),
-                            newDisplayId
-                    );
-                }
+            // There is no activity callback - update resources for window token, if needed.
+            final IBinder windowContextToken = mContext.getWindowContextToken();
+            if (windowContextToken instanceof WindowTokenClient) {
+                WindowTokenClientController.getInstance().onWindowConfigurationChanged(
+                        windowContextToken,
+                        mLastReportedMergedConfiguration.getMergedConfiguration(),
+                        newDisplayId
+                );
             }
             updateConfiguration(newDisplayId);
         }
@@ -7328,6 +7328,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final int MSG_INITIAL_TOUCH_BOOST_TIMEOUT = 44;
     private static final int MSG_REQUEST_HARDWARE_RENDERER_OUTPUT_DISABLED = 45;
     private static final int MSG_REQUEST_VIEW_ANIMATIONS_DISABLED = 46;
+    private static final int MSG_REQUEST_A11Y_EMBEDDED_CONNECTION = 47;
 
     final class ViewRootHandler extends Handler {
         @Override
@@ -7405,6 +7406,8 @@ public final class ViewRootImpl implements ViewParent,
                     return "MSG_REQUEST_HARDWARE_RENDERER_OUTPUT_DISABLED";
                 case MSG_REQUEST_VIEW_ANIMATIONS_DISABLED:
                     return "MSG_REQUEST_VIEW_ANIMATIONS_DISABLED";
+                case MSG_REQUEST_A11Y_EMBEDDED_CONNECTION:
+                    return "MSG_REQUEST_A11Y_EMBEDDED_CONNECTION";
             }
             return super.getMessageName(message);
         }
@@ -7736,6 +7739,17 @@ public final class ViewRootImpl implements ViewParent,
                     WindowManagerGlobal.getInstance()
                             .onAnimationDisableRequestChangedForViewRoot();
                     recalculatePerformanceHintSessionNeeded();
+                    break;
+                }
+                case MSG_REQUEST_A11Y_EMBEDDED_CONNECTION: {
+                    final var receiver = (IResultReceiver) msg.obj;
+                    final var data = new Bundle();
+                    data.putBinder(WindowManager.PARCEL_KEY_A11Y_EMBEDDED_CONNECTION,
+                            getAccessibilityEmbeddedConnection().asBinder());
+                    try {
+                        receiver.send(0, data);
+                    } catch (RemoteException e) {
+                    }
                     break;
                 }
             }
@@ -10545,6 +10559,20 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
+
+    /**
+     * @return whether the synchronized insets animation is allowed for this window.
+     */
+    public boolean usesSyncedInsetsAnimationByDefault() {
+        return mUsesSyncedInsetsAnimationByDefault;
+    }
+
+    /** @hide */
+    @VisibleForTesting
+    public void setUsesSyncedInsetsAnimationByDefault(boolean allowed) {
+        mUsesSyncedInsetsAnimationByDefault = allowed;
+    }
+
     private boolean getViewBoundsSandboxingEnabled() {
         // System dialogs (e.g. ANR) can be created within System process, so handleBindApplication
         // may be never called. This results into all app compat changes being enabled
@@ -10916,6 +10944,10 @@ public final class ViewRootImpl implements ViewParent,
             mOnBackInvokedDispatcher.detachFromWindow();
             removeVrrMessages();
 
+            if (mCachedSurfaceControl != null) {
+                mCachedSurfaceControl.release();
+                mCachedSurfaceControl = null;
+            }
             if (mAdded) {
                 dispatchDetachedFromWindow();
             }
@@ -10941,10 +10973,6 @@ public final class ViewRootImpl implements ViewParent,
                     }
 
                     destroySurface();
-                    if (mCachedSurfaceControl != null) {
-                        mCachedSurfaceControl.release();
-                        mCachedSurfaceControl = null;
-                    }
                 }
             }
 
@@ -11313,18 +11341,14 @@ public final class ViewRootImpl implements ViewParent,
             if (q.shouldSendToSynthesizer()) {
                 stage = mSyntheticInputStage;
             } else {
-                if (predictiveBackFixImeEventsSkipBackDispatcher()) {
-                    // Optimization: Skip to Post-IME stage for pointer events (touch), unless the
-                    // SKIP_IME flag is set.
-                    // Why? The flag implies we need to handle Pre-IME logic (for KEYCODE_BACK
-                    // interception) which lives in the NativePreImeStage, so we can't take the
-                    // shortcut.
-                    boolean canSkipToPostIme = q.shouldSkipIme()
-                            && (q.mFlags & QueuedInputEvent.FLAG_SKIP_IME) == 0;
-                    stage = canSkipToPostIme ? mFirstPostImeInputStage : mFirstInputStage;
-                } else {
-                    stage = q.shouldSkipIme() ? mFirstPostImeInputStage : mFirstInputStage;
-                }
+                // Optimization: Skip to Post-IME stage for pointer events (touch), unless the
+                // SKIP_IME flag is set.
+                // Why? The flag implies we need to handle Pre-IME logic (for KEYCODE_BACK
+                // interception) which lives in the NativePreImeStage, so we can't take the
+                // shortcut.
+                boolean canSkipToPostIme = q.shouldSkipIme()
+                        && (q.mFlags & QueuedInputEvent.FLAG_SKIP_IME) == 0;
+                stage = canSkipToPostIme ? mFirstPostImeInputStage : mFirstInputStage;
             }
 
             if (q.mEvent instanceof KeyEvent) {
@@ -12939,6 +12963,15 @@ public final class ViewRootImpl implements ViewParent,
                 viewAncestor.dispatchScrollToTop(x);
             }
         }
+
+        @Override
+        public void requestAccessibilityEmbeddedConnection(IResultReceiver receiver) {
+            final ViewRootImpl viewAncestor = mViewAncestor.get();
+            if (viewAncestor != null) {
+                viewAncestor.mHandler.obtainMessage(MSG_REQUEST_A11Y_EMBEDDED_CONNECTION,
+                        receiver).sendToTarget();
+            }
+        }
     }
 
     /**
@@ -13408,6 +13441,14 @@ public final class ViewRootImpl implements ViewParent,
                     ViewRootImpl.this);
         }
         return mAccessibilityEmbeddedConnection;
+    }
+
+    /**
+     * Get the token used to track this window with the accessibility manager.
+     * @hide
+     */
+    public IBinder getAccessibilityLeashToken() {
+        return mLeashToken;
     }
 
     private class SendWindowContentChangedAccessibilityEvent implements Runnable {

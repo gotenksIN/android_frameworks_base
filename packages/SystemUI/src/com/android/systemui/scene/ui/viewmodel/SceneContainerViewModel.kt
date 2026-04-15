@@ -22,11 +22,10 @@ import android.os.Build
 import android.view.MotionEvent
 import android.view.WindowInsetsController
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.scene.ContentKey
-import com.android.compose.animation.scene.DefaultEdgeDetector
+import com.android.compose.animation.scene.DynamicSizeEdgeDetector
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
@@ -44,8 +43,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInterac
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.ui.viewmodel.BurnInMovementState
 import com.android.systemui.keyguard.ui.viewmodel.LightRevealScrimViewModel
-import com.android.systemui.lifecycle.ExclusiveActivatable
-import com.android.systemui.lifecycle.Hydrator
+import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.qs.panels.ui.viewmodel.AnimateQsTilesViewModel
 import com.android.systemui.res.R
@@ -62,12 +60,12 @@ import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.domain.interactor.RemoteInputInteractor
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationContainerInteractor
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
+import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import com.android.systemui.wallpapers.ui.viewmodel.WallpaperViewModel
 import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +77,7 @@ class SceneContainerViewModel
 @AssistedInject
 constructor(
     @ShadeDisplayAware private val resources: Resources,
+    @ShadeDisplayAware private val systemBarUtilsState: SystemBarUtilsState,
     private val sceneInteractor: SceneInteractor,
     desktopInteractor: DesktopInteractor,
     private val deviceUnlockedInteractor: DeviceUnlockedInteractor,
@@ -102,13 +101,12 @@ constructor(
     private val toastDisplayer: Lazy<SceneContainerToastDisplayer>,
     @Assisted private val motionEventHandlerReceiver: (MotionEventHandler?) -> Unit,
     private val accessibilityInteractor: AccessibilityInteractor,
-) : ExclusiveActivatable() {
+) : HydratedActivatable() {
 
     /** The scene that should be rendered. */
     val currentScene: SceneKey
         get() = sceneInteractor.currentSceneAsState
 
-    private val hydrator = Hydrator("SceneContainerViewModel.hydrator")
     val blurViewModel: SceneTransitionBlurViewModel = sceneTransitionBlurViewModelFactory.create()
     val toBouncerTransitionViewModel = toBouncerTransitionViewModelFactory.create()
 
@@ -121,12 +119,9 @@ constructor(
     val burnInMovementState: BurnInMovementState = burnInMovementFactory.create()
 
     val isAodOrDozing: Boolean by
-        hydrator.hydratedStateOf(
-            false,
-            keyguardTransitionInteractor.startedKeyguardTransitionStep.map {
-                it.to == KeyguardState.DOZING || it.to == KeyguardState.AOD
-            },
-        )
+        keyguardTransitionInteractor.startedKeyguardTransitionStep
+            .map { it.to == KeyguardState.DOZING || it.to == KeyguardState.AOD }
+            .hydratedStateOf(false)
 
     /**
      * Whether to reject the transition to this ContentKey because the FalsingManager believes the
@@ -143,41 +138,35 @@ constructor(
     private val dualShadeGestureSplitRatio =
         resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
 
+    private val statusBarHeightPx: Int by
+        systemBarUtilsState.statusBarHeight.hydratedStateOf(initialValue = 0)
+
+    private val dynamicSizeEdgeDetector = DynamicSizeEdgeDetector { statusBarHeightPx }
+
     /**
      * The [SwipeSourceDetector] to use for defining which areas of the screen can be defined in the
      * [UserAction]s for this container.
      */
     val swipeSourceDetector: SwipeSourceDetector by
-        hydrator.hydratedStateOf(
-            traceName = "swipeSourceDetector",
-            initialValue = DefaultEdgeDetector,
-            source =
-                shadeModeInteractor.shadeMode.map {
-                    if (it is ShadeMode.Dual) {
-                        SceneContainerSwipeDetector(
-                            edgeSize = 40.dp,
-                            invocationGestureSplitRatio = dualShadeGestureSplitRatio,
-                        )
-                    } else {
-                        DefaultEdgeDetector
-                    }
-                },
-        )
+        shadeModeInteractor.shadeMode
+            .map {
+                if (it is ShadeMode.Dual) {
+                    SceneContainerSwipeDetector(
+                        dynamicSizeEdgeDetector = dynamicSizeEdgeDetector,
+                        invocationGestureSplitRatio = dualShadeGestureSplitRatio,
+                    )
+                } else {
+                    dynamicSizeEdgeDetector
+                }
+            }
+            .hydratedStateOf(initialValue = dynamicSizeEdgeDetector)
 
     /** Amount of color saturation for the Flexi🥃 ribbon. */
     val ribbonColorSaturation: Float by
-        hydrator.hydratedStateOf(
-            traceName = "ribbonColorSaturation",
-            source = keyguardInteractor.dozeAmount.map { 1 - it },
-            initialValue = 1f,
-        )
+        keyguardInteractor.dozeAmount.map { 1 - it }.hydratedStateOf(initialValue = 1f)
 
     private val accessibilityEnabled: Boolean by
-        hydrator.hydratedStateOf(
-            traceName = "accessibilityEnabled",
-            initialValue = false,
-            source = accessibilityInteractor.isEnabledFiltered,
-        )
+        accessibilityInteractor.isEnabledFiltered.hydratedStateOf(initialValue = false)
 
     val accessibilityTitle: Int?
         @StringRes
@@ -203,50 +192,41 @@ constructor(
         }
 
     private val isDesktopStatusBarEnabled by
-        hydrator.hydratedStateOf(
-            traceName = "isDesktopStatusBarEnabled",
-            source =
-                desktopInteractor.useDesktopStatusBar.map { enabled ->
-                    enabled && StatusBarForDesktop.isEnabled
-                },
-            initialValue = false,
+        desktopInteractor.useDesktopStatusBar
+            .map { enabled -> enabled && StatusBarForDesktop.isEnabled }
+            .hydratedStateOf(initialValue = false)
+
+    override suspend fun onActivated() {
+        // Sends a MotionEventHandler to the owner of the view-model so they can report
+        // MotionEvents into the view-model.
+        motionEventHandlerReceiver(
+            object : MotionEventHandler {
+                override fun onMotionEvent(motionEvent: MotionEvent) {
+                    this@SceneContainerViewModel.onMotionEvent(motionEvent)
+                }
+
+                override fun onEmptySpaceMotionEvent(motionEvent: MotionEvent) {
+                    this@SceneContainerViewModel.onEmptySpaceMotionEvent(motionEvent)
+                }
+
+                override fun onMotionEventComplete() {
+                    this@SceneContainerViewModel.onMotionEventComplete()
+                }
+            }
         )
 
-    override suspend fun onActivated(): Nothing {
-        try {
-            // Sends a MotionEventHandler to the owner of the view-model so they can report
-            // MotionEvents into the view-model.
-            motionEventHandlerReceiver(
-                object : MotionEventHandler {
-                    override fun onMotionEvent(motionEvent: MotionEvent) {
-                        this@SceneContainerViewModel.onMotionEvent(motionEvent)
-                    }
-
-                    override fun onEmptySpaceMotionEvent(motionEvent: MotionEvent) {
-                        this@SceneContainerViewModel.onEmptySpaceMotionEvent(motionEvent)
-                    }
-
-                    override fun onMotionEventComplete() {
-                        this@SceneContainerViewModel.onMotionEventComplete()
-                    }
-                }
-            )
-
-            coroutineScope {
-                launch { hydrator.activate() }
-                launch("SceneTransitionBlurViewModel") { blurViewModel.activate() }
-                launch("SceneContainerHapticsViewModel") { hapticsViewModel.activate() }
-                launch("NotificationContainerInteractor") {
-                    notificationContainerInteractor.activate()
-                }
-                launch("BurnInMovementState") { burnInMovementState.activate() }
-            }
-            awaitCancellation()
-        } finally {
-            // Clears the previously-sent MotionEventHandler so the owner of the view-model releases
-            // their reference to it.
-            motionEventHandlerReceiver(null)
+        coroutineScope {
+            launch("SceneTransitionBlurViewModel") { blurViewModel.activate() }
+            launch("SceneContainerHapticsViewModel") { hapticsViewModel.activate() }
+            launch("NotificationContainerInteractor") { notificationContainerInteractor.activate() }
+            launch("BurnInMovementState") { burnInMovementState.activate() }
         }
+    }
+
+    override suspend fun onDeactivated() {
+        // Clears the previously-sent MotionEventHandler so the owner of the view-model releases
+        // their reference to it.
+        motionEventHandlerReceiver(null)
     }
 
     /**
@@ -503,6 +483,20 @@ constructor(
         onBootTransitionInteractor.maybeChangeInitialScene()
     }
 
+    /** Called when SceneContainer has currently composed [scene] with TransitionState.Idle. */
+    fun onIdleSceneEnteredComposition(scene: SceneKey) {
+        sceneInteractor.onIdleSceneEnteredComposition(scene)
+    }
+
+    /**
+     * Called when SceneContainer has re-composed, and previously it was showing [scene] with
+     * TransitionState.Idle - this means that [scene] (at least in its idle state) has left
+     * composition.
+     */
+    fun onIdleSceneExitedComposition(scene: SceneKey) {
+        sceneInteractor.onIdleSceneExitedComposition(scene)
+    }
+
     fun startTransitionImmediately(transition: TransitionState.Transition) {
         sceneInteractor.startTransitionImmediately(transition)
     }
@@ -537,7 +531,8 @@ constructor(
                 Scenes.Shade -> Classifier.SHADE_DRAG
                 Overlays.NotificationsShade -> Classifier.NOTIFICATION_DRAG_DOWN
                 Scenes.QuickSettings,
-                Overlays.QuickSettingsShade -> Classifier.QUICK_SETTINGS
+                Overlays.QuickSettingsShade,
+                Overlays.QuickActions -> Classifier.QUICK_SETTINGS
                 else -> null
             }
 

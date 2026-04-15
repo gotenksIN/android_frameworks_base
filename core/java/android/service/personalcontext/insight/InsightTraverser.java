@@ -26,6 +26,8 @@ import android.util.Slog;
  * applying a stateless {@link InsightVisitor} to each node. It handles the recursion and enforces a
  * maximum depth to prevent stack overflows.
  *
+ * <p>Visitors are provided an index indicating the order in which they were traversed.
+ *
  * @hide
  */
 public final class InsightTraverser {
@@ -41,7 +43,7 @@ public final class InsightTraverser {
      * @param visitor The {@link InsightVisitor} to apply to each visited node.
      */
     public static void traverse(@NonNull ContextInsight root, @NonNull InsightVisitor visitor) {
-        traverseInternal(root, visitor, 0, DEFAULT_MAX_DEPTH);
+        traverseInternal(root, visitor, 0, DEFAULT_MAX_DEPTH, /*index=*/ 0);
     }
 
     /**
@@ -54,14 +56,25 @@ public final class InsightTraverser {
      */
     public static void traverse(
             @NonNull ContextInsight root, @NonNull InsightVisitor visitor, int maxDepth) {
-        traverseInternal(root, visitor, 0, maxDepth);
+        traverseInternal(root, visitor, 0, maxDepth, /*index=*/ 0);
     }
 
-    private static void traverseInternal(
+    /**
+     * Internal function for recursively traversing the tree.
+     *
+     * @param node insight to visit
+     * @param visitor visitor to send the insight to
+     * @param currentDepth the current traversal depth
+     * @param maxDepth the maximum traversal depth
+     * @param index the index of the current node
+     * @return the index to use for the next node in the traversal
+     */
+    private static int traverseInternal(
             @NonNull ContextInsight node,
             @NonNull InsightVisitor visitor,
             int currentDepth,
-            int maxDepth) {
+            int maxDepth,
+            int index) {
         if (currentDepth >= maxDepth) {
             Slog.w(
                     TAG,
@@ -69,13 +82,17 @@ public final class InsightTraverser {
                             + node.getClass().getSimpleName()
                             + " with id "
                             + node.getInsightId());
-            return;
+            return index;
         }
 
-        node.accept(visitor);
+        node.accept(visitor, index);
 
+        // The index for the first child starts at currentIndex + 1. Use the next index returned by
+        // the child's traversal so that their full sub-tree is counted in the numbering.
+        int nextIndex = index + 1;
         for (ContextInsight child : node.getChildren()) {
-            traverseInternal(child, visitor, currentDepth + 1, maxDepth);
+            nextIndex = traverseInternal(child, visitor, currentDepth + 1, maxDepth, nextIndex);
         }
+        return nextIndex;
     }
 }

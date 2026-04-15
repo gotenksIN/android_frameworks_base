@@ -30,7 +30,7 @@ policy_metadata {
           package_name: "android.app.admin"
         }
         int_value: 2
-        documentation: "Screen capture is allowed. "
+        documentation: "Screen capture is allowed."
       }
       resolution_mechanism {
         custom: true
@@ -48,7 +48,7 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
   allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
-  flag: "android.app.admin.flags.policy_streamlining"
+  flag: "android.app.admin.flags.policy_streamlining_screen_capture_api"
 }
 policy_metadata {
   identifier {
@@ -60,7 +60,7 @@ policy_metadata {
     class_name: "Integer"
     package_name: "java.lang"
   }
-  documentation: "Policy that controls whether the time is automatically obtained from the network or not. "
+  documentation: "Policy that controls whether the time is automatically obtained from the network or not."
   type_specific_metadata {
     enum_metadata {
       int_def_name: "android.app.admin.PolicyIdentifier.AutoTimeValue"
@@ -71,7 +71,7 @@ policy_metadata {
           class_name: "PolicyIdentifier"
           package_name: "android.app.admin"
         }
-        documentation: "The user can choose whether the time is automatically obtained from the network or not. "
+        documentation: "The user can choose whether the time is automatically obtained from the network or not."
       }
       values {
         field_name {
@@ -197,7 +197,7 @@ policy_metadata {
           class_name: "PolicyIdentifier"
           package_name: "android.app.admin"
         }
-        documentation: "The user can choose whether the device\'s time zone is set automatically or not. "
+        documentation: "The user can choose whether the device\'s time zone is set automatically or not."
       }
       values {
         field_name {
@@ -281,7 +281,7 @@ policy_metadata {
           package_name: "android.app.admin"
         }
         int_value: 2
-        documentation: "Installing Apps is disallowed. "
+        documentation: "Installing Apps is disallowed."
       }
       resolution_mechanism {
         custom: true
@@ -299,6 +299,59 @@ policy_metadata {
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
   allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining_app_install"
+}
+policy_metadata {
+  identifier {
+    field_name: "APP_UNINSTALL"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether app uninstallation is allowed or disallowed."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 1
+      int_def_name: "android.app.admin.PolicyIdentifier.AppUninstallValue"
+      documentation: "Possible values {@link APP_UNINSTALL}\n\n@hide"
+      values {
+        field_name {
+          field_name: "APP_UNINSTALL_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "Uninstalling Apps is allowed."
+      }
+      values {
+        field_name {
+          field_name: "APP_UNINSTALL_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "Uninstalling Apps is disallowed."
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_FINANCED_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
+  allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining_app_uninstall"
 }
 policy_metadata {
   identifier {
@@ -323,7 +376,7 @@ policy_metadata {
           package_name: "android.app.admin"
         }
         int_value: 1
-        documentation: "Easter eggs are disallowed. "
+        documentation: "Easter eggs are disallowed."
       }
       values {
         field_name {
@@ -332,7 +385,7 @@ policy_metadata {
           package_name: "android.app.admin"
         }
         int_value: 2
-        documentation: "Easter eggs are allowed. "
+        documentation: "Easter eggs are allowed."
       }
       resolution_mechanism {
         custom: true
@@ -360,7 +413,7 @@ policy_metadata {
     class_name: "Integer"
     package_name: "java.lang"
   }
-  documentation: "Policy that controls if the factory reset option is available in the\nsettings menu. Even if it is disabled factory reset might still be\npossible through other means."
+  documentation: "Policy that controls if the factory reset option is available in the settings menu. Even if\nit is disabled factory reset might still be possible through other means."
   type_specific_metadata {
     enum_metadata {
       default_value: 2
@@ -395,9 +448,63 @@ policy_metadata {
   required_permission: "android.permission.MANAGE_DEVICE_POLICY_FACTORY_RESET"
   required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_FINANCED_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
   allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
   flag: "android.app.admin.flags.policy_streamlining_disallow_factory_reset"
+}
+policy_metadata {
+  identifier {
+    field_name: "BLUETOOTH_SHARING"
+    class_name: "PolicyIdentifier"
+    package_name: "android.app.admin"
+  }
+  type {
+    class_name: "Integer"
+    package_name: "java.lang"
+  }
+  documentation: "Policy that controls whether Bluetooth sharing is allowed or disallowed."
+  type_specific_metadata {
+    enum_metadata {
+      default_value: 2
+      int_def_name: "android.app.admin.PolicyIdentifier.BluetoothSharingValue"
+      documentation: "Possible values {@link BLUETOOTH_SHARING}\n\n@hide"
+      values {
+        field_name {
+          field_name: "BLUETOOTH_SHARING_DISALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 1
+        documentation: "Bluetooth sharing is disallowed."
+      }
+      values {
+        field_name {
+          field_name: "BLUETOOTH_SHARING_ALLOWED"
+          class_name: "PolicyIdentifier"
+          package_name: "android.app.admin"
+        }
+        int_value: 2
+        documentation: "Bluetooth sharing is allowed."
+      }
+      resolution_mechanism {
+        custom: true
+      }
+    }
+  }
+  allowed_scopes: POLICY_SCOPE_USER
+  allowed_scopes: POLICY_SCOPE_DEVICE
+  affected_resource: RESOURCE_PER_USER
+  required_permission: "android.permission.MANAGE_DEVICE_POLICY_BLUETOOTH"
+  required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
+  allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_PROFILE_OWNER_ON_USER0
+  allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+  allowed_dpc_types: DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER
+  allowed_dpc_types: DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER
+  flag: "android.app.admin.flags.policy_streamlining_bluetooth_sharing"
 }
 policy_metadata {
   identifier {
@@ -438,7 +545,7 @@ policy_metadata {
       string_metadata {
       }
       resolution_mechanism {
-        custom: true
+        union: true
       }
     }
   }
@@ -448,5 +555,5 @@ policy_metadata {
   required_cross_user_permission: "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL"
   allowed_dpc_types: DPC_TYPE_DEVICE_OWNER
   allowed_dpc_types: DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
-  flag: "android.app.admin.flags.policy_streamlining"
+  flag: "android.app.contentrestriction.flags.content_restriction_api"
 }

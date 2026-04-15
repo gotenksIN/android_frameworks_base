@@ -26,6 +26,7 @@ import com.android.keyguard.logging.DeviceEntryLogger
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
+import com.android.systemui.bouncer.domain.interactor.SimBouncerInteractor
 import com.android.systemui.bouncer.shared.logging.BouncerUiEvent
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -99,6 +100,7 @@ constructor(
     private val shadeInteractor: Lazy<ShadeInteractor>,
     private val shadeModeInteractor: ShadeModeInteractor,
     private val deviceEntryLogger: DeviceEntryLogger,
+    private val simBouncerInteractor: SimBouncerInteractor,
 ) {
     /**
      * Whether the device is unlocked.
@@ -285,7 +287,14 @@ constructor(
                         alternateBouncerInteractor.get().canShowAlternateBouncer.value
                 ) {
                     alternateBouncerInteractor.get().forceShow()
-                } else {
+                } else if (
+                    !(sceneInteractor.get().currentScene.value == Scenes.Occluded &&
+                        simBouncerInteractor.isAnySimSecure.value)
+                ) {
+
+                    // When an occluding activity like emergency call is launched when sim locked,
+                    // do not show the bouncer. Otherwise always request on an attempted device
+                    // entry
                     sceneInteractor
                         .get()
                         .showOverlay(
@@ -587,7 +596,7 @@ constructor(
                     .snapToScene(
                         toScene = Scenes.Gone,
                         loggingReason = loggingReason,
-                        hideAllOverlays = false,
+                        hideOverlays = SceneInteractor.HideOverlayCommand.HideNone,
                     )
                 sceneInteractor.get().hideOverlay(Overlays.Bouncer, loggingReason)
             }
@@ -725,7 +734,7 @@ constructor(
                     loggingReason = loggingReason,
                     transitionKey =
                         WithAnimationOverLockscreen.takeIf { willAnimateDismissActionOnLockscreen },
-                    hideAllOverlays = false,
+                    hideOverlays = SceneInteractor.HideOverlayCommand.HideNone,
                 )
         } else {
             // For SingleShade or SplitShade:
@@ -748,7 +757,9 @@ constructor(
                             WithAnimationOverLockscreen.takeIf {
                                 willAnimateDismissActionOnLockscreen
                             },
-                        hideAllOverlays = true, // hides bouncer overlay if showing
+                        hideOverlays =
+                            SceneInteractor.HideOverlayCommand
+                                .HideAll, // hides bouncer overlay if showing
                     )
             }
         }

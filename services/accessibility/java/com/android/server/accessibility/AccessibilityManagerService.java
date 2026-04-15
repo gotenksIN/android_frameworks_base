@@ -260,7 +260,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         AccessibilitySecurityPolicy.AccessibilityUserManager,
         SystemActionPerformer.SystemActionsChangedListener,
         SystemActionPerformer.DisplayUpdateCallBack, ProxyManager.SystemSupport {
-    private static final String LOG_TAG = "AccessibilityManagerService";
+    private static final String LOG_TAG = AccessibilityManagerService.class.getSimpleName();
 
     private static final boolean DEBUG = AccessibilityLogUtil.isDebugEnabled(LOG_TAG);
 
@@ -4515,8 +4515,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             if (userState.removeShortcutTargetLocked(shortcutType, serviceName)) {
                 final Set<String> currentTargets = userState.getShortcutTargetsLocked(shortcutType);
                 persistColonDelimitedSetToSettingLocked(
-                        shortcutSettingName,
-                        userState.mUserId, currentTargets, str -> str);
+                        shortcutSettingName, userState.mUserId, currentTargets,
+                        str -> str, /* defaultEmptyString= */ "");
 
                 if (shortcutType != QUICK_SETTINGS) {
                     continue;

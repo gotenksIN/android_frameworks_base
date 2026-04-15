@@ -22,6 +22,7 @@ import androidx.annotation.StringRes
 import com.android.settingslib.metadata.preferencesapi.types.ApiType
 import com.android.settingslib.metadata.preferencesapi.types.FiniteOptionsType
 import org.json.JSONObject
+import com.android.settingslib.metadata.preferencesapi.SafetyAnnotated
 
 /**
  * Holds an unvalidated set of key-value parameters. This class is a simple data container.
@@ -82,7 +83,7 @@ open class KeyParameters(
  * @property values The validated map of parameter names to their string values.
  */
 @ConsistentCopyVisibility
-data class ValidatedKeyParameters internal constructor(
+data class ValidatedKeyParameters constructor(
     private val schema: KeyParametersSchema,
     override val values: Map<String, String>
 ) : KeyParameters(values) {
@@ -97,9 +98,25 @@ data class ValidatedKeyParameters internal constructor(
      */
     override operator fun get(key: String): String? {
         if (!schema.containsKey(key)) {
-            throw IllegalArgumentException("Parameter '$key' is not defined in the schema.")
+            throw IllegalArgumentException("Parameter '$key' is not defined in the schema (contains ${schema.getParameters().keys}).")
         }
         return values[key]
+    }
+
+    /**
+     * Retrieves the value for a given parameter key in the correct type.
+     *
+     * This will ultimately replace the get<String> method.
+     *
+     * @param key The name of the parameter to retrieve.
+     * @return The value of the parameter, or `null` if the parameter is optional and was not
+     * provided.
+     * @throws IllegalArgumentException if the key is not defined in the schema.
+     */
+    fun <T> getTyped(key: String): T? {
+        val value = get(key) ?: return null
+        val type = schema.getParameters()[key]?.type as ApiType<T, *>? ?: return null
+        return type.convertStringToInternal(value)
     }
 
     /**
@@ -118,7 +135,7 @@ data class ValidatedKeyParameters internal constructor(
      */
     fun getRequired(key: String): String {
         if (!schema.containsKey(key)) {
-            throw IllegalArgumentException("Parameter '$key' is not defined in the schema.")
+            throw IllegalArgumentException("Parameter '$key' is not defined in the schema. (contains ${schema.getParameters().keys})")
         }
 
         if (!schema.isRequiredParameter(key)) {
@@ -162,7 +179,7 @@ class KeyParametersSchema private constructor(
             name: String,
             description: String,
             required: Boolean,
-            type: ApiType<*, *>
+            type: ApiType<*, *>,
         ) : this(name, description.hashCode(), required, type) {
             purposeHashMap[description.hashCode()] = description
         }
@@ -268,7 +285,29 @@ class KeyParametersSchema private constructor(
      *
      * @see prepare(providedValues: Map<String, String>)
      */
-    fun prepare(vararg values: Pair<String, String>): ValidatedKeyParameters = prepare(values.toMap())
+    fun prepare(vararg values: Pair<*, *>): ValidatedKeyParameters{
+        val valuesMap = mutableMapOf<String, String>()
+        for ((key, value) in values) {
+            val keyString = if (key is SafetyAnnotated<*>) {
+                key.value.toString()
+            } else if (key is String) {
+                key
+            } else {
+                error("Key is not a string or SafetyAnnotated<String>")
+            }
+            val valueString = if (value is SafetyAnnotated<*>) {
+                value.value.toString()
+            } else if (value is String) {
+                value
+            } else {
+                error("Value is not a string or SafetyAnnotated<String>")
+            }
+
+            valuesMap[keyString] = valueString
+        }
+
+        return prepare(valuesMap)
+    }
 
     /**
      * A convenience method to create a validated [ValidatedKeyParameters] instance from a [Bundle].
@@ -432,5 +471,5 @@ fun KeyParametersSchema.prepareForApp(packageName: String): ValidatedKeyParamete
 /**
  * Convenience method to retrieve the package name from a KeyParameters.
  */
-val ValidatedKeyParameters.packageName: String
-    get() = getRequired(KEY_PACKAGE_NAME)
+val ValidatedKeyParameters.packageName: String?
+    get() = get(KEY_PACKAGE_NAME)

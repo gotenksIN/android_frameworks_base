@@ -16,6 +16,8 @@
 
 package com.android.systemui.biometrics.ui.view
 
+import android.hardware.biometrics.PromptContentView
+import android.widget.LinearLayout
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,16 +34,45 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
+import com.android.systemui.biometrics.ui.binder.BiometricCustomizedViewBinder
 import com.android.systemui.biometrics.ui.viewmodel.CredentialHeaderViewModel
 import com.android.systemui.res.R
 
+@Composable
+fun CustomPromptContentView(
+    contentView: PromptContentView?,
+    onMoreOptionsPressed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (contentView == null) {
+        return
+    }
+
+    AndroidView(
+        modifier = modifier.fillMaxWidth(),
+        factory = { context ->
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                BiometricCustomizedViewBinder.bind(this, contentView) { onMoreOptionsPressed() }
+            }
+        },
+    )
+}
+
 // TODO: Will likely get promoted to general prompt header on compose move
 @Composable
-fun PromptHeader(header: CredentialHeaderViewModel, modifier: Modifier = Modifier) {
+fun PromptHeader(
+    header: CredentialHeaderViewModel,
+    modifier: Modifier = Modifier,
+    onContentViewMoreOptionsButtonPressed: () -> Unit = {},
+) {
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         // Logo
         Image(
@@ -75,7 +106,7 @@ fun PromptHeader(header: CredentialHeaderViewModel, modifier: Modifier = Modifie
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 16.dp).testTag("title"),
+                modifier = Modifier.padding(top = 16.dp).testTag("title").semantics { heading() },
             )
         }
 
@@ -90,8 +121,6 @@ fun PromptHeader(header: CredentialHeaderViewModel, modifier: Modifier = Modifie
             )
         }
 
-        // TODO: Custom content? This Header will likely be used for compose prompt in future
-
         // Description
         if (header.description.isNotBlank()) {
             Text(
@@ -102,11 +131,22 @@ fun PromptHeader(header: CredentialHeaderViewModel, modifier: Modifier = Modifie
                 modifier = Modifier.padding(top = 16.dp).testTag("description"),
             )
         }
+
+        // Custom Content View
+        CustomPromptContentView(
+            contentView = header.contentView,
+            onMoreOptionsPressed = onContentViewMoreOptionsButtonPressed,
+            modifier = Modifier.padding(top = 16.dp),
+        )
     }
 }
 
 @Composable
-fun PromptHeaderLandscape(header: CredentialHeaderViewModel, modifier: Modifier = Modifier) {
+fun PromptHeaderLandscape(
+    header: CredentialHeaderViewModel,
+    modifier: Modifier = Modifier,
+    onContentViewMoreOptionsButtonPressed: () -> Unit = {},
+) {
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
         // Top Row: Logo + Description
         Row(
@@ -139,7 +179,7 @@ fun PromptHeaderLandscape(header: CredentialHeaderViewModel, modifier: Modifier 
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Start,
-                modifier = Modifier.testTag("title"),
+                modifier = Modifier.testTag("title").semantics { heading() },
             )
         }
 
@@ -164,5 +204,12 @@ fun PromptHeaderLandscape(header: CredentialHeaderViewModel, modifier: Modifier 
                 modifier = Modifier.testTag("description"),
             )
         }
+
+        // Custom Content View
+        CustomPromptContentView(
+            contentView = header.contentView,
+            onMoreOptionsPressed = onContentViewMoreOptionsButtonPressed,
+            modifier = Modifier.padding(top = 16.dp),
+        )
     }
 }

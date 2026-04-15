@@ -164,7 +164,10 @@ public final class RavenwoodEnvironment {
      * Create and initialize the singleton instance. Also initializes {@link RavenwoodVmState}.
      */
     public static void init() throws IOException {
-        final var props = RavenwoodSystemProperties.readProperties("ravenwood.properties");
+        final var propFile = System.getProperty(
+                "android.ravenwood.prop_file", "ravenwood.properties");
+
+        final var props = RavenwoodSystemProperties.readProperties(propFile);
 
         // TODO: Why do we use a random PID? We can get the real PID via JNI. Why not use that?
         final int pid = new Random().nextInt(100, 32768);
@@ -437,5 +440,18 @@ public final class RavenwoodEnvironment {
             return new String[0];
         }
         return val.split("\\s+");
+    }
+
+    /**
+     * Default filename of the per-test {@link android.os.SystemProperties} override.
+     */
+    private static final String PER_TEST_SYSPROP = "ravenwood.sysprop";
+
+    /**
+     * @return Filename of the per-test {@link android.os.SystemProperties} override.
+     * Default is {@link #PER_TEST_SYSPROP}.
+     */
+    public String perTestSyspropFile() {
+        return System.getProperty("android.ravenwood.per_test_prop_file", PER_TEST_SYSPROP);
     }
 }

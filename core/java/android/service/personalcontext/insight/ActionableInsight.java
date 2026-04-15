@@ -68,7 +68,7 @@ public final class ActionableInsight extends ContextInsight {
 
     @Override
     @NonNull
-    Bundle toBundleImpl() {
+    Bundle toBundleImpl(boolean includeHints) {
         final Bundle b = new Bundle();
         b.putParcelable(KEY_ACTION_DETAILS, mActionDetails);
         b.putParcelable(KEY_DISPLAY_DETAILS, mDisplayDetails);
@@ -129,8 +129,8 @@ public final class ActionableInsight extends ContextInsight {
 
     /** @hide */
     @Override
-    public void accept(@NonNull InsightVisitor visitor) {
-        visitor.visit(this);
+    public void accept(@NonNull InsightVisitor visitor, int index) {
+        visitor.visit(this, index);
     }
 
     /**

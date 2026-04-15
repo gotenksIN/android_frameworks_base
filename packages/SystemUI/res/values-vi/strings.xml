@@ -79,7 +79,6 @@
     <string name="wifi_debugging_allow" msgid="4573224609684957886">"Cho phép"</string>
     <string name="wifi_debugging_secondary_user_title" msgid="2493201475880517725">"Không cho phép gỡ lỗi qua Wi-Fi"</string>
     <string name="wifi_debugging_secondary_user_message" msgid="9085779370142222881">"Người dùng đang đăng nhập trên thiết bị này không thể bật tính năng gỡ lỗi qua Wi-Fi. Để sử dụng tính năng này, hãy chuyển sang tài khoản người dùng quản trị."</string>
-    <string name="change_connected_wifi_text" msgid="6346095920396568246">"Bạn có thể thay đổi chế độ này sau khi đăng nhập"</string>
     <string name="usb_contaminant_title" msgid="894052515034594113">"Đã tắt cổng USB"</string>
     <string name="usb_contaminant_message" msgid="7730476585174719805">"Để bảo vệ thiết bị của bạn khỏi chất lỏng hay mảnh vỡ, cổng USB sẽ tắt và không phát hiện được bất kỳ phụ kiện nào.\n\nBạn sẽ nhận được thông báo khi có thể sử dụng lại cổng USB."</string>
     <string name="usb_port_enabled" msgid="531823867664717018">"Đã bật cổng USB để phát hiện bộ sạc và phụ kiện"</string>
@@ -174,8 +173,7 @@
     <string name="screen_record_accessibility_label_show_previous" msgid="5202414285722078012">"Hiện ứng dụng trước đó"</string>
     <string name="screen_record_settings" msgid="2377267679200139285">"Chế độ cài đặt tính năng ghi màn hình"</string>
     <string name="screen_record_markup" msgid="5583986085046693669">"Đánh dấu"</string>
-    <!-- no translation found for screen_record_color_picker (6732567862106107021) -->
-    <skip />
+    <string name="screen_record_color_picker" msgid="6732567862106107021">"Công cụ chọn màu"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Đã lưu video"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"Đã xoá video"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"Huỷ"</string>
@@ -469,7 +467,6 @@
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"Thiết bị đầu vào"</string>
     <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"Thiết bị trợ thính"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"Đang bật…"</string>
-    <string name="quick_settings_brightness_unable_adjust_msg" msgid="4124028416057617517">"Không điều chỉnh được độ sáng do ứng dụng ở trên cùng đang điều khiển độ sáng"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"Tự động xoay"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"Tự động xoay màn hình"</string>
     <string name="quick_settings_location_label" msgid="2621868789013389163">"Vị trí"</string>
@@ -663,6 +660,8 @@
     <string name="keyguard_indication_charging_time_slowly" msgid="301936949731705417">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Đang sạc chậm • Sẽ đầy sau <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_dock" msgid="3149328898931741271">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Đang sạc • Sẽ đầy sau <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="accessibility_action_open_communal_hub" msgid="3081702792413787849">"Các tiện ích trên màn hình khoá"</string>
+    <!-- no translation found for accessibility_action_customize_lock_screen (1998560311105362696) -->
+    <skip />
     <string name="accessibility_announcement_communal_widget_added" msgid="6911593106099328271">"Đã thêm tiện ích <xliff:g id="WIDGET_NAME">%1$s</xliff:g> vào màn hình khoá"</string>
     <string name="communal_tutorial_indicator_text" msgid="4503010353591430123">"Vuốt sang trái để bắt đầu xem hướng dẫn chung"</string>
     <string name="cta_tile_button_to_open_widget_editor" msgid="3871562362382963878">"Tuỳ chỉnh"</string>
@@ -1461,8 +1460,7 @@
     <string name="controls_media_button_prev" msgid="8126822360056482970">"Bản nhạc trước"</string>
     <string name="controls_media_button_next" msgid="6662636627525947610">"Bản nhạc tiếp theo"</string>
     <string name="controls_media_button_connecting" msgid="3138354625847598095">"Đang kết nối"</string>
-    <!-- no translation found for controls_media_output_chip (324952606619594635) -->
-    <skip />
+    <string name="controls_media_output_chip" msgid="324952606619594635">"Mở phần cài đặt đầu ra"</string>
     <string name="media_transfer_undo" msgid="1895606387620728736">"Hủy"</string>
     <string name="media_move_closer_to_start_cast" msgid="2673104707465013176">"Đưa thiết bị đến gần hơn để phát trên <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
     <string name="media_move_closer_to_end_cast" msgid="7302555909119374738">"Để phát ở đây, vui lòng lại gần <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
@@ -1492,7 +1490,7 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"Các thiết bị có sẵn để xuất âm thanh."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"Âm lượng"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
-    <string name="media_output_dialog_missing_permissions_warning" msgid="4312830846174995199">"Để xem các thiết bị khác, bạn có thể cần cấp quyền cho <xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="4312830846174995199">"Để xem các thiết bị khác, bạn cần phải cấp quyền cho <xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>"</string>
     <string name="media_output_dialog_warning_button_fix" msgid="3650735180540135181">"Mở <xliff:g id="MEDIA_APP_NAME">%1$s</xliff:g>"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"Loa đã kết nối"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Loa và màn hình"</string>
@@ -1838,6 +1836,7 @@
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Tiếp theo"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"chuyển đến trang tiếp theo"</string>
     <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"quay lại"</string>
+    <string name="accessibility_close_overlay_box_description" msgid="8399871568780893724">"quay lại"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"tự động điền"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"mở rộng"</string>
     <string name="location_button_text_precise_location" msgid="4441259889842542799">"Vị trí chính xác"</string>
@@ -1863,25 +1862,18 @@
     <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"Tinh chỉnh chân dung"</string>
     <string name="av_mic_label" msgid="5427348054144789879">"Micrô"</string>
     <string name="av_camera_label" msgid="7719772172590702343">"Camera"</string>
-    <!-- no translation found for av_camera_blur_drill_in_title (3392789469292685354) -->
-    <skip />
+    <string name="av_camera_blur_drill_in_title" msgid="3392789469292685354">"Làm mờ nền"</string>
     <string name="av_camera_blur_off" msgid="3170334995799202022">"Tắt"</string>
-    <!-- no translation found for av_camera_blur_light (5105255788203563538) -->
-    <skip />
-    <!-- no translation found for av_camera_blur_full (6493497965254048479) -->
-    <skip />
+    <string name="av_camera_blur_light" msgid="5105255788203563538">"Làm mờ nhẹ"</string>
+    <string name="av_camera_blur_full" msgid="6493497965254048479">"Làm mờ nhiều"</string>
     <string name="av_camera_improve_lighting" msgid="1540549414296669133">"Cải thiện ánh sáng"</string>
     <string name="av_camera_face_retouch" msgid="45890971969486224">"Tinh chỉnh chân dung"</string>
-    <!-- no translation found for av_camera_framing (2948988841290208034) -->
-    <skip />
-    <!-- no translation found for av_studio_mic (1815195630183143501) -->
-    <skip />
-    <!-- no translation found for av_studio_look (631085505786989852) -->
-    <skip />
+    <string name="av_camera_framing" msgid="2948988841290208034">"Lấy khung hình camera"</string>
+    <string name="av_studio_mic" msgid="1815195630183143501">"Micrô chuyên nghiệp"</string>
+    <string name="av_studio_look" msgid="631085505786989852">"Hình ảnh chuyên nghiệp"</string>
     <string name="av_studio_look_effects" msgid="4105109585851068415">"%d hiệu ứng"</string>
     <string name="av_blur" msgid="405131343487260171">"Làm mờ"</string>
-    <!-- no translation found for av_live_captions (802763867449401889) -->
-    <skip />
+    <string name="av_live_captions" msgid="802763867449401889">"Phụ đề trực tiếp"</string>
     <string name="av_drill_in_return_to_main" msgid="5273814393426741827">"Quay lại"</string>
     <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"Pin %s"</string>
     <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"Pin bên trái %1$s    Pin bên phải %2$s"</string>
@@ -1895,4 +1887,11 @@
     <string name="dream_setup_title" msgid="7996530071414508238">"Thiết lập trình bảo vệ màn hình"</string>
     <string name="dream_setup_button_not_now" msgid="8028385323668620805">"Để sau"</string>
     <string name="dream_setup_button_setup" msgid="4755361016017554826">"Thiết lập"</string>
+    <string name="ace_attribution_dialog_settings_label" msgid="8898211593287114433">"Cài đặt"</string>
+    <string name="ace_attribution_dialog_title" msgid="5236154464063969824">"Đề xuất của tính năng Gợi ý thông minh"</string>
+    <string name="ace_attribution_dialog_description" msgid="1431906058759687758">"Các mục được xem xét trong đề xuất này"</string>
+    <string name="ace_attribution_header_icon_accessibility_description" msgid="7385840112370423581">"Biểu tượng Android Device Intelligence"</string>
+    <string name="ace_attribution_settings_button_accessibility_description" msgid="8426163772933746374">"Nút Cài đặt"</string>
+    <string name="ace_attribution_thumbs_up_button_accessibility_description" msgid="3561722934830934360">"Nút phản hồi thích"</string>
+    <string name="ace_attribution_thumbs_down_button_accessibility_description" msgid="5471283747650437662">"Nút phản hồi không thích"</string>
 </resources>

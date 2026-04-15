@@ -31,7 +31,6 @@ import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.ENTERPRISE_RESTRICTION
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.HARDWARE_UNSUPPORTED
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.INVALID_PREFERENCE
-import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreenTest.Companion.ApiPreconditionsMapper.MISSING_PERMISSION
 import com.android.settingslib.metadata.preferencesapi.Utils.EXCEPTION_MESSAGE_NO_PARAMETER_DEFINED
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageAlreadyDefined
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleDefines
@@ -44,7 +43,7 @@ import com.android.settingslib.metadata.preferencesapi.preconditions.Custom
 import com.android.settingslib.metadata.preferencesapi.preconditions.EnterpriseRestriction
 import com.android.settingslib.metadata.preferencesapi.preconditions.HardwareUnsupported
 import com.android.settingslib.metadata.preferencesapi.preconditions.InvalidPreference
-import com.android.settingslib.metadata.preferencesapi.preconditions.MissingPermission
+import com.android.settingslib.metadata.preferencesapi.preconditions.PreconditionStability
 import com.android.settingslib.metadata.preferencesapi.types.AnyBoolean
 import com.android.settingslib.metadata.preferencesapi.types.AnyInt
 import com.android.settingslib.metadata.preferencesapi.types.GeneratedParameterType
@@ -59,6 +58,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowBuild
+import com.android.settingslib.metadata.preferencesapi.safe
 
 @RunWith(AndroidJUnit4::class)
 class PreferencesApiScreenTest {
@@ -178,7 +178,7 @@ class PreferencesApiScreenTest {
                         R.string.parameter_purpose1,
                         true,
                         GeneratedParameterType(R.string.parameter_type_description) {
-                            listOf(GeneratedValue("value", "type_description"))
+                            listOf(GeneratedValue("value".safe(), "type_description".safe()))
                         },
                     )
                 }
@@ -206,7 +206,7 @@ class PreferencesApiScreenTest {
                         R.string.parameter_purpose1,
                         true,
                         GeneratedParameterType(R.string.parameter_type_description) {
-                            listOf(GeneratedValue("value", "type_description"))
+                            listOf(GeneratedValue("value".safe(), "type_description".safe()))
                         },
                     )
                     prepareSpaRoute { params ->
@@ -400,7 +400,7 @@ class PreferencesApiScreenTest {
                             preconditions(R.string.preconditions_description1) {
                                 when (preconditionsCase) {
                                     ALLOWED -> Allowed
-                                    CUSTOM -> Custom(R.string.preconditions_custom_message)
+                                    CUSTOM -> Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
                                     ENTERPRISE_RESTRICTION ->
                                         EnterpriseRestriction(
                                             R.string.preconditions_enterprise_restriction_message
@@ -414,11 +414,6 @@ class PreferencesApiScreenTest {
                                             "",
                                             "",
                                             R.string.preconditions_invalid_preference_message,
-                                        )
-                                    MISSING_PERMISSION ->
-                                        MissingPermission(
-                                            listOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                                            R.string.preconditions_missing_permission_message,
                                         )
                                 }
                             }
@@ -489,16 +484,6 @@ class PreferencesApiScreenTest {
                                 context.getString(R.string.preconditions_invalid_preference_message)
                             )
                     }
-                    MISSING_PERMISSION -> {
-                        assertThat(
-                                (preference.get.preconditions?.check(apiOperationContext)
-                                        as MissingPermission)
-                                    .getReason(context)
-                            )
-                            .isEqualTo(
-                                context.getString(R.string.preconditions_missing_permission_message)
-                            )
-                    }
                 }
             }
         }
@@ -534,7 +519,7 @@ class PreferencesApiScreenTest {
                             preconditions(preconditionDescription) {
                                 when (preconditionsCase) {
                                     ALLOWED -> Allowed
-                                    CUSTOM -> Custom(customPreconditionsMessage)
+                                    CUSTOM -> Custom(customPreconditionsMessage, stability = PreconditionStability.UNSTABLE)
                                     ENTERPRISE_RESTRICTION ->
                                         EnterpriseRestriction(
                                             enterpriseRestrictionPreconditionsMessage
@@ -546,11 +531,6 @@ class PreferencesApiScreenTest {
                                             "",
                                             "",
                                             invalidPreferencePreconditionsMessage,
-                                        )
-                                    MISSING_PERMISSION ->
-                                        MissingPermission(
-                                            listOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                                            missingPermissionPreconditionsMessage,
                                         )
                                 }
                             }
@@ -611,14 +591,6 @@ class PreferencesApiScreenTest {
                             )
                             .isEqualTo(invalidPreferencePreconditionsMessage)
                     }
-                    MISSING_PERMISSION -> {
-                        assertThat(
-                                (preference.get.preconditions?.check(apiOperationContext)
-                                        as MissingPermission)
-                                    .getReason(context)
-                            )
-                            .isEqualTo(missingPermissionPreconditionsMessage)
-                    }
                 }
             }
         }
@@ -660,7 +632,7 @@ class PreferencesApiScreenTest {
                                 if (sum % 2 == 0) {
                                     Allowed
                                 } else {
-                                    Custom(R.string.value_preconditions_disallow_custom_reason)
+                                    Custom(R.string.value_preconditions_disallow_custom_reason, stability = PreconditionStability.UNSTABLE)
                                 }
                             }
 
@@ -756,7 +728,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -788,7 +760,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -866,7 +838,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -877,7 +849,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose2,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -934,7 +906,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose1,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                             parameter(
@@ -942,7 +914,7 @@ class PreferencesApiScreenTest {
                                 R.string.parameter_purpose2,
                                 true,
                                 GeneratedParameterType(R.string.parameter_type_description) {
-                                    listOf(GeneratedValue("value", "type_description"))
+                                    listOf(GeneratedValue("value".safe(), "type_description".safe()))
                                 },
                             )
                         }
@@ -971,7 +943,7 @@ class PreferencesApiScreenTest {
                             R.string.parameter_purpose1,
                             true,
                             GeneratedParameterType(R.string.parameter_type_description) {
-                                listOf(GeneratedValue("value", "type_description"))
+                                listOf(GeneratedValue("value".safe(), "type_description".safe()))
                             },
                         )
                     }
@@ -1505,7 +1477,7 @@ class PreferencesApiScreenTest {
                             set {
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message)
+                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
                                     }
                                 }
 
@@ -1543,7 +1515,7 @@ class PreferencesApiScreenTest {
                             set {
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message)
+                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
                                     }
                                     valuePreconditions(R.string.warning_preconditions_description1) { value ->
                                         Allowed
@@ -1639,7 +1611,7 @@ class PreferencesApiScreenTest {
 
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message)
+                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
                                     }
                                     warn(R.string.warning_message1)
                                 }
@@ -1792,7 +1764,7 @@ class PreferencesApiScreenTest {
                             set {
                                 warning {
                                     preconditions(R.string.warning_preconditions_description1) {
-                                        Custom(R.string.preconditions_custom_message)
+                                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
                                     }
                                     warn(R.string.warning_message1)
                                 }
@@ -1890,7 +1862,7 @@ class PreferencesApiScreenTest {
     }
 
     @Test
-    fun createPreferencesApiScreen_screenPreconditionsFail_launchIntentIsNull() {
+    fun createPreferencesApiScreen_screenPreconditionsFail_launchIntentIsNotNull() {
         val preferenceScreen =
             object :
                 PreferencesApiScreen(
@@ -1901,12 +1873,12 @@ class PreferencesApiScreenTest {
                 ) {
                 init {
                     preconditions(R.string.preconditions_description1) {
-                        Custom(R.string.preconditions_custom_message)
+                        Custom(R.string.preconditions_custom_message, stability = PreconditionStability.UNSTABLE)
                     }
                 }
             }
 
-        assertThat(preferenceScreen.getLaunchIntent(context, null)).isNull()
+        assertThat(preferenceScreen.getLaunchIntent(context, null)).isNotNull()
     }
 
     @Test
@@ -2017,7 +1989,7 @@ class PreferencesApiScreenTest {
                             R.string.parameter_purpose1,
                             true,
                             GeneratedParameterType(R.string.parameter_type_description) {
-                                listOf(GeneratedValue("value", "type_description"))
+                                listOf(GeneratedValue("value".safe(), "type_description".safe()))
                             },
                         )
                         // Missing prepareSpaRoute
@@ -2134,7 +2106,6 @@ class PreferencesApiScreenTest {
             ENTERPRISE_RESTRICTION,
             HARDWARE_UNSUPPORTED,
             INVALID_PREFERENCE,
-            MISSING_PERMISSION,
             CUSTOM,
         }
     }

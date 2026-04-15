@@ -63,8 +63,8 @@ import org.mockito.kotlin.whenever
 @SmallTest
 class MenuViewTest : SysuiTestCase() {
     private var nightMode = 0
-    private var uiModeManager: UiModeManager? = null
-    private var lastPosition: String? = null
+    private lateinit var uiModeManager: UiModeManager
+    private var lastPosition: String = ""
     private val shortcutTargets = mutableListOf(MAGNIFICATION_CONTROLLER_NAME)
     private val testTargetList =
         listOf(TestAccessibilityTarget(mContext, 123), TestAccessibilityTarget(mContext, 456))
@@ -72,7 +72,6 @@ class MenuViewTest : SysuiTestCase() {
     private val fakeLifecycleOwner: LifecycleOwner = mock()
 
     private val kosmos = testKosmosNew()
-    private lateinit var menuView: MenuView
 
     private val fakeKeyboardRepository = kosmos.keyboardRepository
 
@@ -80,11 +79,10 @@ class MenuViewTest : SysuiTestCase() {
 
     @SuppressLint("MissingPermission")
     @Before
-    @Throws(Exception::class)
     fun setUp() {
         uiModeManager = context.getSystemService(UiModeManager::class.java)
-        nightMode = uiModeManager!!.nightMode
-        uiModeManager!!.nightMode = UiModeManager.MODE_NIGHT_YES
+        nightMode = uiModeManager.nightMode
+        uiModeManager.nightMode = UiModeManager.MODE_NIGHT_YES
 
         // Programmatically update the resource's configuration to night mode to reduce flakiness
         val nightConfig = Configuration(mContext.resources.configuration)
@@ -98,6 +96,7 @@ class MenuViewTest : SysuiTestCase() {
         with(kosmos) {
             whenever(accessibilityManager.getAccessibilityShortcutTargets(anyInt()))
                 .thenReturn(shortcutTargets)
+            menuViewModel.onGuardedSceneChanged(false)
         }
 
         createAndAttachMenuView()
@@ -106,14 +105,13 @@ class MenuViewTest : SysuiTestCase() {
             Prefs.getString(
                 context,
                 Prefs.Key.ACCESSIBILITY_FLOATING_MENU_POSITION,
-                /* defaultValue= */ null,
+                /* defaultValue= */ "",
             )
     }
 
     @After
-    @Throws(Exception::class)
     fun tearDown() {
-        uiModeManager!!.nightMode = nightMode
+        uiModeManager.nightMode = nightMode
         Prefs.putString(mContext, Prefs.Key.ACCESSIBILITY_FLOATING_MENU_POSITION, lastPosition)
     }
 
@@ -245,12 +243,12 @@ class MenuViewTest : SysuiTestCase() {
 
             val initialTargets = listOf(TestAccessibilityTarget(context, 1))
             menuViewModel.onTargetFeaturesChanged(initialTargets)
-            assertThat(menuView.getTargetFeaturesView().adapter!!.itemCount).isEqualTo(1)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(1)
 
             fakeKeyboardRepository.setIsAnyKeyboardConnected(true)
             menuViewModel.onTargetFeaturesChanged(initialTargets)
 
-            assertThat(menuView.getTargetFeaturesView().adapter!!.itemCount).isEqualTo(2)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(2)
         }
     }
 
@@ -262,12 +260,30 @@ class MenuViewTest : SysuiTestCase() {
 
             val initialTargets = listOf(TestAccessibilityTarget(context, 1))
             menuViewModel.onTargetFeaturesChanged(initialTargets)
-            assertThat(menuView.getTargetFeaturesView().adapter!!.itemCount).isEqualTo(1)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(1)
 
             fakePointerDeviceRepository.setIsAnyPointerConnected(true)
             menuViewModel.onTargetFeaturesChanged(initialTargets)
 
-            assertThat(menuView.getTargetFeaturesView().adapter!!.itemCount).isEqualTo(2)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(2)
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_FLOATING_MENU_MORE_OPTIONS)
+    fun onTargetFeaturesChanged_withPointer_guardedScene_moreOptionsIsNotAdded() {
+        kosmos.runTest {
+            menuView.show()
+
+            val initialTargets = listOf(TestAccessibilityTarget(context, 1))
+            menuViewModel.onTargetFeaturesChanged(initialTargets)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(1)
+
+            fakePointerDeviceRepository.setIsAnyPointerConnected(true)
+            menuViewModel.onTargetFeaturesChanged(initialTargets)
+            menuViewModel.onGuardedSceneChanged(true)
+
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(1)
         }
     }
 
@@ -282,7 +298,7 @@ class MenuViewTest : SysuiTestCase() {
             val initialTargets = listOf(TestAccessibilityTarget(context, 1))
             menuViewModel.onTargetFeaturesChanged(initialTargets)
 
-            assertThat(menuView.getTargetFeaturesView().adapter!!.itemCount).isEqualTo(1)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(1)
         }
     }
 
@@ -297,9 +313,41 @@ class MenuViewTest : SysuiTestCase() {
             val initialTargets = listOf(TestAccessibilityTarget(context, 1))
             menuViewModel.onTargetFeaturesChanged(initialTargets)
 
-            assertThat(menuView.getTargetFeaturesView().adapter!!.itemCount).isEqualTo(1)
+            assertThat(menuView.targetFeaturesView.adapter!!.itemCount).isEqualTo(1)
         }
     }
+
+    @Test
+    @EnableFlags(Flags.FLAG_FLOATING_MENU_MAGNIFICATION_STATUS)
+    fun onShow_registersMagnificationListener() =
+        kosmos.runTest {
+            clearInvocations(menuViewMagnification)
+
+            menuView.show()
+
+            verify(menuViewMagnification).registerActivationChangedListener(any())
+        }
+
+    @Test
+    @DisableFlags(Flags.FLAG_FLOATING_MENU_MAGNIFICATION_STATUS)
+    fun onShow_doesNotregisterMagnificationListener() =
+        kosmos.runTest {
+            clearInvocations(menuViewMagnification)
+
+            menuView.show()
+
+            verify(menuViewMagnification, never()).registerActivationChangedListener(any())
+        }
+
+    @Test
+    fun onHide_unregistersMagnificationListener() =
+        kosmos.runTest {
+            clearInvocations(menuViewMagnification)
+
+            menuView.hide()
+
+            verify(menuViewMagnification).unregisterActivationChangedListener(any())
+        }
 
     /** Simplified AccessibilityTarget for testing MenuView. */
     private class TestAccessibilityTarget(context: Context?, uid: Int) :

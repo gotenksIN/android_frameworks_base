@@ -16,8 +16,6 @@
 
 package com.android.wm.shell.dagger;
 
-import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
@@ -99,8 +97,6 @@ import com.android.wm.shell.dagger.hierarchy.ContainerHierarchyDependency;
 import com.android.wm.shell.dagger.hierarchy.HandheldContainersModule;
 import com.android.wm.shell.dagger.pinnedlayer.PinnedLayerModule;
 import com.android.wm.shell.dagger.pip.PipModule;
-import com.android.wm.shell.desktopai.dagger.DesktopAIModule;
-import com.android.wm.shell.desktopai.dagger.DesktopAiInitializer;
 import com.android.wm.shell.desktopmode.CloseDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.DesktopActivityOrientationChangeHandler;
 import com.android.wm.shell.desktopmode.DesktopAnimationConfiguration;
@@ -157,12 +153,14 @@ import com.android.wm.shell.desktopmode.desktopfirst.DesktopDisplayModeControlle
 import com.android.wm.shell.desktopmode.desktopfirst.DesktopFirstListenerManager;
 import com.android.wm.shell.desktopmode.desktoptaskshandlers.DesktopTasksTransitionHandler;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
+import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityUtils;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationFilter;
 import com.android.wm.shell.desktopmode.education.AppToWebEducationController;
 import com.android.wm.shell.desktopmode.education.AppToWebEducationFilter;
 import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.education.data.AppToWebEducationDatastoreRepository;
+import com.android.wm.shell.desktopmode.homescreenpeeking.DesktopHomeScreenPeekController;
 import com.android.wm.shell.desktopmode.multidesks.DeskSwitchTransitionHandler;
 import com.android.wm.shell.desktopmode.multidesks.DesksController;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
@@ -275,7 +273,6 @@ import java.util.Optional;
                 LetterboxModule.class,
                 PinnedLayerModule.class,
                 DesktopModule.class,
-                DesktopAIModule.class,
                 HandheldContainersModule.class,
                 BubbleModule.class,
         })
@@ -819,10 +816,12 @@ public abstract class WMShellModule {
     static DesktopMode provideDesktopMode(
             Optional<DesktopTasksController> desktopTasksController,
             Optional<DesktopFirstListenerManager> desktopFirstListenerManager,
+            DesktopHomeScreenPeekController desktopHomeScreenPeekController,
             @ShellMainThread ShellExecutor mainExecutor) {
         return new DesktopModeImpl(
                 desktopTasksController,
                 desktopFirstListenerManager,
+                desktopHomeScreenPeekController,
                 mainExecutor);
     }
 
@@ -892,7 +891,8 @@ public abstract class WMShellModule {
             DesksController desksController,
             Optional<DesktopTasksTransitionObserver> desktopTasksTransitionObserver,
             SnapController snapController,
-            DesktopRemoteListener desktopRemoteListener) {
+            DesktopRemoteListener desktopRemoteListener,
+            DesktopWallpaperActivityUtils desktopWallpaperActivityUtils) {
         return new DesktopTasksController(
                 context,
                 desktopAnimationConfiguration,
@@ -954,7 +954,8 @@ public abstract class WMShellModule {
                 desksController,
                 desktopTasksTransitionObserver.get(),
                 snapController,
-                desktopRemoteListener);
+                desktopRemoteListener,
+                desktopWallpaperActivityUtils);
     }
 
     @WMSingleton
@@ -1012,8 +1013,7 @@ public abstract class WMShellModule {
             ShellController shellController,
             Optional<PinnedLayerController> pinnedLayerController,
             @DynamicOverride DesksOrganizer desksOrganizer) {
-        if (ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
-                && desktopState.canEnterDesktopMode()) {
+        if (desktopState.canEnterDesktopMode()) {
             return Optional.of(
                     new DesktopTaskChangeListener(
                             desktopUserRepositories,
@@ -1036,8 +1036,7 @@ public abstract class WMShellModule {
             Optional<DesktopImeHandler> desktopImeHandler,
             Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
             DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
-        if (ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
-                && desktopState.canEnterDesktopMode()) {
+        if (desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopInOrderTransitionObserver(
                     desktopImmersiveController,
                     focusTransitionObserver,
@@ -1295,13 +1294,14 @@ public abstract class WMShellModule {
             DisplayController displayController,
             DesktopState desktopState,
             AccessibilityManager accessibilityManager,
-            ShellController shellController) {
+            ShellController shellController,
+            KeyguardManager keyguardManager) {
         if (desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopModeKeyGestureHandler(context,
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories, inputManager, shellTaskOrganizer,
                     focusTransitionObserver, mainExecutor, displayController, desktopState,
-                    accessibilityManager, shellController));
+                    accessibilityManager, shellController, keyguardManager));
         }
         return Optional.empty();
     }
@@ -1702,13 +1702,15 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             @NonNull DesktopModeEventLogger desktopModeEventLogger,
             @NonNull ShellController shellController,
-            @NonNull DisplayController displayController
+            @NonNull DisplayController displayController,
+            DesktopHomeScreenPeekController desktopHomeScreenPeekController
     ) {
         if (desktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.of(
                     new DesksTransitionObserver(desktopUserRepositories, desksOrganizer,
                             transitions, desktopWallpaperActivityTokenProvider, mainScope,
-                            desktopModeEventLogger, shellController, displayController));
+                            desktopModeEventLogger, shellController, displayController,
+                            desktopHomeScreenPeekController));
         }
         return Optional.empty();
     }
@@ -2174,11 +2176,12 @@ public abstract class WMShellModule {
             WindowDecorTaskResourceLoader taskResourceLoader,
             Optional<DesktopModeWindowDecorViewModel> desktopModeWindowDecorViewModel,
             PackageUpdateTransitionHandler packageUpdateTransitionHandler,
+            PackageManager packageManager,
             @ShellMainThreadImmediate CoroutineScope mainImmediateScope
     ) {
         return new PackageUpdateController(transitions, shellTaskOrganizer,
                 shellInit, userProfileContexts, taskResourceLoader,
-                desktopModeWindowDecorViewModel, packageUpdateTransitionHandler,
+                desktopModeWindowDecorViewModel, packageUpdateTransitionHandler, packageManager,
                 mainImmediateScope);
     }
 
@@ -2291,7 +2294,6 @@ public abstract class WMShellModule {
             ShellCrashHandler shellCrashHandler,
             AppToWebEducationController appToWebEducationController,
             QuitFocusedAppKeyGestureHandler quitFocusedAppKeyGestureHandler,
-            Optional<DesktopAiInitializer> desktopAiInitializer,
             BubbleRootTask bubbleRootTask,
             DesktopModeAidlProvider desktopModeAidlProvider,
             DesktopTasksTransitionHandler desktopTasksTransitionHandler,

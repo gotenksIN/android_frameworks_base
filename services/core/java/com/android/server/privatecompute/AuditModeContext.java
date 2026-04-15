@@ -16,47 +16,28 @@
 
 package com.android.server.privatecompute;
 
-import static android.os.UserHandle.USER_SYSTEM;
-
-import android.os.Binder;
-import android.os.SystemClock;
-import com.android.internal.annotations.GuardedBy;
-
 import android.annotation.NonNull;
-import android.annotation.Nullable;
+import android.os.Binder;
 import android.os.Environment;
+import android.os.FileUtils;
 import android.os.PersistableBundle;
-import android.util.Log;
+import android.os.SystemClock;
+import android.os.UserHandle;
 import android.sysprop.PccProperties;
+import android.util.Log;
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import java.io.BufferedOutputStream;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-/* Current Audit Mode limitations (tracked in b/461406944):
- * - Audit mode is set to true. Instead, a system property should be introduced to toggle
- *   audit mode on/off.
- * - Incoming data is not sanitized. Depends on ag/36599762.
- * - If the logging frequency is too high, the log might be incomplete.
- * - The first logging file is always "0".
- */
 
 /**
  * Manages the state of audit mode; when on, collects logs and periodically writes them to disk.
@@ -66,7 +47,7 @@ import java.util.concurrent.TimeUnit;
 class AuditModeContext {
     private static final String TAG = "PccSandboxManagerServiceAuditMode";
 
-    private static final String AUDIT_LOG_FILES_DIRNAME = "audit_logs";
+    static final String AUDIT_LOG_FILES_DIRNAME = "audit_logs";
 
     // Max number of audit log files to keep on disk. When this limit is reached, old files will be
     // overwritten. Overridden by the system property `persist.pcc.audit_mode.max_log_files` if set.
@@ -101,12 +82,16 @@ class AuditModeContext {
     @GuardedBy("mLock")
     private AuditLogInMemoryBuffer mAuditLogInMemoryBuffer;
 
+    final int mUserId;
+
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     AuditModeContext(
+            int userId,
             ExecutorService serializerExecutor,
             ExecutorService diskWriterExecutor,
             File folder,
             Injector injector) {
+        mUserId = userId;
         mBundleSerializerExecutor = serializerExecutor;
         mDiskWriterExecutor = diskWriterExecutor;
         mFolder = folder;
@@ -127,26 +112,27 @@ class AuditModeContext {
         return Executors.newFixedThreadPool(N_THREADS);
     }
 
-    private static File getAuditLogFilesDirectory() {
-        return new File(Environment.getDataSystemCeDirectory(), AUDIT_LOG_FILES_DIRNAME);
-    }
-
     /**
      * Instantiates an AuditModeContext, including an output stream to the audit log file, or
      * returns null if an error occurred.
      */
-    public static @NonNull AuditModeContext create() {
-        File folder = new File(Environment.getDataSystemCeDirectory(), AUDIT_LOG_FILES_DIRNAME);
+    public static @NonNull AuditModeContext create(int userId, File folder) {
         return new AuditModeContext(
+                userId,
                 getBundleSerializerExecutorService(),
                 getDiskWriterExecutorService(),
                 folder,
                 new Injector());
     }
 
-    /** Deletes all audit log files from the default audit log directory. */
-    static void deleteAuditLogFiles() {
-        AuditLogFileManager.deleteAuditLogFiles(getAuditLogFilesDirectory());
+    /** Deletes all audit log files from the user's audit log directory. */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    static void deleteAuditLogFiles(File dir) {
+        if (dir.exists()) {
+            if (!FileUtils.deleteContentsAndDir(dir)) {
+                Log.w(TAG, "Failed to delete audit log directory: " + dir.getAbsolutePath());
+            }
+        }
     }
 
     @VisibleForTesting
@@ -182,18 +168,23 @@ class AuditModeContext {
      *
      * <p>If the in-memory queue is full, it is emptied and asynchronously written to disk.
      */
-    void writeToAuditLog(@NonNull PersistableBundle data, @NonNull String packageName) {
+    void writeToAuditLog(@NonNull PersistableBundle data, @NonNull String packageName,
+                         int callingUid) {
         synchronized (mLock) {
             if (mIsStopping) {
                 return;
             }
         }
+        if (UserHandle.getUserId(callingUid) != mUserId) {
+            throw new SecurityException("Attempted to write to audit log from a different user.");
+        }
         AuditLogEntry entry =
                 new AuditLogEntry(
                         data,
                         SystemClock.elapsedRealtimeNanos(),
+                        System.currentTimeMillis(),
                         packageName,
-                        Binder.getCallingUid());
+                        callingUid);
         mBundleSerializerExecutor.execute(
                 () -> {
                     try {
@@ -266,5 +257,38 @@ class AuditModeContext {
         synchronized (mLock) {
             return mAuditLogInMemoryBuffer.mAuditLogFile;
         }
+    }
+
+    /**
+     * Returns all logs on disk for the given user. Logs are sorted by increasing timestamp. Skips
+     * unreadable logs, if any.
+     */
+    public static List<AuditLogEntry> readAuditLogs(File folder, int userId) {
+        List<AuditLogEntry> entries = readAuditLogs(folder);
+        List<AuditLogEntry> filteredEntries = new ArrayList<>();
+        for (AuditLogEntry entry : entries) {
+            if (UserHandle.getUserId(entry.mCallingUid) == userId) {
+                filteredEntries.add(entry);
+            }
+        }
+        return filteredEntries;
+    }
+
+    /**
+     * Reads all logs on disk for the given folder. Results are sorted by increasing timestamp.
+     * Skips unreadable logs, if any.
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    static List<AuditLogEntry> readAuditLogs(File folder) {
+        String prefix = AuditLogFileManager.AUDIT_LOG_FILE_PREFIX;
+        String suffix = AuditLogFileManager.AUDIT_LOG_FILE_SUFFIX;
+        File[] files =
+                folder.listFiles((dir, name) -> name.startsWith(prefix) && name.endsWith(suffix));
+        if (files == null || files.length == 0) {
+            return new ArrayList<>();
+        }
+        List<AuditLogEntry> entries = AuditLogFileWriter.readEntriesForFiles(Arrays.asList(files));
+        entries.sort(Comparator.comparingLong(entry -> entry.mRealTimeNanos));
+        return entries;
     }
 }

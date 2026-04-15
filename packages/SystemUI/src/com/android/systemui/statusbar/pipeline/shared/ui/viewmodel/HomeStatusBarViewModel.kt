@@ -51,6 +51,9 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.display.domain.interactor.ShadeExpansionTargetDisplayInteractor
+import com.android.systemui.shade.domain.interactor.DisplayAwareShadeElementToggleInteractor
+import com.android.systemui.shade.domain.interactor.NotificationShadeElement
+import com.android.systemui.shade.domain.interactor.QSShadeElement
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.chips.mediaprojection.domain.model.MediaProjectionStopDialogModel
 import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppChipViewModel
@@ -58,7 +61,6 @@ import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChip
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModel
 import com.android.systemui.statusbar.chips.uievents.StatusBarChipsUiEventLogger
 import com.android.systemui.statusbar.domain.interactor.ScrollToTopInteractor
-import com.android.systemui.statusbar.systemstatusicons.domain.interactor.SystemStatusIconBlocklistInteractor
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.events.shared.model.SystemEventAnimationState.Idle
 import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
@@ -78,9 +80,11 @@ import com.android.systemui.statusbar.pipeline.shared.ui.model.ChipsVisibilityMo
 import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombinedVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
+import com.android.systemui.statusbar.quickactions.ime.domain.interactor.ImeIndicatorChipInteractor
 import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipsViewModel
 import com.android.systemui.statusbar.quickactions.shared.model.QuickActionChipModel
+import com.android.systemui.statusbar.systemstatusicons.domain.interactor.SystemStatusIconBlocklistInteractor
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
 import com.android.systemui.user.domain.interactor.UserLogoutInteractor
 import dagger.assisted.AssistedFactory
@@ -163,6 +167,12 @@ interface HomeStatusBarViewModel : Activatable {
     /** Notifies that there was a long press on the status bar. */
     fun onStatusBarLongPressed()
 
+    /** Notifies that the clock container was clicked. */
+    fun onClockClicked()
+
+    /** Notifies that the status bar's blank space was clicked. */
+    fun onSpacerClicked()
+
     /** Notifies that the system icons container was clicked. */
     fun onQuickSettingsChipClicked()
 
@@ -170,7 +180,7 @@ interface HomeStatusBarViewModel : Activatable {
     fun onNotificationIconChipClicked()
 
     /** Notifies that there is an intent to start expansion of a shade */
-    fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int)
+    fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int, isConsumed: Boolean)
 
     /** Whether the QS Chip should be highlighted. */
     val isQuickSettingsChipHighlighted: Boolean
@@ -282,6 +292,10 @@ constructor(
     sceneInteractor: SceneInteractor,
     private val shadeInteractor: ShadeInteractor,
     private val shadeExpansionTargetDisplayInteractor: ShadeExpansionTargetDisplayInteractor,
+    private val displayAwareShadeElementToggleInteractor: DisplayAwareShadeElementToggleInteractor,
+    private val qsShadeElement: QSShadeElement,
+    private val notificationElement: NotificationShadeElement,
+    private val imeIndicatorChipInteractor: ImeIndicatorChipInteractor,
     shareToAppChipViewModel: ShareToAppChipViewModel,
     @DisplayAware private val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel,
     statusBarPopupChipsViewModelFactory: StatusBarPopupChipsViewModel.Factory,
@@ -367,43 +381,39 @@ constructor(
     override val areaDark: IsAreaDark by
         darkIconInteractor
             .isAreaDark(thisDisplayId)
-            .hydratedStateOf(traceName = "areaDark", initialValue = IsAreaDark { true })
+            .hydratedStateOf(initialValue = IsAreaDark { true })
 
     override val useDesktopStatusBar: Boolean by
-        desktopInteractor.useDesktopStatusBar.hydratedStateOf(
-            traceName = "useDesktopStatusBar",
-            initialValue = false,
-        )
+        desktopInteractor.useDesktopStatusBar.hydratedStateOf(initialValue = false)
 
     override val isQuickSettingsChipHighlighted: Boolean by
-        shadeInteractor.isQsExpanded.hydratedStateOf(
-            traceName = "isQsChipHighlighted",
-            initialValue = false,
-        )
+        combine(
+                shadeInteractor.isQsExpanded,
+                statusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
+            ) { isQsExpanded, isShadeOnThisDisplay ->
+                isQsExpanded && isShadeOnThisDisplay
+            }
+            .hydratedStateOf(initialValue = false)
 
     override val isNotificationsChipHighlighted: Boolean by
-        shadeInteractor.isNotificationsExpanded.hydratedStateOf(
-            traceName = "isNotificationsChipHighlighted",
-            initialValue = false,
-        )
+        combine(
+                shadeInteractor.isNotificationsExpanded,
+                statusBarVisibilityInteractor.isShadeWindowOnThisDisplay,
+            ) { isNotificationsExpanded, isShadeOnThisDisplay ->
+                isNotificationsExpanded && isShadeOnThisDisplay
+            }
+            .hydratedStateOf(initialValue = false)
 
     override val hasStatusBarNotifications: Boolean by
         statusBarNotificationIconsInteractor.hasStatusBarNotifications.hydratedStateOf(
-            traceName = "hasStatusBarNotifications",
-            initialValue = false,
+            initialValue = false
         )
 
     override val isNotificationsChipClickable: Boolean by
-        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(
-            traceName = "isNotificationsChipClickable",
-            initialValue = false,
-        )
+        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(initialValue = false)
 
     override val isQuickSettingsChipClickable: Boolean by
-        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(
-            traceName = "isQuickSettingsChipClickable",
-            initialValue = false,
-        )
+        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(initialValue = false)
 
     override val isHomeStatusBarAllowed = statusBarVisibilityInteractor.isHomeStatusBarAllowed
 
@@ -458,12 +468,11 @@ constructor(
 
     override val ongoingActivityChips: ChipsVisibilityModel by
         chipsVisibilityModel.hydratedStateOf(
-            traceName = "ongoingActivityChips",
             initialValue =
                 ChipsVisibilityModel(
                     chips = MultipleOngoingActivityChipsModel(),
                     areChipsAllowed = false,
-                ),
+                )
         )
 
     override fun onChipBoundsChanged(key: String, bounds: RectF) {
@@ -475,31 +484,56 @@ constructor(
         scrollToTopInteractor.onScrollToTop(thisDisplayId, eventX.toInt())
     }
 
+    override fun onClockClicked() {
+        // ImeIndicator is a QuickActions LaunchChip (not PopupChip), with no associated popups. On
+        // click it launches the InputMethodPicker (SystemUI Dialog, via InputMethodManager API)
+        // that appears as if it were a StatusBar popup, thus is required to mimic the behaviour of
+        // StatusBar popups. In particular, click on StatusBar clock should hide InputMethodPicker
+        // for consistency, like how they currently trigger the open StatusBar popup (if any) to
+        // dismiss (by virtue of the click falling outside the bounds of that popup).
+        // TODO: b/478352392 - Consider achieving the same effect by hiding InputMethodPicker upon
+        // "out-of-bounds click" instead, via SceneContainerViewModel.onEmptySpaceMotionEvent().
+        imeIndicatorChipInteractor.hideInputMethodPicker(thisDisplayId)
+    }
+
+    override fun onSpacerClicked() {
+        // ImeIndicator is a QuickActions LaunchChip (not PopupChip), with no associated popups. On
+        // click it launches the InputMethodPicker (SystemUI Dialog, via InputMethodManager API)
+        // that appears as if it were a StatusBar popup, thus is required to mimic the behaviour of
+        // StatusBar popups. In particular, click on StatusBar spacer should hide InputMethodPicker
+        // for consistency, like how they currently trigger the open StatusBar popup (if any) to
+        // dismiss (by virtue of the click falling outside the bounds of that popup).
+        // TODO: b/478352392 - Consider achieving the same effect by hiding InputMethodPicker upon
+        // "out-of-bounds click" instead, via SceneContainerViewModel.onEmptySpaceMotionEvent().
+        imeIndicatorChipInteractor.hideInputMethodPicker(thisDisplayId)
+    }
+
     override fun onStatusBarLongPressed() {
-        shadeInteractor.expandQuickSettingsShade(
+        shadeInteractor.expandNotificationsShade(
             loggingReason = "HomeStatusBarViewModel.onStatusBarLongPressed"
         )
     }
 
     override fun onQuickSettingsChipClicked() {
-        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) {
-            return
-        }
-        shadeInteractor.toggleQuickSettingsShade(
-            loggingReason = "HomeStatusBarViewModel.onQuickSettingsChipClicked"
-        )
+        displayAwareShadeElementToggleInteractor.toggleShadeElement(qsShadeElement, thisDisplayId)
     }
 
     override fun onNotificationIconChipClicked() {
-        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) {
-            return
-        }
-        shadeInteractor.toggleNotificationsShade(
-            loggingReason = "HomeStatusBarViewModel.onNotificationIconChipClicked"
+        displayAwareShadeElementToggleInteractor.toggleShadeElement(
+            notificationElement,
+            thisDisplayId,
         )
     }
 
-    override fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int) {
+    override fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int, isConsumed: Boolean) {
+        // The event was already consumed by a child (like a chip). So we don't want to expand the
+        // shade, but we still update the target display to ensure the shade window becomes
+        // available on the active display.
+        if (isConsumed) {
+            shadeExpansionTargetDisplayInteractor.updateShadeDisplayIfNeeded(thisDisplayId)
+            return
+        }
+
         val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
         shadeExpansionTargetDisplayInteractor.setExpansionIntentFromStatusBarEvent(
             eventX = eventX,
@@ -615,7 +649,7 @@ constructor(
             } else {
                 flowOf(false)
             }
-            .hydratedStateOf(traceName = "isSignOutButtonVisible", initialValue = false)
+            .hydratedStateOf(initialValue = false)
 
     override fun onSignOut() {
         logger.d { "onSignOut" }

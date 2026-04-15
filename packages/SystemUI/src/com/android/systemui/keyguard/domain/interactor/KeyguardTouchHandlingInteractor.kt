@@ -20,6 +20,7 @@ package com.android.systemui.keyguard.domain.interactor
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Point
 import android.graphics.Rect
 import android.os.PowerManager
 import android.provider.Settings
@@ -51,6 +52,7 @@ import com.android.systemui.util.time.SystemClock
 import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
 import dagger.Lazy
 import javax.inject.Inject
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -74,7 +76,7 @@ constructor(
     @ShadeDisplayAware private val context: Context,
     @Application private val scope: CoroutineScope,
     transitionInteractor: KeyguardTransitionInteractor,
-    repository: KeyguardRepository,
+    private val repository: KeyguardRepository,
     private val logger: UiEventLogger,
     broadcastDispatcher: BroadcastDispatcher,
     private val accessibilityManager: AccessibilityManagerWrapper,
@@ -201,19 +203,13 @@ constructor(
 
     /**
      * Notifies that the user has long-pressed on the lock screen.
-     *
-     * @param isA11yAction: Whether the action was performed as an a11y action
      */
-    fun onLongPress(isA11yAction: Boolean = false) {
+    fun onLongPress() {
         if (!isLongPressHandlingEnabled.value) {
             return
         }
 
-        if (isA11yAction) {
-            showSettings()
-        } else {
-            showMenu()
-        }
+        showMenu()
     }
 
     /** Notifies that the user has touched outside of the pop-up. */
@@ -261,6 +257,9 @@ constructor(
         }
         if (wallpaperFocalAreaInteractor.hasFocalArea.value) {
             wallpaperFocalAreaInteractor.sendTapPosition(x, y)
+        }
+        if (SceneContainerFlag.isEnabled) {
+            repository.lastRootViewTapPosition.value = Point(x.roundToInt(), y.roundToInt())
         }
     }
 

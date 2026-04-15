@@ -22,13 +22,12 @@ import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.LogBufferFactory
 import com.android.systemui.notifications.intelligence.rules.data.repository.ContactsRepository
 import com.android.systemui.notifications.intelligence.rules.data.repository.ContactsRepositoryImpl
-import com.android.systemui.notifications.intelligence.rules.data.repository.FreeformRuleRepository
-import com.android.systemui.notifications.intelligence.rules.data.repository.FreeformRuleRepositoryImpl
+import com.android.systemui.notifications.intelligence.rules.data.repository.ConversationPartnersRepository
+import com.android.systemui.notifications.intelligence.rules.data.repository.ConversationPartnersRepositoryImpl
 import com.android.systemui.notifications.intelligence.rules.data.repository.InstalledAppsRepository
 import com.android.systemui.notifications.intelligence.rules.data.repository.InstalledAppsRepositoryImpl
 import com.android.systemui.notifications.intelligence.rules.data.repository.NotificationRulesRepository
 import com.android.systemui.notifications.intelligence.rules.data.repository.NotificationRulesRepositoryImpl
-import com.android.systemui.notifications.intelligence.rules.shared.NmContextualDisplayTestConfig
 import com.android.systemui.notifications.intelligence.rules.shared.NotificationRulesLog
 import dagger.Binds
 import dagger.Module
@@ -41,6 +40,11 @@ interface NotificationRulesDataModule {
     @Binds public fun bindContactsRepository(impl: ContactsRepositoryImpl): ContactsRepository
 
     @Binds
+    public fun bindConversationPartnersRepository(
+        impl: ConversationPartnersRepositoryImpl
+    ): ConversationPartnersRepository
+
+    @Binds
     public fun bindInstalledAppsRepository(
         impl: InstalledAppsRepositoryImpl
     ): InstalledAppsRepository
@@ -49,9 +53,6 @@ interface NotificationRulesDataModule {
     public fun bindRulesRepository(
         impl: NotificationRulesRepositoryImpl
     ): NotificationRulesRepository
-
-    @Binds
-    public fun bindFreeformRepository(impl: FreeformRuleRepositoryImpl): FreeformRuleRepository
 
     @Binds
     @IntoMap
@@ -64,15 +65,6 @@ interface NotificationRulesDataModule {
         @NotificationRulesLog
         fun providesRulesLogBuffer(factory: LogBufferFactory): LogBuffer {
             return factory.create("NotificationRules", 100)
-        }
-
-        @Provides
-        @SysUISingleton
-        fun provideTestConfig(): NmContextualDisplayTestConfig {
-            return object : NmContextualDisplayTestConfig {
-                override val delayOnRuleGenerationMs = 0L
-                override val forceErrorOnRuleGeneration = false
-            }
         }
     }
 }

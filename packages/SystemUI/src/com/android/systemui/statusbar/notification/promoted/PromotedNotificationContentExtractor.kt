@@ -18,35 +18,28 @@ package com.android.systemui.statusbar.notification.promoted
 import android.annotation.WorkerThread
 import android.app.Flags.apiNotificationActionCustom
 import android.app.Notification
-import android.app.Notification.BigPictureStyle
 import android.app.Notification.BigTextStyle
 import android.app.Notification.CallStyle
-import android.app.Notification.EXTRA_BIG_TEXT
-import android.app.Notification.EXTRA_CALL_PERSON
-import android.app.Notification.EXTRA_CHRONOMETER_COUNT_DOWN
-import android.app.Notification.EXTRA_PREFER_SMALL_ICON
 import android.app.Notification.EXTRA_PROGRESS
 import android.app.Notification.EXTRA_PROGRESS_INDETERMINATE
 import android.app.Notification.EXTRA_PROGRESS_MAX
-import android.app.Notification.EXTRA_SUB_TEXT
-import android.app.Notification.EXTRA_TEXT
-import android.app.Notification.EXTRA_TITLE
-import android.app.Notification.EXTRA_TITLE_BIG
-import android.app.Notification.EXTRA_VERIFICATION_ICON
-import android.app.Notification.EXTRA_VERIFICATION_TEXT
-import android.app.Notification.InboxStyle
 import android.app.Notification.MetricStyle
 import android.app.Notification.ProgressStyle
-import android.app.Person
 import android.content.Context
-import android.graphics.drawable.Icon
 import android.os.UserHandle
 import android.service.notification.StatusBarNotification
 import android.view.LayoutInflater
 import androidx.compose.ui.util.trace
 import com.android.internal.R
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.notifications.content.chronometerCountDown
 import com.android.systemui.notifications.content.icon.AppIconProvider
+import com.android.systemui.notifications.content.preferSmallIcon
+import com.android.systemui.notifications.content.subText
+import com.android.systemui.notifications.content.text
+import com.android.systemui.notifications.content.title
+import com.android.systemui.notifications.content.verificationIcon
+import com.android.systemui.notifications.content.verificationText
 import com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_NONE
 import com.android.systemui.statusbar.NotificationLockscreenUserManager.RedactionType
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
@@ -198,8 +191,8 @@ constructor(
                 publicBuilder.subText = publicNotification.subText()
                 // The standard public version is extracted as a collapsed notification,
                 //  so avoid using bigTitle or bigText, and instead get the collapsed versions.
-                publicBuilder.title = publicNotification.title(notificationStyle, expanded = false)
-                publicBuilder.text = publicNotification.text()
+                publicBuilder.title = publicNotification.title(expanded = false)
+                publicBuilder.text = publicNotification.text(expanded = false)
                 publicBuilder.skeletonLargeIcon =
                     publicNotification.skeletonLargeIcon(imageModelProvider)
                 // Only CallStyle has styled content that shows in the collapsed version.
@@ -237,9 +230,9 @@ constructor(
             contentBuilder.shortCriticalText = notification.shortCriticalText
         }
         contentBuilder.lastAudiblyAlertedMs = lastAudiblyAlertedMs
-        contentBuilder.profileBadgeBitmap = recoveredBuilder.getProfileBadge()
-        contentBuilder.title = notification.title(recoveredBuilder.style?.javaClass)
-        contentBuilder.text = notification.text(recoveredBuilder.style?.javaClass)
+        contentBuilder.profileBadgeBitmap = recoveredBuilder.profileBadge
+        contentBuilder.title = notification.title(expanded = true)
+        contentBuilder.text = notification.text(expanded = true)
         contentBuilder.skeletonLargeIcon = notification.skeletonLargeIcon(imageModelProvider)
         contentBuilder.oldProgress = recoveredBuilder.oldProgress(notification)
         val colorsFromNotif = recoveredBuilder.getColors(/* isHeader= */ false)
@@ -317,51 +310,6 @@ constructor(
         return NotifIcon.AppIcon(appIconProvider.getOrFetchSkeletonAppIcon(packageName, userHandle))
     }
 
-    private fun Notification.title(): CharSequence? = getCharSequenceExtraUnlessEmpty(EXTRA_TITLE)
-
-    private fun Notification.bigTitle(): CharSequence? =
-        getCharSequenceExtraUnlessEmpty(EXTRA_TITLE_BIG)
-
-    private fun Notification.callPerson(): Person? =
-        extras?.getParcelable(EXTRA_CALL_PERSON, Person::class.java)
-
-    private fun Notification.title(
-        styleClass: Class<out Notification.Style>?,
-        expanded: Boolean = true,
-    ): CharSequence? {
-        // bigTitle is only used in the expanded form of 3 styles.
-        return when (styleClass) {
-            BigTextStyle::class.java,
-            BigPictureStyle::class.java,
-            InboxStyle::class.java -> if (expanded) bigTitle() else null
-            CallStyle::class.java -> callPerson()?.name?.takeUnlessEmpty()
-            else -> null
-        } ?: title()
-    }
-
-    private fun Notification.text(): CharSequence? = getCharSequenceExtraUnlessEmpty(EXTRA_TEXT)
-
-    private fun Notification.bigText(): CharSequence? =
-        getCharSequenceExtraUnlessEmpty(EXTRA_BIG_TEXT)
-
-    private fun Notification.text(styleClass: Class<out Notification.Style>?): CharSequence? {
-        if (styleClass == MetricStyle::class.java) return null
-
-        return when (styleClass) {
-            BigTextStyle::class.java -> bigText()
-            else -> null
-        } ?: text()
-    }
-
-    private fun Notification.subText(): CharSequence? =
-        getCharSequenceExtraUnlessEmpty(EXTRA_SUB_TEXT)
-
-    private fun Notification.chronometerCountDown(): Boolean =
-        extras?.getBoolean(EXTRA_CHRONOMETER_COUNT_DOWN) ?: false
-
-    private fun Notification.preferSmallIcon(): Boolean =
-        extras?.getBoolean(EXTRA_PREFER_SMALL_ICON) ?: false
-
     private fun Notification.skeletonLargeIcon(
         imageModelProvider: ImageModelProvider
     ): ImageModel? {
@@ -407,12 +355,9 @@ constructor(
     private fun Notification.skeletonVerificationIcon(
         imageModelProvider: ImageModelProvider
     ): ImageModel? =
-        extras.getParcelable(EXTRA_VERIFICATION_ICON, Icon::class.java)?.let {
+        verificationIcon()?.let {
             imageModelProvider.getImageModel(it, SmallSquare, skeletonImageTransform)
         }
-
-    private fun Notification.verificationText(): CharSequence? =
-        getCharSequenceExtraUnlessEmpty(EXTRA_VERIFICATION_TEXT)
 
     private fun Notification.Builder.extractStyleContent(
         notification: Notification,
@@ -470,11 +415,3 @@ constructor(
         private const val LOG_NOT_EXTRACTED = false
     }
 }
-
-private fun Notification.getCharSequenceExtraUnlessEmpty(key: String): CharSequence? =
-    extras?.getCharSequence(key)?.takeUnlessEmpty()
-
-private fun Notification.getStringExtraUnlessEmpty(key: String): String? =
-    extras?.getString(key)?.takeUnlessEmpty()
-
-private fun <T : CharSequence> T.takeUnlessEmpty(): T? = takeUnless { it.isEmpty() }

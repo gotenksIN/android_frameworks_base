@@ -16,7 +16,6 @@
 
 package com.android.server.companion.virtual;
 
-import static android.Manifest.permission.ACCESS_COMPUTER_CONTROL;
 import static android.Manifest.permission.ADD_ALWAYS_UNLOCKED_DISPLAY;
 import static android.Manifest.permission.ADD_MIRROR_DISPLAY;
 import static android.Manifest.permission.ADD_TRUSTED_DISPLAY;
@@ -33,9 +32,8 @@ import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_BLOCKED_
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_CAMERA;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_CLIPBOARD;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
+import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_THERMAL;
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
-
-import static com.android.server.companion.virtual.VirtualDeviceManagerService.DEVICE_PROFILE_COMPUTER_CONTROL;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -55,6 +53,7 @@ import android.companion.virtual.IVirtualDeviceIntentInterceptor;
 import android.companion.virtual.IVirtualDeviceSoundEffectListener;
 import android.companion.virtual.ViewConfigurationParams;
 import android.companion.virtual.VirtualDevice;
+import android.companion.virtual.VirtualDevice.DeviceProfile;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.audio.IAudioConfigChangedCallback;
@@ -108,6 +107,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
+import android.os.Temperature;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.ArrayMap;
@@ -139,6 +139,7 @@ import com.android.server.UiModeManagerInternal;
 import com.android.server.companion.virtual.audio.VirtualAudioController;
 import com.android.server.companion.virtual.camera.VirtualCameraController;
 import com.android.server.inputmethod.InputMethodManagerInternal;
+import com.android.server.power.thermal.ThermalManagerInternal;
 
 import dalvik.annotation.optimization.FastNative;
 
@@ -180,8 +181,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
 
     private static final String PERSISTENT_ID_PREFIX_CDM_ASSOCIATION = "companion:";
 
-    private static final List<String> DEVICE_PROFILES_ALLOWING_MIRROR_DISPLAYS = List.of(
-            AssociationRequest.DEVICE_PROFILE_APP_STREAMING);
+    private static final List<Integer> DEVICE_PROFILES_ALLOWING_MIRROR_DISPLAYS = List.of(
+            VirtualDevice.DEVICE_PROFILE_APP_STREAMING);
 
     /**
      * Timeout until {@link #launchPendingIntent} stops waiting for an activity to be launched.
@@ -219,8 +220,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     @NonNull
     private final AttributionSource mAttributionSource;
     private final int mDeviceId;
-    @NonNull
-    private final String mDeviceProfile;
+    @DeviceProfile
+    private final int mDeviceProfile;
     @Nullable
     private final String mPersistentDeviceId;
     @NonNull
@@ -264,6 +265,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     private final DisplayManagerInternal mDisplayManagerInternal;
     @NonNull
     private final UiModeManagerInternal mUiModeManagerInternal;
+    @NonNull
+    private final ThermalManagerInternal mThermalManagerInternal;
     @NonNull
     private final PowerManager mPowerManager;
     @NonNull
@@ -491,7 +494,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             @NonNull IBinder token,
             @NonNull AttributionSource attributionSource,
             int deviceId,
-            String deviceProfile,
+            @DeviceProfile int deviceProfile,
             @Nullable CameraAccessController cameraAccessController,
             @NonNull PendingTrampolineCallback pendingTrampolineCallback,
             @NonNull IVirtualDeviceActivityListener activityListener,
@@ -532,7 +535,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             @NonNull IBinder token,
             @NonNull AttributionSource attributionSource,
             int deviceId,
-            String deviceProfile,
+            @DeviceProfile int deviceProfile,
             @Nullable InputController inputController,
             @Nullable CameraAccessController cameraAccessController,
             @NonNull PendingTrampolineCallback pendingTrampolineCallback,
@@ -566,6 +569,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         mWindowManager = windowManager;
         mDisplayManagerInternal = LocalServices.getService(DisplayManagerInternal.class);
         mUiModeManagerInternal = LocalServices.getService(UiModeManagerInternal.class);
+        mThermalManagerInternal = LocalServices.getService(ThermalManagerInternal.class);
         mPowerManager = Objects.requireNonNull(context.getSystemService(PowerManager.class));
         mAudioManager = context.getSystemService(AudioManager.class);
         mDisplayManager = Objects.requireNonNull(context.getSystemService(DisplayManager.class));
@@ -617,7 +621,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         mVirtualDeviceLog.logCreated(deviceId, mOwnerUid, mDeviceProfile);
 
         mPublicVirtualDeviceObject = new VirtualDevice(
-                this, getDeviceId(), getPersistentDeviceId(), mParams.getName(), getDisplayName());
+                this, getDeviceId(), getDeviceProfile(), getPersistentDeviceId(),
+                mParams.getName(), getDisplayName());
 
         mActivityPolicyExemptions = new ArraySet<>(
                 mParams.getDevicePolicy(POLICY_TYPE_ACTIVITY) == DEVICE_POLICY_DEFAULT
@@ -695,9 +700,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         return mAssociationInfo == null ? mParams.getName() : mAssociationInfo.getDisplayName();
     }
 
-    @Override // Binder call
-    @NonNull
-    public String getDeviceProfile() {
+    @DeviceProfile
+    public int getDeviceProfile() {
         return mDeviceProfile;
     }
 
@@ -993,6 +997,11 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
 
             mInputController.close();
             mSensorController.close();
+
+            if (getDevicePolicy(POLICY_TYPE_THERMAL) == DEVICE_POLICY_CUSTOM) {
+                mThermalManagerInternal.notifyDeviceThermalStatusChanged(
+                        mDeviceId, PowerManager.THERMAL_STATUS_INVALID);
+            }
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
@@ -1275,8 +1284,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     public void setDisplayUiMode(int displayId, int uiMode) {
         checkCallerIsDeviceOwner();
         if ((uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_CAR
-                && !AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION.equals(
-                        mDeviceProfile)) {
+                && mDeviceProfile != VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION) {
             throw new SecurityException("Setting car UI mode requires "
                     + AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
         }
@@ -1289,6 +1297,20 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         }
         Binder.withCleanCallingIdentity(
                 () -> mUiModeManagerInternal.setDisplayUiMode(displayId, uiMode));
+    }
+
+    @Override // Binder call
+    public void setCurrentThermalStatus(@PowerManager.ThermalStatus int status) {
+        checkCallerIsDeviceOwner();
+        if (getDevicePolicy(POLICY_TYPE_THERMAL) != DEVICE_POLICY_CUSTOM) {
+            throw new UnsupportedOperationException(
+                    "Setting thermal status requires POLICY_TYPE_THERMAL to be custom");
+        }
+        if (!Temperature.isValidStatus(status)) {
+            throw new IllegalArgumentException("Not a valid thermal status: " + status);
+        }
+        Binder.withCleanCallingIdentity(
+                () -> mThermalManagerInternal.notifyDeviceThermalStatusChanged(mDeviceId, status));
     }
 
     @Override // Binder call
@@ -1397,12 +1419,6 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
 
     @Override
     public boolean canCreateMirrorDisplays() {
-        if (Flags.computerControlAccess()
-                && (mContext.checkCallingOrSelfPermission(ACCESS_COMPUTER_CONTROL)
-                        == PackageManager.PERMISSION_GRANTED)) {
-            return true;
-        }
-
         if (Flags.vdmMirrorDisplayPermission()
                 && CompatChanges.isChangeEnabled(CHECK_ADD_MIRROR_DISPLAY_PERMISSION,
                     mOwnerPackageName, UserHandle.getUserHandleForUid(mOwnerUid))) {
@@ -1480,7 +1496,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             return false;
         }
 
-        if (getDevicePolicy(POLICY_TYPE_AUDIO) == VirtualDeviceParams.DEVICE_POLICY_CUSTOM) {
+        if (getDevicePolicy(POLICY_TYPE_AUDIO) == DEVICE_POLICY_CUSTOM) {
             return true;
         }
         final long token = Binder.clearCallingIdentity();
@@ -1504,7 +1520,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         fout.println("  VirtualDevice: ");
         fout.println(indent + "mDeviceId: " + mDeviceId);
         fout.println(indent + "mAssociationId: " + getAssociationId());
-        fout.println(indent + "mDeviceProfile: " + mDeviceProfile);
+        fout.println(indent + "mDeviceProfile: "
+                + VirtualDeviceLog.deviceProfileToString(mDeviceProfile));
         fout.println(indent + "mOwnerPackageName: " + mOwnerPackageName);
         fout.println(indent + "mParams: ");
         mParams.dump(fout, indent + indent);
@@ -1966,7 +1983,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         } catch (RemoteException e) {
             Slog.w(TAG, "Unable to invoke activity listener", e);
         }
-        if (!DEVICE_PROFILE_COMPUTER_CONTROL.equals(mDeviceProfile)) {
+        if (mDeviceProfile != VirtualDevice.DEVICE_PROFILE_COMPUTER_CONTROL) {
             showToastOnDisplay(displayId,
                     mContext.getString(
                             R.string.app_streaming_blocked_message_for_fingerprint_dialog),

@@ -42,6 +42,9 @@ import android.util.Slog;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
+import com.android.server.personalcontext.AccessController;
+import com.android.server.personalcontext.OperatingModeProvider;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,9 +66,8 @@ public class BaseServiceClientComponentTest {
     private Context mContext;
     private final FakeExecutor mFakeExecutor = new FakeExecutor();
 
-    @Mock
-    private UserHandle mUserHandle;
-
+    @Mock private UserHandle mUserHandle;
+    @Mock private AccessController mAccessController;
 
     private HandlerThread mTestHandlerThread;
 
@@ -81,10 +83,21 @@ public class BaseServiceClientComponentTest {
 
     private static class TestServiceClientComponent
             extends BaseServiceClientComponent<ITestService> {
-        TestServiceClientComponent(Context context, UUID componentId,
+        TestServiceClientComponent(
+                Context context,
+                AccessController accessController,
+                UUID componentId,
                 ServiceInfo serviceInfo,
                 UserHandle userHandle, Executor executor, Handler handler) {
-            super(context, componentId, serviceInfo, userHandle, executor, handler);
+            super(
+                    context,
+                    accessController,
+                    componentId,
+                    serviceInfo,
+                    userHandle,
+                    executor,
+                    handler,
+                    new OperatingModeProvider());
         }
 
         @Override
@@ -122,8 +135,14 @@ public class BaseServiceClientComponentTest {
         };
 
         // Request an operation on service, opening the connection.
-        final TestServiceClientComponent component = new TestServiceClientComponent(mContext,
-                UUID.randomUUID(), serviceInfo, mUserHandle, mFakeExecutor, mTestHandler);
+        final TestServiceClientComponent component = new TestServiceClientComponent(
+                mContext,
+                mAccessController,
+                UUID.randomUUID(),
+                serviceInfo,
+                mUserHandle,
+                mFakeExecutor,
+                mTestHandler);
         component.runOp();
         mFakeExecutor.runAll();
         final ArgumentCaptor<ServiceConnection> connectionCaptor = ArgumentCaptor.forClass(
@@ -157,8 +176,14 @@ public class BaseServiceClientComponentTest {
         final ServiceInfo serviceInfo = new ServiceInfo();
         serviceInfo.packageName = "com.foo.bar";
         serviceInfo.name = "baz";
-        TestServiceClientComponent component = new TestServiceClientComponent(mContext,
-                UUID.randomUUID(), serviceInfo, mUserHandle, mFakeExecutor, mTestHandler);
+        TestServiceClientComponent component = new TestServiceClientComponent(
+                mContext,
+                mAccessController,
+                UUID.randomUUID(),
+                serviceInfo,
+                mUserHandle,
+                mFakeExecutor,
+                mTestHandler);
         component.runOp();
         mFakeExecutor.runAll();
         ArgumentCaptor<Intent> intentArgumentCaptor = ArgumentCaptor.forClass(Intent.class);

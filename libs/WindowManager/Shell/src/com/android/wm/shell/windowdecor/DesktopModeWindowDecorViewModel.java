@@ -46,7 +46,6 @@ import android.app.ActivityManager.RunningTaskInfo;
 import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
 import android.app.IActivityManager;
-import android.app.IActivityTaskManager;
 import android.app.compat.CompatChanges;
 import android.content.Context;
 import android.content.Intent;
@@ -1043,7 +1042,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     ) {
         final ArrayList<Pair<Integer, TaskSnapshot>> snapshotList = new ArrayList<>();
         final IActivityManager activityManager = ActivityManager.getService();
-        final IActivityTaskManager activityTaskManagerService = ActivityTaskManager.getService();
         final List<ActivityManager.RecentTaskInfo> recentTasks;
         try {
             recentTasks = mActivityTaskManager.getRecentTasks(
@@ -1055,11 +1053,16 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     "%s: Error getting recent tasks: %s", TAG, e);
             return new ArrayList<>();
         }
-        final String callerPackageName = callerTaskInfo.baseActivity.getPackageName();
+        final String callerPackageName = ComponentUtils.getPackageName(callerTaskInfo);
+        if (callerPackageName == null) {
+            ProtoLog.e(WM_SHELL_DESKTOP_MODE,
+                    "%s: Error getting package name for task: %d", TAG,
+                    callerTaskInfo.taskId);
+            return new ArrayList<>();
+        }
         for (ActivityManager.RecentTaskInfo info : recentTasks) {
-            if (info.baseActivity == null) continue;
-            final String infoPackageName = info.baseActivity.getPackageName();
-            if (!infoPackageName.equals(callerPackageName)) {
+            final String packageName = ComponentUtils.getPackageName(info);
+            if (!callerPackageName.equals(packageName)) {
                 continue;
             }
             // TODO(b/337903443): Fix this returning null for freeform tasks.
@@ -1380,6 +1383,42 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
      */
     private void closePinnedTask(RunningTaskInfo task) {
         mPinnedLayerController.closeTask(task);
+    }
+
+    private void moveTaskToFront(ActivityManager.RunningTaskInfo taskInfo) {
+        // TODO(b/356962065): during a drag-move, this shouldn't be a WCT - just move the
+        //  task surface to the top of other tasks and reorder once the user releases the
+        //  gesture together with the bounds' WCT. This is probably still valid for other
+        //  gestures like simple clicks.
+        final int taskId = taskInfo.taskId;
+        if (!mFocusTransitionObserver.hasGlobalFocus(taskInfo)) {
+            WdLog.logD(
+                    TAG,
+                    taskId,
+                    "moveTaskToFront display=%d "
+                            + "globallyFocusedTaskId=%d globallyFocusedDisplayId=%d",
+                    taskInfo.displayId,
+                    mFocusTransitionObserver.getGloballyFocusedTaskId(),
+                    mFocusTransitionObserver.getGloballyFocusedDisplayId());
+            final boolean isPinned =
+                    mPinnedLayerController != null && mPinnedLayerController.isPinned(taskId);
+            if (isPinned) {
+                mPinnedLayerController.requestFocus(taskInfo);
+            } else {
+                mDesktopModeUiEventLogger.log(taskInfo,
+                        DesktopUiEventEnum.DESKTOP_WINDOW_HEADER_TAP_TO_REFOCUS);
+                mDesktopTasksController.moveTaskToFront(taskInfo);
+            }
+        } else {
+            WdLog.motionEventLogD(
+                    TAG,
+                    taskId,
+                    "moveTaskToFront already had global focus, skipping "
+                            + " display=%d globallyFocusedTaskId=%d globallyFocusedDisplayId=%d",
+                    taskInfo.displayId,
+                    mFocusTransitionObserver.getGloballyFocusedTaskId(),
+                    mFocusTransitionObserver.getGloballyFocusedDisplayId());
+        }
     }
 
     /** Listener for caption touch events. */
@@ -1900,10 +1939,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                         mDesktopModeUiEventLogger, mWindowDecorationActions,
                         mDesktopUserRepositories, mGestureExclusionTracker,
                         new InputPilfererImpl(mInputManager), mInputManager,
-                        mFocusTransitionObserver, mShellDesktopState,
-                        mMultiDisplayDragMoveIndicatorController, mTransactionFactory,
-                        mCaptionTouchStatusListener, mAppHandleMotionEventHandler,
-                        mPinnedLayerController);
+                        mShellDesktopState, mMultiDisplayDragMoveIndicatorController,
+                        mTransactionFactory, mCaptionTouchStatusListener,
+                        mAppHandleMotionEventHandler, mPinnedLayerController);
         windowDecoration.setCaptionListeners(
                 touchEventListener, touchEventListener, touchEventListener, touchEventListener);
         windowDecoration.setExclusionRegionListener(mExclusionRegionListener);
@@ -2173,6 +2211,13 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             WdLog.logD(TAG, "Using DefaultWindowDecorationActions to close task=%d with "
                     + "forceKeepDesktop=%b", taskInfo.taskId, forceKeepDesktop);
             mViewModel.closeTask(taskInfo, forceKeepDesktop);
+        }
+
+        @Override
+        public void onCaptionViewReceivedInteraction(@NonNull RunningTaskInfo taskInfo) {
+            WdLog.logD(TAG, "Using DefaultWindowDecorationActions to bring task=%d to front",
+                    taskInfo.taskId);
+            mViewModel.moveTaskToFront(taskInfo);
         }
 
         @Override

@@ -189,9 +189,10 @@ private fun SimpleButton(
     Column(
         modifier = modifier.then(semanticsModifier),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Top),
     ) {
         ToggleButton(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.height(56.dp).fillMaxWidth(),
             checked = viewModel.state.isEnabled,
             onCheckedChange = { scope.launch { viewModel.onClick() } },
         ) {
@@ -200,15 +201,13 @@ private fun SimpleButton(
             }
         }
         viewModel.state.subText?.let {
-            Row {
-                Text(
-                    text = stringResource(it),
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            Text(
+                text = stringResource(it),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -235,7 +234,14 @@ private fun SectionButton(
                 Icon(painter = painterResource(id = it), contentDescription = null)
             }
         },
-        headlineContent = { viewModel.state.mainTitle?.let { Text(text = stringResource(it)) } },
+        headlineContent = {
+            viewModel.state.mainTitle?.let {
+                Text(
+                    text = stringResource(it),
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                )
+            }
+        },
         supportingContent = {
             if (viewModel.state.isEnabled) {
                 viewModel.state.subTitle?.let {
@@ -245,7 +251,7 @@ private fun SectionButton(
                         } else {
                             stringResource(it)
                         }
-                    Text(text = text)
+                    Text(text = text, style = MaterialTheme.typography.labelMedium)
                 }
             }
         },
@@ -295,13 +301,19 @@ private fun SensorAccessButton(
                                 is SensorAccessSummary.Simple -> summary.text
                                 is SensorAccessSummary.WithCount ->
                                     "${summary.prefix} ${stringResource(summary.suffixResId, summary.suffixArg)}"
-                            }
+                            },
+                        style = MaterialTheme.typography.titleSmallEmphasized,
                     )
                 }
             },
             supportingContent =
                 viewModel.activeAppsSensorSectionSupportText?.let {
-                    { Text(text = stringResource(it)) }
+                    {
+                        Text(
+                            text = stringResource(it),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                 },
             trailingContent = {
                 Icon(

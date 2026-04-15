@@ -75,11 +75,14 @@ interface IPersonalContextManager {
     @EnforcePermission("PERSONAL_CONTEXT_WRITE_SETTINGS")
     void setEnabled(int userId, boolean enabled);
 
-    @EnforcePermission("PERSONAL_CONTEXT_READ_SETTINGS")
+    @RequiresNoPermission
     boolean isEnabled(int userId);
 
     oneway void updateEmbeddedClientInfo(
         in InsightSurfaceClientInfo oldClientInfo,
         in InsightSurfaceClientInfo newClientInfo,
         int userId);
+
+    @EnforcePermission("CHANGE_PERSONAL_CONTEXT_OPERATING_MODE")
+    oneway void setOperatingMode(int userId, int mode);
 }

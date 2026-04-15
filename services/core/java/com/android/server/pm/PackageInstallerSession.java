@@ -250,6 +250,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
@@ -306,6 +307,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private static final String ATTR_UPDATE_OWNER_PACKAGE_NAME = "updateOwnererPackageName";
     private static final String ATTR_INSTALLER_ATTRIBUTION_TAG = "installerAttributionTag";
     private static final String ATTR_INSTALLER_UID = "installerUid";
+    private static final String ATTR_ORIGINAL_INSTALLER_UID = "originalInstallerUid";
     private static final String ATTR_INITIATING_PACKAGE_NAME =
             "installInitiatingPackageName";
     private static final String ATTR_ORIGINATING_PACKAGE_NAME =
@@ -531,14 +533,11 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private long committedMillis;
 
-    /** Uid of the creator of this session. */
-    private final int mOriginalInstallerUid;
+    /** Uid of the owner of the installer session */
+    private volatile int mInstallerUid;
 
     /** Package name of the app that created the installation session. */
     private final String mOriginalInstallerPackageName;
-
-    /** Uid of the owner of the installer session */
-    private volatile int mInstallerUid;
 
     /** Where this install request came from */
     @GuardedBy("mLock")
@@ -1284,7 +1283,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             Context context, PackageManagerService pm,
             PackageSessionProvider sessionProvider,
             SilentUpdatePolicy silentUpdatePolicy, Looper looper, StagingManager stagingManager,
-            int sessionId, int userId, int installerUid, @NonNull InstallSource installSource,
+            int sessionId, int userId, int installerUid,
+            @NonNull InstallSource installSource,
             SessionParams params, long createdMillis, long committedMillis,
             File stageDir, String stageCid, InstallationFile[] files,
             ArrayMap<String, PerFileChecksum> checksums,
@@ -1311,7 +1311,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
         this.sessionId = sessionId;
         this.userId = userId;
-        mOriginalInstallerUid = installerUid;
         mInstallerUid = installerUid;
         mInstallSource = Objects.requireNonNull(installSource);
         mOriginalInstallerPackageName = mInstallSource.mInstallerPackageName;
@@ -1435,8 +1434,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             mDeveloperVerifierController.bindToVerifierServiceIfNeeded(
                     mPm::snapshotComputer, userId, this::onConnectionEstablished);
             if (!TextUtils.isEmpty(params.appPackageName)) {
-                mDeveloperVerifierController.notifyPackageNameAvailable(params.appPackageName,
-                        userId);
+                mDeveloperVerifierController.notifyPackageNameAvailable(sessionId,
+                        params.appPackageName, userId);
             }
             synchronized (mMetrics) {
                 mMetrics.onDeveloperVerificationBindStarted(
@@ -1453,14 +1452,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             clientProgress = mClientProgress;
         }
         synchronized (mLock) {
-            return new PackageInstallerHistoricalSession(sessionId, userId, mOriginalInstallerUid,
-                    mOriginalInstallerPackageName, mInstallSource, mInstallerUid, createdMillis,
-                    updatedMillis, committedMillis, stageDir, stageCid, clientProgress, progress,
+            return new PackageInstallerHistoricalSession(sessionId, userId,
+                    mInstallSource.mOriginalInstallerUid, mOriginalInstallerPackageName,
+                    mInstallSource, mInstallerUid,
+                    createdMillis, updatedMillis, committedMillis, stageDir, stageCid,
+                    clientProgress, progress,
                     isCommitted(), isPreapprovalRequested(), mSealed, mPermissionsManuallyAccepted,
-                    mStageDirInUse, mDestroyed, mFds.size(), mBridges.size(), mFinalStatus,
-                    mFinalMessage, params, mParentSessionId, getChildSessionIdsLocked(),
-                    mSessionApplied, mSessionFailed, mSessionReady, mSessionErrorCode,
-                    mSessionErrorMessage, mPreapprovalDetails, mPreVerifiedDomains, mPackageName,
+                    mStageDirInUse, isDestroyed(), mFds.size(), mBridges.size(),
+                    mFinalStatus, mFinalMessage, params, mParentSessionId,
+                    getChildSessionIdsLocked(), mSessionApplied, mSessionFailed,
+                    mSessionReady, mSessionErrorCode, mSessionErrorMessage,
+                    mPreapprovalDetails, mPreVerifiedDomains, mPackageName,
                     mInitialVerificationPolicy, mCurrentVerificationPolicy.get());
         }
     }
@@ -2636,7 +2638,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         if (psi.getPkg().isUpdatableSystem()) {
             return true;
         }
-        if (mOriginalInstallerUid == Process.ROOT_UID) {
+        if (mInstallSource.mOriginalInstallerUid == Process.ROOT_UID) {
             Slog.w(TAG, "Overriding updatableSystem because the installer is root: "
                     + psi.getPackageName());
             return true;
@@ -2697,11 +2699,11 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
             if (forTransfer) {
                 mContext.enforceCallingOrSelfPermission(Manifest.permission.INSTALL_PACKAGES, null);
-                if (mInstallerUid == mOriginalInstallerUid) {
+                if (mInstallerUid == mInstallSource.mOriginalInstallerUid) {
                     throw new IllegalArgumentException("Session has not been transferred");
                 }
             } else {
-                if (mInstallerUid != mOriginalInstallerUid) {
+                if (mInstallerUid != mInstallSource.mOriginalInstallerUid) {
                     throw new IllegalArgumentException("Session has been transferred");
                 }
             }
@@ -2974,6 +2976,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             throw new SecurityException("Can only transfer sessions that use public options");
         }
 
+        mCallback.checkSessionQuota(newOwnerAppInfo.uid);
+
         synchronized (mLock) {
             assertCallerIsOwnerOrRoot();
             assertPreparedAndNotSealedLocked("transfer");
@@ -2986,7 +2990,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
             mInstallerUid = newOwnerAppInfo.uid;
             mInstallSource = InstallSource.create(packageName, null /* originatingPackageName */,
-                    packageName, mInstallerUid, packageName, null /* installerAttributionTag */,
+                    packageName, mInstallerUid, mInstallSource.mOriginalInstallerUid,
+                    packageName, null /* installerAttributionTag */,
                     params.packageSource);
         }
     }
@@ -4642,7 +4647,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
 
             if (!apk.isUpdatableSystem()) {
-                if (mOriginalInstallerUid == Process.ROOT_UID) {
+                if (mInstallSource.mOriginalInstallerUid == Process.ROOT_UID) {
                     Slog.w(TAG, "Overriding updatableSystem because the installer is root for: "
                             + apk.getPackageName());
                 } else {
@@ -4788,7 +4793,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
         }
 
-        if (mInstallerUid != mOriginalInstallerUid) {
+        if (mInstallerUid != mInstallSource.mOriginalInstallerUid) {
             // Session has been transferred, check package name.
             if (TextUtils.isEmpty(mPackageName) || !mPackageName.equals(
                     mOriginalInstallerPackageName)) {
@@ -4912,6 +4917,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                             }
                         }
                     }
+                } catch (NoSuchFileException e) {
+                    // The oat directory does not exist. This is expected.
                 } catch (IOException | UncheckedIOException e) {
                     Slog.e(TAG, "Error walking directory " + oatDir, e);
                 }
@@ -5401,6 +5408,13 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
      */
     public int getInstallerUid() {
         return mInstallerUid;
+    }
+
+    /**
+     * @return the uid of the creator of this session
+     */
+    public int getOriginalInstallerUid() {
+        return mInstallSource.mOriginalInstallerUid;
     }
 
     /**
@@ -6686,13 +6700,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
         } catch (InstallerException ignored) {
         }
+
         if (shouldUseVerificationService()
                 && !TextUtils.isEmpty(params.appPackageName)
                 && !isCommitted()) {
             // Only notify for the cancellation if the verification request has not
             // been sent out, which happens right after commit() is called.
             mDeveloperVerifierController.notifyVerificationCancelled(
-                    params.appPackageName, userId);
+                    sessionId, params.appPackageName, userId);
             synchronized (mMetrics) {
                 mMetrics.onDeveloperVerificationCancelled();
             }
@@ -6711,7 +6726,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         pw.increaseIndent();
 
         pw.printPair("userId", userId);
-        pw.printPair("mOriginalInstallerUid", mOriginalInstallerUid);
+        pw.printPair("mOriginalInstallerUid", mInstallSource.mOriginalInstallerUid);
         pw.printPair("mOriginalInstallerPackageName", mOriginalInstallerPackageName);
         pw.printPair("installerPackageName", mInstallSource.mInstallerPackageName);
         pw.printPair("installInitiatingPackageName", mInstallSource.mInitiatingPackageName);
@@ -6956,6 +6971,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             writeStringAttribute(out, ATTR_INSTALLER_ATTRIBUTION_TAG,
                     mInstallSource.mInstallerAttributionTag);
             out.attributeInt(null, ATTR_INSTALLER_UID, mInstallerUid);
+            out.attributeInt(null, ATTR_ORIGINAL_INSTALLER_UID,
+                    mInstallSource.mOriginalInstallerUid);
             writeStringAttribute(out, ATTR_INITIATING_PACKAGE_NAME,
                     mInstallSource.mInitiatingPackageName);
             writeStringAttribute(out, ATTR_ORIGINATING_PACKAGE_NAME,
@@ -7151,6 +7168,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         final int installerUid = in.getAttributeInt(null, ATTR_INSTALLER_UID, pm.snapshotComputer()
                 .getPackageUid(installerPackageName, PackageManager.MATCH_UNINSTALLED_PACKAGES,
                         userId));
+        final int originalInstallerUid = in.getAttributeInt(null, ATTR_ORIGINAL_INSTALLER_UID,
+                installerUid);
         final String installInitiatingPackageName =
                 readStringAttribute(in, ATTR_INITIATING_PACKAGE_NAME);
         final String installOriginatingPackageName =
@@ -7339,14 +7358,15 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
         InstallSource installSource = InstallSource.create(installInitiatingPackageName,
                 installOriginatingPackageName, installerPackageName, installPackageUid,
+                originalInstallerUid,
                 updateOwnerPackageName, installerAttributionTag, params.packageSource);
         return new PackageInstallerSession(callback, context, pm, sessionProvider,
                 silentUpdatePolicy, installerThread, stagingManager, sessionId, userId,
-                installerUid, installSource, params, createdMillis, committedMillis, stageDir,
-                stageCid, fileArray, checksumsMap, prepared, committed, destroyed, sealed,
-                childSessionIdsArray, parentSessionId, isReady, isFailed, isApplied,
-                sessionErrorCode, sessionErrorMessage, preVerifiedDomains,
-                developerVerifierController,
+                installerUid, installSource,
+                params, createdMillis, committedMillis, stageDir, stageCid, fileArray,
+                checksumsMap, prepared, committed, destroyed, sealed, childSessionIdsArray,
+                parentSessionId, isReady, isFailed, isApplied, sessionErrorCode,
+                sessionErrorMessage, preVerifiedDomains, developerVerifierController,
                 initialVerificationPolicy, currentVerificationPolicy, installDependencyHelper,
                 /* restoredOnReboot= */ true);
     }

@@ -33,6 +33,7 @@ import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
 import android.annotation.RequiresNoPermission;
 import android.annotation.SuppressLint;
+import android.app.ActivityManager.ProcessState;
 import android.app.AlarmManager;
 import android.app.StatsManager;
 import android.app.usage.NetworkStatsManager;
@@ -596,7 +597,7 @@ public final class BatteryStatsService extends IBatteryStats.Stub
             BatteryStatsService.this.noteJobsDeferred(uid, numDeferred, sinceLast);
         }
 
-        private int transportToSubsystem(NetworkCapabilities nc) {
+        private @CpuWakeupSubsystem int transportToSubsystem(NetworkCapabilities nc) {
             if (nc.hasTransport(TRANSPORT_WIFI)) {
                 return CPU_WAKEUP_SUBSYSTEM_WIFI;
             } else if (nc.hasTransport(TRANSPORT_CELLULAR)) {
@@ -615,7 +616,7 @@ public final class BatteryStatsService extends IBatteryStats.Stub
             }
             final ConnectivityManager cm = mContext.getSystemService(ConnectivityManager.class);
             final NetworkCapabilities nc = cm.getNetworkCapabilities(network);
-            final int subsystem = transportToSubsystem(nc);
+            final @CpuWakeupSubsystem int subsystem = transportToSubsystem(nc);
 
             if (subsystem == CPU_WAKEUP_SUBSYSTEM_UNKNOWN) {
                 Slog.wtf(TAG, "Could not map transport for network: " + network
@@ -668,6 +669,13 @@ public final class BatteryStatsService extends IBatteryStats.Stub
      */
     void noteCpuWakingActivity(@CpuWakeupSubsystem int subsystem, long elapsedMillis, int... uids) {
         Objects.requireNonNull(uids);
+        if (Integer.bitCount(subsystem) != 1) {
+            throw new IllegalArgumentException(
+                    "Exactly one subsystem expected while reporting cpu waking activity. Received"
+                            + " subsystem: 0x" + Integer.toHexString(subsystem)
+                            + " elapsedMillis: " + elapsedMillis
+                            + " uids: " + Arrays.toString(uids));
+        }
         mHandler.post(() -> mCpuWakeupStats.noteWakingActivity(subsystem, elapsedMillis, uids));
     }
 
@@ -925,7 +933,7 @@ public final class BatteryStatsService extends IBatteryStats.Stub
     }
 
     /** @param state Process state from ActivityManager.java. */
-    void noteUidProcessState(int uid, int state) {
+    void noteUidProcessState(int uid, @ProcessState int state) {
         synchronized (mClock) {
             final long elapsedRealtime = mClock.elapsedRealtime();
             final long uptime = mClock.uptimeMillis();

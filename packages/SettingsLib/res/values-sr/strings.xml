@@ -199,6 +199,7 @@
     <string name="accessibility_wifi_three_bars" msgid="779895671061950234">"WiFi сигнал има три црте."</string>
     <string name="accessibility_wifi_signal_full" msgid="7165262794551355617">"WiFi сигнал је најјачи."</string>
     <string name="accessibility_wifi_other_device" msgid="2815627624555795918">"Повезано је са уређајем."</string>
+    <string name="accessibility_wifi_shared_network_icon_message" msgid="7853291528081728631">"Сви корисници овог уређаја могу да виде дељену мрежу и повежу се на њу."</string>
     <string name="accessibility_wifi_security_type_none" msgid="162352241518066966">"Отворена мрежа"</string>
     <string name="accessibility_wifi_security_type_secured" msgid="2399774097343238942">"Безбедна мрежа"</string>
     <string name="process_kernel_label" msgid="950292573930336765">"Android ОС"</string>
@@ -240,7 +241,7 @@
     <string name="tts_engine_settings_title" msgid="7849477533103566291">"Подешавања за <xliff:g id="TTS_ENGINE_NAME">%s</xliff:g>"</string>
     <string name="tts_engine_settings_button" msgid="477155276199968948">"Покрени подешавања машине"</string>
     <string name="tts_engine_preference_section_title" msgid="3861562305498624904">"Жељена алатка"</string>
-    <string name="tts_general_section_title" msgid="8919671529502364567">"Општа"</string>
+    <string name="tts_general_section_title" msgid="8919671529502364567">"Опште"</string>
     <string name="tts_reset_speech_pitch_title" msgid="7149398585468413246">"Ресетујте висину тона говора"</string>
     <string name="tts_reset_speech_pitch_summary" msgid="6822904157021406449">"Ресетујте висину тона којом се текст изговара на подразумевану."</string>
   <string-array name="tts_rate_entries">

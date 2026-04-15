@@ -61,6 +61,7 @@ import static android.content.Intent.CATEGORY_SECONDARY_HOME;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_NO_HISTORY;
 import static android.content.pm.ActivityInfo.CONFIG_ASSETS_PATHS;
+import static android.content.pm.ActivityInfo.CONFIG_DENSITY;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_RESOURCES_UNUSED;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_LAYOUT;
@@ -1248,6 +1249,8 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mAppCompatController.dump(pw, prefix);
+
+        AppCompatCameraPolicy.dump(this, pw, prefix);
     }
 
     static boolean dumpActivity(FileDescriptor fd, PrintWriter pw, int index, ActivityRecord r,
@@ -4173,20 +4176,36 @@ public final class ActivityRecord extends WindowToken {
             mAtmService.getLockTaskController().clearLockedTask(task);
         }
 
-        // Transfer the launch cookie to the next running activity above this in the same task.
-        if (mLaunchCookie != null && mState != RESUMED && task != null && !task.mInRemoveTask
+        if (mState != RESUMED && task != null && !task.mInRemoveTask
                 && !task.isClearingToReuseTask()) {
-            final ActivityRecord nextCookieTarget = task.getActivity(
-                    // Intend to only associate the same app by checking uid.
-                    r -> r.mLaunchCookie == null && !r.finishing && r.isUid(getUid()),
-                    this, false /* includeBoundary */, false /* traverseTopToBottom */);
-            if (nextCookieTarget != null) {
-                ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
-                        "Transferring launch cookie=%s on finish from=%s(%d) to=%s(%d)",
-                        mLaunchCookie, packageName, System.identityHashCode(this),
-                        nextCookieTarget.packageName, System.identityHashCode(nextCookieTarget));
-                nextCookieTarget.mLaunchCookie = mLaunchCookie;
-                mLaunchCookie = null;
+            // Transfer the launch cookie to the next running activity above this in the same task.
+            if (mLaunchCookie != null) {
+                final ActivityRecord nextCookieTarget = findNextRunningActivity(
+                        r -> r.mLaunchCookie == null);
+                if (nextCookieTarget != null) {
+                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
+                            "Transferring launch cookie=%s on finish from=%s(%d) to=%s(%d)",
+                            mLaunchCookie, packageName, System.identityHashCode(this),
+                            nextCookieTarget.packageName,
+                            System.identityHashCode(nextCookieTarget));
+                    nextCookieTarget.mLaunchCookie = mLaunchCookie;
+                    mLaunchCookie = null;
+                }
+            }
+
+            // Similarly, transfer the override task transition flag.
+            if (mOverrideTaskTransition) {
+                final ActivityRecord nextOverrideTarget = findNextRunningActivity(
+                        r -> !r.mOverrideTaskTransition);
+                if (nextOverrideTarget != null) {
+                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS,
+                            "Transferring override task transition flag on finish"
+                                    + " from=%s(%d) to=%s(%d)",
+                            packageName, System.identityHashCode(this),
+                            nextOverrideTarget.packageName,
+                            System.identityHashCode(nextOverrideTarget));
+                    nextOverrideTarget.mOverrideTaskTransition = true;
+                }
             }
         }
 
@@ -4205,6 +4224,23 @@ public final class ActivityRecord extends WindowToken {
         if (mDisplayContent != null) {
             mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         }
+    }
+
+    /**
+     * Finds the next non-finishing activity in this task that belongs to the same app (UID)
+     * and satisfies the given filter. The search proceeds downwards from this activity.
+     *
+     * @param filter The predicate to evaluate against each candidate activity.
+     * @return The next eligible {@link ActivityRecord}, or {@code null} if none is found.
+     */
+    private ActivityRecord findNextRunningActivity(@NonNull Predicate<ActivityRecord> filter) {
+        if (task == null) {
+            return null;
+        }
+        return task.getActivity(
+                // Intend to only associate the same app by checking uid.
+                r -> !r.finishing && r.isUid(getUid()) && filter.test(r),
+                this, false /* includeBoundary */, false /* traverseTopToBottom */);
     }
 
     /**
@@ -4486,9 +4522,7 @@ public final class ActivityRecord extends WindowToken {
         getDisplayContent().mUnknownAppVisibilityController.appRemovedOrHidden(this);
         mWmService.mSnapshotController.onAppRemoved(this);
         mAtmService.mStartingProcessActivities.remove(this);
-
-        mTaskSupervisor.getActivityMetricsLogger().notifyActivityRemoved(this);
-        mTaskSupervisor.mStoppingActivities.remove(this);
+        mTaskSupervisor.onActivityRemovedFromDisplay(this);
 
         mAppCompatController.getLetterboxPolicy().stop();
         mAppCompatController.getTransparentPolicy().stop();
@@ -6407,6 +6441,29 @@ public final class ActivityRecord extends WindowToken {
 
         r.mDisplayContent.handleActivitySizeCompatModeIfNeeded(r);
         r.mDisplayContent.mUnknownAppVisibilityController.notifyAppResumedFinished(r);
+        if (com.android.window.flags.Flags.reportMissedEnterAnimOnResume()) {
+            r.scheduleEnterAnimationCompleteIfNeeded();
+        }
+    }
+
+    void scheduleEnterAnimationCompleteIfNeeded() {
+        if (!mEnteringAnimation) {
+            // Note that mEnteringAnimation is only set to true when an app transition finishes
+            // or when the activity becomes visible without a transition. This ensures that
+            // calling this from activityResumedLocked won't notify completion prematurely while
+            // the transition for this activity is still active.
+            return;
+        }
+        final IApplicationThread client = app == null ? null : app.getThread();
+        if (client == null) {
+            return;
+        }
+        mEnteringAnimation = false;
+        try {
+            client.scheduleEnterAnimationComplete(token);
+        } catch (RemoteException e) {
+            Slog.i(TAG, "scheduleEnterAnimationComplete failed for " + this + " e=" + e);
+        }
     }
 
     static void activityRefreshedLocked(IBinder token) {
@@ -6707,7 +6764,6 @@ public final class ActivityRecord extends WindowToken {
         // stop tracking
         mSplashScreenStyleSolidColor = true;
 
-        mAtmService.mBackNavigationController.removePredictiveSurfaceIfNeeded(this);
         if (mStartingWindow != null) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Finish starting %s"
                     + ": first real window is shown, no animation", win.mToken);
@@ -6735,6 +6791,7 @@ public final class ActivityRecord extends WindowToken {
         }
 
         updateReportedVisibilityLocked();
+        mAtmService.mBackNavigationController.removePredictiveSurfaceIfNeeded(this);
     }
 
     /** Sets whether something has been visible in the task. */
@@ -7921,9 +7978,10 @@ public final class ActivityRecord extends WindowToken {
                 }
             }
         }
-        mAppCompatController.getSandboxingPolicy().resolveTmpOverrides(newParentConfiguration,
-                isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds(),
-                shouldApplyLegacyInsets, getAppCompatDisplayInsets());
+        final AppCompatSandboxingPolicy sandboxPolicy = mAppCompatController.getSandboxingPolicy();
+        sandboxPolicy.resolveTmpOverrides(newParentConfiguration, isFixedRotationTransforming(),
+                safeRegionPolicy.getLatestSafeRegionBounds(), shouldApplyLegacyInsets,
+                getAppCompatDisplayInsets());
 
         // Can't use resolvedConfig.windowConfiguration.getWindowingMode() because it can be
         // different from windowing mode of the task (PiP) during transition from fullscreen to PiP
@@ -8009,6 +8067,8 @@ public final class ActivityRecord extends WindowToken {
         mConfigurationSeq = Math.max(++mConfigurationSeq, 1);
         getResolvedOverrideConfiguration().seq = mConfigurationSeq;
 
+        sandboxPolicy.sandboxBoundsIfNeeded(resolvedConfig, newParentConfiguration);
+
         // TODO(b/392069771): Move to AppCompatSandboxingPolicy.
         // Sandbox max bounds by setting it to the activity bounds, if activity is letterboxed, or
         // has or will have mAppCompatDisplayInsets for size compat. Also forces an activity to be
@@ -8038,9 +8098,6 @@ public final class ActivityRecord extends WindowToken {
             resolvedConfig.windowConfiguration.setMaxBounds(mTmpBounds);
         }
 
-        mAppCompatController.getSandboxingPolicy().sandboxBoundsIfNeeded(resolvedConfig,
-                parentWindowingMode);
-
         applySizeOverrideIfNeeded(
                 mDisplayContent,
                 info.applicationInfo,
@@ -8050,7 +8107,7 @@ public final class ActivityRecord extends WindowToken {
                 hasFixedRotationTransform(),
                 getAppCompatDisplayInsets() != null,
                 task);
-        mAppCompatController.getSandboxingPolicy().resetTmpOverrides();
+        sandboxPolicy.resetTmpOverrides();
 
         logAppCompatState();
     }
@@ -8066,11 +8123,11 @@ public final class ActivityRecord extends WindowToken {
 
     void computeConfigByResolveHint(@NonNull Configuration resolvedConfig,
             @NonNull Configuration parentConfig) {
-        final ConfigOverrideHint resolveConfigHint =
-                mAppCompatController.getSandboxingPolicy().getResolveConfigHint();
+        final AppCompatSandboxingPolicy sandboxPolicy = mAppCompatController.getSandboxingPolicy();
+        final ConfigOverrideHint resolveConfigHint = sandboxPolicy.getResolveConfigHint();
         task.computeConfigResourceOverrides(resolvedConfig, parentConfig, resolveConfigHint);
         // Reset the temp info which should only take effect for the specified computation.
-        mAppCompatController.getSandboxingPolicy().resetDisplayInfoOverride();
+        sandboxPolicy.resetDisplayInfoOverride();
     }
 
     /**
@@ -8594,6 +8651,7 @@ public final class ActivityRecord extends WindowToken {
 
         final boolean wasInPictureInPicture = inPinnedWindowingMode();
         final DisplayContent display = mDisplayContent;
+        final int oldWindowingMode = getWindowConfiguration().getWindowingMode();
         final int oldDisplayRotation = getWindowConfiguration().getDisplayRotation();
         final int activityType = getActivityType();
         if (wasInPictureInPicture && attachedToProcess() && display != null) {
@@ -8643,8 +8701,9 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
 
-        notifyCameraCompatPolicyRotationChangedIfNeeded(oldDisplayRotation, newParentConfig
-                .windowConfiguration.getDisplayRotation());
+        notifyCameraCompatPolicyConfigurationChangedIfNeeded(oldDisplayRotation,
+                newParentConfig.windowConfiguration.getDisplayRotation(), oldWindowingMode,
+                newParentConfig.windowConfiguration.getWindowingMode());
 
         if (mVisibleRequested) {
             // It may toggle the UI for user to restart the size compatibility mode activity.
@@ -8730,10 +8789,16 @@ public final class ActivityRecord extends WindowToken {
         return mPauseConfigurationDispatchCount > 0;
     }
 
-    private void notifyCameraCompatPolicyRotationChangedIfNeeded(
+    private void notifyCameraCompatPolicyConfigurationChangedIfNeeded(
             @Surface.Rotation int oldDisplayRotation,
-            @Surface.Rotation int newDisplayRotation) {
-        if (Flags.cameraCompatUpdateTreatmentOnRotation()
+            @Surface.Rotation int newDisplayRotation,
+            @WindowConfiguration.WindowingMode int oldWindowingMode,
+            @WindowConfiguration.WindowingMode int newWindowingMode) {
+        if (oldWindowingMode != WINDOWING_MODE_UNDEFINED
+                && newWindowingMode != WINDOWING_MODE_UNDEFINED
+                && newWindowingMode != oldWindowingMode) {
+            AppCompatCameraPolicy.onWindowingModeChanged(this, newWindowingMode);
+        } else if (Flags.cameraCompatUpdateTreatmentOnRotation()
                 && oldDisplayRotation != ROTATION_UNDEFINED
                 && newDisplayRotation != ROTATION_UNDEFINED
                 && oldDisplayRotation != newDisplayRotation) {
@@ -8992,6 +9057,11 @@ public final class ActivityRecord extends WindowToken {
         if (shouldSkipActivityRelaunchWhenDocking() && onlyDeskInUiModeChanged(changesConfig)
                 && !hasDeskResources()) {
             skipRelaunchConfigMask |= CONFIG_UI_MODE;
+        }
+
+        // Don't restart due to density changes when in picture-in-picture.
+        if (getWindowingMode() == WINDOWING_MODE_PINNED) {
+            skipRelaunchConfigMask |= CONFIG_DENSITY;
         }
 
         // Some apps relaunch unexpectedly with display move and crash.

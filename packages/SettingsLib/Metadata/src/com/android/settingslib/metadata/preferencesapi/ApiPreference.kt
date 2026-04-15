@@ -236,7 +236,7 @@ abstract class ApiPreference<InternalType: Any, ExternalType : Any>(
      * @param context The application context to be used in the operation context.
      * @return An initialized [ApiOperationContext] instance.
      */
-    private fun getApiOperationContext(context: Context) =
+    fun getApiOperationContext(context: Context) =
         ApiOperationContext(context = context, parameters = cachedKeyParameters)
 
     /**
@@ -244,7 +244,7 @@ abstract class ApiPreference<InternalType: Any, ExternalType : Any>(
      * Returns the first precondition that is not [Allowed], or [Allowed] if all preconditions
      * are met.
      */
-    private suspend fun evaluatePreconditions(
+    suspend fun evaluatePreconditions(
         context: Context,
         operationPreconditions: PreconditionsConfig?
     ): ApiPreconditions {
@@ -292,6 +292,9 @@ abstract class ApiPreference<InternalType: Any, ExternalType : Any>(
     override fun getWritePermit(context: Context, callingPid: Int, callingUid: Int) =
         // TODO(b/469317113): This should run asynchronously
         runBlocking {
+            if (!supportsWrite) {
+                return@runBlocking ReadWritePermit.DISALLOW
+            }
             when (evaluatePreconditions(context, set?.preconditions)) {
                 Allowed -> ReadWritePermit.ALLOW
                 else -> ReadWritePermit.DISALLOW
@@ -910,7 +913,6 @@ class ApiPreferenceConfigBuilder<InternalType : Any, ExternalType : Any>(
         lambda: ApiOperationContext.() -> ApiPreconditions
     ) {
         setPreconditions(PreconditionsConfig(description = description, check = lambda))
-
     }
 
     /**

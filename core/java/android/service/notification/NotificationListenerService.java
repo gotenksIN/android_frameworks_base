@@ -31,6 +31,7 @@ import android.app.Notification.Builder;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
 import android.app.NotificationManager;
+import android.app.NotificationRule;
 import android.app.Person;
 import android.app.Service;
 import android.companion.CompanionDeviceManager;
@@ -1756,6 +1757,21 @@ public abstract class NotificationListenerService extends Service {
         public void onSystemAdjustmentsReceived(List<Adjustment> adjustment) {
             // no-op in the listener
         }
+
+        @Override
+        public void onNotificationRuleAdded(NotificationRule rule) {
+            // no-op in the listener
+        }
+
+        @Override
+        public void onNotificationRuleModified(NotificationRule rule) {
+            // no-op in the listener
+        }
+
+        @Override
+        public void onNotificationRuleRemoved(int ruleId) {
+            // no-op in the listener
+        }
     }
 
     /**
@@ -1803,7 +1819,7 @@ public abstract class NotificationListenerService extends Service {
          */
         public static final int USER_SENTIMENT_POSITIVE = 1;
 
-       /** @hide */
+        /** @hide */
         @IntDef(prefix = { "USER_SENTIMENT_" }, value = {
                 USER_SENTIMENT_NEGATIVE, USER_SENTIMENT_NEUTRAL, USER_SENTIMENT_POSITIVE
         })
@@ -2276,8 +2292,9 @@ public abstract class NotificationListenerService extends Service {
                 case NotificationManager.IMPORTANCE_DEFAULT:
                     return "DEFAULT";
                 case NotificationManager.IMPORTANCE_HIGH:
-                case NotificationManager.IMPORTANCE_MAX:
                     return "HIGH";
+                case NotificationManager.IMPORTANCE_MAX:
+                    return "MAX";
                 default:
                     return "UNKNOWN(" + String.valueOf(importance) + ")";
             }

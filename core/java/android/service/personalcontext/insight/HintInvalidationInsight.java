@@ -68,7 +68,7 @@ public final class HintInvalidationInsight extends ContextInsight {
 
     @NonNull
     @Override
-    Bundle toBundleImpl() {
+    Bundle toBundleImpl(boolean includeHints) {
         return new Bundle();
     }
 
@@ -93,8 +93,8 @@ public final class HintInvalidationInsight extends ContextInsight {
 
     /** @hide */
     @Override
-    public void accept(@NonNull InsightVisitor visitor) {
-        visitor.visit(this);
+    public void accept(@NonNull InsightVisitor visitor, int index) {
+        visitor.visit(this, index);
     }
 
     @Override

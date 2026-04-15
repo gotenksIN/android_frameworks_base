@@ -40,7 +40,7 @@ class BubbleBarExpandedViewDragController(
     private val animationHelper: BubbleBarAnimationHelper,
     private val bubblePositioner: BubblePositioner,
     private val dropTargetManager: DropTargetManager,
-    private val dragZoneFactory: DragZoneFactory,
+    var dragZoneFactory: DragZoneFactory,
     @get:VisibleForTesting val dragListener: DragListener,
 ) {
 
@@ -117,6 +117,9 @@ class BubbleBarExpandedViewDragController(
                 dragZoneFactory.createSortedDragZones(draggedObject),
             )
             isDragged = true
+            // pass the down event to the magnetized object to make sure that positions on the
+            // screen are updated in case they changed, e.g. after rotation
+            magnetizedExpandedView.maybeConsumeMotionEvent(ev)
             return true
         }
 

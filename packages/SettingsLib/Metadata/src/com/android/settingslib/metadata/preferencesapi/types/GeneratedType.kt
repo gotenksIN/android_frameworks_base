@@ -20,6 +20,9 @@ import android.content.Context
 import androidx.annotation.StringRes
 import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.preferencesapi.resolveString
+import com.android.settingslib.metadata.preferencesapi.safe
+import com.android.settingslib.metadata.preferencesapi.SafetyAnnotated
+import com.android.settingslib.metadata.preferencesapi.types.EType
 
 /**
  * The context for a GeneratedType, providing access to the [Context] and any necessary
@@ -43,33 +46,53 @@ class GeneratedTypeContext(val context: Context)
  * @property description A human-readable description of this specific value.
  */
 data class GeneratedValue<T>(
-    val value: T,
-    val description: String,
+    val value: SafetyAnnotated<T>,
+    val description: SafetyAnnotated<String>,
 )
 
 inline fun <reified T : Any> GeneratedType(
     @StringRes description: Int,
     unit: String? = null,
+    key: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
-): GeneratedType<T> = GeneratedType(T::class.java, descriptionRes = description, description = null, unit = unit, lambda = lambda)
+): GeneratedType<T> {
+    val externalType = when (T::class) {
+        Int::class -> EType.Int
+        String::class -> EType.String
+        Boolean::class -> EType.Boolean
+        else -> error("Unsupported external type.")
+    } as EType<T>
+    return GeneratedType(externalType, descriptionRes = description, description = null, unit = unit, key = key, lambda = lambda)
+}
 
 inline fun <reified T : Any> GeneratedType(
         description: String,
         unit: String? = null,
+        key: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
-): GeneratedType<T> = GeneratedType(T::class.java, descriptionRes = null, description = description, unit = unit, lambda = lambda)
+): GeneratedType<T> {
+    val externalType = when (T::class) {
+        Int::class -> EType.Int
+        String::class -> EType.String
+        Boolean::class -> EType.Boolean
+        else -> error("Unsupported external type.")
+    } as EType<T>
+    return GeneratedType(externalType, descriptionRes = null, description = description, unit = unit, key = key, lambda = lambda)
+}
 
 inline fun GeneratedParameterType(
     @StringRes description: Int,
     unit: String? = null,
+    key: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<String>>
-): GeneratedType<String> = GeneratedType(String::class.java, descriptionRes = description, description = null, unit = unit, lambda = lambda)
+): GeneratedType<String> = GeneratedType(EType.String, descriptionRes = description, description = null, unit = unit, key = key, lambda = lambda)
 
 inline fun GeneratedParameterType(
         description: String,
         unit: String? = null,
+        key: String? = null,
     noinline lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<String>>
-): GeneratedType<String> = GeneratedType(String::class.java, descriptionRes = null, description = description, unit = unit, lambda = lambda)
+): GeneratedType<String> = GeneratedType(EType.String, descriptionRes = null, description = description, unit = unit, key = key, lambda = lambda)
 
 
 /**
@@ -79,11 +102,12 @@ inline fun GeneratedParameterType(
  * automatically infer the type.
  */
 class GeneratedType<ExternalType : Any> constructor(
-    private val keyType: Class<ExternalType>,
+    override val externalType: EType<ExternalType>,
     @field:StringRes val descriptionRes: Int?,
     val description: String?,
     private val lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<ExternalType>>,
     private val unit: String? = null,
+    private val key: String? = null,
 ) : DirectFiniteOptionsType<ExternalType> {
     init {
         require(descriptionRes != null || description != null)
@@ -97,8 +121,6 @@ class GeneratedType<ExternalType : Any> constructor(
         unit?.let { put("unit", it) }
     })
 
-    override fun getType(): Class<ExternalType> = keyType
-
     /** Get the description as a string using the provided context. */
     override fun getDescription(context: Context): String =
         resolveString(context, descriptionRes, description)
@@ -107,5 +129,5 @@ class GeneratedType<ExternalType : Any> constructor(
         it.value to it.description
     }
 
-    override fun getKey(): String = "GeneratedType:${System.identityHashCode(lambda)}"
+    override fun getKey(): String = key ?: "GeneratedType:${descriptionRes ?: description?.hashCode() ?: 0}"
 }

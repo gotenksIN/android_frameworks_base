@@ -38,6 +38,7 @@ import android.app.admin.metadata.EnumPolicyMetadata;
 import android.app.admin.metadata.GeneratedPolicyMetadata;
 import android.app.admin.metadata.IntegerPolicyMetadata;
 import android.app.admin.metadata.ListPolicyMetadata;
+import android.app.admin.metadata.PackagePolicyMetadata;
 import android.app.admin.metadata.PolicyMetadata;
 import android.app.admin.metadata.ResolutionMechanismMetadata;
 import android.app.admin.metadata.StringPolicyMetadata;
@@ -49,9 +50,9 @@ import com.android.server.devicepolicy.EnforcingAdmin;
 import com.android.server.devicepolicy.IntegerPolicySerializer;
 import com.android.server.devicepolicy.LeastRecent;
 import com.android.server.devicepolicy.ListOfStringPolicySerializer;
+import com.android.server.devicepolicy.ListUnion;
 import com.android.server.devicepolicy.MostRecent;
 import com.android.server.devicepolicy.MostRestrictive;
-import com.android.server.devicepolicy.PackageListUnion;
 import com.android.server.devicepolicy.PolicyDefinition;
 import com.android.server.devicepolicy.PolicyEnforcerCallbacks;
 import com.android.server.devicepolicy.PolicySerializer;
@@ -175,12 +176,20 @@ public class PolicyDefinitionFactory {
         addFactory(
                 PolicyIdentifier.CONTENT_RESTRICTION_APPS,
                 builder -> {
-                    return builder.setResolutionMechanism(new PackageListUnion())
-                            .setEnforcerCallback(PolicyEnforcerCallbacks::setContentRestrictionApps)
+                    return builder.setEnforcerCallback(
+                                    PolicyEnforcerCallbacks::setContentRestrictionApps)
                             .build();
                 });
         addFactory(
                 PolicyIdentifier.APP_INSTALL,
+                builder -> {
+                    // This (pre-existing) enum policy is stored as a boolean inside DPE, so return
+                    // null here and pass the pre-existing PolicyDefinition into the constructor
+                    // of `EnumStoredAsBooleanPolicyHandler`.
+                    return null;
+                });
+        addFactory(
+                PolicyIdentifier.APP_UNINSTALL,
                 builder -> {
                     // This (pre-existing) enum policy is stored as a boolean inside DPE, so return
                     // null here and pass the pre-existing PolicyDefinition into the constructor
@@ -198,6 +207,14 @@ public class PolicyDefinitionFactory {
         addFactory(
                 PolicyIdentifier.FACTORY_RESET,
                 builder -> {
+                    return null;
+                });
+        addFactory(
+                PolicyIdentifier.BLUETOOTH_SHARING,
+                builder -> {
+                    // This (pre-existing) enum policy is stored as a boolean inside DPE, so return
+                    // null here and pass the pre-existing PolicyDefinition into the constructor
+                    // of `EnumStoredAsBooleanPolicyHandler`.
                     return null;
                 });
     }
@@ -292,10 +309,29 @@ public class PolicyDefinitionFactory {
                 case ResolutionMechanismMetadata.MostRestrictive m ->
                         new MostRestrictive<T>(convertValues(m.getMostToLeastRestrictiveValues()));
                 case ResolutionMechanismMetadata.NotCoexistable n -> new LeastRecent<T>();
+                case ResolutionMechanismMetadata.ListUnion m -> getListUnionResolutionMechanism();
                 default ->
                         throw new UnsupportedOperationException(
                                 "Unsupported resolution mechanism: " + input.getClass());
             };
+        }
+
+        private ResolutionMechanism<T> getListUnionResolutionMechanism() {
+            return (ResolutionMechanism<T>)
+                    switch (mMetadata) {
+                        case ListPolicyMetadata l ->
+                                switch (l.getElementMetadata()) {
+                                    case StringPolicyMetadata s -> ListUnion.STRING;
+                                    case PackagePolicyMetadata p -> ListUnion.PACKAGE;
+                                    default ->
+                                            throw new UnsupportedOperationException(
+                                                    "Unsupported list policy: " + l.getId());
+                                };
+                        default ->
+                                throw new UnsupportedOperationException(
+                                        "ListUnion is only supported on list policies but got: "
+                                                + mMetadata.getId());
+                    };
         }
 
         private List<PolicyValue<T>> convertValues(Collection<T> values) {

@@ -28,7 +28,6 @@ import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
 import static android.view.WindowManager.TRANSIT_CHANGE;
-import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION_ALWAYS;
 
 import static com.android.internal.policy.SystemBarUtils.getDesktopViewAppHeaderHeightId;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE;
@@ -536,7 +535,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 mDesktopModeCompatPolicy.shouldExcludeCaptionFromAppBounds(taskInfo),
                 mDesktopConfig, inSyncWithTransition,
                 mLockTaskChangeListener.isTaskLocked(),
-                /* occludingElementsCalculator = */ () -> getOccludingElements());
+                /* occludingElementsCalculator = */ () -> getOccludingElements(),
+                mDecorThemeUtilFactory);
 
         final Configuration newConfig = mRelayoutParams.mWindowDecorConfig;
 
@@ -1100,7 +1100,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             DesktopConfig desktopConfig,
             boolean inSyncWithTransition,
             boolean isTaskLocked,
-            Supplier<List<OccludingElement>> occludingElementsCalculator) {
+            Supplier<List<OccludingElement>> occludingElementsCalculator,
+            DecorThemeUtil.Factory decorThemeUtilFactory) {
         final int captionLayoutId = getDesktopModeWindowDecorLayoutId(taskInfo.getWindowingMode());
         final boolean isAppHeader =
                 captionLayoutId == R.layout.desktop_mode_app_header;
@@ -1176,14 +1177,12 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                     relayoutParams.mInsetSourceFlags |= FLAG_FORCE_CONSUMING;
                 }
             }
-            if (ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION_ALWAYS.isTrue()) {
-                if (shouldExcludeCaptionFromAppBounds) {
-                    relayoutParams.mShouldSetAppBounds = true;
-                } else {
-                    // Always force-consume the caption bar insets for maximum app compatibility,
-                    // including non-immersive apps that just don't handle caption insets properly.
-                    relayoutParams.mInsetSourceFlags |= FLAG_FORCE_CONSUMING_OPAQUE_CAPTION_BAR;
-                }
+            if (shouldExcludeCaptionFromAppBounds) {
+                relayoutParams.mShouldSetAppBounds = true;
+            } else {
+                // Always force-consume the caption bar insets for maximum app compatibility,
+                // including non-immersive apps that just don't handle caption insets properly.
+                relayoutParams.mInsetSourceFlags |= FLAG_FORCE_CONSUMING_OPAQUE_CAPTION_BAR;
             }
             if (inFullImmersiveMode) {
                 final Rect taskBounds = taskInfo.getConfiguration().windowConfiguration.getBounds();
@@ -1219,7 +1218,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                         : new int[]{R.style.BoxShadowParamsKeyUnfocused,
                                     R.style.BoxShadowParamsAmbientUnfocused};
 
-                final DecorThemeUtil decorThemeUtil = new DecorThemeUtil(context);
+                final DecorThemeUtil decorThemeUtil = decorThemeUtilFactory.create(context);
                 if (decorThemeUtil.getAppTheme(taskInfo) == Theme.DARK) {
                     relayoutParams.mBorderSettingsId = hasGlobalFocus
                             ? R.style.BorderSettingsFocusedDark
@@ -1659,7 +1658,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 // Add top padding to the caption Y so that the menu is shown over what is the
                 // actual contents of the caption, ignoring padding. This is currently relevant
                 // to the Header in desktop immersive.
-                mResult.mCaptionY + mResult.mCaptionTopPadding
+                mResult.mCaptionY + mResult.mCaptionTopPadding,
+                mDecorThemeUtilFactory
         );
         mWindowDecorViewHolder.onHandleMenuOpened();
         mHandleMenu.show(

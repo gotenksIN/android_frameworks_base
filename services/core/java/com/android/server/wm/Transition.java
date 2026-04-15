@@ -30,7 +30,6 @@ import static android.hardware.SyncFence.SIGNAL_TIME_PENDING;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
-import static android.view.DisplayAddress.INVALID_DISPLAY_ID;
 import static android.view.WindowManager.INPUT_CONSUMER_RECENTS_ANIMATION;
 import static android.view.WindowManager.KEYGUARD_VISIBILITY_TRANSIT_FLAGS;
 import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_SEAMLESS;
@@ -754,6 +753,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         } else {
             return mDisconnectReparentDisplays.contains(displayId);
         }
+    }
+
+    /**
+     * @return true, if a display with ID {@param displayId} is a source for content that should be
+     * moved to another display because it is going to be disconnected or stop hosting tasks
+     */
+    private boolean isDisconnectDisplaySource(int displayId) {
+        return mDisconnectDestinationDisplays.indexOfKey(displayId) >= 0;
     }
 
     /**
@@ -1805,7 +1812,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final ChangeInfo changeInfo = mChanges.get(dc);
                 if (changeInfo != null
                         && changeInfo.mRotation != dc.getWindowConfiguration().getRotation()) {
-                    dc.mAppCompatCameraPolicy.onScreenRotationAnimationFinished();
+                    mWmService.mAppCompatCameraPolicy.onScreenRotationAnimationFinished(dc);
                 }
             }
             if (mTransientLaunches != null) {
@@ -2165,9 +2172,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final WindowContainer<?> wc = mTargets.get(i).mContainer;
             if (setClientDrawnCornerRadii()) {
                 Task task = wc.asTask();
+                if (task == null) {
+                    if (wc.asActivityRecord() != null) {
+                        task = wc.asActivityRecord().getTask();
+                    } else if (wc.asTaskFragment() != null) {
+                        task = wc.asTaskFragment().getTask();
+                    }
+                }
                 if (task != null) {
                     SurfaceControl sc = task.getSurfaceControl();
-                    transaction.toggleClientDrawnRoundedCornersOpt(sc, /* enable= */false);
+                    transaction.toggleClientDrawnRoundedCornersOpt(sc, /* enable= */ false);
                     mController.onRoundedCornerOptDisabled(task);
                 }
             }
@@ -3362,7 +3376,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (dc == null) continue;
             final int endDisplayId = dc.getDisplayId();
             final int startDisplayId = change.mDisplayId;
-            if (startDisplayId != INVALID_DISPLAY_ID && startDisplayId != endDisplayId
+            if (TransitionInfo.isCrossDisplay(startDisplayId, endDisplayId)
                     && outInfo.findRootIndex(startDisplayId) < 0) {
                 final DisplayContent startDc = wc.mTransitionController.mAtm.mRootWindowContainer
                         .getDisplayContent(startDisplayId);
@@ -3766,7 +3780,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final int startDisplayId = change.mDisplayId;
             final WindowContainer wc = change.mContainer;
             final int endDisplayId = getDisplayId(wc);
-            if (startDisplayId != INVALID_DISPLAY_ID && startDisplayId != endDisplayId) {
+            if (TransitionInfo.isCrossDisplay(startDisplayId, endDisplayId)) {
                 // There is a display change. If either start or end is on the current
                 // display, then we need to use the display as root.
                 if (startDisplayId == displayId || endDisplayId == displayId) {
@@ -4008,6 +4022,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 displayRemoved = true;
             }
             if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+                if (dc.getDisplay() != null && isDisconnectDisplaySource(displayId)) {
+                    dc.updateContentMode();
+                }
+
                 // Remove the display from the map of unprocessed displays later, since we can have
                 // multiple displays removed with the same destination, so we need to keep those
                 // until we go through all changes

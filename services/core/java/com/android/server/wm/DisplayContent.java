@@ -252,6 +252,7 @@ import android.view.WindowManager.EngagementModeFlags;
 import android.view.WindowManagerPolicyConstants.PointerEventListener;
 import android.view.inputmethod.ImeTracker;
 import android.window.DesktopExperienceFlags;
+import android.window.DisplayAreaInfo;
 import android.window.DisplayWindowPolicyController;
 import android.window.IDisplayAreaOrganizer;
 import android.window.ScreenCaptureInternal;
@@ -264,6 +265,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.internal.os.IResultReceiver;
 import com.android.internal.policy.TransitionAnimation;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.ToBooleanFunction;
@@ -506,9 +508,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     @NonNull
     private final DisplayPolicy mDisplayPolicy;
     private final DisplayRotation mDisplayRotation;
-
-    @NonNull
-    AppCompatCameraPolicy mAppCompatCameraPolicy;
 
     DisplayFrames mDisplayFrames;
     final DeferredDisplayUpdater mDisplayUpdater;
@@ -873,6 +872,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     /** Whether client rendering limitations are enabled for this display. **/
     private boolean mAreClientRenderingLimitationsEnabled = false;
+
+    /** The result receiver for getting a11y embedded connection updates of the focused window. */
+    @Nullable
+    private IResultReceiver mA11yEmbeddedConnectionReceiver = null;
 
     private final Consumer<WindowState> mUpdateWindowsForAnimator = w -> {
         WindowStateAnimator winAnimator = w.mWinAnimator;
@@ -1319,7 +1322,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             mWmService.mDisplayWindowSettings.setShouldShowSystemDecorsInternalLocked(this, false);
         }
 
-        mAppCompatCameraPolicy = new AppCompatCameraPolicy(mWmService, this);
         mDisplayPolicy = new DisplayPolicy(mWmService, this);
         mDisplayRotation = new DisplayRotation(mWmService, this, mDisplayInfo.address,
                 mDeviceStateController, root.getDisplayRotationCoordinator());
@@ -1375,7 +1377,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 R.bool.config_defaultInTouchMode);
         mWmService.mInputManager.setInTouchMode(mInTouchMode, mWmService.MY_PID, mWmService.MY_UID,
                 /* hasPermission= */ true, mDisplayId);
-        mAppCompatCameraPolicy.start();
     }
 
     private void beginHoldScreenUpdate() {
@@ -1584,6 +1585,25 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                         Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
                 .setFrameRateSelectionStrategy(mSurfaceControl,
                         SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
+    }
+
+    void setFocusedA11yEmbeddedConnectionReceiver(@Nullable IResultReceiver receiver) {
+        if (mA11yEmbeddedConnectionReceiver == receiver) {
+            return;
+        }
+        mA11yEmbeddedConnectionReceiver = receiver;
+        handleA11yEmbeddedConnectionUpdatesForFocusedWindow();
+    }
+
+    private void handleA11yEmbeddedConnectionUpdatesForFocusedWindow() {
+        if (mA11yEmbeddedConnectionReceiver == null || mCurrentFocus == null) {
+            return;
+        }
+        try {
+            mCurrentFocus.mClient.requestAccessibilityEmbeddedConnection(
+                    mA11yEmbeddedConnectionReceiver);
+        } catch (RemoteException e) {
+        }
     }
 
     /**
@@ -1932,10 +1952,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 final Rect endBounds = mTmpConfiguration.windowConfiguration.getBounds();
                 final ActionChain chain = mAtmService.mChainTracker.startTransit("recfgDisp");
                 if (!chain.isCollecting()) {
-                    final TransitionRequestInfo.DisplayChange change =
-                            new TransitionRequestInfo.DisplayChange(mDisplayId);
+                    final TransitionRequestInfo.DisplayChange change;
+                    if (com.android.window.flags.Flags.syncedDisplayModeUpdates()) {
+                        final DisplayAreaInfo displayAreaInfo = mDisplayContent
+                                        .getDisplayAreaInfo();
+                        displayAreaInfo.configuration.setTo(mTmpConfiguration);
+                        change = new TransitionRequestInfo.DisplayChange(displayAreaInfo);
+                    } else {
+                        change = new TransitionRequestInfo.DisplayChange(mDisplayId);
+                        change.setEndAbsBounds(endBounds);
+                    }
                     change.setStartAbsBounds(startBounds);
-                    change.setEndAbsBounds(endBounds);
                     requestChangeTransition(changes, change, chain);
                 } else {
                     final Transition transition = chain.getTransition();
@@ -3274,7 +3301,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     @ScreenOrientation
     @Override
     int getOrientation() {
-        final int compatOrientation = mAppCompatCameraPolicy.getOrientation();
+        final int compatOrientation = mWmService.mAppCompatCameraPolicy
+                .getOrientation(this);
         if (compatOrientation != SCREEN_ORIENTATION_UNSPECIFIED) {
             mLastOrientationSource = null;
             return compatOrientation;
@@ -3474,7 +3502,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
             if (physicalDisplayChanged) {
                 mDisplayPolicy.physicalDisplayUpdated();
-                mDisplayUpdater.onDisplayContentDisplayPropertiesPostChanged();
+                if (Flags.syncedDisplayModeUpdates()) {
+                    if (mDisplayContent.isDefaultDisplay) {
+                        mWmService.mRoot.mDisplayUnblocker
+                                .onDefaultDisplayContentDisplayPropertiesPostChanged();
+                    }
+                } else {
+                    mDisplayUpdater.onDisplayContentDisplayPropertiesPostChanged();
+                }
             }
         }
     }
@@ -3848,8 +3883,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         // on the next traversal if it's removed from RootWindowContainer child list.
         getPendingTransaction().apply();
         mWmService.mWindowPlacerLocked.requestTraversal();
-
-        mAppCompatCameraPolicy.dispose();
     }
 
     /** Returns true if a removal action is still being deferred. */
@@ -4449,6 +4482,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                     this::updateAccessibilityOnWindowFocusChanged,
                     mWmService.mAccessibilityController));
         }
+
+        handleA11yEmbeddedConnectionUpdatesForFocusedWindow();
 
         return true;
     }
@@ -5263,7 +5298,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // The control target could be the RemoteInsetsControlTarget if the focussed
             // view is on a virtual display that can not show the IME (and therefore it will
             // be shown on the default display)
-            if (isUserMainDisplay() && mRemoteInsetsControlTarget != null) {
+            final boolean isFocusedOnAnotherDisplay =
+                    mWmService.mRoot.getTopFocusedDisplayContent() != this;
+            if (isFocusedOnAnotherDisplay && mRemoteInsetsControlTarget != null
+                    && isUserMainDisplay()) {
                 return mRemoteInsetsControlTarget;
             }
             return null;
@@ -5508,9 +5546,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         // If we are turning on the screen after the boot is completed normally, don't do so until
         // we have the application and wallpaper.
-        if (mWmService.mSystemBooted
-                && ((!haveApp && !haveKeyguard) || (wallpaperEnabled && !haveWallpaper))) {
-            return true;
+        if (mWmService.mSystemBooted) {
+            if (!haveApp && !haveKeyguard) {
+                return true;
+            }
+
+            if (wallpaperEnabled && !haveWallpaper) {
+                return true;
+            }
+
+            if (!mWmService.mThemeReady) {
+                return true;
+            }
         }
 
         return false;

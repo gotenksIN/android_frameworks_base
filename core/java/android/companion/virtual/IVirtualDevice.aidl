@@ -75,11 +75,6 @@ interface IVirtualDevice {
     String getPersistentDeviceId();
 
     /**
-     * Returns the profile of this virtual device.
-     */
-    String getDeviceProfile();
-
-    /**
      * Returns the IDs of all virtual displays of this device.
      */
     int[] getDisplayIds();
@@ -222,6 +217,9 @@ interface IVirtualDevice {
 
     /** Sets the UI mode for the given display. */
     void setDisplayUiMode(int displayId, int uiMode);
+
+    /** Sets the current thermal status of the device. */
+    void setCurrentThermalStatus(int status);
 
     /**
      * Registers an intent interceptor that will intercept an intent attempting to launch

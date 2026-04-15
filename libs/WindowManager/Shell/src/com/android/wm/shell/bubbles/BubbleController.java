@@ -437,8 +437,12 @@ public class BubbleController implements ConfigurationChangeListener,
             public BubbleTaskView create() {
                 TaskViewTaskController taskViewTaskController = new TaskViewTaskController(
                         context, organizer, mTaskViewController, syncQueue);
+                // Enable background layer to show background color to prevent contents behind
+                // transparent bubble are shown.
+                boolean disableBackgroundLayer =
+                        !com.android.window.flags.Flags.addBgColorForTransparentBubbles();
                 TaskView taskView = new TaskView(context, mTaskViewController,
-                        taskViewTaskController, mainHandler);
+                        taskViewTaskController, mainHandler, disableBackgroundLayer);
                 return new BubbleTaskView(taskView, mainExecutor, BubbleController.this);
             }
         };
@@ -857,17 +861,10 @@ public class BubbleController implements ConfigurationChangeListener,
         mIsStatusBarShade = isShade;
         if (!mIsStatusBarShade && didChange) {
             if (mBubbleData.isExpanded()) {
-                // If the IME is visible, hide it first and then collapse.
                 if (mBubblePositioner.isImeVisible()) {
-                    if (Flags.fixBubbleSwipeUpGesture()) {
-                        hideCurrentInputMethod(/* onImeHidden= */ null);
-                        collapseStack();
-                    } else {
-                        hideCurrentInputMethod(this::collapseStack);
-                    }
-                } else {
-                    collapseStack();
+                    hideCurrentInputMethod(/* onImeHidden= */ null);
                 }
+                collapseStack();
             } else if (mOnImeHidden != null) {
                 // a request to collapse started before we're notified that the device is locking.
                 // we're currently waiting for the IME to collapse, before mOnImeHidden can be
@@ -1837,7 +1834,7 @@ public class BubbleController implements ConfigurationChangeListener,
             @Nullable BubbleTransitions.DragData dragData) {
         if (!BubbleFlagHelper.enableCreateAnyBubble()) return;
         Bubble b = mBubbleData.getOrCreateBubble(taskInfo); // Removes from overflow
-        BubbleLog.v("BubbleController.expandStackAndSelectBubble() taskId=%s", taskInfo.taskId);
+        BubbleLog.v("BubbleController.expandStackAndSelectBubble() taskId=%d", taskInfo.taskId);
         BubbleBarLocation location = null;
         if (dragData != null) {
             location =
@@ -2029,7 +2026,7 @@ public class BubbleController implements ConfigurationChangeListener,
         Bubble existingNotebubble = mBubbleData.getBubbleInStackWithKey(noteBubbleKey);
         BubbleLog.d(
                 "BubbleController.showOrHideNotesBubble() key=%s existingAppBubble=%s  "
-                        + "stackVisibility=%s statusBarShade=%s",
+                        + "stackVisibility=%s statusBarShade=%b",
                 noteBubbleKey, existingNotebubble,
                 (mStackView != null ? mStackView.getVisibility() : "null"),
                 mIsStatusBarShade);
@@ -3045,7 +3042,7 @@ public class BubbleController implements ConfigurationChangeListener,
         if (mStackView == null && mLayerView == null) {
             return;
         }
-        BubbleLog.v("BubbleController.updateBubbleViews() mIsStatusBarShade=%s hasBubbles=%b",
+        BubbleLog.v("BubbleController.updateBubbleViews() mIsStatusBarShade=%b hasBubbles=%b",
                 mIsStatusBarShade, hasBubbles());
         if (!mIsStatusBarShade) {
             // Bubbles don't appear when the device is locked.

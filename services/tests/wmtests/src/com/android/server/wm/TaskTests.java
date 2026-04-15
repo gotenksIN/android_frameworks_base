@@ -2693,10 +2693,13 @@ public class TaskTests extends WindowTestsBase {
         final ActivityManager.RunningTaskInfo info = new ActivityManager.RunningTaskInfo();
         task.fillTaskInfo(info);
 
-        assertTrue(info.isActivityStackTransparent);
+        if (Flags.partialTranslucentActivityEmbedding()) {
+            assertFalse(info.isActivityStackTransparent);
+        } else {
+            assertTrue(info.isActivityStackTransparent);
+        }
     }
 
-    @EnableFlags(Flags.FLAG_VISIBILITY_MANAGEMENT_IN_BUBBLE_ROOT)
     @Test
     public void testIsVisibilityBarrier_failAddChild() {
         final Task visibilityBarrier = new Task.Builder(mAtm)

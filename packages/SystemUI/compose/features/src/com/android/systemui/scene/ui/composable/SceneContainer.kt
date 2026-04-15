@@ -55,6 +55,7 @@ import com.android.compose.animation.scene.observableTransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffectFactory
 import com.android.compose.snapshot.ObserveReads
+import com.android.systemui.Flags.blackScreenOnSceneContainerStartFix
 import com.android.systemui.keyguard.ui.composable.modifier.burnInAware
 import com.android.systemui.lifecycle.rememberActivated
 import com.android.systemui.lifecycle.rememberViewModel
@@ -220,6 +221,13 @@ private fun InternalSceneContainer(
         onDispose { viewModel.setTransitionState(null) }
     }
 
+    if (blackScreenOnSceneContainerStartFix() && state.transitionState.isIdle()) {
+        DisposableEffect(state.transitionState.currentScene) {
+            viewModel.onIdleSceneEnteredComposition(state.transitionState.currentScene)
+            onDispose { viewModel.onIdleSceneExitedComposition(state.transitionState.currentScene) }
+        }
+    }
+
     ObserveReads {
         val transitionState = state.transitionState
         viewModel.blurViewModel.requestWindowBackgroundBlur(
@@ -327,6 +335,10 @@ private fun InternalSceneContainer(
                     userActions = userActionsByContentKey.getOrDefault(overlayKey, emptyMap()),
                     effectFactory = overlayEffectFactory,
                     alwaysCompose = overlay.alwaysCompose,
+                    // The bouncer overlay is special and not rendered here, so avoid adding
+                    // the fullscreen clickable which modals typically introduce. This avoids
+                    // issues with accessibility touch exploration while on the bouncer.
+                    isModal = overlayKey != Overlays.Bouncer,
                 ) {
                     // Activate the overlay.
                     LaunchedEffect(overlay) { overlay.activate() }

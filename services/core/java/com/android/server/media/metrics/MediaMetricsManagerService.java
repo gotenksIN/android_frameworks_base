@@ -16,6 +16,7 @@
 
 package com.android.server.media.metrics;
 
+import android.annotation.NonNull;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.DataSpace;
@@ -25,13 +26,16 @@ import android.media.metrics.BundleSession;
 import android.media.metrics.EditingEndedEvent;
 import android.media.metrics.IMediaMetricsManager;
 import android.media.metrics.MediaItemInfo;
-import android.media.metrics.NetworkEvent;
-import android.media.metrics.PlaybackErrorEvent;
-import android.media.metrics.PlaybackMetrics;
-import android.media.metrics.PlaybackStateEvent;
-import android.media.metrics.TrackChangeEvent;
+import android.media.metrics.reported.ReportedEditingEndedEvent;
+import android.media.metrics.reported.ReportedMediaItemInfo;
+import android.media.metrics.reported.ReportedNetworkEvent;
+import android.media.metrics.reported.ReportedPlaybackErrorEvent;
+import android.media.metrics.reported.ReportedPlaybackMetrics;
+import android.media.metrics.reported.ReportedPlaybackStateEvent;
+import android.media.metrics.reported.ReportedTrackChangeEvent;
 import android.os.Binder;
 import android.os.PersistableBundle;
+import android.os.RemoteException;
 import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.Properties;
 import android.text.TextUtils;
@@ -45,6 +49,8 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.media.editing.flags.Flags;
 import com.android.server.SystemService;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -75,6 +81,14 @@ public final class MediaMetricsManagerService extends SystemService {
     private static final int LOGGING_LEVEL_EVERYTHING = 0;
     private static final int LOGGING_LEVEL_NO_UID = 1000;
     private static final int LOGGING_LEVEL_BLOCKED = 99999;
+
+    // Corresponds to the types of sessions defined in
+    // frameworks/proto_logging/stats/enums/media/session/enums.proto
+    private static final int SESSION_TYPE_PLAYBACK = 1;
+    private static final int SESSION_TYPE_RECORDING = 2;
+    private static final int SESSION_TYPE_TRANSCODING = 3;
+    private static final int SESSION_TYPE_EDITING = 4;
+    private static final int SESSION_TYPE_BUNDLE = 5;
 
     private static final String mMetricsId = MediaMetrics.Name.METRICS_MANAGER;
 
@@ -120,6 +134,7 @@ public final class MediaMetricsManagerService extends SystemService {
         super(context);
         mContext = context;
         mSecureRandom = new SecureRandom();
+        Slog.d(TAG, "Initialized MediaMetricsManagerService");
     }
 
     @Override
@@ -171,9 +186,65 @@ public final class MediaMetricsManagerService extends SystemService {
         return Arrays.asList(pkgArr);
     }
 
+    // dump this service's state
+    private void dumpInternal(PrintWriter pw) {
+        pw.println("media_metrics keeps no statistics."
+                       + " You likely want media.metrics instead of media_metrics");
+    }
+
     private final class BinderService extends IMediaMetricsManager.Stub {
+        @Override // Binder call
+        public void dump(@NonNull FileDescriptor fd, @NonNull final PrintWriter pw, String[] args) {
+
+            // required to reject the un-permissioned, even if we only print a simple
+            // blurb pointing to a different service
+            getContext().enforceCallingPermission("android.permission.DUMP", "media_metrics");
+
+            final long token = Binder.clearCallingIdentity();
+            try {
+                dumpInternal(pw);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
         @Override
-        public void reportPlaybackMetrics(String sessionId, PlaybackMetrics metrics, int userId) {
+        public String getFirstPackageName(int userId) {
+            String[] names = null;
+            Slog.d(TAG, "in system server's mediametrics plugin to get pkg name for uid=" + userId);
+            try {
+                names = getContext().getPackageManager().getPackagesForUid(userId);
+            } catch (Exception e) {
+                // ignore exceptions, returning a null
+                Slog.d(TAG, "during getPackagesForUid: ignoring exception " + e);
+                names = null;
+            }
+            if (names == null) return "";
+            if (names[0] == null) return "";
+            return names[0];
+        }
+
+        @Override
+        public boolean checkPermission(String permission, int pid, int uid) {
+            boolean result = false;
+            try {
+                Slog.v(TAG, "hecking permission " + permission
+                                + " on pid " + pid + ", uid " + uid);
+                int permissionStatus = getContext().checkPermission(permission, -1, uid);
+                if (permissionStatus == PackageManager.PERMISSION_GRANTED) {
+                    result = true;
+                }
+
+            } catch (Exception e) {
+                Slog.v(TAG, "during checkPermission: ignoring exception " + e);
+                result = false;
+            }
+            return result;
+        }
+
+        @Override
+        public void reportPlaybackMetrics(String sessionId,
+                        ReportedPlaybackMetrics metrics, int userId) {
             int level = loggingLevel();
             if (level == LOGGING_LEVEL_BLOCKED) {
                 return;
@@ -184,25 +255,25 @@ public final class MediaMetricsManagerService extends SystemService {
                             .writeInt(
                                     level == LOGGING_LEVEL_EVERYTHING ? Binder.getCallingUid() : 0)
                             .writeString(sessionId)
-                            .writeLong(metrics.getMediaDurationMillis())
-                            .writeInt(metrics.getStreamSource())
-                            .writeInt(metrics.getStreamType())
-                            .writeInt(metrics.getPlaybackType())
-                            .writeInt(metrics.getDrmType())
-                            .writeInt(metrics.getContentType())
-                            .writeString(metrics.getPlayerName())
-                            .writeString(metrics.getPlayerVersion())
+                            .writeLong(metrics.mediaDurationMillis)
+                            .writeInt(metrics.streamSource)
+                            .writeInt(metrics.streamType)
+                            .writeInt(metrics.playbackType)
+                            .writeInt(metrics.drmType)
+                            .writeInt(metrics.contentType)
+                            .writeString(metrics.playerName)
+                            .writeString(metrics.playerVersion)
                             .writeByteArray(new byte[0]) // TODO: write experiments proto
-                            .writeInt(metrics.getVideoFramesPlayed())
-                            .writeInt(metrics.getVideoFramesDropped())
-                            .writeInt(metrics.getAudioUnderrunCount())
-                            .writeLong(metrics.getNetworkBytesRead())
-                            .writeLong(metrics.getLocalBytesRead())
-                            .writeLong(metrics.getNetworkTransferDurationMillis())
+                            .writeInt(metrics.videoFramesPlayed)
+                            .writeInt(metrics.videoFramesDropped)
+                            .writeInt(metrics.audioUnderrunCount)
+                            .writeLong(metrics.networkBytesRead)
+                            .writeLong(metrics.localBytesRead)
+                            .writeLong(metrics.networkTransferDurationMillis)
                             // Raw bytes type not allowed in atoms
                             .writeString(
                                     Base64.encodeToString(
-                                            metrics.getDrmSessionId(), Base64.DEFAULT))
+                                            metrics.drmSessionId, Base64.DEFAULT))
                             .usePooledBuffer()
                             .build();
             StatsLog.write(statsEvent);
@@ -306,7 +377,7 @@ public final class MediaMetricsManagerService extends SystemService {
 
         @Override
         public void reportPlaybackStateEvent(
-                String sessionId, PlaybackStateEvent event, int userId) {
+                String sessionId, ReportedPlaybackStateEvent event, int userId) {
             int level = loggingLevel();
             if (level == LOGGING_LEVEL_BLOCKED) {
                 return;
@@ -315,8 +386,8 @@ public final class MediaMetricsManagerService extends SystemService {
                     StatsEvent.newBuilder()
                             .setAtomId(322)
                             .writeString(sessionId)
-                            .writeInt(event.getState())
-                            .writeLong(event.getTimeSinceCreatedMillis())
+                            .writeInt(event.state)
+                            .writeLong(event.timeSinceCreatedMillis)
                             .usePooledBuffer()
                             .build();
             StatsLog.write(statsEvent);
@@ -344,34 +415,62 @@ public final class MediaMetricsManagerService extends SystemService {
             Slog.v(TAG, "Releasing sessionId " + sessionId + " for userId " + userId + " [NOP]");
         }
 
+        private void reportMediaSessionCreation(String sessionId, int sessionType) {
+            int level = loggingLevel();
+            if (level == LOGGING_LEVEL_BLOCKED) {
+                return;
+            }
+            StatsEvent statsEvent =
+                    StatsEvent.newBuilder()
+                            .setAtomId(1316)
+                            .writeString(sessionId)
+                            .writeInt(level == LOGGING_LEVEL_EVERYTHING
+                                      ? Binder.getCallingUid()
+                                      : 0)
+                            .writeInt(sessionType)
+                            .usePooledBuffer()
+                            .build();
+            StatsLog.write(statsEvent);
+        }
+
         @Override
         public String getPlaybackSessionId(int userId) {
-            return getSessionIdInternal(userId);
+            String id = getSessionIdInternal(userId);
+            reportMediaSessionCreation(id, SESSION_TYPE_PLAYBACK);
+            return id;
         }
 
         @Override
         public String getRecordingSessionId(int userId) {
-            return getSessionIdInternal(userId);
+            String id = getSessionIdInternal(userId);
+            reportMediaSessionCreation(id, SESSION_TYPE_RECORDING);
+            return id;
         }
 
         @Override
         public String getTranscodingSessionId(int userId) {
-            return getSessionIdInternal(userId);
+            String id = getSessionIdInternal(userId);
+            reportMediaSessionCreation(id, SESSION_TYPE_TRANSCODING);
+            return id;
         }
 
         @Override
         public String getEditingSessionId(int userId) {
-            return getSessionIdInternal(userId);
+            String id = getSessionIdInternal(userId);
+            reportMediaSessionCreation(id, SESSION_TYPE_EDITING);
+            return id;
         }
 
         @Override
         public String getBundleSessionId(int userId) {
-            return getSessionIdInternal(userId);
+            String id = getSessionIdInternal(userId);
+            reportMediaSessionCreation(id, SESSION_TYPE_BUNDLE);
+            return id;
         }
 
         @Override
         public void reportPlaybackErrorEvent(
-                String sessionId, PlaybackErrorEvent event, int userId) {
+                String sessionId, ReportedPlaybackErrorEvent event, int userId) {
             int level = loggingLevel();
             if (level == LOGGING_LEVEL_BLOCKED) {
                 return;
@@ -380,16 +479,16 @@ public final class MediaMetricsManagerService extends SystemService {
                     StatsEvent.newBuilder()
                             .setAtomId(323)
                             .writeString(sessionId)
-                            .writeString(event.getExceptionStack())
-                            .writeInt(event.getErrorCode())
-                            .writeInt(event.getSubErrorCode())
-                            .writeLong(event.getTimeSinceCreatedMillis())
+                            .writeString(event.exceptionStack)
+                            .writeInt(event.errorCode)
+                            .writeInt(event.subErrorCode)
+                            .writeLong(event.timeSinceCreatedMillis)
                             .usePooledBuffer()
                             .build();
             StatsLog.write(statsEvent);
         }
 
-        public void reportNetworkEvent(String sessionId, NetworkEvent event, int userId) {
+        public void reportNetworkEvent(String sessionId, ReportedNetworkEvent event, int userId) {
             int level = loggingLevel();
             if (level == LOGGING_LEVEL_BLOCKED) {
                 return;
@@ -398,15 +497,16 @@ public final class MediaMetricsManagerService extends SystemService {
                     StatsEvent.newBuilder()
                             .setAtomId(321)
                             .writeString(sessionId)
-                            .writeInt(event.getNetworkType())
-                            .writeLong(event.getTimeSinceCreatedMillis())
+                            .writeInt(event.networkType)
+                            .writeLong(event.timeSinceCreatedMillis)
                             .usePooledBuffer()
                             .build();
             StatsLog.write(statsEvent);
         }
 
         @Override
-        public void reportTrackChangeEvent(String sessionId, TrackChangeEvent event, int userId) {
+        public void reportTrackChangeEvent(String sessionId,
+                        ReportedTrackChangeEvent event, int userId) {
             int level = loggingLevel();
             if (level == LOGGING_LEVEL_BLOCKED) {
                 return;
@@ -415,37 +515,38 @@ public final class MediaMetricsManagerService extends SystemService {
                     StatsEvent.newBuilder()
                             .setAtomId(324)
                             .writeString(sessionId)
-                            .writeInt(event.getTrackState())
-                            .writeInt(event.getTrackChangeReason())
-                            .writeString(event.getContainerMimeType())
-                            .writeString(event.getSampleMimeType())
-                            .writeString(event.getCodecName())
-                            .writeInt(event.getBitrate())
-                            .writeLong(event.getTimeSinceCreatedMillis())
-                            .writeInt(event.getTrackType())
-                            .writeString(event.getLanguage())
-                            .writeString(event.getLanguageRegion())
-                            .writeInt(event.getChannelCount())
-                            .writeInt(event.getAudioSampleRate())
-                            .writeInt(event.getWidth())
-                            .writeInt(event.getHeight())
-                            .writeFloat(event.getVideoFrameRate())
+                            .writeInt(event.trackState)
+                            .writeInt(event.trackChangeReason)
+                            .writeString(event.containerMimeType)
+                            .writeString(event.sampleMimeType)
+                            .writeString(event.codecName)
+                            .writeInt(event.bitrate)
+                            .writeLong(event.timeSinceCreatedMillis)
+                            .writeInt(event.trackType)
+                            .writeString(event.language)
+                            .writeString(event.languageRegion)
+                            .writeInt(event.channelCount)
+                            .writeInt(event.audioSampleRate)
+                            .writeInt(event.width)
+                            .writeInt(event.height)
+                            .writeFloat(event.videoFrameRate)
                             .usePooledBuffer()
                             .build();
             StatsLog.write(statsEvent);
         }
 
         @Override
-        public void reportEditingEndedEvent(String sessionId, EditingEndedEvent event, int userId) {
+        public void reportEditingEndedEvent(String sessionId,
+                        ReportedEditingEndedEvent event, int userId) {
             // Editing ended events use the same blocklist as player metrics.
             int level = loggingLevel();
             if (level == LOGGING_LEVEL_BLOCKED) {
                 return;
             }
             MediaItemInfo inputMediaItemInfo =
-                    event.getInputMediaItemInfos().isEmpty()
+                    event.inputMediaItemInfos.length == 0
                             ? EMPTY_MEDIA_ITEM_INFO
-                            : event.getInputMediaItemInfos().get(0);
+                            : new MediaItemInfo(event.inputMediaItemInfos[0]);
             @MediaItemInfo.DataType long inputDataTypes = inputMediaItemInfo.getDataTypes();
             String inputAudioSampleMimeType =
                     getFilteredFirstMimeType(
@@ -466,9 +567,9 @@ public final class MediaMetricsManagerService extends SystemService {
             String inputSecondCodecName = inputCodecNames.size() > 1 ? inputCodecNames.get(1) : "";
 
             MediaItemInfo outputMediaItemInfo =
-                    event.getOutputMediaItemInfo() == null
+                    event.outputMediaItemInfo == null
                             ? EMPTY_MEDIA_ITEM_INFO
-                            : event.getOutputMediaItemInfo();
+                            : new MediaItemInfo(event.outputMediaItemInfo);
             @MediaItemInfo.DataType long outputDataTypes = outputMediaItemInfo.getDataTypes();
             String outputAudioSampleMimeType =
                     getFilteredFirstMimeType(
@@ -489,15 +590,15 @@ public final class MediaMetricsManagerService extends SystemService {
                     !outputCodecNames.isEmpty() ? outputCodecNames.get(0) : "";
             String outputSecondCodecName =
                     outputCodecNames.size() > 1 ? outputCodecNames.get(1) : "";
-            @EditingEndedEvent.OperationType long operationTypes = event.getOperationTypes();
+            @EditingEndedEvent.OperationType long operationTypes = event.operationTypes;
             StatsEvent.Builder statsEventBuilder =
                     StatsEvent.newBuilder()
                             .setAtomId(798)
                             .writeString(sessionId)
-                            .writeInt(event.getFinalState())
-                            .writeFloat(event.getFinalProgressPercent())
-                            .writeInt(event.getErrorCode())
-                            .writeLong(event.getTimeSinceCreatedMillis())
+                            .writeInt(event.finalState)
+                            .writeFloat(event.finalProgressPercent)
+                            .writeInt(event.errorCode)
+                            .writeLong(event.timeSinceCreatedMillis)
                             .writeBoolean(
                                     (operationTypes
                                                     & EditingEndedEvent
@@ -529,10 +630,10 @@ public final class MediaMetricsManagerService extends SystemService {
                             .writeBoolean(
                                     (operationTypes & EditingEndedEvent.OPERATION_TYPE_RESUMED)
                                             != 0)
-                            .writeString(getFilteredLibraryName(event.getExporterName()))
-                            .writeString(getFilteredLibraryName(event.getMuxerName()))
+                            .writeString(getFilteredLibraryName(event.exporterName))
+                            .writeString(getFilteredLibraryName(event.muxerName))
                             .writeInt(getThroughputFps(event))
-                            .writeInt(event.getInputMediaItemInfos().size())
+                            .writeInt(event.inputMediaItemInfos.length)
                             .writeInt(inputMediaItemInfo.getSourceType())
                             .writeBoolean((inputDataTypes & MediaItemInfo.DATA_TYPE_IMAGE) != 0)
                             .writeBoolean((inputDataTypes & MediaItemInfo.DATA_TYPE_VIDEO) != 0)
@@ -641,6 +742,16 @@ public final class MediaMetricsManagerService extends SystemService {
                         level == LOGGING_LEVEL_EVERYTHING ? Binder.getCallingUid() : 0);
             }
             StatsLog.write(statsEventBuilder.usePooledBuffer().build());
+        }
+
+        @Override
+        public int getInterfaceVersion() throws RemoteException {
+            return 0;
+        }
+
+        @Override
+        public String getInterfaceHash() throws RemoteException {
+            return null;
         }
 
         private int loggingLevel() {
@@ -814,16 +925,17 @@ public final class MediaMetricsManagerService extends SystemService {
         return libraryName;
     }
 
-    private static int getThroughputFps(EditingEndedEvent event) {
-        MediaItemInfo outputMediaItemInfo = event.getOutputMediaItemInfo();
+    private static int getThroughputFps(ReportedEditingEndedEvent reported) {
+        ReportedMediaItemInfo outputMediaItemInfo =
+                        reported.outputMediaItemInfo;
         if (outputMediaItemInfo == null) {
             return -1;
         }
-        long videoSampleCount = outputMediaItemInfo.getVideoSampleCount();
+        long videoSampleCount = outputMediaItemInfo.videoSampleCount;
         if (videoSampleCount == MediaItemInfo.VALUE_UNSPECIFIED) {
             return -1;
         }
-        long elapsedTimeMs = event.getTimeSinceCreatedMillis();
+        long elapsedTimeMs = reported.timeSinceCreatedMillis;
         if (elapsedTimeMs == EditingEndedEvent.TIME_SINCE_CREATED_UNKNOWN) {
             return -1;
         }

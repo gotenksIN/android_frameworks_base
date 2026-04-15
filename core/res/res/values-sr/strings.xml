@@ -2707,9 +2707,12 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Дуго притисните дугме за укључивање и искључите ТВ"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Упозорења о ресурсима система"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Прекомерно коришћење ресурса"</string>
-    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> користи превише ресурса."</string>
+    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> је онемогућена због прекомерног коришћења ресурса. Можете поново да је омогућите у менију Апликације у Подешавањима."</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Новости од родитеља"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> је за сад уклоњена"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> је сада доступна"</string>
     <string name="media_route_chooser_share_cast_others" msgid="8797886650999355673">"Пребацуј на друге"</string>
+    <!-- no translation found for activity_embedding_divider_drag_handle_description (4922243158119077780) -->
+    <skip />
+    <string name="brightness_unable_adjust_msg" msgid="739363986705194491">"Не можете да прилагодите осветљеност јер је контролише апликација у првом плану"</string>
 </resources>

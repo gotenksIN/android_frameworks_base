@@ -62,7 +62,7 @@ public final class DisplayInsight extends ContextInsight {
 
     @NonNull
     @Override
-    Bundle toBundleImpl() {
+    Bundle toBundleImpl(boolean includeHints) {
         final Bundle b = new Bundle();
         b.putParcelable(KEY_DISPLAY_DETAILS, mDisplayDetails);
         return b;
@@ -83,8 +83,8 @@ public final class DisplayInsight extends ContextInsight {
 
     /** @hide */
     @Override
-    public void accept(@NonNull InsightVisitor visitor) {
-        visitor.visit(this);
+    public void accept(@NonNull InsightVisitor visitor, int index) {
+        visitor.visit(this, index);
     }
 
     @Override

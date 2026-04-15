@@ -410,3 +410,23 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "encapsulate_cur_oom_adj"
+    namespace: "backstage_power"
+    description: "Use setAdj instead of curAdj and curRawAdj outside of psc package."
+    bug: "489901078"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "explicit_cpu_capability_for_top_processes"
+    namespace: "backstage_power"
+    description: "Enables explicit handling of CPU capabilities for top processes, rather than granting by default."
+    bug: "483177131"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}

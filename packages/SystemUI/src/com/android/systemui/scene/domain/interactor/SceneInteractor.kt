@@ -29,6 +29,7 @@ import com.android.compose.animation.scene.TransitionKey
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.systemui.Flags.blackScreenOnSceneContainerStartFix
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -313,8 +314,8 @@ constructor(
      * scene, any current transition will be canceled and an animation to the target scene will be
      * started.
      *
-     * If [hideAllOverlays] is `true`, any visible overlays will be hidden (with transition), even
-     * if the scene change is rejected.
+     * If [hideOverlays] is not [HideOverlayCommand.HideNone], any visible overlays (all or some)
+     * will be hidden (with transition), even if the scene change is rejected.
      */
     @JvmOverloads
     fun changeScene(
@@ -323,13 +324,13 @@ constructor(
         transitionKey: TransitionKey? = null,
         keyguardState: KeyguardState? = null,
         forceSettleToTargetScene: Boolean = false,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
     ) {
         if (keyguardState != null) {
             lockscreenSceneTransitionInteractor.get().setNextLockscreenTargetState(keyguardState)
         }
 
-        val currentSceneKey = currentScene.value
+        val currentSceneKey = currentSceneAsState
         val resolvedScene = sceneFamilyResolvers.get()[toScene]?.resolvedScene?.value ?: toScene
 
         if (resolvedScene == currentSceneKey && forceSettleToTargetScene) {
@@ -337,11 +338,20 @@ constructor(
             repository.freezeAndAnimateToCurrentState()
         }
 
-        if (hideAllOverlays) {
-            transitionState.currentOverlays.forEach {
-                hideOverlay(it, "Hiding overlay ${it.debugName} due to scene change request")
+        when (hideOverlays) {
+            HideOverlayCommand.HideAll -> {
+                transitionState.currentOverlays.forEach {
+                    hideOverlay(it, "Hiding overlay ${it.debugName} due to scene change request")
+                }
             }
+            is HideOverlayCommand.HideSome -> {
+                hideOverlays.overlays.forEach {
+                    hideOverlay(it, "Hiding overlay ${it.debugName} due to scene change request")
+                }
+            }
+            HideOverlayCommand.HideNone -> {}
         }
+        restrictedModeInteractor.get().modifyOverlaysOnSceneChange(toScene)
 
         if (
             !validateSceneChange(
@@ -375,13 +385,13 @@ constructor(
      */
     fun snapToGoneForUnlockedPowerLaunchGesture(
         loggingReason: String,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         keyguardState: KeyguardState? = null,
     ) {
         snapToScene(
             Scenes.Gone,
             loggingReason,
-            hideAllOverlays,
+            hideOverlays,
             keyguardState,
             // Only allowed for unlocked power gesture! Do not emulate this!
             skipValidateSceneChange = true,
@@ -397,19 +407,19 @@ constructor(
      * If [keyguardState] is provided, we'll notify KeyguardTransitionRepository to transition to
      * that state as part of this scene change.
      *
-     * If [hideAllOverlays] is `true`, any visible overlays will be instantly hidden, even if the
-     * scene change is rejected.
+     * Override the [hideOverlays] to avoid hiding any overlays or to specify which ones should be
+     * hidden.
      */
     fun snapToScene(
         toScene: SceneKey,
         loggingReason: String,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         keyguardState: KeyguardState? = null,
     ) {
         snapToScene(
             toScene,
             loggingReason,
-            hideAllOverlays,
+            hideOverlays,
             keyguardState,
             skipValidateSceneChange = false,
         )
@@ -418,7 +428,7 @@ constructor(
     private fun snapToScene(
         toScene: SceneKey,
         loggingReason: String,
-        hideAllOverlays: Boolean = true,
+        hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         keyguardState: KeyguardState? = null,
         // Whether to skip validating the scene change. This should *always* be false unless we're
         // doing the unlocked power launch gesture, which is the only case where System UI can
@@ -429,7 +439,7 @@ constructor(
             lockscreenSceneTransitionInteractor.get().setNextLockscreenTargetState(keyguardState)
         }
 
-        val currentSceneKey = currentScene.value
+        val currentSceneKey = currentSceneAsState
         val resolvedScene = sceneFamilyResolvers.get()[toScene]?.resolvedScene?.value ?: toScene
         if (
             !skipValidateSceneChange &&
@@ -439,8 +449,15 @@ constructor(
                     loggingReason = loggingReason,
                 )
         ) {
-            if (hideAllOverlays) {
-                repository.instantlyTransitionTo(overlays = emptySet())
+            when (hideOverlays) {
+                HideOverlayCommand.HideAll ->
+                    repository.instantlyTransitionTo(overlays = emptySet())
+                HideOverlayCommand.HideNone -> Unit
+                is HideOverlayCommand.HideSome -> {
+                    repository.instantlyTransitionTo(
+                        overlays = transitionState.currentOverlays - hideOverlays.overlays.toSet()
+                    )
+                }
             }
             return
         }
@@ -459,10 +476,14 @@ constructor(
             isInstant = true,
         )
 
-        repository.instantlyTransitionTo(
-            scene = resolvedScene,
-            overlays = emptySet<OverlayKey>().takeIf { hideAllOverlays },
-        )
+        val overlaysToSet =
+            when (hideOverlays) {
+                HideOverlayCommand.HideAll -> emptySet()
+                HideOverlayCommand.HideNone -> null
+                is HideOverlayCommand.HideSome ->
+                    transitionState.currentOverlays - hideOverlays.overlays.toSet()
+            }
+        repository.instantlyTransitionTo(scene = resolvedScene, overlays = overlaysToSet)
     }
 
     /**
@@ -663,6 +684,16 @@ constructor(
             is Event.SurfaceBehindAnimationChange -> {
                 repository.isSurfaceBehindAnimating = event.isAnimating
             }
+
+            is Event.IdleSceneEnteredComposition -> {
+                repository.composedIdleScene = event.scene
+            }
+
+            is Event.IdleSceneExitedComposition -> {
+                if (repository.composedIdleScene == event.scene) {
+                    repository.composedIdleScene = null
+                }
+            }
         }
     }
 
@@ -701,6 +732,27 @@ constructor(
 
                             transitionState.currentOverlays.isNotEmpty() ->
                                 IsVisibleWithLoggingReason(true, "overlay is shown")
+
+                            // If the current scene is idle and transparent, the SceneWindowRootView
+                            // should be made INVISIBLE. When SceneWindowRootView is INVISIBLE,
+                            // composition of its contents will be paused (see ViewLifecycleOwner in
+                            // RepeatWhenAttached - it will toggle to lifecycle state CREATED). If
+                            // we made the SceneWindowRootView invisible immediately here, this
+                            // could happen before the transparent scene has composed.
+                            //
+                            // However, the handling of swipe gestures on scenes currently relies on
+                            // SceneContainer composing before it can react on the configured
+                            // UserActions of the scene's UserActionsViewModel. This applies to
+                            // transparent scenes too.
+                            //
+                            // Thus we delay toggling the View to INVISIBLE until the transparent
+                            // scene has composed (and is ready to handle input events).
+                            blackScreenOnSceneContainerStartFix() &&
+                                repository.composedIdleScene != transitionState.currentScene ->
+                                IsVisibleWithLoggingReason(
+                                    true,
+                                    "waiting for ${transitionState.currentScene.debugName} to be composed (currently composed: ${repository.composedIdleScene?.debugName ?: "<none>"})",
+                                )
 
                             transitionState.currentScene == Scenes.Occluded ->
                                 IsVisibleWithLoggingReason(false, "occluded")
@@ -772,6 +824,20 @@ constructor(
     fun resolveSceneFamilyOrNull(sceneKey: SceneKey): StateFlow<SceneKey>? =
         sceneFamilyResolvers.get()[sceneKey]?.resolvedScene
 
+    /** Called when SceneContainer has currently composed [scene] with TransitionState.Idle. */
+    fun onIdleSceneEnteredComposition(scene: SceneKey) {
+        handleEvent(Event.IdleSceneEnteredComposition(scene))
+    }
+
+    /**
+     * Called when SceneContainer has re-composed, and previously it was showing [scene] with
+     * TransitionState.Idle - this means that [scene] (at least in its idle state) has exited
+     * composition.
+     */
+    fun onIdleSceneExitedComposition(scene: SceneKey) {
+        handleEvent(Event.IdleSceneExitedComposition(scene))
+    }
+
     fun startTransitionImmediately(transition: TransitionState.Transition) {
         repository.startTransitionImmediately(transition)
     }
@@ -827,21 +893,7 @@ constructor(
             return false
         }
 
-        if (!restrictedModeInteractor.get().isSceneChangeAllowed(toScene = to)) {
-            logger.logContentChangeRejection(
-                from = from,
-                to = to,
-                originalChangeReason = loggingReason,
-                rejectionReason =
-                    "Only scene changes to Lockscreen and Occluded are allowed " +
-                        "when the device is in restricted mode",
-            )
-            return false
-        }
-
-        val inMidTransitionFromGone =
-            (transitionStateFlow.value as? ObservableTransitionState.Transition)?.fromContent ==
-                Scenes.Gone
+        val inMidTransitionFromGone = transitionState.isTransitioning(from = Scenes.Gone)
         val isChangeAllowed =
             to != Scenes.Gone ||
                 inMidTransitionFromGone ||
@@ -850,7 +902,7 @@ constructor(
                 !keyguardEnabledInteractor.get().isKeyguardEnabled.value
         check(isChangeAllowed) {
             "Cannot change to the Gone scene while the device is locked/secured and not currently" +
-                " transitioning from Gone. Current transition state is ${transitionStateFlow.value}." +
+                " transitioning from Gone. Current transition state is $transitionState." +
                 " Logging reason for scene change was: $loggingReason"
         }
 
@@ -942,17 +994,6 @@ constructor(
                     to = to,
                     originalChangeReason = loggingReason,
                     rejectionReason = "Cannot show Bouncer when device already unlocked",
-                )
-                false
-            }
-
-            !restrictedModeInteractor.get().isOverlayChangeAllowed(to) -> {
-                logger.logContentChangeRejection(
-                    from = from,
-                    to = to,
-                    originalChangeReason = loggingReason,
-                    rejectionReason =
-                        "Cannot show any other overlays when device is in restricted mode.",
                 )
                 false
             }
@@ -1092,6 +1133,16 @@ constructor(
 
     private data class IsVisibleWithLoggingReason(val value: Boolean, val loggingReason: String)
 
+    sealed interface HideOverlayCommand {
+        data object HideAll : HideOverlayCommand
+
+        data object HideNone : HideOverlayCommand
+
+        class HideSome(val overlays: List<OverlayKey>) : HideOverlayCommand {
+            constructor(overlay: OverlayKey) : this(listOf(overlay))
+        }
+    }
+
     /**
      * Defines interface for classes that represents events that are of interest to the scene
      * framework.
@@ -1114,11 +1165,17 @@ constructor(
         /** A transition animation (for example, to show an activity) has ended. */
         data object TransitionAnimationEnd : Event
 
-        /** A transition animation (for example, to show an activity) has been cancelled. */
+        /** A transition animation (for example, to show an activity) has been canceled. */
         data object TransitionAnimationCancel : Event
 
         /** A change to the device provisioning state (setup wizard started or finished). */
         data class DeviceProvisioningChange(val isDeviceProvisioned: Boolean) : Event
+
+        /** The scene [scene] has entered the composition with TransitionState.Idle . */
+        data class IdleSceneEnteredComposition(val scene: SceneKey) : Event
+
+        /** The scene [scene] with TransitionState.Idle has exited the composition. */
+        data class IdleSceneExitedComposition(val scene: SceneKey) : Event
 
         /** The device has become locked or unlocked. */
         data class DeviceUnlockChange(val isDeviceUnlocked: Boolean) : Event

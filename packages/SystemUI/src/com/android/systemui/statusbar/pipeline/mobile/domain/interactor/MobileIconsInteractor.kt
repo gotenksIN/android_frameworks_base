@@ -111,6 +111,13 @@ interface MobileIconsInteractor {
      * [MobileIconInteractor] responsible for the active data connection, if any.
      */
     val activeDataIconInteractor: StateFlow<MobileIconInteractor?>
+
+    /**
+     * Flow providing a reference to the Interactor for the default data subId. This represents the
+     * [MobileIconInteractor] responsible for the default data connection, if any.
+     */
+    val defaultDataIconInteractor: StateFlow<MobileIconInteractor?>
+
     /** True if the RAT icon should always be displayed and false otherwise. */
     val alwaysShowDataRatIcon: StateFlow<Boolean>
     /** True if the CDMA level should be preferred over the primary level. */
@@ -219,6 +226,18 @@ constructor(
                 }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
+
+    override val defaultDataIconInteractor: StateFlow<MobileIconInteractor?> =
+        mobileConnectionsRepo.defaultDataSubId
+            .mapDirect {
+                if (it != null && it != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    getMobileConnectionInteractorForSubId(it)
+                } else {
+                    null
+                }
+            }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), null)
+
     private val unfilteredSubscriptions: Flow<List<SubscriptionModel>> =
         mobileConnectionsRepo.subscriptions
     /** Any filtering that we can do based purely on the info of each subscription individually. */
@@ -449,15 +468,17 @@ constructor(
         mobileConnectionsRepo.defaultDataSubRatConfig
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { defaultConfig ->
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 val enabled = (defaultConfig?.alwaysShowNetworkTypeIcon ?: false)
                     || (defaultConfig?.enableDdsRatIconEnhancement ?: false)
                     || (defaultConfig?.enableRatIconEnhancement ?: false)
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 val state = MobileIconCustomizationMode(
                     isRatCustomization = enabled,
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                     alwaysShowNetworkTypeIcon = defaultConfig?.alwaysShowNetworkTypeIcon ?: false,
                     ddsRatIconEnhancementEnabled = defaultConfig?.enableDdsRatIconEnhancement ?: false,
                     nonDdsRatIconEnhancementEnabled = defaultConfig?.enableRatIconEnhancement ?: false,
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 )
                 state
             }

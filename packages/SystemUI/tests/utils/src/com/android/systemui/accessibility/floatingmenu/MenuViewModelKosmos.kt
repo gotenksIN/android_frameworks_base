@@ -22,17 +22,27 @@ import com.android.settingslib.bluetooth.HearingAidDeviceManager
 import com.android.systemui.accessibility.TestUtils
 import com.android.systemui.inputdevice.data.repository.pointerDeviceRepository
 import com.android.systemui.keyboard.data.repository.keyboardRepository
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
+import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
-import org.mockito.Mockito
+import com.android.systemui.scene.domain.interactor.SceneInteractor
+import com.android.systemui.scene.shared.model.Scenes
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.mock
 
 val Kosmos.menuViewModel by Fixture {
     MenuViewModel(
         testableContext,
         accessibilityManager,
         TestUtils.mockSecureSettings(testableContext),
-        Mockito.mock(HearingAidDeviceManager::class.java),
+        mock<HearingAidDeviceManager>(),
         keyboardRepository,
         pointerDeviceRepository,
+        mock<KeyguardTransitionInteractor> {
+            on { currentKeyguardState } doReturn MutableStateFlow(KeyguardState.GONE)
+        },
+        mock<SceneInteractor> { on { currentScene } doReturn MutableStateFlow(Scenes.Gone) },
     )
 }

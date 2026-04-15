@@ -48,8 +48,14 @@ class NotificationRulesScreenImpl @Inject constructor() : NotificationRulesScree
         val screenViewModel =
             rememberViewModel("NotificationRulesScreen") { viewModelFactory.create(backStack) }
 
+        val onNavigateToCurrentRulesScreen: () -> Unit = {
+            navigateBackToCurrentRulesScreen(backStack)
+        }
         val onNavigateToEditScreen: (DraftRuleModel) -> Unit = { draftRule ->
-            val newState = RulesScreenViewState.EditRule(editViewModelFactory.create(draftRule))
+            val newState =
+                RulesScreenViewState.EditRule(
+                    editViewModelFactory.create(draftRule, onNavigateToCurrentRulesScreen)
+                )
             backStack.add(newState)
         }
         val onEnterEditField: (RulesScreenViewState.EditField) -> Unit = { backStack.add(it) }
@@ -92,13 +98,27 @@ class NotificationRulesScreenImpl @Inject constructor() : NotificationRulesScree
                 is RulesScreenViewState.EditField.Action -> {
                     ActionChoiceScreen(viewState, onDismissRequest = onDismissRequest)
                 }
-                is RulesScreenViewState.EditField.Contacts -> {
-                    ContactChoiceScreen(viewState, onDismissRequest = onDismissRequest)
+                is RulesScreenViewState.EditField.People -> {
+                    PeopleChoiceScreen(viewState, onDismissRequest = onDismissRequest)
                 }
                 is RulesScreenViewState.EditField.Apps -> {
                     AppChoiceScreen(viewState, onDismissRequest = onDismissRequest)
                 }
+                is RulesScreenViewState.EditField.Keywords -> {
+                    KeywordChoiceScreen(viewState, onDismissRequest = onDismissRequest)
+                }
             }
+        }
+    }
+
+    private fun navigateBackToCurrentRulesScreen(backStack: MutableList<RulesScreenViewState>) {
+        while (backStack.removeLastOrNull() != null) {
+            if (backStack.last() is RulesScreenViewState.CurrentRules) {
+                break
+            }
+        }
+        if (backStack.isEmpty()) {
+            backStack.add(RulesScreenViewState.CurrentRules)
         }
     }
 }

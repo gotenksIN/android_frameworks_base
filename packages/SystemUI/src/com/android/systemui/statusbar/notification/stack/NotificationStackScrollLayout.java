@@ -756,7 +756,6 @@ public class NotificationStackScrollLayout
         return 0f;
     }
 
-    @VisibleForTesting
     protected void setLogger(NotificationStackScrollLogger logger) {
         mLogger = logger;
     }
@@ -1922,6 +1921,12 @@ public class NotificationStackScrollLayout
             setCheckForLeaveBehind(false);
             onExpansionStopped();
         }
+    }
+
+    @Override
+    public void setLStoShadeProgress(float shadeProgress) {
+        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        mAmbientState.setLStoShadeProgress(shadeProgress);
     }
 
     @VisibleForTesting
@@ -3502,15 +3507,15 @@ public class NotificationStackScrollLayout
     }
 
     @Override
-    public void setAlignToInnerQqsTiles(boolean alignToInnerQqsTiles) {
+    public void setSidePaddingConfig(int baseSidePadding, boolean alignToInnerQqsTiles) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        mScrollViewFields.alignToInnerQqsTiles = alignToInnerQqsTiles;
-    }
-
-    @Override
-    public void setBaseSidePadding(int baseSidePadding) {
-        if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        if (mScrollViewFields.baseSidePadding == baseSidePadding
+                && mScrollViewFields.alignToInnerQqsTiles == alignToInnerQqsTiles) {
+            return;
+        }
         mScrollViewFields.baseSidePadding = baseSidePadding;
+        mScrollViewFields.alignToInnerQqsTiles = alignToInnerQqsTiles;
+        requestLayout();
     }
 
     private void updateNotificationAnimationStates() {
@@ -3590,8 +3595,8 @@ public class NotificationStackScrollLayout
             boolean isTransient = child instanceof ExpandableNotificationRow
                     && child.getTransientContainer() != null;
             Log.e(TAG, "Attempting to re-position "
-                    + (isTransient ? "transient" : "")
-                    + " view {"
+                    + (isTransient ? "transient " : "")
+                    + "view {"
                     + child
                     + "}");
             return;
@@ -3907,40 +3912,18 @@ public class NotificationStackScrollLayout
      */
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        boolean shouldRefuse = false;
         if (SceneContainerFlag.isEnabled()) {
             // TODO(b/433984972): this is especially useful because there are scenarios that the
             //  NSSL children overlaps with other visible, interactive items.
-            shouldRefuse = shouldRefuseTouchEvent(ev);
-            if (shouldRefuse) {
-                if (ev.getActionMasked() != MotionEvent.ACTION_MOVE && mLogger != null) {
-                    mLogger.logNsslOnInterceptTouchEvent(
-                            ev.getActionMasked(),
-                            /* result= */ true,
-                            /* shouldRefuse= */ true,
-                            /* touchHandlerIntercepted= */ false
-                    );
-                }
+            if (shouldRefuseTouchEvent(ev)) {
                 return true;
             }
         }
 
-        boolean touchHandlerIntercepted = false;
-        if (mTouchHandler != null) {
-            touchHandlerIntercepted = mTouchHandler.onInterceptTouchEvent(ev);
+        if (mTouchHandler != null && mTouchHandler.onInterceptTouchEvent(ev)) {
+            return true;
         }
-
-        boolean result = touchHandlerIntercepted || super.onInterceptTouchEvent(ev);
-
-        if (ev.getActionMasked() != MotionEvent.ACTION_MOVE && mLogger != null) {
-            mLogger.logNsslOnInterceptTouchEvent(
-                    ev.getActionMasked(),
-                    result,
-                    shouldRefuse,
-                    touchHandlerIntercepted
-            );
-        }
-        return result;
+        return super.onInterceptTouchEvent(ev);
     }
 
     /**
@@ -4004,14 +3987,7 @@ public class NotificationStackScrollLayout
             debugShadeLog("NSSL's root view is not visible. Refusing touch event");
             return true;
         }
-        boolean interactive = mScrollViewFields.interactive;
-        boolean isOutBounds = isOutBoundsDownEvent(ev);
-        boolean result = !interactive || isOutBounds;
-        if (ev.getActionMasked() != MotionEvent.ACTION_MOVE && mLogger != null) {
-            mLogger.logNsslShouldRefuseTouchEvent(ev.getActionMasked(), result, interactive,
-                    isOutBounds);
-        }
-        return result;
+        return !mScrollViewFields.interactive || isOutBoundsDownEvent(ev);
     }
 
     private boolean isRootViewVisible() {
@@ -4037,7 +4013,7 @@ public class NotificationStackScrollLayout
             return false;
         }
         ShadeScrimBounds bounds = shape.getBounds();
-        Log.d("NSSL", "bounds=" + bounds.toString() + " x: " + x + " y: " + y);
+        Log.d("NSSL", "bounds=" + bounds + " x: " + x + " y: " + y);
         return x < bounds.getLeft()
                 || x > bounds.getRight()
                 || y < bounds.getTop()
@@ -6025,6 +6001,9 @@ public class NotificationStackScrollLayout
     public void setAlphaForLockscreenFadeIn(float alphaForLockscreenFadeIn) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
         mAmbientState.setLockscreenStackFadeInProgress(alphaForLockscreenFadeIn);
+        if (alphaForLockscreenFadeIn == 0f || alphaForLockscreenFadeIn == 1f) {
+            requestChildrenUpdate();
+        }
     }
 
     void onStatePostChange(boolean fromShadeLocked) {

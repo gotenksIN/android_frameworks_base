@@ -19,8 +19,8 @@ package com.android.server.permission.access.immutable
 import android.util.ArraySet
 import com.android.server.permission.access.collection.forEachIndexed
 
-fun <T> indexedSetOf(vararg elements: T): IndexedSet<T> =
-    MutableIndexedSet(ArraySet(elements.asList()))
+@Suppress("NOTHING_TO_INLINE")
+inline fun <T> indexedSetOf(vararg elements: T): IndexedSet<T> = mutableIndexedSetOf(*elements)
 
 inline fun <T> IndexedSet<T>.allIndexed(predicate: (Int, T) -> Boolean): Boolean {
     forEachIndexed { index, element ->
@@ -39,6 +39,9 @@ inline fun <T> IndexedSet<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boolean
     }
     return false
 }
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun <T> IndexedSet<T>.first(): T = elementAt(0)
 
 inline fun <T> IndexedSet<T>.forEachIndexed(action: (Int, T) -> Unit) {
     for (index in 0 until size) {
@@ -72,6 +75,9 @@ inline fun <T> IndexedSet<T>.noneIndexed(predicate: (Int, T) -> Boolean): Boolea
 
 operator fun <T> IndexedSet<T>.plus(element: T): MutableIndexedSet<T> =
     toMutable().apply { this += element }
+
+fun <T> mutableIndexedSetOf(vararg elements: T): MutableIndexedSet<T> =
+    MutableIndexedSet(ArraySet(elements.asList()))
 
 @Suppress("NOTHING_TO_INLINE")
 inline operator fun <T> MutableIndexedSet<T>.minusAssign(element: T) {

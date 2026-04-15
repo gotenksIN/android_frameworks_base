@@ -16,6 +16,7 @@
 
 package com.android.server;
 
+import static android.app.admin.DevicePolicyManager.MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED;
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.media.tv.flags.Flags.mediaQualityFw;
@@ -51,7 +52,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.res.Configuration;
 import android.content.res.Resources.Theme;
-import android.crashrecovery.flags.Flags;
 import android.credentials.CredentialManager;
 import android.database.sqlite.SQLiteCompatibilityWalFlags;
 import android.database.sqlite.SQLiteGlobal;
@@ -159,7 +159,6 @@ import com.android.server.camera.CameraServiceProxy;
 import com.android.server.clipboard.ClipboardService;
 import com.android.server.companion.CompanionDeviceManagerService;
 import com.android.server.companion.datatransfer.continuity.TaskContinuityManagerService;
-import com.android.server.companion.datatransfer.continuity.UniversalClipboardService;
 import com.android.server.companion.virtual.VirtualDeviceManagerService;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.compat.PlatformCompatNative;
@@ -175,7 +174,6 @@ import com.android.server.contentsuggestions.ContentSuggestionsManagerService;
 import com.android.server.contextualsearch.ContextualSearchManagerService;
 import com.android.server.coverage.CoverageService;
 import com.android.server.cpu.CpuMonitorService;
-import com.android.server.crashrecovery.CrashRecoveryAdaptor;
 import com.android.server.credentials.CredentialManagerService;
 import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.devicepolicy.DevicePolicyManagerService;
@@ -235,7 +233,6 @@ import com.android.server.pm.BackgroundInstallControlService;
 import com.android.server.pm.CrossProfileAppsService;
 import com.android.server.pm.DataLoaderManagerService;
 import com.android.server.pm.DexOptHelper;
-import com.android.server.pm.DynamicCodeLoggingService;
 import com.android.server.pm.HsumBootUserInitializer;
 import com.android.server.pm.Installer;
 import com.android.server.pm.LauncherAppsService;
@@ -277,6 +274,7 @@ import com.android.server.security.authenticationpolicy.WatchRangingService;
 import com.android.server.security.authenticationpolicy.agent.AgentAuthService;
 import com.android.server.security.intrusiondetection.IntrusionDetectionService;
 import com.android.server.security.rkp.RemoteProvisioningService;
+import com.android.server.security.trusttoken.TrustTokenManagerService;
 import com.android.server.selectiontoolbar.SelectionToolbarManagerService;
 import com.android.server.selinux.SelinuxAuditLogsService;
 import com.android.server.sensorprivacy.SensorPrivacyService;
@@ -415,6 +413,8 @@ public final class SystemServer implements Dumpable {
      */
     private static final String APPSEARCH_MODULE_LIFECYCLE_CLASS =
             "com.android.server.appsearch.AppSearchModule$Lifecycle";
+    private static final String CRASHRECOVERY_MODULE_LIFECYCLE_CLASS =
+            "com.android.server.crashrecovery.CrashRecoveryModule$Lifecycle";
     private static final String ISOLATED_COMPILATION_SERVICE_CLASS =
             "com.android.server.compos.IsolatedCompilationService";
     private static final String MEDIA_COMMUNICATION_SERVICE_CLASS =
@@ -504,6 +504,11 @@ public final class SystemServer implements Dumpable {
     private static final String RANGING_SERVICE_CLASS = "com.android.server.ranging.RangingService";
 
     private static final String TETHERING_CONNECTOR_CLASS = "android.net.ITetheringConnector";
+
+    private static final String DEVICE_TO_DEVICE_SERVICE_CLASS =
+            "com.android.server.devicetodevice.DeviceToDeviceService";
+    private static final String DEVICE_TO_DEVICE_APEX_SERVICE_JAR_PATH =
+            "/apex/com.android.bettertogether/javalib/service-device-to-device.jar";
 
     private static final String PERSISTENT_DATA_BLOCK_PROP = "ro.frp.pst";
 
@@ -1336,12 +1341,6 @@ public final class SystemServer implements Dumpable {
         t.traceBegin("StartRecoverySystemService");
         mSystemServiceManager.startService(RecoverySystemService.Lifecycle.class);
         t.traceEnd();
-
-        if (!Flags.refactorCrashrecovery()) {
-            // Initialize RescueParty.
-            CrashRecoveryAdaptor.rescuePartyRegisterHealthObserver(mSystemContext);
-        }
-
 
         // Manages LEDs and display backlight so we need it to bring up the display.
         t.traceBegin("StartLightsService");
@@ -2764,7 +2763,8 @@ public final class SystemServer implements Dumpable {
                     new GraphicsStatsService(context));
             t.traceEnd();
 
-            if (android.service.personalcontext.Flags.enablePersonalContextService()) {
+            if (context.getResources().getBoolean(
+                    R.bool.config_enablePersonalContextManagerService)) {
                 t.traceBegin("StartPersonalContextService");
                 mSystemServiceManager.startService(PersonalContextManagerService.class);
                 t.traceEnd();
@@ -2786,6 +2786,12 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(AttestationVerificationManagerService.class);
             t.traceEnd();
 
+            if (android.security.Flags.enableTalismanService()) {
+                t.traceBegin("StartTrustTokenManagerService");
+                mSystemServiceManager.startService(TrustTokenManagerService.class);
+                t.traceEnd();
+            }
+
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_COMPANION_DEVICE_SETUP)) {
                 t.traceBegin("StartCompanionDeviceManager");
                 mSystemServiceManager.startService(CompanionDeviceManagerService.class);
@@ -2795,12 +2801,6 @@ public final class SystemServer implements Dumpable {
             if (android.companion.Flags.taskContinuity()) {
                 t.traceBegin("StartTaskContinuityService");
                 mSystemServiceManager.startService(TaskContinuityManagerService.class);
-                t.traceEnd();
-            }
-
-            if (android.companion.Flags.universalClipboard()) {
-                t.traceBegin("StartUniversalClipboardService");
-                mSystemServiceManager.startService(UniversalClipboardService.class);
                 t.traceEnd();
             }
 
@@ -2922,18 +2922,6 @@ public final class SystemServer implements Dumpable {
 
                 t.traceBegin("StartAuthenticationPolicyService");
                 mSystemServiceManager.startService(AuthenticationPolicyService.class);
-                t.traceEnd();
-            }
-
-            if (!isWatch) {
-                // We don't run this on watches as there are no plans to use the data logged
-                // on watch devices.
-                t.traceBegin("StartDynamicCodeLoggingService");
-                try {
-                    DynamicCodeLoggingService.schedule(context);
-                } catch (Throwable e) {
-                    reportWtf("starting DynamicCodeLoggingService", e);
-                }
                 t.traceEnd();
             }
 
@@ -3172,7 +3160,8 @@ public final class SystemServer implements Dumpable {
         }
 
         // AiSeal
-        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_AISEAL)) {
+        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_AISEAL)
+                && android.aiseal.Flags.aisealHostApis()) {
             t.traceBegin("StartAiSealSystemService");
             try {
                 mSystemServiceManager.startService(AiSealSystemService.class);
@@ -3188,7 +3177,7 @@ public final class SystemServer implements Dumpable {
         t.traceEnd();
 
         // Anomaly Detector
-        if (android.os.profiling.anomaly.flags.Flags.anomalyDetectorCore()) {
+        if (android.os.profiling.anomaly.flags.Flags.anomalyDetectorCoreC()) {
             // Both AnomalyDetectorService and SignalCollectorService are build flagged
             // behind RELEASE_ANOMALY_DETECTOR, beside being behind the above flag.
             // Avoid crashing the system if the aconfig flag is enabled but the build flag is
@@ -3314,13 +3303,19 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startBootPhase(t, SystemService.PHASE_LOCK_SETTINGS_READY);
         t.traceEnd();
 
+        boolean requiresAdmin =
+                dpms.getMultiuserManagedDeviceProvisioningState()
+                    == MULTIUSER_MANAGED_DEVICE_PROVISIONING_STATE_UNMANAGED;
+
         // Create initial user if needed, which should be done early since some system services rely
         // on it in their setup, but likely needs to be done after LockSettingsService is ready.
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(mUserManagerService, mActivityManagerService,
                         // NOTE: there is no need to pass the whole dpms because it just need to
-                        // to check if the device is managed (at boot time).
-                        mPackageManagerService, dpms.isDeviceManaged(), mSystemContext);
+                        // to check if the device is unmanaged (at boot time).
+                        mPackageManagerService,
+                        requiresAdmin,
+                        mSystemContext);
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);
@@ -3423,17 +3418,9 @@ public final class SystemServer implements Dumpable {
         mPackageManagerService.systemReady();
         t.traceEnd();
 
-        if (Flags.refactorCrashrecovery()) {
-            t.traceBegin("StartCrashRecoveryModule");
-            CrashRecoveryAdaptor.initializeCrashrecoveryModuleService(mSystemServiceManager);
-            t.traceEnd();
-        } else {
-            // Now that we have the essential services needed for mitigations, register the boot
-            // with package watchdog.
-            // Note that we just booted, which might send out a rescue party if we're stuck in a
-            // runtime restart loop.
-            CrashRecoveryAdaptor.packageWatchdogNoteBoot(mSystemContext);
-        }
+        t.traceBegin("StartCrashRecoveryModule");
+        mSystemServiceManager.startService(CRASHRECOVERY_MODULE_LIFECYCLE_CLASS);
+        t.traceEnd();
 
         t.traceBegin("MakeDisplayManagerServiceReady");
         try {
@@ -3530,6 +3517,20 @@ public final class SystemServer implements Dumpable {
                 || android.view.flags.Flags.sensitiveContentAppProtection()) {
             t.traceBegin("StartSensitiveContentProtectionManager");
             mSystemServiceManager.startService(SensitiveContentProtectionManagerService.class);
+            t.traceEnd();
+        }
+
+        if (android.bettertogether.flags.Flags.enableD2dConnectivityService()) {
+            t.traceBegin("DeviceToDeviceService");
+            // Avoid crashing the system if the aconfig flag is enabled but the build flag is
+            // disabled (the services classes are not present in that case).
+            // TODO: b/466104217 - Remove this try catch once flag is cleaned up.
+            try {
+                mSystemServiceManager.startServiceFromJar(DEVICE_TO_DEVICE_SERVICE_CLASS,
+                        DEVICE_TO_DEVICE_APEX_SERVICE_JAR_PATH);
+            } catch (Throwable e) {
+                Slog.e(TAG, "Failed to start DeviceToDeviceService", e);
+            }
             t.traceEnd();
         }
 

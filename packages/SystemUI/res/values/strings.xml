@@ -360,11 +360,6 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="wifi_debugging_secondary_user_message">The user currently signed in to this device can\u2019t turn on wireless debugging. To use this feature, switch to an admin user.</string>
 
-    <!-- Message of notification shown when trying to modify connected wifi settings at the login screen. [CHAR LIMIT=50] -->
-<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="change_connected_wifi_text">You can change this setting once logged in</string>
-
     <!-- Title of USB contaminant presence dialog [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -760,6 +755,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_markup">Markup</string>
     <!-- Label for a button opening a color picker menu in screen recording. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_color_picker">Color picker</string>
     <!-- Snackbar shows after the screen recording is saved [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2021,10 +2018,6 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_bluetooth_secondary_label_transient">Turning on&#8230;</string>
-    <!-- QuickSettings: Brightness [CHAR LIMIT=NONE] -->
-<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-<string name="quick_settings_brightness_unable_adjust_msg">Can\'t adjust brightness because it\'s being controlled by the top app</string>
     <!-- QuickSettings: Rotation Unlocked [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2968,6 +2961,11 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_action_open_communal_hub">Widgets on lock screen</string>
+
+    <!-- Label for accessibility action that takes user to the customize lock screen screen. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="accessibility_action_customize_lock_screen">Customize lock screen</string>
 
     <!-- Label for an accessibility announcement when a widget has been added to the lock screen. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4478,6 +4476,8 @@
     <string name="inline_turn_off_notifications">Turn off</string>
 
     <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="bridged_source_device">source device</string>
 
     <!-- Notification inline controls: button to open bridged notification settings on associated device [CHAR_LIMIT=35] -->
@@ -4781,15 +4781,38 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_activity_title" translatable="false">Notification Rules</string>
     <!-- Title for a page where users can create a new notification rule. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_create_new_title" translatable="false">Create New</string>
     <!-- Text explaining that a notification rule is being generated and the user must wait for generation to finish. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_generating" translatable="false">Generating a rule\u2026</string>
     <!-- Title for an error box explaining that a notification rule could not be generated. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_generation_error_title" translatable="false">Generation error</string>
     <!-- Error text explaining that a notification rule could not be generated. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_generation_error_body" translatable="false">The rule could not be generated. Please try again.</string>
+    <!-- Title for an error box explaining that a notification rule could not be saved. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_save_error" translatable="false">The rule could not be saved. Please try again.</string>
+
     <!-- Title for a button that will let users move to the next step of creating a new notification rule. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_next" translatable="false">Next</string>
+    <!-- Label for a button that will let users save a new notification rule. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_create_new_rule" translatable="false">Confirm and create</string>
+    <!-- Label for a button that will let users save changes to an existing notification rule. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_confirm_changes" translatable="false">Confirm changes</string>
 
     <!-- Notifications with this action will be highlighted in the list and will alert the user via sound and/or vibration if enabled. [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4812,6 +4835,28 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_action_block" translatable="false">Block</string>
 
+    <!-- Notifications with this action will be highlighted in the list and will alert the user via sound and/or vibration if enabled. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_highlight_and_alert_description" translatable="false">Notifications can interrupt all modes, including Do Not Disturb.</string>
+    <!-- Notifications with this action will be highlighted in the list. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_highlight_description" translatable="false">Highlighted notifications show at the top of the notification shade.</string>
+    <!-- Notifications with this action will be silenced, with no sound or vibration. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_silence_description" translatable="false">Silenced notifications show at the bottom of the shade and do not ring or vibrate.</string>
+    <!-- Notifications with this action will be silenced, with no sound or vibration, and be bundled into a single group. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_bundle_description" translatable="false">Notifications are collapsed &amp; grouped together.</string>
+    <!-- Notifications with this action will not be shown to the user at all. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_block_description" translatable="false">Notifications are blocked from interrupting and appearing in the shade.</string>
+
+
     <!-- Title for a page where users can add or remove people/contacts/group chats that will be affected by a notification rule. [CHAR LIMIT=30]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4820,18 +4865,65 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_field_app" translatable="false">App</string>
+    <!-- Title for a page where users can add or remove keywords that will trigger a notification rule. [CHAR LIMIT=30]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_field_keyword" translatable="false">Keyword</string>
     <!-- Title for a page where users choose the action for a notification rule. [CHAR LIMIT=50]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_rules_choose_action_title" translatable="false">Choose Action</string>
+    <!-- Header for actions that have more alerting behavior (e.g. sound & vibration) than a typical notification. [CHAR LIMIT=50]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_more_alerting" translatable="false">More Alerting</string>
+    <!-- Header for actions that have less alerting behavior (e.g. sound & vibration) than a typical notification. [CHAR LIMIT=50]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_action_less_alerting" translatable="false">Less Alerting</string>
+    <!-- Accessibility description for a dropdown button letting users change the selected action. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_modify_action" translatable="false">Modify action</string>
 
-    <!-- The full text for a notification rule. Includes substrings for particular parts of the rule, like what apps are part of the rule or what contacts are part of the rule. [CHAR LIMIT=NONE] -->
-    <string name="notification_rules_full_text" translatable="false">Notifications<xliff:g id="appsSubstring">%1$s</xliff:g><xliff:g id="contactsSubstring">%2$s</xliff:g></string>
-    <!-- Text explaining that the notification rule applies to a single item. For example, "from Phone" explains that the rule applies to just notifications from the 'Phone' app.
-     The "valueField" annotation specifies that 'Phone' is the item value. When the user taps on 'Phone', they will be able to change which items(s) are selected. [CHAR LIMIT=NONE]-->
-    <string name="notification_rules_from_single_item" translatable="false">\u0020from <annotation valueField="true"><xliff:g id="item">^1</xliff:g></annotation></string>
+    <!-- The full text for a notification rule. Includes substrings for particular parts of the rule, like what apps are part of the rule or what people are part of the rule. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_full_text" translatable="false">Notifications<xliff:g id="appsSubstring">%1$s</xliff:g><xliff:g id="peopleSubstring">%2$s</xliff:g><xliff:g id="keywordsSubstring">%3$s</xliff:g><xliff:g id="bundleSubstring">%4$s</xliff:g></string>
 
-    <!-- Text explaining that the notification rule applies to multiple items. For example, "from Phone +3 more" explains that the rule applies to the 'Phone' app and 3 additional apps.
-         The "valueField" annotation specifies that 'Phone +3 more' has the item values. When the user taps on 'Phone +3 more', they will be able to change which items(s) are selected. [CHAR LIMIT=NONE] -->
-    <string name="notification_rules_from_multi_items" translatable="false">\u0020from <annotation valueField="true"><xliff:g id="firstItem">^1</xliff:g> +<xliff:g id="number">^2</xliff:g> more</annotation></string>
+    <!-- Text explaining what items the notification rule applies to. For example, "from Phone" explains that the rule applies to just notifications from the 'Phone' app and "from Phone +3 more" explains that the rule applies to the 'Phone' app and 3 additional apps.
+         The "valueField" annotation specifies that 'Phone' is the item value. When the user taps on 'Phone', they will be able to change which items(s) are selected. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <plurals name="notification_rules_from_items" translatable="false">
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+        <item quantity="one">\u0020from <annotation valueField="true"><xliff:g id="item">^1</xliff:g></annotation></item>
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+        <item quantity="other">\u0020from <annotation valueField="true"><xliff:g id="item">^1</xliff:g> +<xliff:g id="number">^2</xliff:g> more</annotation></item>
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    </plurals>
+
+    <!-- Text explaining that the notification rule will apply if a notification contains the given word. For example, "that contain 'sale'" explains that the rule applies to notifications with the word 'sale' and "that contain 'sale' +3 more" explains that the rule applies to notifications with the word 'sale' or 3 other words.
+         The "valueField" annotation specifies that the 'sale' is the item value. When the user taps on 'sale', they will be able to change which keywords are used. [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <plurals name="notification_rules_keyword_items" translatable="false">
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+        <item quantity="one">\u0020that contain <annotation valueField="true">\u201c<xliff:g id="item">^1</xliff:g>\u201d</annotation></item>
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+        <item quantity="other">\u0020that contain <annotation valueField="true">\u201c<xliff:g id="firstItem">^1</xliff:g>\u201d +<xliff:g id="number">^2</xliff:g> more</annotation></item>
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    </plurals>
+
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_rules_bundle_text_description" translatable="false">\u0020into <annotation bundleName="true">\u201c<xliff:g id="bundleName">^1</xliff:g>\u201d</annotation> bundle with <annotation bundleEmoji="true"><xliff:g id="bundleEmoji">^2</xliff:g></annotation> emoji</string>
 
     <!-- Text for a button letting users edit a particular notification rule. [CHAR LIMIT=30]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

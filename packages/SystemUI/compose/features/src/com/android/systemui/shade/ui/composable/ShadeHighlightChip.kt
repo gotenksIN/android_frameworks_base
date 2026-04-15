@@ -16,15 +16,18 @@
 
 package com.android.systemui.shade.ui.composable
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -34,8 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.android.compose.modifiers.clickableWithoutFocus
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.shade.ui.composable.ShadeHeader.Dimensions.ChipPaddingHorizontal
@@ -58,8 +61,8 @@ sealed interface ChipHighlightModel {
     companion object {
         /** Alpha values for the different chip states. */
         internal object Alpha {
-            const val DEFAULT_HOVER = 0.11f
-            const val DEFAULT_RIPPLE = 0.15f
+            const val DEFAULT_HOVER = 0.89f
+            const val DEFAULT_RIPPLE = 0.85f
             const val TRANSPARENT_HOVER = 0.22f
             const val TRANSPARENT_RIPPLE = 0.26f
         }
@@ -67,25 +70,16 @@ sealed interface ChipHighlightModel {
 
     data object Weak : ChipHighlightModel {
         override val backgroundColor: Color
-            @Composable
-            get() {
-                val alpha =
-                    if (isSystemInDarkTheme()) {
-                        0.1f
-                    } else {
-                        0.4f
-                    }
-                return Color.White.copy(alpha = alpha)
-            }
+            @Composable get() = Color.White.copy(alpha = if (isSystemInDarkTheme()) 0.1f else 0.4f)
 
         override val foregroundColor: Color
             @Composable get() = if (isSystemInDarkTheme()) Color.White else Color.Black
 
         override val hoverBackgroundColor: Color
-            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_HOVER)
+            @Composable get() = backgroundColor.copy(alpha = Alpha.DEFAULT_HOVER)
 
         override val rippleColor: Color
-            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_RIPPLE)
+            @Composable get() = backgroundColor.copy(alpha = Alpha.DEFAULT_RIPPLE)
     }
 
     data object Strong : ChipHighlightModel {
@@ -93,13 +87,13 @@ sealed interface ChipHighlightModel {
             @Composable get() = MaterialTheme.colorScheme.secondary
 
         override val foregroundColor: Color
-            @Composable get() = if (isSystemInDarkTheme()) Color.Black else Color.White
+            @Composable get() = MaterialTheme.colorScheme.onSecondary
 
         override val hoverBackgroundColor: Color
-            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_HOVER)
+            @Composable get() = backgroundColor.copy(alpha = Alpha.DEFAULT_HOVER)
 
         override val rippleColor: Color
-            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_RIPPLE)
+            @Composable get() = backgroundColor.copy(alpha = Alpha.DEFAULT_RIPPLE)
     }
 
     data object Transparent : ChipHighlightModel {
@@ -128,38 +122,56 @@ fun ShadeHighlightChip(
     includePadding: Boolean = true,
     isClickable: Boolean = true,
     onClick: () -> Unit = {},
+    clickTargetModifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = horizontalArrangement,
+    // Note: Intentionally assigning here instead of using `by`, which would unwrap the value and
+    // cause recomposition.
+    val animatedBackgroundColor =
+        animateColorAsState(
+            targetValue = if (isClickable && isHovered) hoverBackgroundColor else backgroundColor
+        )
+
+    // Wrapper for the rounded chip, intended to increase the click target.
+    Box(
         modifier =
-            modifier
-                .clip(RoundedCornerShape(25.dp))
-                .thenIf(backgroundColor != Color.Unspecified) {
-                    Modifier.background(backgroundColor)
-                }
-                .thenIf(isClickable && isHovered && hoverBackgroundColor != Color.Unspecified) {
-                    Modifier.background(hoverBackgroundColor)
-                }
-                .then(
-                    if (isClickable)
-                        Modifier.clickableWithoutFocus(
-                            interactionSource = interactionSource,
-                            indication = ripple(color = rippleColor),
-                            onClick = onClick,
-                        )
-                    else Modifier
-                )
-                .thenIf(backgroundColor != Color.Unspecified && includePadding) {
-                    Modifier.padding(
-                        horizontal = ChipPaddingHorizontal,
-                        vertical = ChipPaddingVertical,
+            if (isClickable)
+                Modifier.clickableWithoutFocus(
+                        interactionSource = interactionSource,
+                        indication = null, // The indication is applied in the Row below instead.
+                        onClick = onClick,
                     )
-                },
-        content = content,
-    )
+                    .then(clickTargetModifier)
+            else clickTargetModifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = horizontalArrangement,
+            modifier =
+                modifier
+                    .align(Alignment.CenterStart)
+                    .clip(CircleShape)
+                    .indication(
+                        interactionSource = interactionSource,
+                        indication = ripple(color = rippleColor),
+                    )
+                    .drawBehind {
+                        val bgColor = animatedBackgroundColor.value
+                        if (bgColor != Color.Unspecified) {
+                            drawRoundRect(color = bgColor)
+                        }
+                    }
+                    .thenIf(backgroundColor != Color.Unspecified && includePadding) {
+                        Modifier.padding(
+                            horizontal = ChipPaddingHorizontal,
+                            vertical = ChipPaddingVertical,
+                        )
+                    }
+                    .hoverable(interactionSource = interactionSource),
+            content = content,
+        )
+    }
 }

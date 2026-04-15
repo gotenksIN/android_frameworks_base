@@ -1704,12 +1704,12 @@
     <string name="date_picker_decrement_year_button" msgid="4102586521754172684">"Намали година"</string>
     <string name="date_picker_prev_month_button" msgid="3418694374017868369">"Претходниот месец"</string>
     <string name="date_picker_next_month_button" msgid="4858207337779144840">"Следниот месец"</string>
-    <string name="keyboardview_keycode_alt" msgid="8997420058584292385">"Копче „Alt“"</string>
+    <string name="keyboardview_keycode_alt" msgid="8997420058584292385">"Alt"</string>
     <string name="keyboardview_keycode_cancel" msgid="2134624484115716975">"Откажи"</string>
     <string name="keyboardview_keycode_delete" msgid="2661117313730098650">"Копче „Избриши“"</string>
     <string name="keyboardview_keycode_done" msgid="2524518019001653851">"Готово"</string>
     <string name="keyboardview_keycode_mode_change" msgid="2743735349997999020">"Копче „Промени режим“"</string>
-    <string name="keyboardview_keycode_shift" msgid="3026509237043975573">"Копче „Shift“"</string>
+    <string name="keyboardview_keycode_shift" msgid="3026509237043975573">"Shift"</string>
     <string name="keyboardview_keycode_enter" msgid="168054869339091055">"Копче „Внеси“"</string>
     <string name="activitychooserview_choose_application" msgid="3500574466367891463">"Избери апликација"</string>
     <string name="activitychooserview_choose_application_error" msgid="6937782107559241734">"Не може да се стартува <xliff:g id="APPLICATION_NAME">%s</xliff:g>"</string>
@@ -2114,12 +2114,9 @@
     <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
     <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
     <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
-    <!-- no translation found for notification_history_metric_subtext (7408216222655116821) -->
-    <skip />
-    <!-- no translation found for notification_metric_running_timer (1096459900744921213) -->
-    <skip />
-    <!-- no translation found for notification_metric_running_stopwatch (8039546029949295377) -->
-    <skip />
+    <string name="notification_history_metric_subtext" msgid="7408216222655116821">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>: <xliff:g id="METRIC_VALUE">%2$s</xliff:g>"</string>
+    <string name="notification_metric_running_timer" msgid="1096459900744921213">"Активен тајмер"</string>
+    <string name="notification_metric_running_stopwatch" msgid="8039546029949295377">"Активна штоперица"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Одговори"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Видео"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Одбиј"</string>
@@ -2709,9 +2706,13 @@
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Исклучете го телевизорот притискајќи го долго копчето за вклучување"</string>
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Системски известувања за ресурси"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Прекумерно користење ресурси"</string>
-    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Апликацијата „<xliff:g id="APP_NAME">%1$s</xliff:g>“ користи премногу ресурси.“"</string>
+    <string name="tv_watchdog_notification_content" msgid="8330578168178291921">"Апликацијата „<xliff:g id="APP_NAME">%1$s</xliff:g>“ е оневозможена поради прекумерното користење ресурси. Може да ја овозможите повторно од менито „Апликации“ во „Поставки“."</string>
     <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Ажурирање од родителот"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> е отстранета засега"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> сега е достапна"</string>
     <string name="media_route_chooser_share_cast_others" msgid="8797886650999355673">"Емитувај на други"</string>
+    <!-- no translation found for activity_embedding_divider_drag_handle_description (4922243158119077780) -->
+    <skip />
+    <!-- no translation found for brightness_unable_adjust_msg (739363986705194491) -->
+    <skip />
 </resources>

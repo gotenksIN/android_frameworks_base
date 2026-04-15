@@ -92,8 +92,6 @@ import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowTracingLogLevel.ALL;
-import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES;
-import static com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE;
 import static com.android.window.flags.Flags.FLAG_FIX_TF_ADJACENT_FOCUS;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -121,9 +119,9 @@ import static org.mockito.Mockito.when;
 import android.annotation.NonNull;
 import android.app.ActivityTaskManager;
 import android.app.WindowConfiguration;
-import android.content.Context;
 import android.content.pm.ActivityInfo.ScreenOrientation;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Region;
@@ -179,6 +177,10 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import perfetto.protos.Windowmanagerservice.DisplayContentProto;
+import perfetto.protos.Windowmanagerservice.DisplayFramesProto;
+import perfetto.protos.Windowmanagerservice.WindowContainerChildProto;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -189,10 +191,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
-
-import perfetto.protos.Windowmanagerservice.DisplayContentProto;
-import perfetto.protos.Windowmanagerservice.DisplayFramesProto;
-import perfetto.protos.Windowmanagerservice.WindowContainerChildProto;
 
 /**
  * Tests for the {@link DisplayContent} class.
@@ -668,6 +666,33 @@ public class DisplayContentTests extends WindowTestsBase {
         // Verify not waiting for drawn windows on display with system decorations.
         setDrawnState(WindowStateAnimator.HAS_DRAWN, windows);
         assertFalse(secondaryDisplay.shouldWaitForSystemDecorWindowsOnBoot());
+    }
+
+    @Test
+    public void testShouldWaitForSystemDecorWindowsOnBoot_ThemeReady() {
+        mWm.mSystemBooted = true;
+        final DisplayContent defaultDisplay = mWm.getDefaultDisplayContentLocked();
+
+        // Drawn windows
+        final WindowState[] windows = createNotDrawnWindowsOn(defaultDisplay,
+                TYPE_WALLPAPER, TYPE_BASE_APPLICATION);
+        setDrawnState(WindowStateAnimator.HAS_DRAWN, windows);
+
+        // Set up wallpaper enabled
+        final Resources res = mWm.mContext.getResources();
+        spyOn(res);
+        doReturn(true).when(res).getBoolean(
+                com.android.internal.R.bool.config_enableWallpaperService);
+        doReturn(true).when(res).getBoolean(
+                com.android.internal.R.bool.config_checkWallpaperAtBoot);
+
+        // Theme not ready -> should wait
+        mWm.mThemeReady = false;
+        assertTrue(defaultDisplay.shouldWaitForSystemDecorWindowsOnBoot());
+
+        // Theme ready -> should not wait
+        mWm.mThemeReady = true;
+        assertFalse(defaultDisplay.shouldWaitForSystemDecorWindowsOnBoot());
     }
 
     @Test
@@ -1441,6 +1466,31 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
+    public void testComputeImeControlTarget_focusedOnAnotherDisplay() {
+        final DisplayContent dc = createNewDisplay();
+        dc.setRemoteInsetsController(createDisplayWindowInsetsController());
+        final DisplayContent anotherDc = createNewDisplay();
+
+        // Make this display the user's main display
+        final int displayId = dc.getDisplayId();
+        doReturn(0).when(mWm.mUmInternal).getUserAssignedToDisplay(displayId);
+        doReturn(displayId).when(mWm.mUmInternal).getMainDisplayAssignedToUser(0);
+
+        // Focus on this display, no input target
+        dc.setImeInputTarget(null);
+        spyOn(mWm.mRoot);
+        doReturn(dc).when(mWm.mRoot).getTopFocusedDisplayContent();
+        assertNull("Control target should be null when focus is on this display",
+                dc.computeImeControlTarget());
+
+        // Focus on another display, no input target on this display
+        doReturn(anotherDc).when(mWm.mRoot).getTopFocusedDisplayContent();
+        assertEquals("Control target should be remote insets when focus is on another display",
+                dc.mRemoteInsetsControlTarget,
+                dc.computeImeControlTarget());
+    }
+
+    @Test
     public void testComputeImeControlTarget_splitScreen() {
         final DisplayContent dc = createNewDisplay();
         dc.setRemoteInsetsController(createDisplayWindowInsetsController());
@@ -1489,7 +1539,7 @@ public class DisplayContentTests extends WindowTestsBase {
         appWin.setHasSurface(true);
         dc.updateSystemGestureExclusion();
 
-        final boolean[] invoked = { false };
+        final boolean[] invoked = {false};
         final var verifier = new ISystemGestureExclusionListener.Stub() {
             @Override
             public void onSystemGestureExclusionChanged(int displayId, Region actual,
@@ -1633,7 +1683,7 @@ public class DisplayContentTests extends WindowTestsBase {
         appWin.setHasSurface(false);
     }
 
-    @SetupWindows(addWindows = { W_ABOVE_ACTIVITY, W_ACTIVITY })
+    @SetupWindows(addWindows = {W_ABOVE_ACTIVITY, W_ACTIVITY})
     @Test
     public void testRequestResizeForEmptyFrames() {
         final WindowState win = mChildAppWindowAbove;
@@ -1671,8 +1721,8 @@ public class DisplayContentTests extends WindowTestsBase {
         assertEquals(Configuration.ORIENTATION_PORTRAIT, logMakerCaptor.getValue().getSubtype());
     }
 
-    @SetupWindows(addWindows = { W_ACTIVITY, W_WALLPAPER, W_STATUS_BAR, W_NAVIGATION_BAR,
-            W_INPUT_METHOD, W_NOTIFICATION_SHADE })
+    @SetupWindows(addWindows = {W_ACTIVITY, W_WALLPAPER, W_STATUS_BAR, W_NAVIGATION_BAR,
+            W_INPUT_METHOD, W_NOTIFICATION_SHADE})
     @Test
     public void testApplyTopFixedRotationTransform() {
         mDisplayContent.setIgnoreOrientationRequest(false);
@@ -1779,14 +1829,16 @@ public class DisplayContentTests extends WindowTestsBase {
         assertTrue(mImeWindow.isAnimating(PARENTS, ANIMATION_TYPE_TOKEN_TRANSFORM));
 
         // The fixed rotation transform can only be finished when all animation finished.
-        doReturn(false).when(app2).inTransition();
+        final TransitionController transitionController = mDisplayContent.mTransitionController;
+        spyOn(transitionController);
+        doReturn(false).when(transitionController).isParticipant(eq(app2));
         mDisplayContent.mFixedRotationTransitionListener.onAppTransitionFinishedLocked(app2.token);
         assertTrue(app.hasFixedRotationTransform());
         assertTrue(app2.hasFixedRotationTransform());
 
         // The display should be rotated after the launch is finished.
         app.setVisible(true);
-        doReturn(false).when(app).inTransition();
+        doReturn(false).when(transitionController).isParticipant(eq(app));
         mDisplayContent.mFixedRotationTransitionListener.onAppTransitionFinishedLocked(app.token);
 
         // The fixed rotation should be cleared and the new rotation is applied to display.
@@ -2429,7 +2481,7 @@ public class DisplayContentTests extends WindowTestsBase {
     @Test
     public void testEnsureActivitiesVisibleNotRecursive() {
         final TaskDisplayArea mockTda = mock(TaskDisplayArea.class);
-        final boolean[] called = { false };
+        final boolean[] called = {false};
         doAnswer(invocation -> {
             // The assertion will fail if DisplayArea#ensureActivitiesVisible is called twice.
             assertFalse(called[0]);
@@ -2535,7 +2587,7 @@ public class DisplayContentTests extends WindowTestsBase {
         verifySizes(dc, forcedWidth, forcedHeight, forcedDensity);
     }
 
-    @SetupWindows(addWindows = { W_ACTIVITY, W_INPUT_METHOD })
+    @SetupWindows(addWindows = {W_ACTIVITY, W_INPUT_METHOD})
     @Test
     public void testComputeImeLayeringTarget_shouldNotCheckOutdatedImeLayeringTargetWhenRemoved() {
         final var childWin1 = newWindowBuilder("childWin1", FIRST_SUB_WINDOW).setParent(mAppWindow)
@@ -3272,54 +3324,40 @@ public class DisplayContentTests extends WindowTestsBase {
         verify(mWm.mUmInternal, never()).isUserVisible(userId2, displayId);
     }
 
-  @Test
-  @EnableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
-  public void testHasAccessConsidersUserVisibilityForBackgroundVisibleUsers() {
-    doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
-    final int appId = 1234;
-    final int userId1 = 11;
-    final int userId2 = 12;
-    final int uid1 = UserHandle.getUid(userId1, appId);
-    final int uid2 = UserHandle.getUid(userId2, appId);
-    final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
-    final DisplayContent dc = createNewDisplay(displayInfo);
-    int displayId = dc.getDisplayId();
-    doReturn(userId1).when(mWm.mUmInternal).getUserAssignedToDisplay(displayId);
+    @Test
+    @EnableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
+    public void testHasAccessConsidersUserVisibilityForBackgroundVisibleUsers() {
+        doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
+        final int appId = 1234;
+        final int userId1 = 11;
+        final int userId2 = 12;
+        final int uid1 = UserHandle.getUid(userId1, appId);
+        final int uid2 = UserHandle.getUid(userId2, appId);
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        int displayId = dc.getDisplayId();
+        doReturn(userId1).when(mWm.mUmInternal).getUserAssignedToDisplay(displayId);
 
-    assertTrue(dc.hasAccess(uid1));
-    assertFalse(dc.hasAccess(uid2));
-  }
-
-  @Test
-  @EnableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
-  public void testHasAccessIgnoresUserVisibilityForPrivateDisplay() {
-    doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
-    final int appId = 1234;
-    final int userId2 = 12;
-    final int uid2 = UserHandle.getUid(userId2, appId);
-    final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
-    displayInfo.flags = FLAG_PRIVATE;
-    displayInfo.ownerUid = uid2;
-    final DisplayContent dc = createNewDisplay(displayInfo);
-    int displayId = dc.getDisplayId();
-
-    assertTrue(dc.hasAccess(uid2));
-
-    verify(mWm.mUmInternal, never()).getUserAssignedToDisplay(displayId);
-  }
+        assertTrue(dc.hasAccess(uid1));
+        assertFalse(dc.hasAccess(uid2));
+    }
 
     @Test
-    public void cameraCompatFreeformFlagEnabled_cameraCompatFreeformPolicyNotNull() {
-        doReturn(true).when(() ->
-                DesktopModeHelper.canEnterDesktopMode(any(Context.class)));
+    @EnableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
+    public void testHasAccessIgnoresUserVisibilityForPrivateDisplay() {
+        doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
+        final int appId = 1234;
+        final int userId2 = 12;
+        final int uid2 = UserHandle.getUid(userId2, appId);
+        final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+        displayInfo.flags = FLAG_PRIVATE;
+        displayInfo.ownerUid = uid2;
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        int displayId = dc.getDisplayId();
 
-        assertTrue(createNewDisplay().mAppCompatCameraPolicy.hasSimReqOrientationPolicy());
-  }
+        assertTrue(dc.hasAccess(uid2));
 
-    @DisableFlags({FLAG_ENABLE_DESKTOP_WINDOWING_MODE, FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES})
-    @Test
-    public void desktopWindowingFlagNotEnabled_cameraCompatFreeformPolicyIsNull() {
-        assertFalse(createNewDisplay().mAppCompatCameraPolicy.hasSimReqOrientationPolicy());
+        verify(mWm.mUmInternal, never()).getUserAssignedToDisplay(displayId);
     }
 
     @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)

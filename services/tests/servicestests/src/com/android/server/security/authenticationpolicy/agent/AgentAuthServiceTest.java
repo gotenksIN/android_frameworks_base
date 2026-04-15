@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 
 import android.app.KeyguardManager;
 import android.companion.AssociationInfo;
-import android.companion.AssociationRequest;
 import android.companion.CompanionDeviceManager;
 import android.companion.DeviceId;
 import android.companion.DevicePresenceEvent;
@@ -370,10 +369,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
+    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
     public void testIsAgentAuthorizedByDeviceId_localAgent_returnsStatus() throws RemoteException {
         int deviceId = 456;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(false);
         when(mKeyguardManager.isDeviceLocked(USER_ID, Context.DEVICE_ID_DEFAULT)).thenReturn(false);
 
@@ -393,10 +392,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
+    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
     public void testSetOverride_ForDeviceId_updatesSession() throws RemoteException {
         int deviceId = 456;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(true);
         when(mKeyguardManager.isDeviceLocked(USER_ID, Context.DEVICE_ID_DEFAULT)).thenReturn(true);
 
@@ -463,7 +462,7 @@ public class AgentAuthServiceTest {
     @Test
     public void testOnVirtualDeviceCreated_otherProfile_virtualDeviceUnlocked_isAuthorized() throws RemoteException {
         int deviceId = 789;
-        mockVirtualDevice(deviceId, "some.other.profile");
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_APP_STREAMING);
         // Host lock state shouldn't matter, but let's test with host locked to prove it's ignored
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(true);
         when(mKeyguardManager.isDeviceLocked(USER_ID, Context.DEVICE_ID_DEFAULT)).thenReturn(true);
@@ -480,7 +479,7 @@ public class AgentAuthServiceTest {
     @Test
     public void testOnVirtualDeviceCreated_otherProfile_virtualDeviceLocked_isUnauthorized() throws RemoteException {
         int deviceId = 789;
-        mockVirtualDevice(deviceId, "some.other.profile");
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_APP_STREAMING);
         // Host lock state shouldn't matter
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(false);
         when(mKeyguardManager.isDeviceLocked(USER_ID, Context.DEVICE_ID_DEFAULT)).thenReturn(false);
@@ -495,10 +494,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
-    public void testOnVirtualDeviceCreated_AAP_flagEnabled_hostLocked_noRecentAuth_isUnauthorized() throws RemoteException {
+    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
+    public void testOnVirtualDeviceCreated_AutoProjected_flagEnabled_hostLocked_noRecentAuth_isUnauthorized() throws RemoteException {
         int deviceId = 789;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
 
         // Host locked, no recent auth
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(true);
@@ -515,10 +514,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
-    public void testOnVirtualDeviceCreated_AAP_flagEnabled_hostLocked_withRecentAuth_isAuthorized() throws RemoteException {
+    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
+    public void testOnVirtualDeviceCreated_AutoProjected_flagEnabled_hostLocked_withRecentAuth_isAuthorized() throws RemoteException {
         int deviceId = 789;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
 
         // Host locked, but WITH recent auth
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(true);
@@ -536,10 +535,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
-    public void testOnVirtualDeviceCreated_AAP_flagEnabled_hostUnlocked_isAuthorized() throws RemoteException {
+    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
+    public void testOnVirtualDeviceCreated_AutoProjected_flagEnabled_hostUnlocked_isAuthorized() throws RemoteException {
         int deviceId = 789;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
 
         // Host unlocked at connection
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(false);
@@ -554,10 +553,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
-    public void testOnVirtualDeviceCreated_AAP_flagEnabled_virtualDeviceLocked_isUnauthorized() throws RemoteException {
+    @EnableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
+    public void testOnVirtualDeviceCreated_AutoProjected_flagEnabled_virtualDeviceLocked_isUnauthorized() throws RemoteException {
         int deviceId = 89;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
 
         // Host unlocked at connection (authorizes the session)
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(false);
@@ -571,17 +570,17 @@ public class AgentAuthServiceTest {
 
         assertThat(mService.isAgentAuthorized(USER_ID, deviceId, null)).isFalse();
     }
-    
+
     @Test
-    @DisableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
-    public void testOnVirtualDeviceCreated_AAP_flagDisabled_usesHostLockState_isAuthorized() throws RemoteException {
+    @DisableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
+    public void testOnVirtualDeviceCreated_AutoProjected_flagDisabled_usesHostLockState_isAuthorized() throws RemoteException {
         int deviceId = 789;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
 
         // Host locked at connection - doesn't matter for session creation because flag is disabled
         when(mKeyguardManager.isDeviceLocked(USER_ID)).thenReturn(true);
         when(mKeyguardManager.isDeviceLocked(USER_ID, Context.DEVICE_ID_DEFAULT)).thenReturn(true);
-        
+
         mVirtualDeviceListener.onVirtualDeviceCreated(deviceId);
         TestableLooper.get(this).processAllMessages();
 
@@ -597,10 +596,10 @@ public class AgentAuthServiceTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AAP)
-    public void testOnVirtualDeviceCreated_AAP_flagDisabled_usesHostLockState_isUnauthorized() throws RemoteException {
+    @DisableFlags(Flags.FLAG_AGENT_AUTH_ALLOW_AUTO_PROJECTED)
+    public void testOnVirtualDeviceCreated_AutoProjected_flagDisabled_usesHostLockState_isUnauthorized() throws RemoteException {
         int deviceId = 78;
-        mockVirtualDevice(deviceId, AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
+        mockVirtualDevice(deviceId, VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION);
 
         mVirtualDeviceListener.onVirtualDeviceCreated(deviceId);
         TestableLooper.get(this).processAllMessages();
@@ -616,12 +615,11 @@ public class AgentAuthServiceTest {
         assertThat(mService.isAgentAuthorized(USER_ID, deviceId, null)).isFalse();
     }
 
-    private void mockVirtualDevice(int deviceId, String profile) throws RemoteException {
+    private void mockVirtualDevice(int deviceId, int profile) throws RemoteException {
         when(mMockVDMService.isValidVirtualDeviceId(deviceId)).thenReturn(true);
-        when(mMockIVirtualDevice.getDeviceProfile()).thenReturn(profile);
 
-        VirtualDevice vd = new VirtualDevice(mMockIVirtualDevice, deviceId,
-                "companion:" + deviceId, "device_name");
+        VirtualDevice vd = new VirtualDevice(mMockIVirtualDevice, deviceId, profile,
+                "companion:" + deviceId, "device_name", "display name");
         when(mMockVDMService.getVirtualDevice(deviceId)).thenReturn(vd);
     }
 

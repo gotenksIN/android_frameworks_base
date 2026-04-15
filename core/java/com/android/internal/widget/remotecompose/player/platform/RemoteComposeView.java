@@ -29,12 +29,14 @@ import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewTreeObserver;
 import android.widget.EdgeEffect;
 import android.widget.FrameLayout;
 
 import com.android.internal.widget.remotecompose.core.CoreDocument;
 import com.android.internal.widget.remotecompose.core.LayoutCallback;
+import com.android.internal.widget.remotecompose.core.Limits;
 import com.android.internal.widget.remotecompose.core.RemoteClock;
 import com.android.internal.widget.remotecompose.core.RemoteContext;
 import com.android.internal.widget.remotecompose.core.SystemClock;
@@ -60,9 +62,7 @@ public class RemoteComposeView extends FrameLayout
         implements View.OnAttachStateChangeListener, LayoutCallback {
 
     static final boolean USE_VIEW_AREA_CLICK = true; // Use views to represent click areas
-    static final float DEFAULT_FRAME_RATE = 60f;
     static final float POST_TO_NEXT_FRAME_THRESHOLD = 60f;
-    private static final int MAX_BITMAP_MEMORY = 20 * 1024 * 1024;
     private String mErrorMessage = "";
 
     RemoteClock mClock;
@@ -72,9 +72,14 @@ public class RemoteComposeView extends FrameLayout
     boolean mInActionDown = false;
     int mDebug = 0;
     boolean mHasClickAreas = false;
+    boolean mUseGestureDetector = false;
     Point mActionDownPoint = new Point(0, 0);
     Point mActionCurrentPoint = new Point(0, 0);
     int mTouchSlop;
+    int mDoubleTapSlopSquare;
+    long mLongPressTimeout;
+    long mDoubleTapTimeout;
+
     AndroidRemoteContext mARContext;
     Map<Integer, Object> mResolvedData = null;
 
@@ -82,10 +87,30 @@ public class RemoteComposeView extends FrameLayout
     long mStart;
 
     long mLastFrameDelay = 1;
-    float mMaxFrameRate = DEFAULT_FRAME_RATE; // frames per seconds
+    float mMaxFrameRate = Limits.DEFAULT_MAX_FPS; // frames per seconds
     long mMaxFrameDelay = (long) (1000 / mMaxFrameRate);
 
     long mLastFrameCall;
+
+    private long mDownTime;
+    private float mDownX, mDownY;
+    private long mLastUpTime;
+    private float mLastUpX, mLastUpY;
+    private boolean mIsDoubleTap = false;
+    private boolean mHasMoved = false;
+    private boolean mIsLongPressPerformed = false;
+
+    private void init(@NonNull Context context) {
+        ViewConfiguration vc = ViewConfiguration.get(context);
+        mTouchSlop = vc.getScaledTouchSlop();
+        int doubleTapSlop = vc.getScaledDoubleTapSlop();
+        mDoubleTapSlopSquare = doubleTapSlop * doubleTapSlop;
+        mLongPressTimeout = ViewConfiguration.getLongPressTimeout();
+        mDoubleTapTimeout = ViewConfiguration.getDoubleTapTimeout();
+
+        addOnAttachStateChangeListener(this);
+        setClock(RemoteClock.SYSTEM);
+    }
 
     private Choreographer mChoreographer;
     private final Choreographer.FrameCallback mFrameCallback =
@@ -107,6 +132,8 @@ public class RemoteComposeView extends FrameLayout
             };
 
     int[] mLocationCache = new int[2];
+    private ViewTreeObserver mRegisteredObserver;
+    private boolean mIsAttached = false;
 
     private void updateOrigin() {
         if (mDocument != null) {
@@ -116,11 +143,16 @@ public class RemoteComposeView extends FrameLayout
     }
 
     private void updateGlobalLayoutListener() {
-        getViewTreeObserver().removeOnGlobalLayoutListener(mGlobalLayoutListener);
-        if (isAttachedToWindow()
+        if (mRegisteredObserver != null && mRegisteredObserver.isAlive()) {
+            mRegisteredObserver.removeOnGlobalLayoutListener(mGlobalLayoutListener);
+        }
+        mRegisteredObserver = null;
+
+        if (mIsAttached
                 && mDocument != null
                 && mDocument.getDocument().useFeature(Header.FEATURE_LT_RESIZE)) {
-            getViewTreeObserver().addOnGlobalLayoutListener(mGlobalLayoutListener);
+            mRegisteredObserver = getViewTreeObserver();
+            mRegisteredObserver.addOnGlobalLayoutListener(mGlobalLayoutListener);
             updateOrigin();
         }
     }
@@ -132,9 +164,7 @@ public class RemoteComposeView extends FrameLayout
      */
     public RemoteComposeView(@NonNull Context context) {
         super(context);
-        mTouchSlop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
-        addOnAttachStateChangeListener(this);
-        setClock(RemoteClock.SYSTEM);
+        init(context);
     }
 
     /**
@@ -145,9 +175,7 @@ public class RemoteComposeView extends FrameLayout
      */
     public RemoteComposeView(@NonNull Context context, @NonNull AttributeSet attrs) {
         super(context, attrs);
-        mTouchSlop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
-        addOnAttachStateChangeListener(this);
-        setClock(RemoteClock.SYSTEM);
+        init(context);
     }
 
     /**
@@ -161,10 +189,8 @@ public class RemoteComposeView extends FrameLayout
     public RemoteComposeView(
             @NonNull Context context, @NonNull AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        mTouchSlop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
+        init(context);
         setBackgroundColor(Color.WHITE);
-        addOnAttachStateChangeListener(this);
-        setClock(RemoteClock.SYSTEM);
     }
 
     /**
@@ -182,9 +208,8 @@ public class RemoteComposeView extends FrameLayout
             int defStyleAttr,
             @NonNull Clock clock) {
         super(context, attrs, defStyleAttr);
-        mTouchSlop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
+        init(context);
         setBackgroundColor(Color.WHITE);
-        addOnAttachStateChangeListener(this);
         setClock(new SystemClock(clock));
     }
 
@@ -234,10 +259,10 @@ public class RemoteComposeView extends FrameLayout
         }
 
         mDocument = value;
-        mMaxFrameRate = DEFAULT_FRAME_RATE;
+        mMaxFrameRate = Limits.DEFAULT_MAX_FPS;
         mDocument.initializeContext(mARContext, mResolvedData);
         mDisable = false;
-        if (mDocument.getDocument().bitmapMemory() > MAX_BITMAP_MEMORY) {
+        if (mDocument.getDocument().bitmapMemory() > Limits.MAX_BITMAP_MEMORY) {
             mDisable = true;
             mErrorMessage =
                     "Bitmap memory "
@@ -252,7 +277,8 @@ public class RemoteComposeView extends FrameLayout
         setContentDescription(mDocument.getDocument().getContentDescription());
 
         mDocument.getDocument().setLayoutCallback(this);
-
+        mUseGestureDetector =
+                !(mDocument.getDocument().featureIntValue(Header.FEATURE_CLICK_VERSION) == 1);
         updateGlobalLayoutListener();
         updateClickAreas();
         requestLayout();
@@ -276,13 +302,14 @@ public class RemoteComposeView extends FrameLayout
         }
         Integer fps = (Integer) mDocument.getDocument().getProperty(Header.DOC_DESIRED_FPS);
         if (fps != null && fps > 0) {
-            mMaxFrameRate = fps;
+            mMaxFrameRate = Math.min(fps, Limits.MAX_FPS);
             mMaxFrameDelay = (long) (1000 / mMaxFrameRate);
         }
     }
 
     @Override
     public void onViewAttachedToWindow(@NonNull View view) {
+        mIsAttached = true;
         if (mChoreographer == null) {
             mChoreographer = Choreographer.getInstance();
             mChoreographer.postFrameCallback(mFrameCallback);
@@ -342,6 +369,7 @@ public class RemoteComposeView extends FrameLayout
 
     @Override
     public void onViewDetachedFromWindow(@NonNull View view) {
+        mIsAttached = false;
         updateGlobalLayoutListener();
         if (mChoreographer != null) {
             mChoreographer.removeFrameCallback(mFrameCallback);
@@ -471,6 +499,15 @@ public class RemoteComposeView extends FrameLayout
         if (mDocument != null) {
             mDocument.invalidate();
         }
+    }
+
+    /**
+     * Get the animation time
+     *
+     * @return the animation time
+     */
+    public float getAnimationTime() {
+        return mARContext.getAnimationTime();
     }
 
     /**
@@ -623,24 +660,44 @@ public class RemoteComposeView extends FrameLayout
         if (USE_VIEW_AREA_CLICK && mHasClickAreas) {
             return super.onTouchEvent(event);
         }
+        CoreDocument doc = mDocument.getDocument();
+        float x = event.getX();
+        float y = event.getY();
+        long time = event.getEventTime();
+
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                mActionDownPoint.x = (int) event.getX();
-                mActionDownPoint.y = (int) event.getY();
-                mActionCurrentPoint.x = (int) event.getX();
-                mActionCurrentPoint.y = (int) event.getY();
-                CoreDocument doc = mDocument.getDocument();
+                mDownTime = time;
+                mDownX = x;
+                mDownY = y;
+                mInActionDown = true;
+                mHasMoved = false;
+                mIsLongPressPerformed = false;
+
+                if (mUseGestureDetector) {
+                    if (time - mLastUpTime < mDoubleTapTimeout) {
+                        float dx = x - mLastUpX;
+                        float dy = y - mLastUpY;
+                        if (dx * dx + dy * dy < mDoubleTapSlopSquare) {
+                            mIsDoubleTap = true;
+                        } else {
+                            mIsDoubleTap = false;
+                        }
+                    } else {
+                        mIsDoubleTap = false;
+                    }
+                }
+
                 if (doc.hasTouchListener()) {
                     mARContext.loadFloat(
                             RemoteContext.ID_TOUCH_EVENT_TIME, mARContext.getAnimationTime());
-                    mInActionDown = true;
                     if (mVelocityTracker == null) {
                         mVelocityTracker = VelocityTracker.obtain();
                     } else {
                         mVelocityTracker.clear();
                     }
                     mVelocityTracker.addMovement(event);
-                    doc.touchDown(mARContext, event.getX(), event.getY());
+                    doc.touchDown(mARContext, x, y);
                     invalidate();
                     return true;
                 }
@@ -648,12 +705,11 @@ public class RemoteComposeView extends FrameLayout
 
             case MotionEvent.ACTION_CANCEL:
                 mInActionDown = false;
-                doc = mDocument.getDocument();
                 if (doc.hasTouchListener()) {
                     mVelocityTracker.computeCurrentVelocity(1000);
                     float dx = mVelocityTracker.getXVelocity(pointerId);
                     float dy = mVelocityTracker.getYVelocity(pointerId);
-                    doc.touchCancel(mARContext, event.getX(), event.getY(), dx, dy);
+                    doc.touchCancel(mARContext, x, y, dx, dy);
                     invalidate();
                     return true;
                 }
@@ -661,37 +717,57 @@ public class RemoteComposeView extends FrameLayout
 
             case MotionEvent.ACTION_UP:
                 mInActionDown = false;
-                mActionCurrentPoint.x = (int) event.getX();
-                mActionCurrentPoint.y = (int) event.getY();
-                float dxDown = mActionCurrentPoint.x - mActionDownPoint.x;
-                float dyDown = mActionCurrentPoint.y - mActionDownPoint.y;
-                float distance = (float) Math.sqrt(dxDown * dxDown + dyDown * dyDown);
-                if (distance < mTouchSlop) {
-                    performClick();
+                mActionCurrentPoint.x = (int) x;
+                mActionCurrentPoint.y = (int) y;
+                boolean handled = false;
+                if (!mHasMoved) {
+                    if (mIsDoubleTap) {
+                        doc.onDoubleClick(mARContext, x, y);
+                        mLastUpTime = 0;
+                        mIsDoubleTap = false;
+                    } else if (!mIsLongPressPerformed) {
+                        long duration = time - mDownTime;
+                        if (mUseGestureDetector && duration >= mLongPressTimeout) {
+                            doc.onLongPress(mARContext, x, y);
+                            mLastUpTime = 0;
+                        } else {
+                            performClick();
+                            mLastUpTime = time;
+                            mLastUpX = x;
+                            mLastUpY = y;
+                            handled = true;
+                        }
+                    }
+                    invalidate();
                 }
-                doc = mDocument.getDocument();
                 if (doc.hasTouchListener()) {
                     mARContext.loadFloat(
                             RemoteContext.ID_TOUCH_EVENT_TIME, mARContext.getAnimationTime());
                     mVelocityTracker.computeCurrentVelocity(1000);
                     float dx = mVelocityTracker.getXVelocity(pointerId);
                     float dy = mVelocityTracker.getYVelocity(pointerId);
-                    doc.touchUp(mARContext, event.getX(), event.getY(), dx, dy);
+                    doc.touchUp(mARContext, x, y, dx, dy);
                     invalidate();
-                    return true;
+                    handled = true;
                 }
-                return false;
+                return handled;
 
             case MotionEvent.ACTION_MOVE:
+                if (!mHasMoved) {
+                    float dx = x - mDownX;
+                    float dy = y - mDownY;
+                    if (dx * dx + dy * dy > mTouchSlop * mTouchSlop) {
+                        mHasMoved = true;
+                    }
+                }
                 if (mInActionDown) {
-                    mActionCurrentPoint.x = (int) event.getX();
-                    mActionCurrentPoint.y = (int) event.getY();
+                    mActionCurrentPoint.x = (int) x;
+                    mActionCurrentPoint.y = (int) y;
                     if (mVelocityTracker != null) {
                         mARContext.loadFloat(
                                 RemoteContext.ID_TOUCH_EVENT_TIME, mARContext.getAnimationTime());
                         mVelocityTracker.addMovement(event);
-                        doc = mDocument.getDocument();
-                        boolean repaint = doc.touchDrag(mARContext, event.getX(), event.getY());
+                        boolean repaint = doc.touchDrag(mARContext, x, y);
                         if (repaint) {
                             invalidate();
                         }
@@ -880,6 +956,23 @@ public class RemoteComposeView extends FrameLayout
                 }
             }
             int nextFrame = mDocument.needsRepaint();
+
+            if (mUseGestureDetector) {
+                if (mInActionDown && !mIsLongPressPerformed && !mHasMoved && !mIsDoubleTap) {
+                    long elapsed = android.os.SystemClock.uptimeMillis() - mDownTime;
+                    if (elapsed >= mLongPressTimeout) {
+                        mIsLongPressPerformed = true;
+                        mDocument.getDocument().onLongPress(mARContext, mDownX, mDownY);
+                        nextFrame = 1;
+                    } else {
+                        int remaining = (int) (mLongPressTimeout - elapsed);
+                        if (nextFrame <= 0 || remaining < nextFrame) {
+                            nextFrame = remaining;
+                        }
+                    }
+                }
+            }
+
             if (nextFrame > 0) {
                 if (mMaxFrameRate >= POST_TO_NEXT_FRAME_THRESHOLD) {
                     mLastFrameDelay = nextFrame;

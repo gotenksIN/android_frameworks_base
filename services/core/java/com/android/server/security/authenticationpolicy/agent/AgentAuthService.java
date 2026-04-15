@@ -25,7 +25,6 @@ import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
-import android.companion.AssociationRequest;
 import android.companion.CompanionDeviceManager;
 import android.companion.DeviceId;
 import android.companion.virtual.VirtualDevice;
@@ -102,9 +101,10 @@ public class AgentAuthService implements AgentAuthServiceInternal {
             // check for valid VDM managed local agents first
             if (mVirtualDeviceManager != null
                     && mVirtualDeviceManager.isValidVirtualDeviceId(deviceId)) {
-                // TODO: delete this block when AAP flag is removed
-                if (isAAP(mVirtualDeviceManager.getVirtualDevice(deviceId)) && !Flags.agentAuthAllowAap()) {
-                    Slog.w(TAG, "Skip AAP");
+                // TODO: delete this block when flag is removed
+                if (isAutomotiveProjection(mVirtualDeviceManager.getVirtualDevice(deviceId))
+                        && !Flags.agentAuthAllowAutoProjected()) {
+                    Slog.w(TAG, "Skip AutomotiveProjection");
                     return !mKeyguardManager.isDeviceLocked(userId, Context.DEVICE_ID_DEFAULT);
                 }
                 return isAgentAuthorizedByDeviceId(userId, deviceId);
@@ -302,17 +302,17 @@ public class AgentAuthService implements AgentAuthServiceInternal {
     private boolean requiresRecentUnlockOnHost(@Nullable VirtualDevice virtualDevice) {
         if (virtualDevice != null) {
             // only auto projected supports this, others use only the virtual device lock state
-            if (Flags.agentAuthAllowAap() && isAAP(virtualDevice)) {
+            if (Flags.agentAuthAllowAutoProjected() && isAutomotiveProjection(virtualDevice)) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean isAAP(@Nullable VirtualDevice virtualDevice) {
+    private boolean isAutomotiveProjection(@Nullable VirtualDevice virtualDevice) {
         if(virtualDevice != null) {
-            final String profile = virtualDevice.getDeviceProfile();
-            return AssociationRequest.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION.equals(profile);
+            final int profile = virtualDevice.getDeviceProfile();
+            return profile == VirtualDevice.DEVICE_PROFILE_AUTOMOTIVE_PROJECTION;
         }
         return false;
     }

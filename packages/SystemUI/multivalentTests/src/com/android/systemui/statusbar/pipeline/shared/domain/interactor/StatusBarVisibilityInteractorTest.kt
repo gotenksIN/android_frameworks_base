@@ -70,7 +70,10 @@ class StatusBarVisibilityInteractorTest(flags: FlagsParameterization) : SysuiTes
             val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
 
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(false, taskInfo = null)
+            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
+                false,
+                taskInfo = null,
+            )
 
             assertThat(latest).isFalse()
         }
@@ -82,7 +85,7 @@ class StatusBarVisibilityInteractorTest(flags: FlagsParameterization) : SysuiTes
             val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
 
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(true, taskInfo = null)
+            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(true, taskInfo = null)
 
             assertThat(latest).isTrue()
         }
@@ -263,13 +266,36 @@ class StatusBarVisibilityInteractorTest(flags: FlagsParameterization) : SysuiTes
         }
 
     @Test
+    fun isShadeWindowOnThisDisplay_thisDisplayIsPending_true() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isShadeWindowOnThisDisplay)
+
+            kosmos.fakeShadeDisplaysRepository.setPendingDisplayId(DEFAULT_DISPLAY)
+
+            assertThat(latest).isTrue()
+        }
+
+    @Test
+    fun isShadeWindowOnThisDisplay_otherDisplayIsPending_false() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isShadeWindowOnThisDisplay)
+
+            kosmos.fakeShadeDisplaysRepository.setPendingDisplayId(EXTERNAL_DISPLAY)
+
+            assertThat(latest).isFalse()
+        }
+
+    @Test
     fun canShowOngoingActivityChips_statusBarHidden_noSecureCamera_noHun_false() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.canShowOngoingActivityChips)
 
             // home status bar not allowed
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(false, taskInfo = null)
+            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
+                false,
+                taskInfo = null,
+            )
 
             assertThat(latest).isFalse()
         }
@@ -335,7 +361,10 @@ class StatusBarVisibilityInteractorTest(flags: FlagsParameterization) : SysuiTes
 
             // GIVEN home status bar is NOT allowed by Scene(e.g. on lockscreen)
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Lockscreen)
-            kosmos.keyguardOcclusionRepository.setShowWhenLockedActivityInfo(false, taskInfo = null)
+            kosmos.keyguardOcclusionRepository.setOccludedFromRemoteAnimation(
+                false,
+                taskInfo = null,
+            )
 
             // WHEN desktop status bar is in use
             overrideResource(R.bool.config_useDesktopStatusBar, true)

@@ -2786,6 +2786,14 @@ public class CarrierConfigManager {
             "auto_unhold_on_remote_disconnect_bool";
 
     /**
+     * Flag to indicate whether to show a warning when answering an incoming VoWiFi call on one
+     * subscription will drop an ongoing VoLTE call on another subscription in a DSDS device.
+     * @hide
+     */
+    public static final String KEY_SHOW_VOWIFI_DROP_DIALOG_ON_DSDS_BOOL =
+            "show_vowifi_drop_dialog_on_dsds_bool";
+
+    /**
      * Flag indicating whether the carrier supports call deflection for an incoming IMS call.
      */
     public static final String KEY_CARRIER_ALLOW_DEFLECT_IMS_CALL_BOOL =
@@ -11905,21 +11913,28 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
     public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
 
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * Specifies whether the "Radio Info" (and related) activities should be hidden on user builds.
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * <p>If {@code true}, the activities will be hidden on user builds.
      * If {@code false}, the activities will be visible (default behavior).
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      * <p>Note: The hidden menu will always be displayed in non-user builds, regardless of this
      * configuration.
+// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
      *
      * @hide
      */
+// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     public static final String KEY_HIDE_RADIO_INFO_ON_USER_BUILD_BOOL =
             "hide_radio_info_on_user_build_bool";
 
-// QTI_BEGIN: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
     /**
      * Controls whether the turbo DSDA icon is shown on the UI.
      *
@@ -11932,7 +11947,6 @@ public class CarrierConfigManager {
      */
     public static final String KEY_SHOW_TURBO_DSDA_ICON = "show_turbo_dsda_icon";
 
-// QTI_END: 2026-01-29: Telephony: Add turbo DSDA icon carrier config key
 
     /**
      * A list of network types that support a linger timer to delay the teardown of a data network.
@@ -11954,6 +11968,7 @@ public class CarrierConfigManager {
         sDefaults.putString(KEY_CARRIER_CONFIG_VERSION_STRING, "");
         sDefaults.putBoolean(KEY_ALLOW_HOLD_IN_IMS_CALL_BOOL, true);
         sDefaults.putBoolean(KEY_AUTO_UNHOLD_ON_REMOTE_DISCONNECT_BOOL, false);
+        sDefaults.putBoolean(KEY_SHOW_VOWIFI_DROP_DIALOG_ON_DSDS_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_ALLOW_DEFLECT_IMS_CALL_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_ALLOW_TRANSFER_IMS_CALL_BOOL, false);
         sDefaults.putBoolean(KEY_ALWAYS_PLAY_REMOTE_HOLD_TONE_BOOL, false);

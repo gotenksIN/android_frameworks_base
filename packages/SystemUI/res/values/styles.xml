@@ -743,6 +743,7 @@
         <item name="android:paddingEnd">12dp</item>
         <item name="android:insetTop">8dp</item>
         <item name="android:insetBottom">8dp</item>
+        <item name="android:fontFamily">variable-label-large</item>
         <item name="android:textColor">@color/media_dialog_on_surface_variant</item>
         <item name="iconSize">18dp</item>
         <item name="iconTint">@color/media_dialog_primary</item>
@@ -1046,10 +1047,6 @@
         <item name="android:statusBarColor">@color/materialColorSurfaceContainer</item>
         <item name="android:navigationBarColor">@color/materialColorSurfaceContainerHighest</item>
         <item name="android:windowActivityTransitions">true</item>
-    </style>
-
-    <style name="FloatingOverlay" parent="@android:style/Theme.DeviceDefault.DayNight">
-        <item name="overlayButtonTextColor">@color/materialColorOnSurface</item>
     </style>
 
     <style name="EditTextActivityButton" parent="@android:style/Widget.DeviceDefault.Button.Colored">

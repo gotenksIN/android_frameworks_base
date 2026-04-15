@@ -601,19 +601,9 @@ public abstract class Connection extends Conferenceable {
      */
     public static final int PROPERTY_CROSS_SIM = 1 << 13;
 
-// QTI_BEGIN: 2020-12-09: Telephony: IMS: Add property PROPERTY_IS_PARTICIPANT_HOST
-    /**
-     * Set by the framework to indicate that a Connection is participant host, which
-     * means the conference participant's handle is the same as the conference host's handle.
-     * <p>
-     * This property is specific to IMS conference calls originating in Telephony.
-     * @hide
-     */
-// QTI_END: 2020-12-09: Telephony: IMS: Add property PROPERTY_IS_PARTICIPANT_HOST
-    public static final int PROPERTY_IS_PARTICIPANT_HOST = 1 << 14;
 
     //**********************************************************************************************
-    // Next PROPERTY value: 1<<16
+    // Next PROPERTY value: 1<<14
     //**********************************************************************************************
 
     /**

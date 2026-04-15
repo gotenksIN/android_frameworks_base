@@ -18,16 +18,17 @@ package com.android.internal.widget.remotecompose.core.operations.layout.manager
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 
+import com.android.internal.widget.remotecompose.core.Operation;
 import com.android.internal.widget.remotecompose.core.PaintContext;
 import com.android.internal.widget.remotecompose.core.RemoteContext;
+import com.android.internal.widget.remotecompose.core.VariableSupport;
 import com.android.internal.widget.remotecompose.core.operations.layout.Component;
 import com.android.internal.widget.remotecompose.core.operations.layout.LayoutComponent;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.ComponentMeasure;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.Measurable;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.MeasurePass;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.Size;
-import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.HeightInModifierOperation;
-import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.WidthInModifierOperation;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.DimensionInModifierOperation;
 
 /** Base class for layout managers -- resizable components. */
 public abstract class LayoutManager extends LayoutComponent implements Measurable {
@@ -35,8 +36,10 @@ public abstract class LayoutManager extends LayoutComponent implements Measurabl
     @NonNull Size mCachedWrapSize = new Size(0f, 0f);
 
     private static final int INSET_WRAP_MEASURE = 2;
+    private static final int INLINE_EXPRESSION_MEASURE = 3;
+    private static final int ENFORCE_CONSTRAINTS = 4;
 
-    public static final int DEFAULT_MEASURE_TYPE = INSET_WRAP_MEASURE;
+    public static final int DEFAULT_MEASURE_TYPE = INLINE_EXPRESSION_MEASURE;
 
     public static final int FIX_TOUCH_EVENT = 1;
     public static final int DEFAULT_TOUCH_VERSION = FIX_TOUCH_EVENT;
@@ -312,12 +315,12 @@ public abstract class LayoutManager extends LayoutComponent implements Measurabl
         if (mHeightModifier.isIntrinsicMin()) {
             maxHeight = minIntrinsicHeight(context.getContext()) + mPaddingTop + mPaddingBottom;
         }
-        WidthInModifierOperation widthIn = mWidthModifier.getWidthIn();
+        DimensionInModifierOperation widthIn = mWidthModifier.getWidthIn();
         if (widthIn != null) {
             minWidth = Math.max(minWidth, widthIn.getMin());
             maxWidth = Math.min(maxWidth, widthIn.getMax());
         }
-        HeightInModifierOperation heightIn = mHeightModifier.getHeightIn();
+        DimensionInModifierOperation heightIn = mHeightModifier.getHeightIn();
         if (heightIn != null) {
             minHeight = Math.max(minHeight, heightIn.getMin());
             maxHeight = Math.min(maxHeight, heightIn.getMax());
@@ -406,6 +409,11 @@ public abstract class LayoutManager extends LayoutComponent implements Measurabl
         }
         if (minHeight == maxHeight) {
             measuredHeight = maxHeight;
+        }
+
+        if (measureVersion >= INLINE_EXPRESSION_MEASURE) {
+            // Update component values with current computed sizes
+            updateComponentValues(context, measuredWidth, measuredHeight);
         }
 
         if (hasHorizontalWrap || hasVerticalWrap) {
@@ -556,12 +564,33 @@ public abstract class LayoutManager extends LayoutComponent implements Measurabl
         measuredWidth = Math.max(measuredWidth, minWidth);
         measuredHeight = Math.max(measuredHeight, minHeight);
 
+        if (measureVersion >= ENFORCE_CONSTRAINTS) {
+            measuredWidth = Math.min(measuredWidth, maxWidth);
+            measuredHeight = Math.min(measuredHeight, maxHeight);
+
+            measuredWidth = applyWidthConstraints(measuredWidth);
+            measuredHeight = applyHeightConstraints(measuredHeight);
+        }
         ComponentMeasure m = measure.get(this);
         m.setW(measuredWidth);
         m.setH(measuredHeight);
         m.setVisibility(mScheduledVisibility);
 
         internalLayoutMeasure(context, measure);
+    }
+
+    private void updateComponentValues(@NonNull PaintContext context, float measuredWidth,
+            float measuredHeight) {
+        Component prev = context.getContext().mLastComponent;
+        context.getContext().mLastComponent = this;
+        updateComponentValues(context.getContext(), measuredWidth, measuredHeight);
+        for (Operation operation : mList) {
+            if (operation.isDirty() && operation instanceof VariableSupport) {
+                ((VariableSupport) operation).updateVariables(context.getContext());
+                operation.apply(context.getContext());
+            }
+        }
+        context.getContext().mLastComponent = prev;
     }
 
     /** Base implementation of the measure resolution */

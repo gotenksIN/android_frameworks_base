@@ -140,8 +140,8 @@ constructor(
                             occludeTransitionFinishedCallback = null
                         }
                     }
-                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
-                    showWhenLockedActivityOnTop = true,
+                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
+                    onTop = true,
                     taskInfo = info?.changes?.firstOrNull { it.mode == TRANSIT_OPEN }?.taskInfo,
                 )
                 delegate =
@@ -194,8 +194,8 @@ constructor(
                             occludeAnimationFinishedCallback = null
                         }
                     }
-                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
-                    showWhenLockedActivityOnTop = true,
+                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
+                    onTop = true,
                     taskInfo = apps.firstOrNull()?.taskInfo,
                 )
                 activityTransitionAnimator
@@ -228,6 +228,16 @@ constructor(
             var unoccludeAnimator: ValueAnimator? = null
             val unoccludeMatrix = Matrix()
 
+            private fun finishAnimation() {
+                try {
+                    unoccludeAnimationFinishedCallback?.onAnimationFinished()
+                } catch (e: RemoteException) {
+                    Log.e(TAG, "Failed to call onAnimationFinished", e)
+                } finally {
+                    interactionJankMonitor.end(CUJ_LOCKSCREEN_OCCLUSION)
+                }
+            }
+
             /** TODO(b/326470033): Extract this logic into ViewModels. */
             override fun onAnimationStart(
                 transit: Int,
@@ -245,32 +255,41 @@ constructor(
                             unoccludeAnimationFinishedCallback = null
                         }
                     }
-                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
-                    showWhenLockedActivityOnTop = false,
+                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
+                    onTop = false,
                     taskInfo = apps.firstOrNull()?.taskInfo,
                 )
                 interactionJankMonitor.begin(
                     createInteractionJankMonitorConf(CUJ_LOCKSCREEN_OCCLUSION, "UNOCCLUDE")
                 )
                 if (apps.isEmpty()) {
-                    Log.d(
+                    Log.w(
                         TAG,
                         "No apps provided to unocclude runner; " +
                             "skipping animation and unoccluding.",
                     )
-                    unoccludeAnimationFinishedCallback?.onAnimationFinished()
+                    finishAnimation()
                     return
                 }
                 val target = apps[0]
-                val localView: View = keyguardViewController.get().getViewRootImpl().getView()
-                val applier = SyncRtSurfaceTransactionApplier(localView)
                 executor.execute {
                     unoccludeAnimator?.cancel()
+                    if (!target.leash.isValid) {
+                        Log.w(TAG, "Unocclude animation skipped: leash is invalid.")
+                        finishAnimation()
+                        return@execute
+                    }
+                    val localView: View = keyguardViewController.get().getViewRootImpl().view
+                    val applier = SyncRtSurfaceTransactionApplier(localView)
                     unoccludeAnimator =
                         ValueAnimator.ofFloat(1f, 0f).apply {
                             duration = UNOCCLUDE_ANIMATION_DURATION.toLong()
                             interpolator = Interpolators.TOUCH_RESPONSE
                             addUpdateListener { animation: ValueAnimator ->
+                                if (!target.leash.isValid) {
+                                    animation.cancel()
+                                    return@addUpdateListener
+                                }
                                 val animatedValue = animation.animatedValue as Float
                                 val surfaceHeight: Float =
                                     target.screenSpaceBounds.height().toFloat()
@@ -292,16 +311,8 @@ constructor(
                             addListener(
                                 object : AnimatorListenerAdapter() {
                                     override fun onAnimationEnd(animation: Animator) {
-                                        try {
-                                            unoccludeAnimationFinishedCallback
-                                                ?.onAnimationFinished()
-                                            unoccludeAnimator = null
-                                            interactionJankMonitor.end(
-                                                InteractionJankMonitor.CUJ_LOCKSCREEN_OCCLUSION
-                                            )
-                                        } catch (e: RemoteException) {
-                                            e.printStackTrace()
-                                        }
+                                        finishAnimation()
+                                        unoccludeAnimator = null
                                     }
                                 }
                             )
@@ -349,6 +360,10 @@ constructor(
                             LockscreenToDreamingTransitionViewModel.DREAMING_ANIMATION_DURATION_MS
                         interpolator = Interpolators.LINEAR
                         addUpdateListener { animation ->
+                            if (!target.leash.isValid) {
+                                animation.cancel()
+                                return@addUpdateListener
+                            }
                             val animatedValue = animation.animatedValue as Float
                             val params =
                                 SurfaceParams.Builder(target.leash).withAlpha(animatedValue).build()
@@ -390,15 +405,21 @@ constructor(
                     return
                 }
 
-                keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(
-                    showWhenLockedActivityOnTop = true,
+                keyguardOcclusionInteractor.setOccludedFromRemoteAnimation(
+                    onTop = true,
                     taskInfo = taskInfo!!, // Safe due to the check above
                 )
 
-                val localView: View = keyguardViewController.get().getViewRootImpl().view
-                val applier = SyncRtSurfaceTransactionApplier(localView)
-
                 executor.execute {
+                    if (!target.leash.isValid) {
+                        Log.w(TAG, "Occlude by dream animation skipped: leash is invalid.")
+                        finishAnimation(finishedCallback, CUJ_LOCKSCREEN_OCCLUSION)
+                        return@execute
+                    }
+
+                    val localView: View = keyguardViewController.get().getViewRootImpl().view
+                    val applier = SyncRtSurfaceTransactionApplier(localView)
+
                     startDreamFadeInAnimation(target, applier) {
                         finishAnimation(finishedCallback, CUJ_LOCKSCREEN_OCCLUSION)
                     }
@@ -421,7 +442,7 @@ constructor(
      */
     fun onKeyguardServiceSetOccluded(occluded: Boolean) {
         Log.d(TAG, "#onKeyguardServiceSetOccluded($occluded)")
-        keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(occluded)
+        keyguardOcclusionInteractor.setOccludedFromWm(occluded)
     }
 
     @VisibleForTesting

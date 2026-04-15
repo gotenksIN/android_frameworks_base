@@ -16,7 +16,7 @@
 
 package com.android.systemui.qs.ui.viewmodel
 
-import android.content.Context
+import android.content.res.Resources
 import android.graphics.Rect
 import android.media.AudioManager
 import androidx.compose.runtime.getValue
@@ -28,11 +28,11 @@ import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.development.ui.viewmodel.BuildNumberViewModel
 import com.android.systemui.keyguard.ui.transitions.BlurConfig
-import com.android.systemui.lifecycle.ExclusiveActivatable
-import com.android.systemui.lifecycle.Hydrator
+import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.qs.panels.domain.interactor.QSPanelAppearanceInteractor
 import com.android.systemui.qs.panels.ui.viewmodel.toolbar.ToolbarViewModel
 import com.android.systemui.qs.tiles.dialog.AudioDetailsViewModel
+import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
@@ -43,6 +43,7 @@ import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.notification.stack.domain.interactor.NotificationStackAppearanceInteractor
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape
+import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import com.android.systemui.volume.dialog.domain.interactor.ExpandedAudioTileDetailsFeatureInteractor
 import com.android.systemui.volume.panel.component.volume.domain.model.SliderType
 import com.android.systemui.volume.panel.component.volume.slider.ui.viewmodel.AudioStreamSliderViewModel
@@ -53,7 +54,6 @@ import dagger.assisted.AssistedInject
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -77,19 +77,18 @@ constructor(
     val audioDetailsViewModelFactory: AudioDetailsViewModel.Factory,
     val buildNumberViewModelFactory: BuildNumberViewModel.Factory,
     val expandedAudioTileDetailsFeatureInteractor: ExpandedAudioTileDetailsFeatureInteractor,
-    @ShadeDisplayAware shadeContext: Context,
     val shadeInteractor: ShadeInteractor,
     val shadeModeInteractor: ShadeModeInteractor,
     val sceneInteractor: SceneInteractor,
     val notificationStackAppearanceInteractor: NotificationStackAppearanceInteractor,
+    @ShadeDisplayAware private val resources: Resources,
+    @ShadeDisplayAware systemBarUtilsState: SystemBarUtilsState,
     @Assisted private val volumeSliderCoroutineScope: CoroutineScope?,
     val toolbarViewModelFactory: ToolbarViewModel.Factory,
     private val blurConfig: BlurConfig,
     private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     private val qsPanelAppearanceInteractor: QSPanelAppearanceInteractor,
-) : ExclusiveActivatable() {
-
-    private val hydrator = Hydrator("QuickSettingsShadeOverlayContentViewModel.hydrator")
+) : HydratedActivatable() {
 
     /**
      * The Shade header can only be shown if usingDesktopStatusBar is disabled. This is because the
@@ -97,11 +96,12 @@ constructor(
      */
     val showHeader: Boolean by
         if (StatusBarForDesktop.isEnabled) {
-            hydrator.hydratedStateOf(
-                traceName = "showHeader",
-                initialValue = !desktopInteractor.useDesktopStatusBar.value,
-                source = desktopInteractor.useDesktopStatusBar.map { !it },
-            )
+            desktopInteractor.useDesktopStatusBar
+                .map { !it }
+                .hydratedStateOf(
+                    traceName = "showHeader",
+                    initialValue = !desktopInteractor.useDesktopStatusBar.value,
+                )
         } else {
             mutableStateOf(true)
         }
@@ -111,17 +111,21 @@ constructor(
      * render a fully-opaque shade container (`false`).
      */
     val isTransparencyEnabled: Boolean by
-        hydrator.hydratedStateOf(
-            traceName = "transparencyEnabled",
-            initialValue =
-                Flags.notificationShadeBlur() &&
-                    windowRootViewBlurInteractor.isBlurCurrentlySupported.value,
-            source =
-                if (Flags.notificationShadeBlur()) {
-                    windowRootViewBlurInteractor.isBlurCurrentlySupported
-                } else {
-                    flowOf(false)
-                },
+        if (Flags.notificationShadeBlur()) {
+                windowRootViewBlurInteractor.isBlurCurrentlySupported
+            } else {
+                flowOf(false)
+            }
+            .hydratedStateOf(
+                initialValue =
+                    Flags.notificationShadeBlur() &&
+                        windowRootViewBlurInteractor.isBlurCurrentlySupported.value
+            )
+
+    val statusBarHeightPx: Int by
+        systemBarUtilsState.statusBarHeight.hydratedStateOf(
+            traceName = "QuickSettingsShadeOverlayContentViewModel#statusBarHeight",
+            initialValue = resources.getDimensionPixelSize(R.dimen.status_bar_height),
         )
 
     /**
@@ -153,9 +157,8 @@ constructor(
             null
         }
 
-    override suspend fun onActivated(): Nothing {
+    override suspend fun onActivated() {
         coroutineScope {
-            launch { hydrator.activate() }
             launch {
                 shadeInteractor.isShadeTouchable
                     .distinctUntilChanged()
@@ -169,8 +172,6 @@ constructor(
                     }
             }
         }
-
-        awaitCancellation()
     }
 
     /**

@@ -157,10 +157,27 @@ flag {
 }
 
 flag {
+    name: "device_aware_thermal_status"
+    namespace: "virtual_devices"
+    description: "API for exposing the virtual device's thermal status"
+    bug: "444259414"
+    is_exported: true
+}
+
+flag {
     name: "virtual_input_view_behavior"
     namespace: "virtual_devices"
     description: "API for setting the view behavior for virtual input devices"
     bug: "434658418"
+    is_exported: true
+}
+
+
+flag {
+    name: "public_device_profile"
+    namespace: "virtual_devices"
+    description: "API for getting the profile of a virtual device"
+    bug: "493126008"
     is_exported: true
 }
 
@@ -255,6 +272,26 @@ flag {
     namespace: "virtual_devices"
     description: "Require the ASSISTANT role for computer control session creation"
     bug: "487979979"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "computer_control_cross_device"
+    namespace: "virtual_devices"
+    description: "Enables support for cross-device ComputerControl"
+    bug: "493529664"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "computer_control_support_v5"
+    namespace: "virtual_devices"
+    description: "Enables support for the ComputerControl v5 APIs"
+    bug: "489808412"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -25,6 +25,7 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
 import static com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR;
+import static com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE;
 import static com.android.wm.shell.bubbles.util.BubbleTestUtils.verifyEnterBubbleTransaction;
 import static com.android.wm.shell.transition.Transitions.TRANSIT_BUBBLE_CONVERT_FLOATING_TO_BAR;
@@ -58,6 +59,7 @@ import android.content.Intent;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.IBinder;
 import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
@@ -65,6 +67,7 @@ import android.platform.test.annotations.EnableFlags;
 import android.view.SurfaceControl;
 import android.view.ViewRootImpl;
 import android.window.TransitionInfo;
+import android.window.WindowAnimationState;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
@@ -109,6 +112,9 @@ import com.android.wm.shell.taskview.TaskView;
 import com.android.wm.shell.taskview.TaskViewRepository;
 import com.android.wm.shell.taskview.TaskViewTaskController;
 import com.android.wm.shell.taskview.TaskViewTransitions;
+import com.android.wm.shell.transition.AnimationPlan;
+import com.android.wm.shell.transition.DetachResult;
+import com.android.wm.shell.transition.ITransitionAnimation;
 import com.android.wm.shell.transition.Transitions;
 
 import org.junit.Before;
@@ -118,6 +124,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -1184,6 +1191,136 @@ public class BubbleTransitionsTest extends ShellTestCase {
     }
 
     @Test
+    @EnableFlags({FLAG_ENABLE_BUBBLE_ROOT_TASK, FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER})
+    public void testLaunchOrConvert_processChangesFindMatching_mutuallyExclusiveAlpha() {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble)
+                        mBubbleTransitions.startLaunchIntoOrConvertToBubble(
+                                mBubble,
+                                mExpandedViewManager,
+                                mTaskViewFactory,
+                                mBubblePositioner,
+                                mStackView,
+                                mLayerView,
+                                mIconFactory,
+                                false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final TransitionInfo toFrontTransition =
+                setupToFrontTransition(
+                        taskInfo, taskLeash, null /* snapshot */, bt.mLaunchCookie.binder);
+
+        final IBinder transitionToken = mock(IBinder.class);
+        bt.mPlayingTransition = transitionToken;
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+
+        bt.startAnimation(
+                transitionToken,
+                toFrontTransition,
+                startT,
+                mock(SurfaceControl.Transaction.class),
+                wct -> {});
+
+        verify(startT).setAlpha(taskLeash, 0f);
+        verify(startT, never()).setAlpha(taskLeash, 1f);
+    }
+
+    @Test
+    @EnableFlags({FLAG_ENABLE_BUBBLE_ROOT_TASK, FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER})
+    public void testLaunchOrConvert_plan() {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble)
+                        mBubbleTransitions.startLaunchIntoOrConvertToBubble(
+                                mBubble,
+                                mExpandedViewManager,
+                                mTaskViewFactory,
+                                mBubblePositioner,
+                                mStackView,
+                                mLayerView,
+                                mIconFactory,
+                                false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+        assertThat(bt.mLaunchCookie).isNotNull();
+
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final TransitionInfo convertTransition =
+                setupConvertTransition(
+                        taskInfo, taskLeash, null /* snapshot */, bt.mLaunchCookie.binder);
+        final IBinder transitionToken = mock(IBinder.class);
+        bt.mPlayingTransition = transitionToken;
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+        final AnimationPlan plan = mock(AnimationPlan.class);
+
+        // Call plan
+        bt.plan(plan, convertTransition, transitionToken, convertTransition, startT);
+
+        // Verify setAnimation was called
+        ArgumentCaptor<ITransitionAnimation> animCaptor =
+                ArgumentCaptor.forClass(ITransitionAnimation.class);
+        verify(plan).setAnimation(eq(taskInfo.token), animCaptor.capture());
+
+        // Verify startTransaction modifications (position)
+        verify(startT).setPosition(taskLeash, 0, 0);
+        verify(startT).apply();
+
+        // Verify side effects
+        verify(mBubbleData)
+                .notificationEntryUpdated(
+                        eq(mBubble), eq(true), eq(false), eq(BubbleBarLocation.RIGHT));
+    }
+
+    @Test
+    @EnableFlags({FLAG_ENABLE_BUBBLE_ROOT_TASK, FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER})
+    public void testLaunchOrConvert_plan_animation() {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble)
+                        mBubbleTransitions.startLaunchIntoOrConvertToBubble(
+                                mBubble,
+                                mExpandedViewManager,
+                                mTaskViewFactory,
+                                mBubblePositioner,
+                                mStackView,
+                                mLayerView,
+                                mIconFactory,
+                                false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final TransitionInfo convertTransition =
+                setupConvertTransition(
+                        taskInfo, taskLeash, null /* snapshot */, bt.mLaunchCookie.binder);
+        final AnimationPlan plan = mock(AnimationPlan.class);
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+
+        bt.plan(plan, convertTransition, mock(IBinder.class), convertTransition, startT);
+
+        ArgumentCaptor<ITransitionAnimation> animCaptor =
+                ArgumentCaptor.forClass(ITransitionAnimation.class);
+        verify(plan).setAnimation(eq(taskInfo.token), animCaptor.capture());
+
+        ITransitionAnimation animation = animCaptor.getValue();
+        assertThat(animation).isNotNull();
+
+        // Test animation.start()
+        final ITransitionAnimation.IFinishedCallback finishCallback =
+                mock(ITransitionAnimation.IFinishedCallback.class);
+        animation.start(convertTransition, new java.util.ArrayList<>(), finishCallback);
+
+        // Verify it triggers startExpandAnim -> canExpandView
+        verify(mLayerView).canExpandView(eq(mBubble));
+    }
+
+    @Test
     public void launchNewTaskBubbleForExistingTransition_startTransitionBeforeBubbleInflated() {
         final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
 
@@ -1236,6 +1373,180 @@ public class BubbleTransitionsTest extends ShellTestCase {
 
         verify(mBubble).setCurrentTransition(null);
         assertThat(mTaskViewTransitions.hasPending()).isFalse();
+    }
+
+    @Test
+    @EnableFlags({FLAG_ENABLE_BUBBLE_ROOT_TASK, FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER})
+    public void testLaunchOrConvert_plan_usesWindowAnimationState() {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        when(mLayerView.canExpandView(mBubble)).thenReturn(true);
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble) mBubbleTransitions
+                        .startLaunchIntoOrConvertToBubble(
+                                mBubble, mExpandedViewManager, mTaskViewFactory, mBubblePositioner,
+                                mStackView, mLayerView, mIconFactory, false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final SurfaceControl snapshot = new SurfaceControl.Builder().setName("snapshot").build();
+        final TransitionInfo info = setupConvertTransition(taskInfo, taskLeash,
+                snapshot /* snapshot */, bt.mLaunchCookie.binder);
+        final IBinder transitionToken = mock(IBinder.class);
+        final AnimationPlan plan = mock(AnimationPlan.class);
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+        // Call plan
+        bt.plan(plan, info, transitionToken, info, startT);
+        // Verify setAnimation is called and capture the animator
+        ArgumentCaptor<ITransitionAnimation> animCaptor =
+                ArgumentCaptor.forClass(ITransitionAnimation.class);
+        verify(plan).setAnimation(eq(taskInfo.token), animCaptor.capture());
+        // Call start on the captured animator with a state
+        final WindowAnimationState state = new WindowAnimationState();
+        state.bounds = new RectF(50f, 50f, 250f, 150f);
+        state.scale = 0.8f;
+
+        animCaptor
+                .getValue()
+                .start(info, List.of(state), mock(ITransitionAnimation.IFinishedCallback.class));
+        bt.surfaceCreated();
+        // Verify mStartBounds and mStartScale are updated
+        assertThat(bt.mStartBounds).isEqualTo(new Rect(50, 50, 250, 150));
+        assertThat(bt.mStartScale).isEqualTo(0.8f);
+        verify(mLayerView).animateConvert(
+                any(),
+                eq(new Rect(50, 50, 250, 150)),
+                eq(0.8f),
+                eq(snapshot),
+                eq(taskLeash),
+                any()
+        );
+    }
+
+    @Test
+    @EnableFlags({FLAG_ENABLE_BUBBLE_ROOT_TASK, FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER})
+    public void testLaunchOrConvert_detach_defaultState() throws Exception {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        when(mLayerView.canExpandView(mBubble)).thenReturn(true);
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble)
+                        mBubbleTransitions.startLaunchIntoOrConvertToBubble(
+                                mBubble,
+                                mExpandedViewManager,
+                                mTaskViewFactory,
+                                mBubblePositioner,
+                                mStackView,
+                                mLayerView,
+                                mIconFactory,
+                                false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final TransitionInfo info =
+                setupConvertTransition(
+                        taskInfo, taskLeash, null /* snapshot */, bt.mLaunchCookie.binder);
+        final IBinder transitionToken = mock(IBinder.class);
+        final AnimationPlan plan = mock(AnimationPlan.class);
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+
+        // Call plan
+        bt.plan(plan, info, transitionToken, info, startT);
+
+        // Verify setAnimation is called and capture the animator
+        ArgumentCaptor<ITransitionAnimation> animCaptor =
+                ArgumentCaptor.forClass(ITransitionAnimation.class);
+        verify(plan).setAnimation(eq(taskInfo.token), animCaptor.capture());
+
+        ITransitionAnimation animation = animCaptor.getValue();
+        assertThat(animation).isNotNull();
+
+        // Start animation
+        animation.start(info, List.of(), mock(ITransitionAnimation.IFinishedCallback.class));
+
+        bt.surfaceCreated();
+
+        // Mock cancelAnimation to return null
+        when(mLayerView.cancelAnimation()).thenReturn(null);
+
+        // Call detach with matching token
+        DetachResult result = animation.detach(List.of(taskInfo.token), startT);
+
+        // Verify cancelAnimation was called
+        verify(mLayerView).cancelAnimation();
+
+        // Verify DetachResult contains a default state
+        WindowAnimationState defaultState = new WindowAnimationState();
+        assertThat(result).isNotNull();
+        List<WindowAnimationState> states = result.get();
+        assertThat(states).hasSize(1);
+        WindowAnimationState resultState = states.get(0);
+        assertThat(resultState.scale).isEqualTo(defaultState.scale);
+        assertThat(resultState.bounds).isNull();
+        assertThat(resultState.timestamp).isEqualTo(defaultState.timestamp);
+    }
+
+    @Test
+    @EnableFlags({FLAG_ENABLE_BUBBLE_ROOT_TASK, FLAG_ENABLE_BUBBLE_TRANSITION_PLANNER})
+    public void testLaunchOrConvert_detach_withState() throws Exception {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        when(mLayerView.canExpandView(mBubble)).thenReturn(true);
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble)
+                        mBubbleTransitions.startLaunchIntoOrConvertToBubble(
+                                mBubble,
+                                mExpandedViewManager,
+                                mTaskViewFactory,
+                                mBubblePositioner,
+                                mStackView,
+                                mLayerView,
+                                mIconFactory,
+                                false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final TransitionInfo info =
+                setupConvertTransition(
+                        taskInfo, taskLeash, null /* snapshot */, bt.mLaunchCookie.binder);
+        final IBinder transitionToken = mock(IBinder.class);
+        final AnimationPlan plan = mock(AnimationPlan.class);
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+
+        // Call plan
+        bt.plan(plan, info, transitionToken, info, startT);
+
+        // Verify setAnimation is called and capture the animator
+        ArgumentCaptor<ITransitionAnimation> animCaptor =
+                ArgumentCaptor.forClass(ITransitionAnimation.class);
+        verify(plan).setAnimation(eq(taskInfo.token), animCaptor.capture());
+
+        ITransitionAnimation animation = animCaptor.getValue();
+        assertThat(animation).isNotNull();
+
+        // Start animation
+        animation.start(info, List.of(), mock(ITransitionAnimation.IFinishedCallback.class));
+
+        bt.surfaceCreated();
+
+        // Mock cancelAnimation to return a populated state
+        WindowAnimationState state = new WindowAnimationState();
+        state.bounds = new RectF(10f, 20f, 30f, 40f);
+        state.scale = 0.5f;
+        when(mLayerView.cancelAnimation()).thenReturn(state);
+
+        // Call detach with matching token
+        DetachResult result = animation.detach(List.of(taskInfo.token), startT);
+
+        // Verify cancelAnimation was called
+        verify(mLayerView).cancelAnimation();
+
+        // Verify DetachResult contains the state
+        assertThat(result).isNotNull();
+        List<WindowAnimationState> states = result.get();
+        assertThat(states).hasSize(1);
+        assertThat(states.get(0).bounds).isEqualTo(new RectF(10f, 20f, 30f, 40f));
+        assertThat(states.get(0).scale).isEqualTo(0.5f);
     }
 
     @Test
@@ -1587,6 +1898,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
         verify(finishT).reparent(taskLeash, taskViewSurface);
         verify(finishT).setPosition(taskLeash, 0, 0);
         verify(finishT).setWindowCrop(taskLeash, 50, 100);
+        verify(bev).setContentVisibility(true);
 
         TaskViewRepository.TaskViewState state = mRepository.byTaskView(mTaskViewTaskController);
         assertThat(state).isNotNull();

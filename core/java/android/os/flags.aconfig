@@ -227,6 +227,16 @@ flag {
 }
 
 flag {
+    name: "fix_main_thread_blocking_on_first_unlock"
+    namespace: "system_performance"
+    description: "Fix main thread blocking on first unlock"
+    bug: "491497495"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "get_private_space_settings"
     namespace: "profile_experiences"
     description: "Guards a new Private Profile API in LauncherApps"
@@ -318,6 +328,13 @@ flag {
     description: "Adding new Material Tokens for M3 Shape (corner radius) Spec"
     bug: "324928718"
     is_exported: true
+}
+
+flag {
+    name: "message_queue_monitoring_enabled"
+    namespace: "system_performance"
+    description: "Enables MessageQueue monitoring via LooperDoctor."
+    bug: "483709211"
 }
 
 flag {
@@ -493,6 +510,13 @@ flag {
      description: "Control framework initialization APIs of telemetry APIs feature."
      is_fixed_read_only: true
      bug: "324241334"
+}
+
+flag {
+    namespace: "users_and_accounts"
+    name: "login_add_user_enforcement"
+    description: "Enables a cross-user restriction check to prevent users from bypassing DISALLOW_ADD_USER by adding new users from the Login screen."
+    bug: "433361306"
 }
 
 # keep-sorted end

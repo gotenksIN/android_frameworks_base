@@ -69,6 +69,7 @@ import androidx.core.animation.ValueAnimator;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.launcher3.icons.BubbleIconFactory;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.bubbles.Bubble;
 import com.android.wm.shell.bubbles.BubbleController;
@@ -597,7 +598,7 @@ public class BubbleTransitions {
             } else {
                 mExpandedViewAnimator = stackView;
             }
-            BubbleLog.d("LaunchNewTaskBubbleForExistingTransition() expanded=%s",
+            BubbleLog.d("LaunchNewTaskBubbleForExistingTransition() expanded=%b",
                     mExpandedViewAnimator.isExpanded());
             mBubble = bubble;
             mTransition = transition;
@@ -1135,6 +1136,7 @@ public class BubbleTransitions {
         private Runnable mAnimationFinishCb;
         private WindowContainerTransaction mFinishWct;
         final Rect mStartBounds = new Rect();
+        float mStartScale = 1.0f;
         SurfaceControl mSnapshot = null;
         // The task info is resolved once we find the task from the transition info using the
         // pending launch cookie otherwise
@@ -1289,7 +1291,7 @@ public class BubbleTransitions {
             wct.setBounds(bubbleRootTask, bounds);
             wct.setAlwaysOnTop(bubbleRootTask, true);
 
-            BubbleLog.d("LaunchOrConvertToBubble.handleRequest(), set root bounds " + bounds);
+            BubbleLog.d("LaunchOrConvertToBubble.handleRequest(), set root bounds %s", bounds);
             if (BubbleFlagHelper.isBubbleTransitionPlannerEnabled()) {
                 return new Transitions.RequestResult(wct,
                         Collections.singletonList(mBubbleTransitionsPlanner));
@@ -1454,11 +1456,10 @@ public class BubbleTransitions {
             }
 
             if (animate) {
-                float startScale = 1f;
                 if (mPlayConvertTaskAnimation) {
                     mExpandedViewAnimator.animateConvert(startT,
                             mStartBounds,
-                            startScale,
+                            mStartScale,
                             mSnapshot,
                             mTaskLeash,
                             this::cleanup);
@@ -1475,11 +1476,13 @@ public class BubbleTransitions {
         private void cleanup() {
             BubbleLog.d("LaunchOrConvertToBubble.cleanup(): removeCookie=%s",
                     mLaunchCookie.binder);
+            mStartScale = 1.0f;
             if (!mHasPlayed) {
                 // Cleanup the new Bubble which is never used.
                 // This would happen when the animation is aborted.
-                mBubbleData.dismissBubbleWithKey(mBubble.getKey(),
-                        Bubbles.DISMISS_REPLACE_BY_EXISTING);
+                // TODO(b/483107404): fix bubble expanded view flick
+                mBubbleData.dismissBubbleWithKey(
+                        mBubble.getKey(), Bubbles.DISMISS_REPLACE_BY_EXISTING);
             }
             mBubble.setCurrentTransition(null);
             // Trigger finishCb after reset current transition as it will immediately kick off
@@ -1535,9 +1538,8 @@ public class BubbleTransitions {
                         // leaf Task can be considered as dependent.
                         startTransaction.setAlpha(chg.getLeash(), 0f);
                     }
-                }
-                if (transitionInfo.getType() == TRANSIT_OPEN && isOpeningMode(
-                        chg.getMode())) {
+                } else if (transitionInfo.getType() == TRANSIT_OPEN
+                        && isOpeningMode(chg.getMode())) {
                     // In core-initiated launches, the transition is of an OPEN type, and we need to
                     // manually show the surfaces behind the newly bubbled task
                     startTransaction.setAlpha(chg.getLeash(), 1f);
@@ -1550,19 +1552,21 @@ public class BubbleTransitions {
         public void plan(@NonNull AnimationPlan plan, @NonNull TransitionInfo fullInfo,
                 @NonNull IBinder transition, @NonNull TransitionInfo plannableInfo,
                 @NonNull SurfaceControl.Transaction startTransaction) {
+            if (!Flags.enableBubbleTransitionPlanner()) {
+                throw new IllegalStateException(
+                        "ITransitionPlanner.plan() should not be called if guarding flag is"
+                            + " disabled");
+            }
             BubbleLog.d("LaunchOrConvertToBubble.plan() bubble=%s", mBubble.getKey());
             mPlayConvertTaskAnimation = false;
             SurfaceControl.Transaction finishTransaction = new SurfaceControl.Transaction();
             TransitionInfo.Change change =
                     processChangesFindMatching(plannableInfo, startTransaction, finishTransaction);
-            WindowContainerToken token = null;
-            if (change != null) {
-                token = change.getContainer();
-            }
+            final WindowContainerToken token = change == null ? null : change.getContainer();
             if (token == null) {
                 String reason = change == null ? "change not found" : "no container for change";
                 BubbleLog.e("Expected a TaskView conversion in this transition but didn't get "
-                        + "one - " + reason + ", cleaning up the task view");
+                        + "one - %s, cleaning up the task view", reason);
                 mBubble.getTaskView().getController().setTaskNotFound();
                 cleanup();
                 return;
@@ -1600,13 +1604,17 @@ public class BubbleTransitions {
                                 @NonNull List<WindowContainerToken> containers,
                                 @NonNull SurfaceControl.Transaction startTransaction) {
                             BubbleLog.w("ITransitionAnimation.detach()");
-                            // TODO(b/483107404) Properly implement detach
                             final ArrayList<WindowAnimationState> states =
                                     new ArrayList<>(containers.size());
                             for (int i = 0; i < containers.size(); ++i) {
-                                final WindowAnimationState state = new WindowAnimationState();
-                                state.scale = 1.f;
-                                state.timestamp = System.currentTimeMillis();
+                                WindowAnimationState state = null;
+                                if (containers.get(i).equals(token)) {
+                                    mHasPlayed = false;
+                                    state = mExpandedViewAnimator.cancelAnimation();
+                                }
+                                if (state == null) {
+                                    state = new WindowAnimationState();
+                                }
                                 states.add(state);
                             }
                             return new DetachResult(states);
@@ -1617,8 +1625,14 @@ public class BubbleTransitions {
                                 @NonNull TransitionInfo info,
                                 @NonNull List<WindowAnimationState> from,
                                 @NonNull IFinishedCallback onFinished) {
-                            BubbleLog.w("ITransitionAnimation.start()");
-                            // TODO(b/483107404) use from for the animation
+                            BubbleLog.d("LaunchOrConvertToBubble.ITransitionAnimation.start()");
+                            if (!from.isEmpty()) {
+                                WindowAnimationState state = from.getFirst();
+                                if (state.bounds != null) {
+                                    state.bounds.roundOut(mStartBounds);
+                                }
+                                mStartScale = state.scale;
+                            }
                             mAnimationFinishCb = () -> onFinished.onFinished(finishTransaction);
                             startExpandAnim();
                         }
@@ -1686,7 +1700,7 @@ public class BubbleTransitions {
             } else {
                 mExpandedViewAnimator = stackView;
             }
-            BubbleLog.d("ConvertToBubble() expanded=%s",
+            BubbleLog.d("ConvertToBubble() expanded=%b",
                     mExpandedViewAnimator.isExpanded());
             mBubble = bubble;
             mTransitionProgress = new TransitionProgress();

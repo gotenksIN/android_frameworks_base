@@ -17,12 +17,14 @@
 package com.android.systemui.statusbar.pipeline.shared.ui.composable
 
 import android.view.ContextThemeWrapper
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -32,10 +34,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.android.systemui.clock.ClockModernization
 import com.android.systemui.clock.ui.composable.Clock
@@ -60,6 +63,7 @@ import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
 import com.android.systemui.shade.ui.composable.ChipHighlightModel
+import com.android.systemui.shade.ui.composable.OverlayShade
 import com.android.systemui.shade.ui.composable.ShadeHighlightChip
 import com.android.systemui.shade.ui.composable.VariableDayDate
 import com.android.systemui.statusbar.chips.ui.compose.OngoingActivityChips
@@ -82,6 +86,9 @@ import com.android.systemui.statusbar.systemstatusicons.ui.compose.movableSystem
 
 object DesktopStatusBar {
     object Dimensions {
+        val PaddingHorizontal: Dp
+            @Composable @ReadOnlyComposable get() = OverlayShade.Dimensions.PanelPaddingHorizontal
+
         val ElementSpacing = 12.dp
         val ChipInternalSpacing = 6.dp
         val ChipHeight = 24.dp
@@ -90,7 +97,6 @@ object DesktopStatusBar {
 
 // TODO(b/343358983): Add support for color themes in this composable.
 /** Top level composable responsible for all UI shown for the Status Bar for DesktopMode. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DesktopStatusBar(
     viewModel: HomeStatusBarViewModel,
@@ -103,7 +109,10 @@ fun DesktopStatusBar(
     // TODO(433589833): Update padding values to match UX specs.
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxSize().padding(start = 16.dp, end = 12.dp),
+        modifier =
+            // TODO(b/478352392): Move this padding to clickable Row below (after applying the
+            // clickable modifier), so it's included in the click target. Ref: b/494287030.
+            modifier.fillMaxSize().padding(start = DesktopStatusBar.Dimensions.PaddingHorizontal),
     ) {
         WithAdaptiveTint(
             highlightModel = ChipHighlightModel.Transparent,
@@ -116,6 +125,7 @@ fun DesktopStatusBar(
                         Alignment.Start,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable(onClick = viewModel::onClockClicked),
             ) {
                 val clockViewModel =
                     rememberViewModel("HomeStatusBar.Clock") {
@@ -137,7 +147,7 @@ fun DesktopStatusBar(
                 )
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(1f).clickable(onClick = viewModel::onSpacerClicked))
 
         Row(
             horizontalArrangement =
@@ -161,17 +171,23 @@ fun DesktopStatusBar(
             if (StatusBarPopupChips.isEnabled) {
                 QuickActionChipsContainer(
                     chips = viewModel.popupChips,
-                    isDarkProvider = { bounds -> viewModel.areaDark.isDarkTheme(bounds) },
+                    isDarkProvider = viewModel.areaDark::isDarkTheme,
                 )
             }
 
-            NotificationsChip(viewModel = viewModel)
+            // The wrapper row prevents application of ElementSpacing between the chips. Instead,
+            // they will internally allocate the same padding space to their touch targets.
+            // TODO(b/489444201): Remove this wrapper and `spacedBy` above once all the elements in
+            //  this row have expanded touch targets.
+            Row {
+                NotificationsChip(viewModel = viewModel)
 
-            QuickSettingsChip(
-                viewModel = viewModel,
-                statusBarIconController = statusBarIconController,
-                iconManagerFactory = iconManagerFactory,
-            )
+                QuickSettingsChip(
+                    viewModel = viewModel,
+                    statusBarIconController = statusBarIconController,
+                    iconManagerFactory = iconManagerFactory,
+                )
+            }
         }
     }
 }
@@ -206,7 +222,14 @@ private fun NotificationsChip(viewModel: HomeStatusBarViewModel, modifier: Modif
                     .widthIn(min = DesktopStatusBar.Dimensions.ChipHeight)
                     .semantics { this.contentDescription = contentDescription }
                     .sysuiResTag("notificationIcons"),
-            onClick = { viewModel.onNotificationIconChipClicked() },
+            onClick = viewModel::onNotificationIconChipClicked,
+            clickTargetModifier =
+                Modifier.fillMaxHeight()
+                    .padding(
+                        // Divide by two, since the spacing between this chip and the next one is
+                        // divided among the corresponding touch targets.
+                        end = DesktopStatusBar.Dimensions.ElementSpacing / 2
+                    ),
             backgroundColor = chipHighlightModel.backgroundColor,
             hoverBackgroundColor = hoverColor,
             rippleColor = rippleColor,
@@ -271,7 +294,7 @@ private fun QuickSettingsChip(
 
     WithAdaptiveTint(
         highlightModel = chipHighlightModel,
-        isDarkProvider = { bounds -> viewModel.areaDark.isDarkTheme(bounds) },
+        isDarkProvider = viewModel.areaDark::isDarkTheme,
     ) { tint ->
         val (hoverColor, rippleColor) =
             when (chipHighlightModel) {
@@ -284,7 +307,15 @@ private fun QuickSettingsChip(
         ShadeHighlightChip(
             modifier =
                 modifier.height(DesktopStatusBar.Dimensions.ChipHeight).sysuiResTag("statusIcons"),
-            onClick = { viewModel.onQuickSettingsChipClicked() },
+            onClick = viewModel::onQuickSettingsChipClicked,
+            clickTargetModifier =
+                Modifier.fillMaxHeight()
+                    .padding(
+                        // Divide by two, since the spacing between this chip and the previous one
+                        // is divided among the corresponding touch targets.
+                        start = DesktopStatusBar.Dimensions.ElementSpacing / 2,
+                        end = DesktopStatusBar.Dimensions.PaddingHorizontal,
+                    ),
             backgroundColor = chipHighlightModel.backgroundColor,
             hoverBackgroundColor = hoverColor,
             rippleColor = rippleColor,
@@ -364,8 +395,8 @@ private fun QuickSettingsChip(
 private fun SignOutButton(onSignOut: () -> Unit) {
     Button(
         onClick = onSignOut,
-        contentPadding = PaddingValues(start = 6.dp, end = 6.dp),
-        modifier = Modifier.heightIn(min = 24.dp),
+        contentPadding = PaddingValues(horizontal = DesktopStatusBar.Dimensions.ElementSpacing / 2),
+        modifier = Modifier.heightIn(min = DesktopStatusBar.Dimensions.ChipHeight),
     ) {
         Icon(
             icon =

@@ -868,6 +868,27 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         }
     }
 
+    /**
+     * Called when the task that occludes the Keyguard has changed.
+     *
+     * <p>This method is called before the keyguard occlude/unocclude transition is requested.
+     *
+     * @param displayId The ID of the display where the occlusion state has changed.
+     * @param taskInfo The {@link ActivityManager.RunningTaskInfo} of the task that is now occluding
+     *     the Keyguard, or {@code null} if no task is occluding it.
+     */
+    void handleKeyguardOccludingTaskChanged(int displayId,
+            @Nullable ActivityManager.RunningTaskInfo taskInfo) {
+        final ITaskOrganizer organizer = getTaskOrganizer();
+        if (organizer != null) {
+            try {
+                organizer.onKeyguardOccludingTaskChanged(displayId, taskInfo);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Exception sending onKeyguardOccludingTaskChanged callback", e);
+            }
+        }
+    }
+
     void onTaskAppeared(ITaskOrganizer organizer, Task task) {
         final TaskOrganizerState state = mTaskOrganizerStates.get(organizer.asBinder());
         if (state != null && state.addTask(task)) {
@@ -952,7 +973,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
             return null;
         }
         final WindowContainer parent;
-        if (Flags.visibilityManagementInBubbleRoot() && params.getParentContainer() != null) {
+        if (params.getParentContainer() != null) {
             parent = fromBinder(params.getParentContainer().asBinder());
             if (parent == null) {
                 ProtoLog.e(WM_DEBUG_WINDOW_ORGANIZER, "createTask unknown requested parent");
@@ -986,8 +1007,9 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                 .setLaunchCookie(params.getLaunchCookie())
                 .setParent(parent)
                 .setRemoveWithTaskOrganizer(true)
+                .setOnTop(params.isOnTop())
                 .setReparentOnDisplayRemoval(properties.isReparentOnDisplayRemoval());
-        if (Flags.visibilityManagementInBubbleRoot() && params.isVisibilityBarrier()) {
+        if (params.isVisibilityBarrier()) {
             builder.setIsVisibilityBarrier(true);
         } else {
             builder.setWindowingMode(params.getWindowingMode())
@@ -998,8 +1020,32 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         }
         final Task task = builder.build();
 
-        if (Flags.visibilityManagementInBubbleRoot() && properties.isForceLeafTasksNonOccluding()) {
+        if (properties.isForceLeafTasksNonOccluding()) {
             task.setForceLeafTasksNonOccluding(true);
+        }
+        if (properties.isReparentLeafTaskIfRelaunchFromHome()) {
+            task.setReparentLeafTaskIfRelaunchFromHome(true);
+        }
+        if (properties.isDisallowOverrideWindowingModeForChildren()) {
+            task.setDisallowOverrideWindowingModeForChildren(true);
+        }
+        if (properties.isPreserveLeafTaskIfRelaunch()) {
+            task.setPreserveLeafTaskIfRelaunch(true);
+        }
+        if (properties.isInterceptBackPressedOnTaskRoot()) {
+            setInterceptBackPressedOnTaskRoot(task.mTaskId, true);
+        }
+        if (properties.isTaskForceExcludedFromRecents()) {
+            task.setForceExcludedFromRecents(true);
+        }
+        if (properties.isDisablePip()) {
+            task.setDisablePip(true);
+        }
+        if (properties.isDisableLaunchAdjacent()) {
+            task.setLaunchAdjacentDisabled(true);
+        }
+        if (properties.isForceTranslucent()) {
+            task.setForceTranslucent(true);
         }
 
         // We want to defer the task appear signal until the task is fully created and attached to

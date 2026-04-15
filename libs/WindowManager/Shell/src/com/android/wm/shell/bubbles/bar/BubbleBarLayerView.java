@@ -39,6 +39,7 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.window.WindowAnimationState;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
@@ -345,6 +346,7 @@ public class BubbleBarLayerView extends FrameLayout
      *
      * @return previous open bubble if there was one.
      */
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private BubbleViewProvider prepareExpandedView(BubbleViewProvider b) {
         if (!canExpandView(b)) {
             throw new IllegalStateException("Can't prepare expand. Check canExpandView(b) first.");
@@ -791,6 +793,9 @@ public class BubbleBarLayerView extends FrameLayout
             updateExpandedView();
         }
         setupDragZoneFactory();
+        if (mDragController != null) {
+            mDragController.setDragZoneFactory(mDragZoneFactory);
+        }
     }
 
     /** Ensures that only the expanded bubble is added at the end of all animations. */
@@ -828,5 +833,11 @@ public class BubbleBarLayerView extends FrameLayout
         if (ContextUtils.isGestureNavigationMode(mContext)) {
             mBubbleBarGestureNavSwipeController.stopMonitoring();
         }
+    }
+
+    @Override
+    @Nullable
+    public WindowAnimationState cancelAnimation() {
+        return mAnimationHelper.cancelAnimationsAndReturnState();
     }
 }

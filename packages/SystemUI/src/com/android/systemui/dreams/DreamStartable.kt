@@ -26,6 +26,7 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.KeyguardViewMediator.KEYGUARD_LOCK_AFTER_DELAY_DEFAULT
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.shared.DriveDreamStateFromOcclusion
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.DreamLog
@@ -71,7 +72,9 @@ constructor(
     override fun start() {
         if (SceneContainerFlag.isEnabled) {
             handleStopDreamWhenGoingToGone()
-            handleDreamState()
+            if (!DriveDreamStateFromOcclusion.isEnabled) {
+                handleDreamState()
+            }
             handleShowLockscreenAfterDreamWhenUnsecured()
         }
     }
@@ -79,6 +82,7 @@ constructor(
     /** Manages scene transitions to and from the Dream scene. */
     @RequiresPermission(WRITE_DREAM_STATE)
     private fun handleDreamState() {
+        DriveDreamStateFromOcclusion.assertInLegacyMode()
         applicationScope.launch {
             keyguardInteractor.isDreamingNotDozing.collect { isDreaming ->
                 if (isDreaming) {
@@ -90,7 +94,7 @@ constructor(
                         sceneInteractor.snapToScene(
                             toScene = Scenes.Dream,
                             loggingReason = "Snap to dream behind bouncer",
-                            hideAllOverlays = false,
+                            hideOverlays = SceneInteractor.HideOverlayCommand.HideNone,
                         )
                         sceneInteractor.hideOverlay(
                             overlay = Overlays.Bouncer,
@@ -120,13 +124,18 @@ constructor(
                         sceneInteractor.snapToScene(
                             toScene = SceneFamilies.Home,
                             loggingReason = "Snap to home behind bouncer",
-                            hideAllOverlays = false,
+                            hideOverlays = SceneInteractor.HideOverlayCommand.HideNone,
                         )
                     } else {
                         sceneInteractor.changeScene(
                             toScene = SceneFamilies.Home,
                             loggingReason = "Dream stopped",
-                            hideAllOverlays = !keyguardInteractor.isKeyguardShowing.value,
+                            hideOverlays =
+                                if (!keyguardInteractor.isKeyguardShowing.value) {
+                                    SceneInteractor.HideOverlayCommand.HideAll
+                                } else {
+                                    SceneInteractor.HideOverlayCommand.HideNone
+                                },
                         )
                     }
                 }

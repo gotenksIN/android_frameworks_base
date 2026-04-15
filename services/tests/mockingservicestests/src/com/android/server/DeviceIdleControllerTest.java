@@ -17,6 +17,7 @@ package com.android.server;
 
 import static android.os.PowerExemptionManager.REASON_OTHER;
 import static android.os.PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED;
+import static android.os.Process.FIRST_PCC_UID;
 import static android.platform.test.flag.junit.SetFlagsRule.DefaultInitValueType.NULL_DEFAULT;
 
 import static androidx.test.InstrumentationRegistry.getContext;
@@ -69,13 +70,17 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+import android.Manifest;
 import android.app.ActivityManagerInternal;
 import android.app.AlarmManager;
 import android.app.IActivityManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.hardware.devicestate.DeviceState;
+import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -96,14 +101,20 @@ import android.os.SystemClock;
 import android.os.WearModeManagerInternal;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
+import android.platform.test.annotations.RequiresFlagsDisabled;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.DeviceConfig;
 import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.telephony.emergency.EmergencyNumber;
+import android.util.ArraySet;
 
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.internal.app.IBatteryStats;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.deviceidle.ConstraintController;
@@ -125,6 +136,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 
+import java.util.Arrays;
 import java.util.concurrent.Executor;
 
 /**
@@ -135,6 +147,11 @@ import java.util.concurrent.Executor;
 public class DeviceIdleControllerTest {
     @Rule
     public final SetFlagsRule mSetFlagsRule = new SetFlagsRule(NULL_DEFAULT);
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+    private static final String TEST_PCC_PACKAGE = "com.android.system.pcc.app";
+    private static final int TEST_MAIN_UID = 10101;
+    private static final int TEST_PCC_UID = FIRST_PCC_UID;
 
     private DeviceIdleController mDeviceIdleController;
     private DeviceIdleController.MyHandler mHandler;
@@ -152,6 +169,8 @@ public class DeviceIdleControllerTest {
     private ConnectivityManager mConnectivityManager;
     @Mock
     private ContentResolver mContentResolver;
+    @Mock
+    private DeviceStateManager mDeviceStateManager;
     @Mock
     private IActivityManager mIActivityManager;
     @Mock
@@ -177,6 +196,7 @@ public class DeviceIdleControllerTest {
         ConnectivityManager connectivityManager;
         LocationManager locationManager;
         ConstraintController constraintController;
+        DeviceStateManager deviceStateManager;
         // Freeze time for testing.
         volatile long nowElapsed;
         volatile long nowUptime;
@@ -208,6 +228,11 @@ public class DeviceIdleControllerTest {
         @Override
         ConnectivityManager getConnectivityManager() {
             return connectivityManager;
+        }
+
+        @Override
+        DeviceStateManager getDeviceStateManager() {
+            return deviceStateManager;
         }
 
         @Override
@@ -392,6 +417,8 @@ public class DeviceIdleControllerTest {
 
         doReturn(mWearModeManagerInternal)
                 .when(() -> LocalServices.getService(WearModeManagerInternal.class));
+        setupPackageManagerFeature(PackageManager.FEATURE_PC, false);
+        mSetFlagsRule.disableFlags(Flags.FLAG_QUICK_DOZE_ON_LID_CLOSE);
 
         setupDeviceIdleController();
     }
@@ -3038,6 +3065,212 @@ public class DeviceIdleControllerTest {
         assertEquals(1234, mConstants.INACTIVE_TIMEOUT);
         assertEquals(567, mConstants.IDLE_AFTER_INACTIVE_TIMEOUT);
     }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testPowerSaveAllowlist_prefillIncludesPccApp() throws Exception {
+        MockitoSession localSession =
+                mockitoSession()
+                        .mockStatic(SystemConfig.class)
+                        .strictness(Strictness.LENIENT)
+                        .startMocking();
+
+        try {
+            cleanupDeviceIdleController();
+            SystemConfig mockSystemConfig = mock(SystemConfig.class);
+            ExtendedMockito.doReturn(mockSystemConfig).when(SystemConfig::getInstance);
+
+            ArraySet<String> allowPower = new ArraySet<>();
+            allowPower.add(TEST_PCC_PACKAGE);
+            when(mockSystemConfig.getAllowInPowerSave()).thenReturn(allowPower);
+            when(mockSystemConfig.getAllowInPowerSaveExceptIdle()).thenReturn(new ArraySet<>());
+
+            ApplicationInfo ai = new ApplicationInfo();
+            ai.packageName = TEST_PCC_PACKAGE;
+            ai.uid = TEST_MAIN_UID;
+            ai.pccUid = TEST_PCC_UID;
+            final PackageManager pm = getContext().getPackageManager();
+            reset(pm);
+            doReturn(ai).when(pm).getApplicationInfo(eq(TEST_PCC_PACKAGE), anyInt());
+
+            setupDeviceIdleController();
+
+            assertTrue(
+                    "PCC UID should be pre-filled in full allowlist",
+                    Arrays.stream(mDeviceIdleController.getAppIdWhitelistInternal())
+                            .anyMatch(id -> id == TEST_PCC_UID));
+        } finally {
+            localSession.finishMocking();
+        }
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testPowerSaveAllowlist_prefillExcludesPccApp_flagDisabled() throws Exception {
+        MockitoSession localSession =
+                mockitoSession()
+                        .mockStatic(SystemConfig.class)
+                        .strictness(Strictness.LENIENT)
+                        .startMocking();
+
+        try {
+            cleanupDeviceIdleController();
+            SystemConfig sysConfig = mock(SystemConfig.class);
+            ExtendedMockito.doReturn(sysConfig).when(SystemConfig::getInstance);
+
+            ArraySet<String> allowPower = new ArraySet<>();
+            allowPower.add(TEST_PCC_PACKAGE);
+            doReturn(allowPower).when(sysConfig).getAllowInPowerSave();
+            doReturn(new ArraySet<>()).when(sysConfig).getAllowInPowerSaveExceptIdle();
+
+            ApplicationInfo ai = new ApplicationInfo();
+            ai.packageName = TEST_PCC_PACKAGE;
+            ai.uid = TEST_MAIN_UID;
+            ai.pccUid = TEST_PCC_UID;
+            final PackageManager pm = getContext().getPackageManager();
+            reset(pm);
+            doReturn(ai).when(pm).getApplicationInfo(eq(TEST_PCC_PACKAGE), anyInt());
+
+            setupDeviceIdleController();
+
+            assertFalse(
+                    "PCC UID should NOT be pre-filled when flag is disabled",
+                    Arrays.stream(mDeviceIdleController.getAppIdWhitelistInternal())
+                            .anyMatch(id -> id == TEST_PCC_UID));
+        } finally {
+            localSession.finishMocking();
+        }
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    @DisableFlags({Flags.FLAG_STOP_POWER_SAVE_TEMP_WHITELIST_BROADCAST})
+    public void testTempAllowlist_includesPccApp_dynamic() throws Exception {
+        doNothing().when(getContext()).sendBroadcastAsUser(any(), any(), any(), any());
+        doNothing()
+                .when(getContext())
+                .enforceCallingOrSelfPermission(
+                        eq(Manifest.permission.CHANGE_DEVICE_IDLE_TEMP_WHITELIST),
+                        /* message= */ anyString());
+        ApplicationInfo ai = new ApplicationInfo();
+        ai.packageName = TEST_PCC_PACKAGE;
+        ai.uid = TEST_MAIN_UID;
+        ai.pccUid = TEST_PCC_UID;
+
+        final PackageManager pm = getContext().getPackageManager();
+        reset(pm);
+        doReturn(ai)
+                .when(pm)
+                .getApplicationInfoAsUser(eq(TEST_PCC_PACKAGE), /* flags= */ anyInt(), anyInt());
+
+        mDeviceIdleController.addPowerSaveTempAllowlistAppInternal(
+                /* callingUid= */ 1000,
+                TEST_PCC_PACKAGE,
+                /* durationMs= */ 10000,
+                TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED,
+                /* userId= */ 0,
+                /* sync= */ true,
+                REASON_OTHER,
+                /* reason= */ "test-dynamic");
+
+        assertTrue(
+                "PCC UID should be dynamically added",
+                mDeviceIdleController.mTempWhitelistAppIdEndTimes.indexOfKey(TEST_PCC_UID) >= 0);
+        mDeviceIdleController.removePowerSaveTempAllowlistAppChecked(
+                TEST_PCC_PACKAGE, /* userId= */ 0);
+        assertFalse(
+                "PCC UID should be removed",
+                mDeviceIdleController.mTempWhitelistAppIdEndTimes.indexOfKey(TEST_PCC_UID) >= 0);
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testTempAllowlist_excludesPccApp_flagDisabled() throws Exception {
+        doNothing().when(getContext()).sendBroadcastAsUser(any(), any(), any(), any());
+        ApplicationInfo ai = new ApplicationInfo();
+        ai.packageName = TEST_PCC_PACKAGE;
+        ai.uid = TEST_MAIN_UID;
+        ai.pccUid = TEST_PCC_UID;
+
+        final PackageManager pm = getContext().getPackageManager();
+        reset(pm);
+        doReturn(ai).when(pm).getApplicationInfoAsUser(eq(TEST_PCC_PACKAGE), anyInt(), anyInt());
+
+        mDeviceIdleController.addPowerSaveTempAllowlistAppInternal(
+                /* callingUid= */ 1000,
+                TEST_PCC_PACKAGE,
+                /* durationMs= */ 10000,
+                TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED,
+                /* userId= */ 0,
+                /* sync= */ true,
+                REASON_OTHER,
+                /* reason= */ "test-disabled");
+
+        assertFalse(
+                "PCC UID " + TEST_PCC_UID + " should NOT be added when flag is disabled",
+                mDeviceIdleController.mTempWhitelistAppIdEndTimes.indexOfKey(TEST_PCC_UID) >= 0);
+    }
+
+    @Test
+    public void testQuickDozeOnLidClose_flagDisabled_doesNotRegisterListener() {
+        cleanupDeviceIdleController();
+        setupPackageManagerFeature(PackageManager.FEATURE_PC, true);
+        mInjector = new InjectorForTest(getContext());
+        mInjector.deviceStateManager = mDeviceStateManager;
+        setupDeviceIdleController();
+
+        verify(mDeviceStateManager, never()).registerCallback(any(Executor.class), any());
+    }
+
+    @Test
+    public void testQuickDozeOnLidClose_flagEnabled_featureNotPc_doesNotRegisterListener() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_QUICK_DOZE_ON_LID_CLOSE);
+        cleanupDeviceIdleController();
+        mInjector = new InjectorForTest(getContext());
+        mInjector.deviceStateManager = mDeviceStateManager;
+        setupDeviceIdleController();
+
+        verify(mDeviceStateManager, never()).registerCallback(any(Executor.class), any());
+    }
+
+    @Test
+    public void testQuickDozeOnLidClose_flagEnabled_quickDozeWhenLidClosedAndOpened() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_QUICK_DOZE_ON_LID_CLOSE);
+        cleanupDeviceIdleController();
+        setupPackageManagerFeature(PackageManager.FEATURE_PC, true);
+        mInjector = new InjectorForTest(getContext());
+        mInjector.deviceStateManager = mDeviceStateManager;
+        setupDeviceIdleController();
+
+        ArgumentCaptor<DeviceStateManager.DeviceStateCallback> callbackCaptor =
+                ArgumentCaptor.forClass(DeviceStateManager.DeviceStateCallback.class);
+        verify(mDeviceStateManager).registerCallback(any(), callbackCaptor.capture());
+        DeviceStateManager.DeviceStateCallback callback = callbackCaptor.getValue();
+
+        enterDeepState(STATE_ACTIVE);
+        setQuickDozeEnabled(false);
+        setScreenOn(false);
+        setChargingOn(false);
+        verifyStateConditions(STATE_INACTIVE);
+
+        DeviceState closedState = mock(DeviceState.class);
+        doReturn(true).when(closedState).hasProperty(
+                DeviceState.PROPERTY_LAPTOP_HARDWARE_CONFIGURATION_LID_CLOSED);
+        callback.onDeviceStateChanged(closedState);
+
+        assertTrue("Quick Doze should be enabled when entering CLOSED state",
+                mDeviceIdleController.isQuickDozeEnabled());
+        verifyStateConditions(STATE_QUICK_DOZE_DELAY);
+
+        DeviceState openedState = mock(DeviceState.class);
+        doReturn(false).when(openedState).hasProperty(
+                DeviceState.PROPERTY_LAPTOP_HARDWARE_CONFIGURATION_LID_CLOSED);
+        callback.onDeviceStateChanged(openedState);
+
+        assertFalse("Quick Doze should be disabled when exiting CLOSED state",
+                mDeviceIdleController.isQuickDozeEnabled());
+    }
+
 
     private void enterDeepState(int state) {
         switch (state) {

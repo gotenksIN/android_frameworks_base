@@ -52,6 +52,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.runBlocking
+import com.android.settingslib.metadata.preferencesapi.safe
+import com.android.settingslib.metadata.preferencesapi.unsafe
 
 /** Interface for preference screens that provide parameters in a non-static method. */
 interface ProvidesParametersNonStatically {
@@ -74,7 +76,7 @@ class ParameterizationConfig {
         val name: String,
         @StringRes val purpose: Int,
         val required: Boolean,
-        val type: FiniteOptionsType<*, String>,
+        val type: FiniteOptionsType<*, *>,
     )
 
     internal val parameters = mutableMapOf<String, ApiParameterDefinition>()
@@ -94,7 +96,7 @@ class ParameterizationConfig {
         name: String,
         @StringRes purpose: Int,
         required: Boolean = false,
-        type: FiniteOptionsType<*, String>,
+        type: FiniteOptionsType<*, *>,
     ) {
         if (parameters.containsKey(name)) {
             throw IllegalArgumentException("Parameter '$name' is already defined.")
@@ -242,24 +244,36 @@ private constructor(
             }
         }
 
-    override fun getLaunchIntent(context: Context, metadata: PreferenceMetadata?): Intent? {
+    /**
+     * Evaluates preconditions in order: screen-level.
+     * Returns the first precondition that is not [Allowed], or [Allowed] if all preconditions
+     * are met.
+     */
+    suspend fun evaluatePreconditions(context: Context): ApiPreconditions {
         val opContext =
             ApiOperationContext(
                 context = context,
                 parameters = keyParameters ?: ValidatedKeyParameters.EMPTY,
             )
 
-        // TODO(b/469317113): This should run asynchronously
-        val checkScreenPreconditions =
-            runBlocking { screenPreconditions?.check(opContext) } ?: Allowed
-
-        if (checkScreenPreconditions != Allowed) {
-            if (checkScreenPreconditions is Disallowed) {
+        screenPreconditions?.check(opContext)?.let {
+            if (it is Disallowed) {
                 Log.d(
                     TAG,
-                    "Screen precondition failed: ${checkScreenPreconditions.getReason(context)}",
+                    "Screen precondition failed: ${it.getReason(context)}",
                 )
             }
+            if (it != Allowed) return it
+        }
+        return Allowed
+    }
+
+    override fun getLaunchIntent(context: Context, metadata: PreferenceMetadata?): Intent? {
+        val checkScreenPreconditions =
+            // TODO(b/469317113): This should run asynchronously
+            runBlocking { evaluatePreconditions(context) }
+
+        if (checkScreenPreconditions != Allowed) {
             return null
         }
 
@@ -392,8 +406,12 @@ private constructor(
                 { keyParametersSchema },
                 { keyParameters },
             )
-        builder.lambda()
-        preferences.add(builder.build())
+        try {
+            builder.lambda()
+            preferences.add(builder.build())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to build preference: $key for screen: $key", e)
+        }
     }
 
     /** Initializes the [ValidatedKeyParameters] if this preference screen is parameterized. */
@@ -519,10 +537,10 @@ private constructor(
             val parameterToUse = scope.parameters.values.first()
 
             this@PreferencesApiScreen.allPossibleParameters = { context ->
-                parameterToUse.type.getOptions(context).mapNotNull { parameterOption ->
+                parameterToUse.type.getCachedOptions(context).mapNotNull { parameterOption ->
                     parameterOption.first?.let {
                         this@PreferencesApiScreen.parametersSchema!!.prepare(
-                            parameterToUse.name to it.toString()
+                            parameterToUse.name.safe() to it
                         )
                     }
                 }

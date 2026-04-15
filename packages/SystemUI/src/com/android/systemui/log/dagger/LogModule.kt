@@ -503,6 +503,14 @@ abstract class LogModule {
             return factory.create("CommunalLog", 250)
         }
 
+        /** Provides a [LogBuffer] for window background blur logs. */
+        @Provides
+        @SysUISingleton
+        @WindowBackgroundBlurLog
+        fun provideWindowBackgroundBlurLogBuffer(factory: LogBufferFactory): LogBuffer {
+            return factory.create("WindowBackgroundBlur", 250)
+        }
+
         /** Provides a [LogBuffer] for communal touch-handling logs. */
         @Provides
         @SysUISingleton
@@ -674,6 +682,14 @@ abstract class LogModule {
         @CameraLog
         fun providesCameraLog(factory: LogBufferFactory): LogBuffer {
             return factory.create(name = "CameraLog", maxSize = 50)
+        }
+
+        /** Provides a [LogBuffer] for Camera related events. */
+        @Provides
+        @SysUISingleton
+        @ScreenRecordingLog
+        fun providesScreenRecordingLog(factory: LogBufferFactory): LogBuffer {
+            return factory.create(name = "ScreenRecordingLog", maxSize = 100)
         }
     }
 }

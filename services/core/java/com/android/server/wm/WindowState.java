@@ -138,6 +138,7 @@ import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_FIRST_TIME;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
+import static android.window.TaskConstants.TASK_CHILD_LAYER_STARTING_WINDOW;
 
 import static com.android.internal.policy.TransitionAnimation.MAX_ANIMATION_DURATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
@@ -192,6 +193,7 @@ import android.app.admin.DevicePolicyCache;
 import android.app.servertransaction.WindowStateInsetsControlChangeItem;
 import android.app.servertransaction.WindowStateResizeItem;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -795,6 +797,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     private boolean mInsetsAnimationRunning;
 
+    private final boolean mUsesSyncedInsetsAnimation;
+
     private final Consumer<SurfaceControl.Transaction> mSetSurfacePositionConsumer = t -> {
         // Only apply the position to the surface when there's no leash created.
         if (mSurfaceControl != null && mSurfaceControl.isValid() && !mSurfaceAnimator.hasLeash()) {
@@ -1152,6 +1156,41 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             parentWindow.addChild(this, sWindowSubLayerComparator);
         }
 
+        mUsesSyncedInsetsAnimation = calculateUsesSyncedInsetsAnimation();
+    }
+
+    boolean isSyncedInsetsAnimationEnabled() {
+        return mUsesSyncedInsetsAnimation;
+    }
+
+    private boolean calculateUsesSyncedInsetsAnimation() {
+        if (mOwnerUid == android.os.Process.SYSTEM_UID) {
+            return true;
+        }
+
+        if (mActivityRecord != null) {
+            try {
+                return mContext.getPackageManager().getPropertyAsUser(
+                        WindowManager.PROPERTY_COMPAT_ALLOW_SYNCHRONIZED_INSETS_ANIMATION,
+                        mActivityRecord.mActivityComponent.getPackageName(),
+                        mActivityRecord.mActivityComponent.getClassName(), mShowUserId)
+                        .getBoolean();
+            } catch (PackageManager.NameNotFoundException e) {
+                // Not found for activity, fallback to application
+            }
+        }
+        try {
+            return mContext.getPackageManager().getPropertyAsUser(
+                    WindowManager.PROPERTY_COMPAT_ALLOW_SYNCHRONIZED_INSETS_ANIMATION,
+                    getOwningPackage(), null, mShowUserId)
+                    .getBoolean();
+        } catch (PackageManager.NameNotFoundException e) {
+            // Not found for application either
+        }
+
+        return android.app.compat.CompatChanges.isChangeEnabled(
+                android.content.pm.ActivityInfo.ENABLE_SYNCHRONIZED_INSETS_ANIMATION,
+                getOwningPackage(), android.os.UserHandle.of(mShowUserId));
     }
 
     @Override
@@ -2460,7 +2499,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                         if (startingWindow && mSurfaceAnimator.hasLeash()) {
                             // Keep starting window on top during fade-out animation.
                             getPendingTransaction().setLayer(mSurfaceAnimator.mLeash,
-                                    Integer.MAX_VALUE);
+                                    TASK_CHILD_LAYER_STARTING_WINDOW);
                         }
                         mAnimatingExit = true;
 
@@ -4593,6 +4632,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
         // Force the show in the next prepareSurfaceLocked() call.
         mWinAnimator.mLastAlpha = -1;
+        if (com.android.window.flags.Flags.showImeLayeringTargetWhenAdding()
+                && WindowManager.useClientSurface()) {
+            // The alpha could be set to 0 when adding a window which is IME layering target.
+            mWinAnimator.mAlpha = mAttrs.alpha;
+        }
         ProtoLog.v(WM_DEBUG_ANIM, "performShowLocked: mDrawState=HAS_DRAWN in %s", this);
         mWinAnimator.mDrawState = HAS_DRAWN;
         mWmService.scheduleAnimationLocked();
@@ -4957,7 +5001,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
         }
 
-        if (mWinAnimator.mEnteringAnimation) {
+        if (!com.android.window.flags.Flags.reduceWindowTraversalOnEntering()
+                && mWinAnimator.mEnteringAnimation) {
+            // TODO(b/493429456): Remove the field mEnteringAnimation.
             mWinAnimator.mEnteringAnimation = false;
             mWmService.requestTraversal();
         }
@@ -5626,7 +5672,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 t = getSyncTransaction();
             }
             // The starting window should cover the task.
-            t.setLayer(mSurfaceControl, Integer.MAX_VALUE);
+            t.setLayer(mSurfaceControl, TASK_CHILD_LAYER_STARTING_WINDOW);
             return;
         }
         // See comment in assignRelativeLayerForImeLayeringTargetChild
@@ -5665,7 +5711,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         super.onAnimationLeashCreated(t, leash);
         if (isStartingWindowAssociatedToTask()) {
             // Make sure the animation leash is still on top of the task.
-            t.setLayer(leash, Integer.MAX_VALUE);
+            t.setLayer(leash, TASK_CHILD_LAYER_STARTING_WINDOW);
         }
     }
 

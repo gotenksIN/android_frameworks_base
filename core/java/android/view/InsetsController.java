@@ -238,10 +238,10 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         }
 
         /**
-         * @return {@code true} if the default synchronized insets animation is allowed for this
+         * @return {@code true} if the default synchronized insets animation is enabled for this
          *         host, {@code false} otherwise.
          */
-        default boolean allowsAdditionalSyncedAnimation() {
+        default boolean usesSyncedInsetsAnimationByDefault() {
             return false;
         }
 
@@ -421,15 +421,11 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         @Nullable
         private final InputMethodJankContext mInputMethodJankContext;
 
-        /* The handler of the thread used for running inset animations. */
-        @Nullable
-        private final Handler mHandler;
-
         public InternalAnimationControlListener(boolean show, boolean hasAnimationCallbacks,
                 @InsetsType int requestedTypes, @Behavior int behavior, boolean disable,
                 int floatingImeBottomInset,
                 @Nullable WindowInsetsAnimationControlListener loggingListener,
-                @Nullable InputMethodJankContext jankContext, @Nullable Handler handler) {
+                @Nullable InputMethodJankContext jankContext) {
             mShow = show;
             mHasAnimationCallbacks = hasAnimationCallbacks;
             mRequestedTypes = requestedTypes;
@@ -438,7 +434,6 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             mFloatingImeBottomInset = floatingImeBottomInset;
             mLoggingListener = loggingListener;
             mInputMethodJankContext = jankContext;
-            mHandler = handler;
         }
 
         @Override
@@ -495,8 +490,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                     ImeTracker.forJank().onRequestAnimation(
                             mInputMethodJankContext,
                             getAnimationType(),
-                            !mHasAnimationCallbacks,
-                            mHandler);
+                            !mHasAnimationCallbacks);
                 }
 
                 @Override
@@ -1713,14 +1707,15 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
     @VisibleForTesting
     @Override
     public void notifyFinished(@NonNull InsetsAnimationControlRunner runner, boolean shown) {
-        setRequestedVisibleTypes(shown ? runner.getTypes() : 0, runner.getTypes());
-        if (runner.getAnimationType() != ANIMATION_TYPE_RESIZE) {
-            // We update and send the requestedVisibleTypes first to the server to avoid an
-            // unwanted show/hide request.
-            // This could happen if a controlled (hide) animation is finished, but the IME is
-            // still shown: In this case, it is crucial that the server knows about the IME's
-            // requested visibility to avoid flickering (by first hiding due to being not
-            // requested and not animating, then showing because it becomes requested again).
+        if (runner.getAnimationType() == ANIMATION_TYPE_USER) {
+            // App-controlled animations (USER) may finish with a visibility state that differs
+            // from the last requested state. We update the requested visible types here and
+            // report them to the server to ensure synchronization between the client and server.
+            // This prevents unwanted show/hide requests and avoids flickering. For example, if a
+            // controlled hide animation for the IME finishes but the IME surface is still
+            // briefly visible, the server needs to know that the IME is officially not requested
+            // to avoid a redundant show request when the animation officially ends.
+            setRequestedVisibleTypes(shown ? runner.getTypes() : 0, runner.getTypes());
             reportRequestedVisibleTypes(null /* statsToken */);
         }
         cancelAnimation(runner, false /* invokeCallback */);
@@ -2023,19 +2018,12 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         final boolean hasAnimationCallbacks = mHost.hasAnimationCallbacks();
         final boolean useInsetsAnimationThread =
                 (!hasAnimationCallbacks && (!com.android.window.flags.Flags.syncedInsetsAnimation()
-                        || !mHost.allowsAdditionalSyncedAnimation())) || skipsCallbacks;
-
-        Handler handler = null;
-        if (Flags.fixJankTrackerImeAnimationDelay() && useInsetsAnimationThread) {
-            handler = android.view.InsetsAnimationThread.getHandler();
-        } else if (mHost.getRootViewContext() != null) {
-            handler = mHost.getRootViewContext().getMainThreadHandler();
-        }
+                        || !mHost.usesSyncedInsetsAnimationByDefault())) || skipsCallbacks;
 
         final var listener = new InternalAnimationControlListener(
                 show, hasAnimationCallbacks, types, mHost.getSystemBarsBehavior(),
                 skipsAnim || mAnimationsDisabled, mHost.dipToPx(FLOATING_IME_BOTTOM_INSET_DP),
-                mLoggingListener, mJankContext, handler);
+                mLoggingListener, mJankContext);
 
         // We are about to playing the default animation (show/hide). Passing a null frame indicates
         // the controlled types should be animated regardless of the frame.
@@ -2234,12 +2222,17 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
      */
     @InsetsType
     private int invokeControllableInsetsChangedListeners() {
+        if (mControllableInsetsChangedListeners.isEmpty()) {
+            return 0;
+        }
         mLastStartedAnimTypes = 0;
+        final ArrayList<WindowInsetsController.OnControllableInsetsChangedListener> listeners =
+                new ArrayList<>(mControllableInsetsChangedListeners);
+        final int size = listeners.size();
         @InsetsType
-        int types = calculateControllableTypes();
-        int size = mControllableInsetsChangedListeners.size();
+        final int types = calculateControllableTypes();
         for (int i = 0; i < size; i++) {
-            mControllableInsetsChangedListeners.get(i).onControllableInsetsChanged(this, types);
+            listeners.get(i).onControllableInsetsChanged(this, types);
         }
         return mLastStartedAnimTypes;
     }

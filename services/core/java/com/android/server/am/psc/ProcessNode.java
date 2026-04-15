@@ -16,6 +16,7 @@
 package com.android.server.am.psc;
 
 import static android.app.ActivityManager.PROCESS_CAPABILITY_NONE;
+import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 
 import static com.android.server.am.psc.PlatformCompatCache.CACHED_COMPAT_CHANGE_CAMERA_MICROPHONE_CAPABILITY;
 
@@ -42,9 +43,12 @@ import java.util.function.Consumer;
  * bindings, to determine the importance of the edges' target processes during graph traversal.
  */
 @RavenwoodKeepWholeClass
-class ProcessNode implements GraphNode {
+class ProcessNode extends GraphNode {
     /** A reference to the underlying ProcessRecordInternal. */
     private final @NonNull ProcessRecordInternal mProc;
+
+    /** Capabilities granted to this process. */
+    private @ProcessCapability int mCapability = PROCESS_CAPABILITY_NONE;
 
     /**
      * Whether this process node has {@link ActivityManager#PROCESS_CAPABILITY_IMPLICIT_CPU_TIME}
@@ -55,6 +59,9 @@ class ProcessNode implements GraphNode {
     // TODO(b/479393330): Remove this property and evaluate implicit CPU time directly from
     //  ProcessRecordInternal once the computation can be decoupled from oomadj.
     private boolean mHasIntrinsicImplicitCpuTime;
+
+    /** The process state of this process, calculated by {@link ProcStateController}. */
+    private @ProcessState int mProcState = PROCESS_STATE_UNKNOWN;
 
     ProcessNode(@NonNull ProcessRecordInternal proc) {
         mProc = Objects.requireNonNull(proc);
@@ -141,8 +148,15 @@ class ProcessNode implements GraphNode {
 
     @Override
     public final @ProcessCapability int getCapability() {
-        // TODO: b/477161434 - Implement the method.
-        return PROCESS_CAPABILITY_NONE;
+        return mCapability;
+    }
+
+    final void clearCapability() {
+        mCapability = PROCESS_CAPABILITY_NONE;
+    }
+
+    final void setCapability(@ProcessCapability int capability) {
+        mCapability = capability;
     }
 
     // TODO: b/483182189 - Move state getters below to ProcessEdge.
@@ -152,6 +166,15 @@ class ProcessNode implements GraphNode {
 
     void setHasIntrinsicImplicitCpuTime(boolean hasIntrinsicImplicitCpuTime) {
         mHasIntrinsicImplicitCpuTime = hasIntrinsicImplicitCpuTime;
+    }
+
+    @Override
+    public @ProcessState int getProcState() {
+        return mProcState;
+    }
+
+    void setProcState(@ProcessState int procState) {
+        mProcState = procState;
     }
 
     int getMaxAdj() {
@@ -169,6 +192,10 @@ class ProcessNode implements GraphNode {
 
     boolean isReceivingBroadcast() {
         return mProc.getReceivers().isReceivingBroadcast();
+    }
+
+    boolean isPendingFinishAttach() {
+        return mProc.isPendingFinishAttach();
     }
 
     boolean hasActiveInstrumentation() {
@@ -233,7 +260,7 @@ class ProcessNode implements GraphNode {
     }
 
     @ProcessState
-    int getProcState() {
+    int getCurProcState() {
         return mProc.getCurProcState();
     }
 

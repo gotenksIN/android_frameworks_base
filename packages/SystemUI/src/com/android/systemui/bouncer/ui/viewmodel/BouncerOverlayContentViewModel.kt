@@ -52,6 +52,8 @@ import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.model.Overlays
+import com.android.systemui.user.domain.interactor.UserLockedInteractor
+import com.android.systemui.user.domain.interactor.UserLogoutInteractor
 import com.android.systemui.user.ui.viewmodel.UserSwitcherViewModel
 import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import dagger.assisted.AssistedFactory
@@ -94,6 +96,8 @@ constructor(
     private val sceneInteractor: SceneInteractor,
     private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
     private val faceAuthInteractor: DeviceEntryFaceAuthInteractor,
+    private val userLockedInteractor: UserLockedInteractor,
+    private val userLogoutInteractor: UserLogoutInteractor,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
 ) : HydratedActivatable(enableEnqueuedActivations = enableWeaverWarmup()) {
     private val _selectedUserImage = MutableStateFlow<Bitmap?>(null)
@@ -144,8 +148,7 @@ constructor(
      */
     val actionButton: BouncerActionButtonModel? by
         bouncerActionButtonInteractor.actionButton.hydratedStateOf(
-            traceName = "actionButton",
-            initialValue = bouncerActionButtonInteractor.currentActionButton,
+            initialValue = bouncerActionButtonInteractor.currentActionButton
         )
 
     private val _isOneHandedModeSupported = MutableStateFlow(false)
@@ -211,11 +214,10 @@ constructor(
             .filter { it !is AuthenticationMethodModel.Biometric }
             .distinctUntilChanged()
             .hydratedStateOf(
-                traceName = "authenticationMethod",
                 initialValue =
                     authenticationInteractor.authenticationMethod.value.takeIf {
                         it !is AuthenticationMethodModel.Biometric
-                    },
+                    }
             )
 
     /** View-model for the current UI, based on the current authentication method. */
@@ -231,8 +233,7 @@ constructor(
             .filterNotNull()
             .flatMapLatest { it.readyToTryAuthenticate }
             .hydratedStateOf(
-                traceName = "isSignInButtonEnabled",
-                initialValue = authMethodViewModel?.readyToTryAuthenticate?.value ?: false,
+                initialValue = authMethodViewModel?.readyToTryAuthenticate?.value ?: false
             )
 
     /**
@@ -538,7 +539,33 @@ constructor(
         keyguardDismissActionInteractor.clearDismissAction()
     }
 
-    fun navigateBack() {
+    /**
+     * Handles back button clicks. Signs out the user or navigates back based on
+     * `shouldSignOutOnGoBack()`.
+     */
+    fun onGoBack() {
+        enqueueOnActivatedScope {
+            if (shouldSignOutOnGoBack()) {
+                userLogoutInteractor.logOutToSystemUser()
+            } else {
+                navigateBack()
+            }
+        }
+    }
+
+    /**
+     * Checks if the user should be signed out when going back.
+     *
+     * True if the user logged in, but not yet unlocked.
+     *
+     * @return True to sign out, false otherwise.
+     */
+    suspend private fun shouldSignOutOnGoBack(): Boolean {
+        return userLogoutInteractor.isLogoutToSystemUserEnabled.value &&
+            userLockedInteractor.isCurrentUserStorageLocked()
+    }
+
+    private fun navigateBack() {
         sceneInteractor.hideOverlay(Overlays.Bouncer, "back button clicked")
     }
 

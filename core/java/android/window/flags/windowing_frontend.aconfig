@@ -12,11 +12,20 @@ flag {
 }
 
 flag {
-  name: "release_all_transition_surfaces"
+  name: "show_ime_layering_target_when_adding"
+  namespace: "windowing_frontend"
+  description: "Prevent IME flickering when adding a layering target"
+  bug: "495662368"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "release_all_transition_surfaces_on_idle"
   namespace: "windowing_frontend"
   description: "Reduce offscreen layers which rely on GC to release"
   bug: "429548260"
-  is_fixed_read_only: true
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -139,11 +148,31 @@ flag {
 }
 
 flag {
+  name: "reduce_window_traversal_on_entering"
+  namespace: "windowing_frontend"
+  description: "Reduce unnecessary window traversal when an entering animation is done"
+  bug: "493429456"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "fifo_priority_for_major_ui_processes"
   namespace: "windowing_frontend"
   description: "Use realtime priority for SystemUI and launcher"
   bug: "288140556"
   is_fixed_read_only: true
+}
+
+flag {
+  name: "report_missed_enter_anim_on_resume"
+  namespace: "windowing_frontend"
+  description: "Notify onEnterAnimationComplete if process attaches after transition"
+  bug: "493382989"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -334,16 +363,6 @@ flag {
 
 
 flag {
-    name: "predictive_back_fix_ime_events_skip_back_dispatcher"
-    namespace: "windowing_frontend"
-    description: "Fixes a bug that prevented IMEs to send back events to the app's dispatcher"
-    bug: "460382604"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "transit_invisible_existence_change"
     namespace: "windowing_frontend"
     description: "Allow invisible containers to be in a transition if gone or created"
@@ -446,16 +465,6 @@ flag {
 }
 
 flag {
-    name: "use_transition_for_screenshot_window_additions"
-    namespace: "web_apps_on_chromeos_and_android"
-    description: "Use shell transitions to synchronize screenshot window additions."
-    bug: "476223353"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "send_new_insets_state_with_rotation"
     namespace: "windowing_frontend"
     description: "Send the new InsetsState to the shell when the display rotates"
@@ -483,7 +492,7 @@ flag {
 }
 
 flag {
-    name: "cross_display_transition"
+    name: "cross_display_transition_v2"
     namespace: "windowing_frontend"
     description: "Cross fade transition between two displays"
     bug: "481219379"

@@ -438,7 +438,7 @@ public final class DropBoxManagerService extends SystemService {
 
                 mContentResolver.registerContentObserver(
                     Settings.Global.CONTENT_URI, true,
-                    new ContentObserver(new Handler()) {
+                    new ContentObserver(new Handler(Looper.getMainLooper())) {
                         @Override
                         public void onChange(boolean selfChange) {
                             mReceiver.onReceive(getContext(), (Intent) null);
@@ -599,10 +599,8 @@ public final class DropBoxManagerService extends SystemService {
         try {
             boolean disabledByDefault = DISABLED_BY_DEFAULT_TAGS.contains(tag);
             if (disabledByDefault
-                    && Flags.enableWtfExceptionDropboxCarveout()
                     && exceptionClassName != null
                     && ENABLED_BY_DEFAULT_EXCEPTIONS.contains(exceptionClassName)) {
-                Slog.d(TAG, "Allowing exception: " + exceptionClassName + " for tag " + tag);
                 disabledByDefault = false;
             }
             if (disabledByDefault) {

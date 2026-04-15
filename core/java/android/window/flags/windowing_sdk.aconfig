@@ -85,15 +85,6 @@ flag {
     bug: "407669465"
 }
 
-flag {
-    namespace: "windowing_sdk"
-    name: "visibility_management_in_bubble_root"
-    description: "Visibility management improvement within Bubble root Task"
-    bug: "456051408"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     namespace: "aaos_core_contrib"
@@ -230,4 +221,30 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "add_bg_color_for_transparent_bubbles"
+    description: "Adds a background color to bubbles to prevent transparent layer issues"
+    bug: "457312170"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "engagement_control_api"
+    description: "Engagement Control APIs for requesting visual state changes."
+    bug: "477386067"
+    is_exported: true
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "activity_start_interceptor_speedbumps"
+    is_exported: true
+    description: "Feature flag for Activity Start Interceptor Speedbumps"
+    bug: "492347206"
 }

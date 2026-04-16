@@ -7996,12 +7996,6 @@
     <!-- Whether to force color fade. -->
     <bool name="config_forceColorFade">false</bool>
 
-    <!-- The locale languages that force camera shutter sound-->
-    <string-array name="config_cameraSoundForcedLanguage" translatable="false">
-        <item>ja</item>
-        <item>ko</item>
-    </string-array>
-
     <!-- location button service components -->
     <string name="config_locationButtonRenderService" translatable="false">com.android.systemui/.locationbutton.LocationButtonRenderService</string>
 
@@ -8103,4 +8097,7 @@
 
     <!-- Whether the speech compass is available. -->
     <bool name="config_speechCompassAvailable">false</bool>
+
+    <!-- Whether to explicitly disable the Video capability over IWLAN when Wi-Fi Calling is turned off. -->
+    <bool name="config_disable_video_capability_when_wfc_off">false</bool>
 </resources>

@@ -482,10 +482,10 @@ public final class DisconnectCause {
     /** @hide */
     public static final int INCOMING_CALLS_BARRED_WITHIN_CUG = 129;
 
-// QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     /** @hide */
     public static final int NARROWBAND_TERRESTRIAL_NETWORK = 130;
 
+// QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     //*********************************************************************************************
     // When adding a disconnect type:
     // 1) Please assign the new type the next id value below.

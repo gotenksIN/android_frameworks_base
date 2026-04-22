@@ -40,6 +40,7 @@ package com.android.systemui.statusbar.policy;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.util.Log;
@@ -516,7 +517,9 @@ public class FiveGServiceClient {
         }
     }
 
-    private Handler mHandler = new Handler() {
+// QTI_END: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
+// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+    private Handler mHandler = new Handler(Looper.getMainLooper()) {
         public void handleMessage(Message msg) {
             int what = msg.what;
             switch ( msg.what ) {

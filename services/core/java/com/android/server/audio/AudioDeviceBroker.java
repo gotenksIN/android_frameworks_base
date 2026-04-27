@@ -2543,6 +2543,15 @@ public class AudioDeviceBroker {
                 // workaround before we consistently update the route stack for active device
                 // switches
                 topDevice = mBtHelper.getHeadsetAudioDevice();
+                // In VOIP WAR, CallAudio advertises a dummy device ("00:00:00:00:00:00") as the
+                // active HFP device to avoid AudioManager applying HFP routing to the real LE
+                // Audio device. Return null here so updateCommunicationRoute falls through to
+                // its voip-war path and routes audio to the BLE device instead.
+                if (SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false)
+                        && topDevice != null
+                        && "00:00:00:00:00:00".equals(topDevice.getAddress())) {
+                    return null;
+                }
             }
             return topDevice;
         } else {
@@ -2599,7 +2608,8 @@ public class AudioDeviceBroker {
             boolean mVoipLeaWarEnabled =
                     SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
             if (AudioService.DEBUG_COMM_RTE) {
-                Log.v(TAG, "onUpdateCommunicationRoute, voipLeaEnabled " + mVoipLeaWarEnabled);
+                Log.v(TAG, "onUpdateCommunicationRoute, voipLeaEnabled " + mVoipLeaWarEnabled
+                        + " defaultDevice: " + defaultDevice);
             }
             if (mVoipLeaWarEnabled) {
                 AudioDeviceAttributes requestedDevice =

@@ -62,11 +62,7 @@
     <item msgid="695678520785580527">"無効"</item>
     <item msgid="6336372935919715515">"有効（フィルタ済み）"</item>
     <item msgid="2779123106632690576">"有効"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"有効（ヘッダーのみ）"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"有効（メディアパケット除外）"</item>
     <item>"有効 (プロファイルはフィルター処理されます)"</item>
   </string-array>
@@ -111,8 +107,6 @@
     <item msgid="3517061573669307965">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_HD">aptX™ HD</xliff:g> オーディオ"</item>
     <item msgid="2553206901068987657">"LDAC"</item>
     <item msgid="3026476115049855657">"Opus"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="102988075927343894">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_ADAPTIVE">aptX™ Adaptive</xliff:g> オーディオ"</item>
     <item msgid="6486050771049481">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_TWSP">aptX™ TWS+</xliff:g> オーディオ"</item>  </string-array>
   <string-array name="bluetooth_a2dp_codec_sample_rate_titles">

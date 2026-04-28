@@ -79,9 +79,7 @@ import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.FlagsParameterization;
 import android.telephony.TelephonyManager;
 import android.testing.TestableLooper;
-// QTI_BEGIN: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.testing.TestableLooper.RunWithLooper;
-// QTI_END: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.uilatencystats.UiLatencyStatsManager;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;

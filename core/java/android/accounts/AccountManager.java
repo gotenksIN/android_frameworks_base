@@ -579,9 +579,7 @@ public class AccountManager {
      * @return The account's password, null if none or if the account doesn't exist
      */
     public String getPassword(final Account account) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(22);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             return mService.getPassword(account);
@@ -612,9 +610,7 @@ public class AccountManager {
      * @return The user data, null if the account, key doesn't exist, or the user is locked
      */
     public String getUserData(final Account account, final String key) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(23);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         return mUserDataCache.query(new AccountKeyData(account,key));
     }
 
@@ -857,9 +853,7 @@ public class AccountManager {
         return new Future2Task<String>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.getAuthTokenLabel(mResponse, accountType, authTokenType);
             }
 
@@ -912,9 +906,7 @@ public class AccountManager {
         return new Future2Task<Boolean>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.hasFeatures(
                         mResponse, account, features, userId, mContext.getOpPackageName());
             }
@@ -976,9 +968,7 @@ public class AccountManager {
         return new Future2Task<Account[]>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.getAccountsByFeatures(mResponse, type, features,
                         mContext.getOpPackageName());
             }
@@ -1023,9 +1013,7 @@ public class AccountManager {
      *         already exists, the account is null, the user is locked, or another error occurs.
      */
     public boolean addAccountExplicitly(Account account, String password, Bundle userdata) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(24);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             return mService.addAccountExplicitly(
@@ -1250,9 +1238,7 @@ public class AccountManager {
         return new Future2Task<Account>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.renameAccount(mResponse, account, newName);
             }
             @Override
@@ -1314,9 +1300,7 @@ public class AccountManager {
     @Deprecated
     public AccountManagerFuture<Boolean> removeAccount(final Account account,
             AccountManagerCallback<Boolean> callback, Handler handler) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(25);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         return removeAccountAsUser(account, callback, handler, mContext.getUser());
     }
 
@@ -1367,9 +1351,7 @@ public class AccountManager {
     @FlaggedApi(FLAG_SPLIT_CREATE_MANAGED_PROFILE_ENABLED)
     public AccountManagerFuture<Bundle> removeAccount(final Account account,
             final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(28);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         return removeAccountAsUser(account, activity, callback, handler, mContext.getUser());
     }
 
@@ -1389,9 +1371,7 @@ public class AccountManager {
         return new Future2Task<Boolean>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.removeAccountAsUser(mResponse, account, false, userHandle.getIdentifier());
             }
             @Override
@@ -1418,9 +1398,7 @@ public class AccountManager {
         return new AmsTask(activity, handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(34);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.removeAccountAsUser(mResponse, account, activity != null,
                         userHandle.getIdentifier());
             }
@@ -1534,9 +1512,7 @@ public class AccountManager {
      * @param password The password to set, null to clear the password
      */
     public void setPassword(final Account account, final String password) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(26);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             mService.setPassword(account, password);
@@ -1565,9 +1541,7 @@ public class AccountManager {
      * @param account The account whose password to clear
      */
     public void clearPassword(final Account account) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(27);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (account == null) throw new IllegalArgumentException("account is null");
         try {
             mService.clearPassword(account);
@@ -1595,9 +1569,7 @@ public class AccountManager {
      * @param value String value to set, {@code null} to clear this user data key
      */
     public void setUserData(final Account account, final String key, final String value) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(28);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (account == null) throw new IllegalArgumentException("account is null");
         if (key == null) throw new IllegalArgumentException("key is null");
         try {
@@ -1748,9 +1720,7 @@ public class AccountManager {
         return new AmsTask(activity, handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.getAuthToken(mResponse, account, authTokenType,
                         false /* notifyOnAuthFailure */, true /* expectActivityLaunch */,
                         optionsIn);
@@ -1922,9 +1892,7 @@ public class AccountManager {
         return new AmsTask(null, handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.getAuthToken(mResponse, account, authTokenType,
                         notifyAuthFailure, false /* expectActivityLaunch */, optionsIn);
             }
@@ -2028,9 +1996,7 @@ public class AccountManager {
         return new AmsTask(activity, handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.addAccountAsUser(mResponse, accountType, authTokenType,
                         requiredFeatures, activity != null, optionsIn, userHandle.getIdentifier());
             }
@@ -2085,9 +2051,7 @@ public class AccountManager {
         return new Future2Task<Boolean>(handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(34);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.copyAccountToUser(
                         mResponse, account, fromUser.getIdentifier(), toUser.getIdentifier());
             }
@@ -2187,9 +2151,7 @@ public class AccountManager {
         return new AmsTask(activity, handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.confirmCredentialsAsUser(mResponse, account, options, activity != null,
                         userId);
             }
@@ -2303,16 +2265,12 @@ public class AccountManager {
     public AccountManagerFuture<Bundle> editProperties(final String accountType,
             final Activity activity, final AccountManagerCallback<Bundle> callback,
             final Handler handler) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(30);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (accountType == null) throw new IllegalArgumentException("accountType is null");
         return new AmsTask(activity, handler, callback) {
             @Override
             public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
                 mService.editProperties(mResponse, accountType, activity != null);
             }
         }.start();
@@ -2734,9 +2692,7 @@ public class AccountManager {
 
         @Override
         public void doWork() throws RemoteException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(31);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             getAccountByTypeAndFeatures(mAccountType, mFeatures,
                     new AccountManagerCallback<Bundle>() {
                         @Override

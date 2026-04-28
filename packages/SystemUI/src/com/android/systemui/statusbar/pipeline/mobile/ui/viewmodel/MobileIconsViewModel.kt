@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
 import android.telephony.SubscriptionManager
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.coroutines.newTracingContext
@@ -32,9 +30,7 @@ import com.android.systemui.statusbar.pipeline.mobile.StatusBarMobileIconKairos
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.VerboseMobileViewLogger
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import com.android.systemui.util.kotlin.mapDirect
@@ -78,17 +74,12 @@ constructor(
     val reuseCache = ConcurrentHashMap<Int, Pair<MobileIconViewModel, CoroutineScope>>()
     val activeMobileDataSubscriptionId: StateFlow<Int?> = interactor.activeMobileDataSubscriptionId
 
-// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions
-// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
             .mapDirect { subscriptions ->
-// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
                 subscriptions.map { subscriptionModel -> subscriptionModel.subscriptionId }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())
-// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
     private val ddsIcon: StateFlow<SignalIconModel?> =
         combine(interactor.defaultDataSubId, subscriptionIdsFlow) {
@@ -105,7 +96,6 @@ constructor(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
 
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     val mobileSubViewModels: StateFlow<List<MobileIconViewModelCommon>> =
         subscriptionIdsFlow
             .map { ids -> ids.map { commonViewModelForSub(it) } }
@@ -138,9 +128,7 @@ constructor(
             )
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     init {
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
         interactor.setDdsIconFLow(ddsIcon)
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
         scope.launch { subscriptionIdsFlow.collect { invalidateCaches(it) } }
     }
     fun viewModelForSub(subId: Int, location: StatusBarLocation): LocationBasedMobileViewModel {

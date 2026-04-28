@@ -96,10 +96,8 @@ class ShadeCarrierGroupMobileIconViewModel(
         verboseLogger = null,
     ) {
     private val isSingleCarrier = interactor.isSingleCarrier
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     val carrierName = interactor.customizedCarrierName
 
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     override val isVisible: StateFlow<Boolean> =
         combine(super.isVisible, isSingleCarrier) { isVisible, isSingleCarrier ->
                 if (isSingleCarrier) false else isVisible

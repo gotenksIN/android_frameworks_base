@@ -1086,12 +1086,10 @@ public class AudioDeviceBroker {
             for (String pair : kvpairs) {
                 String[] kv = pair.split("=");
 // QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
-// QTI_BEGIN: 2024-08-22: Audio: Fix string comparison for received SCO params
                 if (kv[0].equals("bt_lc3_swb")) {
                     mHasSwbLc3Enabled = ((kv[1].equals("on")) ? true : false);
                 } else if (kv[0].equals("bt_swb")) {
                     mHasSwbAptXEnabled = ((kv[1].equals("0")) ? true : false);
-// QTI_END: 2024-08-22: Audio: Fix string comparison for received SCO params
 // QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
                 }
             }

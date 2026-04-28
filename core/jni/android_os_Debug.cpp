@@ -809,7 +809,7 @@ static jboolean android_os_Debug_logAllocatorStats(JNIEnv*, jobject) {
     return mallopt(M_LOG_STATS, 0) == 1 ? JNI_TRUE : JNI_FALSE;
 }
 
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 static jstring android_os_Debug_getPidComm(JNIEnv* env, jobject clazz, jint pid) {
     char path[64];
     snprintf(path, sizeof(path), "/proc/%d/comm", pid);
@@ -832,13 +832,13 @@ static jstring android_os_Debug_getPidComm(JNIEnv* env, jobject clazz, jint pid)
 
 static jboolean android_os_Debug_getProcfsDmaBuffer(JNIEnv* env, jobject clazz, jobject listObj) {
     std::vector<dmabufinfo::DmaBuffer> dmabufs;
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     dmabufinfo::DmabufPerBufferStats stats;
     if (!dmabufinfo::GetDmabufPerBufferStats(stats)) {
         return false ? JNI_TRUE : JNI_FALSE;
     }
     if (!dmabufinfo::ReadProcfsDmaBufs(dmabufs, stats)) {
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         return false ? JNI_TRUE : JNI_FALSE;
     }
     if (dmabufs.empty()) {
@@ -925,7 +925,7 @@ static jboolean android_os_Debug_getProcfsDmaBuffer(JNIEnv* env, jobject clazz, 
     return true ? JNI_TRUE : JNI_FALSE;
 }
 
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 /*
  * JNI registration.
  */
@@ -969,10 +969,10 @@ static const JNINativeMethod gMethods[] = {
         {"isVmapStack", "()Z", (void*)android_os_Debug_isVmapStack},
         {"logAllocatorStats", "()Z", (void*)android_os_Debug_logAllocatorStats},
         {"getKernelCmaUsageKb", "()J", (void*)android_os_Debug_getKernelCmaUsageKb},
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         {"getProcfsDmaBuffer", "(Ljava/util/List;)Z", (void *)android_os_Debug_getProcfsDmaBuffer},
         {"getPidComm", "(I)Ljava/lang/String;", (void *)android_os_Debug_getPidComm},
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 };
 
 int register_android_os_Debug(JNIEnv *env)

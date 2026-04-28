@@ -55,9 +55,7 @@ import android.media.AudioManager;
 import android.media.AudioManager.AudioDeviceCategory;
 import android.media.AudioSystem;
 import android.media.BluetoothProfileConnectionInfo;
-// QTI_BEGIN: 2025-03-09: Bluetooth: LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
 import android.telecom.TelecomManager;
-// QTI_END: 2025-03-09: Bluetooth: LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Process;
@@ -104,10 +102,8 @@ public class BtHelper {
     private final Map<BluetoothDevice, AudioDeviceAttributes> mResolvedScoAudioDevices =
             new HashMap<>();
 
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
     private @Nullable BluetoothDevice mBluetoothHeadsetDummyDevice;
 
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
     @GuardedBy("BtHelper.this")
     private @Nullable BluetoothHearingAid mHearingAid = null;
 
@@ -120,9 +116,7 @@ public class BtHelper {
     // Reference to BluetoothA2dp to query for AbsoluteVolume.
     @GuardedBy("BtHelper.this")
     static private @Nullable BluetoothA2dp mA2dp = null;
-// QTI_BEGIN: 2020-07-09: Bluetooth: BT-Audio: Keep track of Active TWS+ EB device in BTHelper
     static private @Nullable BluetoothDevice mBluetoothA2dpActiveDevice;
-// QTI_END: 2020-07-09: Bluetooth: BT-Audio: Keep track of Active TWS+ EB device in BTHelper
 
     @GuardedBy("BtHelper.this")
     private @Nullable BluetoothCodecConfig mA2dpCodecConfig;
@@ -684,34 +678,20 @@ public class BtHelper {
         return deviceName;
     }
 
-// QTI_BEGIN: 2020-07-09: Bluetooth: BT-Audio: Keep track of Active TWS+ EB device in BTHelper
     /*packages*/ static void SetA2dpActiveDevice(BluetoothDevice device) {
         Log.w(TAG,"SetA2dpActiveDevice for TWS+ pair as " + device);
         mBluetoothA2dpActiveDevice = device;
     }
 
-// QTI_END: 2020-07-09: Bluetooth: BT-Audio: Keep track of Active TWS+ EB device in BTHelper
-// QTI_BEGIN: 2019-06-04: Bluetooth: TWS_A2DP: Handle active device change between TWS+ earbuds
     /*packages*/ @NonNull static boolean isTwsPlusSwitch(@NonNull BluetoothDevice device,
                                                                  String address) {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-// QTI_END: 2019-06-04: Bluetooth: TWS_A2DP: Handle active device change between TWS+ earbuds
-// QTI_BEGIN: 2020-02-05: Bluetooth: BT_Audio: Updated Check for TWS+ switch
         BluetoothDevice connDevice = adapter.getRemoteDevice(address);
-// QTI_END: 2020-02-05: Bluetooth: BT_Audio: Updated Check for TWS+ switch
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
         if (device == null || connDevice == null) {
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
-// QTI_BEGIN: 2019-06-04: Bluetooth: TWS_A2DP: Handle active device change between TWS+ earbuds
             return false;
         }
-// QTI_END: 2019-06-04: Bluetooth: TWS_A2DP: Handle active device change between TWS+ earbuds
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
         return false;
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
-// QTI_BEGIN: 2019-06-04: Bluetooth: TWS_A2DP: Handle active device change between TWS+ earbuds
     }
-// QTI_END: 2019-06-04: Bluetooth: TWS_A2DP: Handle active device change between TWS+ earbuds
     BtHelper(@NonNull AudioDeviceBroker broker) {
         mDeviceBroker = broker;
         if (!mDeviceBroker.isScoManagedByAudio()) {
@@ -741,11 +721,9 @@ public class BtHelper {
 
     @GuardedBy("mDeviceBroker.mDeviceStateLock")
     /*package*/ synchronized void onSystemReady() {
-// QTI_BEGIN: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
         if (AudioService.DEBUG_SCO) {
             Log.i(TAG, "In onSystemReady(), calling resetBluetoothSco()");
         }
-// QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
         if (mScoHelper != null) {
             mScoHelper.resetBluetoothSco();
         }
@@ -942,15 +920,11 @@ public class BtHelper {
         }
     }
 
-// QTI_BEGIN: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
      //SCO device tracking for TWSPLUS or GROUP device
-// QTI_END: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
     private HashMap<BluetoothDevice, Integer> mScoClientDevices =
                                           new HashMap<BluetoothDevice, Integer>();
-// QTI_BEGIN: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
     private static final int GROUP_ID_START = 0;
     private static final int GROUP_ID_END = 15;
-// QTI_END: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
 
     private void updateTwsPlusScoState(BluetoothDevice device, Integer state) {
         if (mScoClientDevices.containsKey(device)) {
@@ -995,13 +969,8 @@ public class BtHelper {
         return ret;
     }
 
-// QTI_BEGIN: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
     private boolean isGroupDevice(BluetoothDevice device) {
-// QTI_END: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
         int type = 0;
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
-// QTI_BEGIN: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
         boolean ret = false;
         Log.i(TAG, "Bluetooth device type: " + type);
         if (type >= GROUP_ID_START && type <= GROUP_ID_END)
@@ -1062,7 +1031,6 @@ public class BtHelper {
         return ret;
     }
 
-// QTI_END: 2022-01-18: Bluetooth: BtHelper: enhancement change for CSIP group device SCO connection update
     /*package*/ synchronized Pair<Integer, Boolean>
                     getCodecWithFallback(@NonNull BluetoothDevice device,
                                          @AudioService.BtProfile int profile,
@@ -1540,7 +1508,6 @@ public class BtHelper {
         return btHeadsetDeviceToAudioDevice(btDevice);
     }
 
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
     @Nullable AudioDeviceAttributes getHeadsetAudioDummyDevice() {
         if (mBluetoothHeadsetDummyDevice == null) {
             return null;
@@ -1548,7 +1515,6 @@ public class BtHelper {
         return btHeadsetDeviceToAudioDevice(mBluetoothHeadsetDummyDevice);
     }
 
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
     private static AudioDeviceAttributes btHeadsetDeviceToAudioDevice(BluetoothDevice btDevice) {
         if (btDevice == null) {
             return new AudioDeviceAttributes(AudioSystem.DEVICE_OUT_BLUETOOTH_SCO, "");
@@ -1646,9 +1612,7 @@ public class BtHelper {
         if (!handleBtScoActiveDeviceChange(previousActiveDevice, false, deviceSwitch)) {
             Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
                     + getAnonymizedAddress(previousActiveDevice));
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
         }
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
         // mBluetoothHeadsetDevice must correspond to previous device until now and new device from
         // now on for SCO activation/deactivation requests made by
         // AudioDeviceBroker.onUpdateCommunicationRouteClient() to succeed.
@@ -1669,12 +1633,10 @@ public class BtHelper {
     private BluetoothProfile.ServiceListener mBluetoothProfileServiceListener =
             new BluetoothProfile.ServiceListener() {
                 public void onServiceConnected(int profile, BluetoothProfile proxy) {
-// QTI_BEGIN: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
                     if (AudioService.DEBUG_SCO) {
                         Log.i(TAG, "In onServiceConnected(), profile: " + profile +
                                    ", proxy: "+proxy);
                     }
-// QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
                     switch(profile) {
                         case BluetoothProfile.A2DP:
                         case BluetoothProfile.HEADSET:

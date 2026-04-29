@@ -1148,17 +1148,13 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private String getDefaultValueOfBroadcastName() {
         // set the default value;
         int postfix = ThreadLocalRandom.current().nextInt(DEFAULT_CODE_MIN, DEFAULT_CODE_MAX);
-// QTI_BEGIN: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
         return BluetoothAdapter.getDefaultAdapter().getName() + UNDERLINE + postfix;
-// QTI_END: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
     }
 
     private String getDefaultValueOfProgramInfo() {
         // set the default value;
         int postfix = ThreadLocalRandom.current().nextInt(DEFAULT_CODE_MIN, DEFAULT_CODE_MAX);
-// QTI_BEGIN: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
         return BluetoothAdapter.getDefaultAdapter().getName() + UNDERLINE + postfix;
-// QTI_END: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
     }
 
     private byte[] getDefaultValueOfBroadcastCode() {

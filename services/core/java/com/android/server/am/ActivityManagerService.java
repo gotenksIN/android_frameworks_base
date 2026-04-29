@@ -1002,14 +1002,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.addPidLocked(app);
-            }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1035,15 +1027,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.removePidLocked(pid, app);
-                freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
-            }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
@@ -8474,12 +8457,27 @@ public class ActivityManagerService extends IActivityManager.Stub
                 // promote to FIFO now
                 if (proc.mState.getCurrentSchedulingGroup() == ProcessList.SCHED_GROUP_TOP_APP) {
                     if (DEBUG_OOM_ADJ) Slog.d("UI_FIFO", "Promoting " + tid + "out of band");
-                    if (proc.useFifoUiScheduling()) {
+                    if (proc.useFifoUiScheduling()
+                            || ((AppBackgroundManager.getInstance().useUIRTSettings())
+                                && (!proc.info.isSystemApp() && !proc.info.isUpdatedSystemApp()
+                                && proc.processName.equals(proc.info.packageName)))) {
                         setThreadScheduler(proc.getRenderThreadTid(),
                                 SCHED_FIFO | SCHED_RESET_ON_FORK, 1);
                     } else {
                         setThreadPriority(proc.getRenderThreadTid(),
                             THREAD_PRIORITY_TOP_APP_BOOST);
+                    }
+
+                    if (mOomAdjuster.mUsePerfCoreAffinity
+                            || AppBackgroundManager.getInstance().useUIAffinitySettings()) {
+                        if (!proc.info.isSystemApp() && !proc.info.isUpdatedSystemApp()
+                                && proc.processName.equals(proc.info.packageName)) {
+                            try {
+                                Process.setPerfCoreAffinity(proc.getRenderThreadTid(), true);
+                            } catch (Exception e) {
+                                Slog.e("UI_Affinity", "Failed to set perf core affinity", e);
+                            }
+                        }
                     }
                 }
             } else {
@@ -9342,6 +9340,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             t.traceEnd(); // PhaseActivityManagerReady
         }
+
+        AppBackgroundManager.getInstance().setAMS(this);
     }
 
     private class MyBinderProxyCountEventListener implements BinderProxyCountEventListener {
@@ -9829,7 +9829,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
         sb.append("SystemUptimeMs: ").append(SystemClock.uptimeMillis()).append("\n");
 
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9837,12 +9836,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         // is invoked due to unavailability of lock on am and it
         // would prevent watchdog from killing system_server.
         if (process == null) {
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             sb.append("Process: ").append(processName).append("\n");
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             return;
         }
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Note: ProcessRecord 'process' is guarded by the service
         // instance.  (notably process.pkgList, which could otherwise change
         // concurrently during execution of this method)
@@ -11144,6 +11140,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mProcessList.mAppExitInfoTracker.dumpHistoryProcessExitInfo(pw, dumpPackage);
             } else if ("component-alias".equals(cmd)) {
                 mComponentAliasResolver.dump(pw);
+            } else if ("ui-fluency".equals(cmd)){
+                AppBackgroundManager.getInstance().dump(fd, pw, args);
             } else {
                 // Dumping a single activity?
                 if (!mAtmInternal.dumpActivity(fd, pw, cmd, args, opti, dumpAll,

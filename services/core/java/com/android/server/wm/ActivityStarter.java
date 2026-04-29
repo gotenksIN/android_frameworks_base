@@ -148,6 +148,9 @@ import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.UiThread;
 import com.android.server.am.ActivityManagerService.IntentCreatorToken;
 import com.android.server.am.PendingIntentRecord;
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+import com.android.server.am.AppBackgroundManager;
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import com.android.server.pm.InstantAppResolver;
 import com.android.server.pm.PackageArchiver;
 import com.android.server.power.ShutdownCheckPoints;
@@ -1102,6 +1105,15 @@ class ActivityStarter {
                     && realCallingUid != Request.DEFAULT_REAL_CALLING_UID) {
                 request.logMessage.append(" (realCallingUid=").append(realCallingUid).append(")");
             }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+
+            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+            if (appBgManager != null && aInfo != null) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+                appBgManager.handleActivityStart(aInfo.applicationInfo);
+            }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         }
 
         ActivityRecord sourceRecord = null;

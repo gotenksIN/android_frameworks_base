@@ -1816,4 +1816,14 @@ public class Process {
     }
 
     private static native int nativePidFdOpen(int pid, int flags) throws ErrnoException;
+
+    /**
+    * Set thread affinity to performance cores.
+    *
+    * @param tid The thread ID to set affinity for
+    * @param enable Whether to enable performance core affinity
+    *
+    * @hide
+    */
+    public static native boolean setPerfCoreAffinity(int tid, boolean enable);
 }

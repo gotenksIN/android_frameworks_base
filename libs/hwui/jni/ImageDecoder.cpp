@@ -331,11 +331,10 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
 
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
     const bool isHardware = !requireMutable
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
-        && ((allocator == kDefault_Allocator && !should_use_sw) ||
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+        && (allocator == kDefault_Allocator ||
             allocator == kHardware_Allocator)
-        && colorType != kGray_8_SkColorType;
+        && colorType != kGray_8_SkColorType
+        && !should_use_sw;
 
     if (colorType == kRGBA_F16_SkColorType && isHardware &&
             !uirenderer::HardwareBitmapUploader::hasFP16Support()) {

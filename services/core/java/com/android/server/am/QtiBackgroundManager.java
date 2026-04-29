@@ -39,6 +39,7 @@ import android.content.IntentFilter;
 import android.provider.Settings;
 import android.database.ContentObserver;
 import android.net.Uri;
+import android.os.SystemProperties;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -476,8 +477,21 @@ public class QtiBackgroundManager {
                 "ro.vendor.perf.qti_bg_manager.enable_process_level_freezer", "false"));
         mUsePackageLevelFreezer = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.qti_bg_manager.enable_package_level_freezer", "true"));
-        mUseAppKeepaliveManager = Boolean.valueOf(mPerf.perfGetProp(
-                "ro.vendor.perf.qti_bg_manager.enable_app_keepalive_manager", "true"));
+
+        String vendorValue = mPerf.perfGetProp(
+                "ro.vendor.perf.qti_bg_manager.enable_app_keepalive_manager", "");
+        if (vendorValue == null || vendorValue.isEmpty()) {
+            String gmsVersion = SystemProperties.get("ro.com.google.gmsversion", "");
+            mUseAppKeepaliveManager = gmsVersion.isEmpty();
+        } else {
+            mUseAppKeepaliveManager = Boolean.valueOf(vendorValue);
+        }
+
+        Slog.i(TAG, LOG_PREFIX_KEEPALIVE + " mUseAppKeepaliveManager=" + mUseAppKeepaliveManager
+                + " (vendorProp=" + vendorValue + ", gmsVersion="
+                + (vendorValue.isEmpty() ? SystemProperties.get("ro.com.google.gmsversion", "")
+                : "n/a") + ")");
+
         mUseUIRTSettings = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.qti_bg_manager.enable_ui_rt_settings", "true"));
         mUseUIAffinitySettings = Boolean.valueOf(mPerf.perfGetProp(

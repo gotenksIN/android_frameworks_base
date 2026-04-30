@@ -384,6 +384,7 @@ public class AudioSystem
             case AUDIO_FORMAT_SBC -> BluetoothCodecType.CODEC_ID_SBC;
             case AUDIO_FORMAT_APTX -> BluetoothCodecType.CODEC_ID_APTX;
             case AUDIO_FORMAT_APTX_HD -> BluetoothCodecType.CODEC_ID_APTX_HD;
+            case AUDIO_FORMAT_APTX_ADAPTIVE -> BluetoothCodecType.CODEC_ID_APTX_AD;
             case AUDIO_FORMAT_LDAC -> {
                 if (com.android.bluetooth.flags.Flags.a2dpLdacApi()) {
                     yield BluetoothCodecType.CODEC_ID_SONY_LDAC;
@@ -441,6 +442,9 @@ public class AudioSystem
         }
         if (codecId == BluetoothCodecType.CODEC_ID_APTX_HD) {
             return AudioSystem.AUDIO_FORMAT_APTX_HD;
+        }
+        if (codecId == BluetoothCodecType.CODEC_ID_APTX_AD) {
+            return AudioSystem.AUDIO_FORMAT_APTX_ADAPTIVE;
         }
         if (com.android.bluetooth.flags.Flags.a2dpLdacApi()) {
             if (codecId == BluetoothCodecType.CODEC_ID_SONY_LDAC) {

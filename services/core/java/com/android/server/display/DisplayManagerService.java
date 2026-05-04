@@ -175,9 +175,7 @@ import android.view.ContentRecordingSession;
 import android.view.Display;
 import android.view.DisplayEventReceiver;
 import android.view.DisplayInfo;
-// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
 import android.view.DisplayAddress;
-// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
 import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.RefreshRateRange;
@@ -679,7 +677,6 @@ public final class DisplayManagerService extends SystemService {
     @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.S)
     static final long DISPLAY_MODE_RETURNS_PHYSICAL_REFRESH_RATE = 170503758L;
 
-// QTI_BEGIN: 2020-10-14: Display: DisplayManager: Fix synchronization issue
     // The synchronization root for the display dumpsys.
     private final SyncRoot mSyncDump = new SyncRoot();
 
@@ -687,7 +684,6 @@ public final class DisplayManagerService extends SystemService {
     @GuardedBy("mSyncDump")
     private boolean mDumpInProgress;
 
-// QTI_END: 2020-10-14: Display: DisplayManager: Fix synchronization issue
     public DisplayManagerService(Context context) {
         this(context, new Injector());
     }
@@ -763,9 +759,7 @@ public final class DisplayManagerService extends SystemService {
         mWideColorSpace = colorSpaces[1];
         mOverlayProperties = SurfaceControl.getOverlaySupport();
         mSystemReady = false;
-// QTI_BEGIN: 2020-10-14: Display: DisplayManager: Fix synchronization issue
         mDumpInProgress = false;
-// QTI_END: 2020-10-14: Display: DisplayManager: Fix synchronization issue
         mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
         mExtraDisplayLoggingPackageName = DisplayProperties.debug_vri_package().orElse(null);
         mExtraDisplayEventLogging = !TextUtils.isEmpty(mExtraDisplayLoggingPackageName);
@@ -2666,9 +2660,7 @@ public final class DisplayManagerService extends SystemService {
             });
         }
 
-// QTI_BEGIN: 2021-06-28: Display: initialize displays to On state
         mDisplayStates.append(displayId, Display.STATE_ON);
-// QTI_END: 2021-06-28: Display: initialize displays to On state
 
         final float brightnessDefault = display.getDisplayInfoLocked().brightnessDefault;
         mDisplayBrightnesses.append(displayId,
@@ -4168,7 +4160,6 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void dumpInternal(PrintWriter pw) {
-// QTI_BEGIN: 2020-10-14: Display: DisplayManager: Fix synchronization issue
         synchronized (mSyncDump) {
             if (mDumpInProgress) {
                 pw.println("One dump is in service already.");
@@ -4177,7 +4168,6 @@ public final class DisplayManagerService extends SystemService {
             mDumpInProgress = true;
         }
 
-// QTI_END: 2020-10-14: Display: DisplayManager: Fix synchronization issue
         pw.println("DISPLAY MANAGER (dumpsys display)");
         BrightnessTracker brightnessTrackerLocal;
         SparseArray<DisplayPowerController> displayPowerControllersLocal = new SparseArray<>();
@@ -4292,11 +4282,9 @@ public final class DisplayManagerService extends SystemService {
             pw.println();
             mSmallAreaDetectionController.dump(pw);
         }
-// QTI_BEGIN: 2020-10-14: Display: DisplayManager: Fix synchronization issue
         synchronized (mSyncDump) {
             mDumpInProgress = false;
         }
-// QTI_END: 2020-10-14: Display: DisplayManager: Fix synchronization issue
 
         pw.println();
         mDisplayTopologyCoordinator.dump(pw);

@@ -2593,31 +2593,21 @@ public abstract class ConnectionService extends Service {
         findConnectionForAction(callId, "abort").onAbort();
     }
 
-// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
     protected void answerVideo(String callId, int videoState) {
-// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         Log.i(this, "answerVideo %s", callId);
-// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "answer").onAnswer(videoState);
         } else {
             findConferenceForAction(callId, "answer").onAnswer(videoState);
         }
-// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
     }
 
-// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
     protected void answer(String callId) {
-// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         Log.i(this, "answer %s", callId);
         if (mConnectionById.containsKey(callId)) {
-// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
             findConnectionForAction(callId, "answer").onAnswer();
-// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         } else {
-// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
             findConferenceForAction(callId, "answer").onAnswer();
-// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         }
     }
 
@@ -2671,9 +2661,7 @@ public abstract class ConnectionService extends Service {
         }
     }
 
-// QTI_BEGIN: 2025-01-25: Telephony: Revert "DSDA Framework changes"
     private void hold(String callId) {
-// QTI_END: 2025-01-25: Telephony: Revert "DSDA Framework changes"
         Log.i(this, "hold %s", callId);
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "hold").onHold();
@@ -2682,9 +2670,7 @@ public abstract class ConnectionService extends Service {
         }
     }
 
-// QTI_BEGIN: 2025-01-25: Telephony: Revert "DSDA Framework changes"
     private void unhold(String callId) {
-// QTI_END: 2025-01-25: Telephony: Revert "DSDA Framework changes"
         Log.i(this, "unhold %s", callId);
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "unhold").onUnhold();
@@ -3893,9 +3879,7 @@ public abstract class ConnectionService extends Service {
         }
     }
 
-// QTI_BEGIN: 2025-01-25: Telephony: Revert "DSDA Framework changes"
     private Connection findConnectionForAction(String callId, String action) {
-// QTI_END: 2025-01-25: Telephony: Revert "DSDA Framework changes"
         if (callId != null && mConnectionById.containsKey(callId)) {
             return mConnectionById.get(callId);
         }
@@ -3910,9 +3894,7 @@ public abstract class ConnectionService extends Service {
         return sNullConnection;
     }
 
-// QTI_BEGIN: 2025-01-25: Telephony: Revert "DSDA Framework changes"
     private Conference findConferenceForAction(String conferenceId, String action) {
-// QTI_END: 2025-01-25: Telephony: Revert "DSDA Framework changes"
         if (mConferenceById.containsKey(conferenceId)) {
             return mConferenceById.get(conferenceId);
         }
@@ -3958,9 +3940,7 @@ public abstract class ConnectionService extends Service {
         return ids;
     }
 
-// QTI_BEGIN: 2025-01-25: Telephony: Revert "DSDA Framework changes"
     private Conference getNullConference() {
-// QTI_END: 2025-01-25: Telephony: Revert "DSDA Framework changes"
         if (sNullConference == null) {
             sNullConference = new Conference(null) {};
         }

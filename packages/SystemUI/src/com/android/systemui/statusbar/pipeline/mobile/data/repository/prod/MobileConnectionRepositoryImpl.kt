@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.data.repository.prod
 
 import android.annotation.SuppressLint
@@ -34,32 +34,30 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
 import android.database.ContentObserver
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
-// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-06-26: Data: Separate exclamation mark display for mobile network
 import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.TelephonyNetworkSpecifier
-// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2023-06-26: Data: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
 import android.provider.Settings.Global
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 import android.telephony.CellSignalStrength.SIGNAL_STRENGTH_GREAT
 import android.telephony.CellSignalStrength.SIGNAL_STRENGTH_GOOD
 import android.telephony.CellSignalStrength.SIGNAL_STRENGTH_MODERATE
 import android.telephony.CellSignalStrength.SIGNAL_STRENGTH_POOR
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 import android.telephony.CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN
 import android.telephony.CellSignalStrengthCdma
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
 import android.telephony.CellSignalStrengthLte
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
 import android.telephony.ims.ImsException
 import android.telephony.ims.ImsMmTelManager
 import android.telephony.ims.ImsReasonInfo
@@ -67,16 +65,16 @@ import android.telephony.ims.ImsRegistrationAttributes
 import android.telephony.ims.ImsStateCallback
 import android.telephony.ims.feature.MmTelFeature.MmTelCapabilities
 import android.telephony.ims.RegistrationManager
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
 import android.telephony.ServiceState
 import android.telephony.SignalStrength
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import android.telephony.SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX
 import android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID
 import android.telephony.TelephonyCallback
@@ -89,18 +87,18 @@ import android.telephony.TelephonyManager.EXTRA_SUBSCRIPTION_ID
 import android.telephony.TelephonyManager.NETWORK_TYPE_UNKNOWN
 import android.telephony.TelephonyManager.UNKNOWN_CARRIER_ID
 import android.telephony.satellite.NtnSignalStrength
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
 import android.util.Log
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
 import com.android.settingslib.Utils
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.flags.Flags.ROAMING_INDICATOR_VIA_DISPLAY_INFO
 import com.android.systemui.log.table.TableLogBuffer
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
 import com.android.systemui.log.table.logDiffsForTable
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
 import com.android.systemui.statusbar.pipeline.mobile.data.MobileInputLogger
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState.Disconnected
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
@@ -118,11 +116,11 @@ import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxy
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.toMobileDataActivityModel
 import com.android.systemui.util.kotlin.mapDirect
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import com.android.systemui.statusbar.policy.FiveGServiceClient
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
 import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import com.qti.extphone.RadioIconType
 import javax.inject.Inject
@@ -136,9 +134,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
 import kotlinx.coroutines.flow.distinctUntilChanged
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -147,13 +145,11 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
 import kotlinx.coroutines.launch
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
 import java.util.concurrent.ConcurrentHashMap
 
 
@@ -174,20 +170,18 @@ class MobileConnectionRepositoryImpl(
     broadcastDispatcher: BroadcastDispatcher,
     private val mobileMappingsProxy: MobileMappingsProxy,
     private val bgDispatcher: CoroutineDispatcher,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private val logger: MobileInputLogger,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     override val tableLogBuffer: TableLogBuffer,
     flags: FeatureFlagsClassic,
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
     private val scope: CoroutineScope,
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
     private val fiveGServiceClient: FiveGServiceClient,
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     slotIndexForSubId:  Flow<Int>? = null,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
 ) : MobileConnectionRepository {
     init {
         if (telephonyManager.subscriptionId != subId) {
@@ -197,20 +191,18 @@ class MobileConnectionRepositoryImpl(
             )
         }
     }
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
     private val tag: String = MobileConnectionRepositoryImpl::class.java.simpleName
     private val imsMmTelManager: ImsMmTelManager = ImsMmTelManager.createForSubscriptionId(subId)
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private var imsStateCallback: ImsStateCallback? = null
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private var registrationCallback: RegistrationManager.RegistrationCallback? = null
     private var capabilityCallback: ImsMmTelManager.CapabilityCallback? = null
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private var imsStateCallBackRegistered = false
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     /**
      * This flow defines the single shared connection to system_server via TelephonyCallback. Any
      * new callback should be added to this listener and funneled through callbackEvents via a data
@@ -301,11 +293,11 @@ class MobileConnectionRepositoryImpl(
                     }
 
                 telephonyManager.registerTelephonyCallback(bgDispatcher.asExecutor(), callback)
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
                 awaitClose {
                     telephonyManager.unregisterTelephonyCallback(callback)
                 }
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
             }
             .flowOn(bgDispatcher)
             .scan(initial = initial) { state, event -> state.applyEvent(event) }
@@ -314,9 +306,7 @@ class MobileConnectionRepositoryImpl(
 
 
     private val fiveGStateCache = ConcurrentHashMap<Int, StateFlow<TelephonyCallbackState>>()
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
     private fun getFiveGStateFlow(slotIndex: Int): Flow<TelephonyCallbackState> {
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
         return fiveGStateCache.getOrPut(slotIndex) {
             callbackFlow {
                 val listener =
@@ -338,27 +328,20 @@ class MobileConnectionRepositoryImpl(
                             logger.logOnCiwlanAvailableChanged(available, subId)
                             trySend(CallbackEvent.OnCiwlanAvailableChanged(available))
                         }
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
                     }
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
                 fiveGServiceClient.registerListener(slotIndex, listener)
                 awaitClose {
                     fiveGServiceClient.unregisterListener(slotIndex, listener)
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
                 }
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
             }
                 .scan(TelephonyCallbackState()) { state, event -> state.applyEvent(event) }
                 .stateIn(scope, SharingStarted.WhileSubscribed(), TelephonyCallbackState())
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
         }
     }
 
     private val fiveGState: Flow<TelephonyCallbackState> = run {
         val initial = flowOf(TelephonyCallbackState()
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
             .applyEvent(CallbackEvent.OnRadioIconTypeChanged(RadioIconType.TYPE_NONE, false))
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
             .applyEvent(CallbackEvent.OnCiwlanAvailableChanged(false)))
         if (slotIndexForSubId == null) {
             initial
@@ -374,8 +357,7 @@ class MobileConnectionRepositoryImpl(
         }
     }
 
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private fun unRegisterImsCallbackIfNeeded() {
         if (!imsStateCallBackRegistered) {
             return
@@ -426,7 +408,7 @@ class MobileConnectionRepositoryImpl(
         }
     }
 
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     override val isEmergencyOnly =
         callbackEvents
             .mapNotNull { it.onServiceStateChanged }
@@ -481,9 +463,9 @@ class MobileConnectionRepositoryImpl(
                         SIGNAL_STRENGTH_NONE_OR_UNKNOWN
                     }
                 }
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
             }
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
             .stateIn(scope, SharingStarted.WhileSubscribed(), SIGNAL_STRENGTH_NONE_OR_UNKNOWN)
 
     override val primaryLevel =
@@ -528,17 +510,17 @@ class MobileConnectionRepositoryImpl(
                     OverrideNetworkType(
                         mobileMappingsProxy.toIconKeyOverride(
                             it.telephonyDisplayInfo.overrideNetworkType
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
                         ),
                         it.telephonyDisplayInfo.overrideNetworkType
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
                     )
                 } else if (it.telephonyDisplayInfo.networkType != NETWORK_TYPE_UNKNOWN) {
                     DefaultNetworkType(
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
                         mobileMappingsProxy.toIconKey(it.telephonyDisplayInfo.networkType),
                         it.telephonyDisplayInfo.networkType
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
                     )
                 } else {
                     UnknownNetworkType
@@ -605,14 +587,12 @@ class MobileConnectionRepositoryImpl(
      * See b/322432056 for context.
      */
     @SuppressLint("RegisterReceiverViaContext")
-// QTI_BEGIN: 2024-07-15: Android_UI: SystemUI: Fix "No service" in Internet tile after ANR/ crash.
     override val networkName: StateFlow<NetworkNameModel> = run {
         var subscriptionManager: SubscriptionManager? =
             context.getSystemService(SubscriptionManager::class.java)
         val initial = subscriptionManager?.getActiveSubscriptionInfo(subId)?.let {
              NetworkNameModel.IntentDerived(it.carrierName.toString())
         } ?: defaultNetworkName
-// QTI_END: 2024-07-15: Android_UI: SystemUI: Fix "No service" in Internet tile after ANR/ crash.
         conflatedCallbackFlow {
                 val receiver =
                     object : BroadcastReceiver() {
@@ -642,11 +622,9 @@ class MobileConnectionRepositoryImpl(
                 awaitClose { context.unregisterReceiver(receiver) }
             }
             .flowOn(bgDispatcher)
-// QTI_BEGIN: 2024-07-15: Android_UI: SystemUI: Fix "No service" in Internet tile after ANR/ crash.
             .stateIn(scope, SharingStarted.Eagerly, initial)
     }
 
-// QTI_END: 2024-07-15: Android_UI: SystemUI: Fix "No service" in Internet tile after ANR/ crash.
 
     override val dataEnabled = run {
         val initial = telephonyManager.isDataConnectionAllowed
@@ -661,7 +639,7 @@ class MobileConnectionRepositoryImpl(
     }
 
 
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     override val lteRsrpLevel: StateFlow<Int> =
         callbackEvents
             .mapNotNull { it.onSignalStrengthChanged }
@@ -696,26 +674,24 @@ class MobileConnectionRepositoryImpl(
             .map { it.serviceState.dataNetworkType }
             .stateIn(scope, SharingStarted.WhileSubscribed(), NETWORK_TYPE_UNKNOWN)
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     override val radioIconType: StateFlow<Int> =
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
         fiveGState
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
             .mapNotNull {it.onRadioIconTypeChanged }
             .map { it.radioIconType}
             .stateIn(scope, SharingStarted.WhileSubscribed(), RadioIconType.TYPE_NONE)
 
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx: StateFlow<Boolean> =
         fiveGState
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             .mapNotNull {it.onRadioIconTypeChanged }
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             .map { it.is6Rx}
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
     private val dataRoamingSettingChangedEvent: Flow<Unit> = conflatedCallbackFlow {
         val observer =
             object : ContentObserver(null) {
@@ -734,9 +710,9 @@ class MobileConnectionRepositoryImpl(
     override val dataRoamingEnabled: StateFlow<Boolean> = run {
         val initial = telephonyManager.isDataRoamingEnabled
         dataRoamingSettingChangedEvent
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
             .mapDirect { telephonyManager.isDataRoamingEnabled }
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
             .distinctUntilChanged()
             .logDiffsForTable(
                     tableLogBuffer,
@@ -747,16 +723,15 @@ class MobileConnectionRepositoryImpl(
             .stateIn(scope, SharingStarted.WhileSubscribed(), initial)
     }
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
     override val originNetworkType: StateFlow<Int> =
         callbackEvents
             .mapNotNull { it.onDisplayInfoChanged }
             .map { it.telephonyDisplayInfo.networkType }
             .stateIn(scope, SharingStarted.WhileSubscribed(), NETWORK_TYPE_UNKNOWN)
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
     private fun registerCapabilityAndRegistrationCallback() {
         if (registrationCallback == null) {
             registrationCallback =
@@ -765,22 +740,16 @@ class MobileConnectionRepositoryImpl(
                         imsRegistered.value = true
                         imsRegistrationTech.value = attributes.getRegistrationTechnology()
                     }
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
 
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
                     override fun onUnregistered(info: ImsReasonInfo) {
                         imsRegistered.value = false
                         imsRegistrationTech.value = REGISTRATION_TECH_NONE
                     }
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
                 }
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
         }
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
 
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
         if (capabilityCallback == null) {
             capabilityCallback =
                 object : ImsMmTelManager.CapabilityCallback() {
@@ -790,15 +759,12 @@ class MobileConnectionRepositoryImpl(
                         videoCapable.value = config.isCapable(
                             MmTelCapabilities.CAPABILITY_TYPE_VIDEO)
                     }
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
                 }
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
         }
 
         try {
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
             registrationCallback?.let {
                 imsMmTelManager.registerImsRegistrationCallback(
                     context.mainExecutor,it)
@@ -807,7 +773,6 @@ class MobileConnectionRepositoryImpl(
                 imsMmTelManager.registerMmTelCapabilityCallback(
                     context.mainExecutor, it)
             }
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
         } catch (e: ImsException) {
             Log.e(tag, "failed to call register ims callback ", e)
         }
@@ -817,35 +782,26 @@ class MobileConnectionRepositoryImpl(
         try {
             capabilityCallback?.let {
                 imsMmTelManager.unregisterMmTelCapabilityCallback(it)
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
             }
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
             registrationCallback?.let {
                 imsMmTelManager.unregisterImsRegistrationCallback(it)
             }
         } catch (exception: Exception) {
             Log.e(tag, " failed to call unregister ims callback ", exception)
 
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
         }
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
         capabilityCallback = null
         registrationCallback = null
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2025-01-19: Android_UI: SystemUI: Fix NPE in MobileConnectionRepositoryImpl
         imsRegistered?.value = false
         imsRegistrationTech?.value = REGISTRATION_TECH_NONE
         voiceCapable?.value = false
         videoCapable?.value = false
-// QTI_END: 2025-01-19: Android_UI: SystemUI: Fix NPE in MobileConnectionRepositoryImpl
-// QTI_BEGIN: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
     }
-// QTI_END: 2023-07-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue.
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
 
     override val voiceCapable: MutableStateFlow<Boolean> =
         MutableStateFlow<Boolean>(false)
@@ -856,13 +812,12 @@ class MobileConnectionRepositoryImpl(
     override val imsRegistered: MutableStateFlow<Boolean> =
         MutableStateFlow<Boolean>(false)
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     override val imsRegistrationTech: MutableStateFlow<Int> =
         MutableStateFlow<Int>(REGISTRATION_TECH_NONE)
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
-// QTI_BEGIN: 2025-01-19: Android_UI: SystemUI: Fix NPE in MobileConnectionRepositoryImpl
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     init {
         slotIndexForSubId?.let { slotIndex ->
             scope.launch { slotIndex.collect {
@@ -876,20 +831,17 @@ class MobileConnectionRepositoryImpl(
         }
     }
 
-// QTI_END: 2025-01-19: Android_UI: SystemUI: Fix NPE in MobileConnectionRepositoryImpl
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     override val ciwlanAvailable: StateFlow<Boolean> =
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         fiveGState
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
             .mapNotNull {it.onCiwlanAvailableChanged }
             .map { it.available}
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2023-06-26: Data: Separate exclamation mark display for mobile network
     override val isConnectionFailed: StateFlow<Boolean> = conflatedCallbackFlow {
         val callback =
             object : NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
@@ -916,34 +868,34 @@ class MobileConnectionRepositoryImpl(
                 .build()
     }
 
-// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-06-26: Data: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
     private fun getSlotIndex(subId: Int): Int {
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         var subscriptionManager: SubscriptionManager? =
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
                 context.getSystemService(SubscriptionManager::class.java)
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         var list: List<SubscriptionInfo>? = subscriptionManager?.completeActiveSubscriptionInfoList
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         var slotIndex: Int = 0
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         list?.let{
             for (subscriptionInfo in list.iterator()) {
                 if (subscriptionInfo.subscriptionId == subId) {
                     slotIndex = subscriptionInfo.simSlotIndex
                     break
                 }
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
             }
         }
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         Log.d(tag, "getSlotIndex subId: $subId slotIndex: $slotIndex list.size: ${list?.size}")
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         return slotIndex
     }
 
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
     override suspend fun isInEcmMode(): Boolean =
         withContext(bgDispatcher) { telephonyManager.emergencyCallbackMode }
 
@@ -1001,9 +953,9 @@ class MobileConnectionRepositoryImpl(
         private val flags: FeatureFlagsClassic,
         @Background private val bgDispatcher: CoroutineDispatcher,
         @Background private val scope: CoroutineScope,
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         private val fiveGServiceClient: FiveGServiceClient,
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
     ) {
         fun build(
             subId: Int,
@@ -1011,9 +963,9 @@ class MobileConnectionRepositoryImpl(
             subscriptionModel: Flow<SubscriptionModel?>,
             defaultNetworkName: NetworkNameModel,
             networkNameSeparator: String,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
             slotIndexForSubId:  Flow<Int>? = null,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
         ): MobileConnectionRepository {
             return MobileConnectionRepositoryImpl(
                 subId,
@@ -1031,12 +983,12 @@ class MobileConnectionRepositoryImpl(
                 mobileLogger,
                 flags,
                 scope,
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
                 fiveGServiceClient,
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
                 slotIndexForSubId,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
             )
         }
     }
@@ -1067,10 +1019,10 @@ sealed interface CallbackEvent {
     data class OnSignalStrengthChanged(val signalStrength: SignalStrength) : CallbackEvent
 
     data class OnRadioIconTypeChanged(val radioIconType: Int, val is6Rx: Boolean) : CallbackEvent
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
 
     data class OnCiwlanAvailableChanged(val available: Boolean): CallbackEvent
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
 
     data class OnCarrierRoamingNtnSignalStrengthChanged(val signalStrength: NtnSignalStrength) :
         CallbackEvent
@@ -1094,9 +1046,9 @@ data class TelephonyCallbackState(
     val onServiceStateChanged: CallbackEvent.OnServiceStateChanged? = null,
     val onSignalStrengthChanged: CallbackEvent.OnSignalStrengthChanged? = null,
     val onRadioIconTypeChanged: CallbackEvent.OnRadioIconTypeChanged? = null,
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     val onCiwlanAvailableChanged: CallbackEvent.OnCiwlanAvailableChanged? = null,
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     val onCarrierRoamingNtnSignalStrengthChanged:
         CallbackEvent.OnCarrierRoamingNtnSignalStrengthChanged? =
         null,
@@ -1119,9 +1071,9 @@ data class TelephonyCallbackState(
             }
             is CallbackEvent.OnSignalStrengthChanged -> copy(onSignalStrengthChanged = event)
             is CallbackEvent.OnRadioIconTypeChanged -> copy(onRadioIconTypeChanged = event)
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
             is CallbackEvent.OnCiwlanAvailableChanged -> copy(onCiwlanAvailableChanged = event)
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
             is CallbackEvent.OnCarrierRoamingNtnSignalStrengthChanged ->
                 copy(onCarrierRoamingNtnSignalStrengthChanged = event)
             is CallbackEvent.OnCallBackModeStarted -> {

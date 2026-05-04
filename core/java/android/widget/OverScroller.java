@@ -21,16 +21,14 @@ import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.hardware.SensorManager;
 import android.os.Build;
-// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
 import android.util.BoostFramework.ScrollOptimizer;
-// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
 import android.util.Log;
 import android.view.ViewConfiguration;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
-// QTI_BEGIN: 2018-05-21: Performance: Fling/Pre-fling Boost: Call perf boost from System Server context
 import android.os.SystemProperties;
-// QTI_END: 2018-05-21: Performance: Fling/Pre-fling Boost: Call perf boost from System Server context
 
 /**
  * This class encapsulates scrolling with the ability to overshoot the bounds
@@ -169,13 +167,13 @@ public class OverScroller {
      */
     public final void forceFinished(boolean finished) {
         mScrollerX.mFinished = mScrollerY.mFinished = finished;
-// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
         if (finished && mMode == FLING_MODE) {
-// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
-// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
             ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
         }
-// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
     }
 
     /**
@@ -300,11 +298,11 @@ public class OverScroller {
      */
     public boolean computeScrollOffset() {
         if (isFinished()) {
-// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
             if (mMode == FLING_MODE) {
                 ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
             }
-// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
             return false;
         }
 
@@ -344,11 +342,11 @@ public class OverScroller {
                     }
                 }
 
-// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
                 if (isFinished()) {
                     ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
                 }
-// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
                 break;
         }
 
@@ -387,9 +385,9 @@ public class OverScroller {
      * @param duration Duration of the scroll in milliseconds.
      */
     public void startScroll(int startX, int startY, int dx, int dy, int duration) {
-// QTI_BEGIN: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
+// QTI_BEGIN: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
         ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
-// QTI_END: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
+// QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
         mMode = SCROLL_MODE;
         mScrollerX.startScroll(startX, dx, duration);
         mScrollerY.startScroll(startY, dy, duration);
@@ -461,10 +459,10 @@ public class OverScroller {
             }
         }
 
-// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
         ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_START);
 
-// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
         mMode = FLING_MODE;
         mScrollerX.fling(startX, velocityX, minX, maxX, overX);
         mScrollerY.fling(startY, velocityY, minY, maxY, overY);
@@ -532,11 +530,11 @@ public class OverScroller {
      * @see #forceFinished(boolean)
      */
     public void abortAnimation() {
-// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
         if (mMode == FLING_MODE) {
             ScrollOptimizer.setFlingFlag(ScrollOptimizer.FLING_END);
         }
-// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
         mScrollerX.finish();
         mScrollerY.finish();
     }
@@ -886,9 +884,7 @@ public class OverScroller {
         }
 
         void notifyEdgeReached(int start, int end, int over) {
-// QTI_BEGIN: 2018-05-21: Performance: Fling/Pre-fling Boost: Call perf boost from System Server context
             // mState is used to detect successive notifications
-// QTI_END: 2018-05-21: Performance: Fling/Pre-fling Boost: Call perf boost from System Server context
             if (mState == SPLINE) {
                 mOver = over;
                 mStartTime = AnimationUtils.currentAnimationTimeMillis();
@@ -953,14 +949,12 @@ public class OverScroller {
          */
         boolean update() {
             final long time = AnimationUtils.currentAnimationTimeMillis();
-// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
             final long adjustedTime = ScrollOptimizer.getAdjustedAnimationClock(time);
             final long currentTime = adjustedTime - mStartTime;
-// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 
-// QTI_BEGIN: 2020-11-09: Performance: Don't update OverScroller fling state if improper time passed
             if (currentTime <= 0) {
-// QTI_END: 2020-11-09: Performance: Don't update OverScroller fling state if improper time passed
                 // Skip work but report that we're still going if we have a nonzero duration.
                 return mDuration > 0;
             }
@@ -1000,10 +994,8 @@ public class OverScroller {
                     final float t = (float) (currentTime) / mDuration;
                     final float t2 = t * t;
                     final float sign = Math.signum(mVelocity);
-// QTI_BEGIN: 2018-05-21: Performance: Fling/Pre-fling Boost: Call perf boost from System Server context
                     distance = sign * mOver * (3.0f * t2 - 2.0f * t * t2);
                     mCurrVelocity = sign * mOver * 6.0f * (- t + t2);
-// QTI_END: 2018-05-21: Performance: Fling/Pre-fling Boost: Call perf boost from System Server context
                     break;
                 }
             }

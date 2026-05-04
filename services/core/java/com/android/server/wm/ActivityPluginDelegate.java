@@ -1,4 +1,3 @@
-// QTI_BEGIN: 2019-04-11: Data: Add back activity delegate framework hook for foreground app information.
 /*
  *Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
@@ -118,11 +117,7 @@ public class ActivityPluginDelegate {
     private static synchronized boolean loadActivityExtJar() {
         final String realProvider = "com.qualcomm.qti."+
                                     "activityextension.ActivityNotifier";
-// QTI_END: 2019-04-11: Data: Add back activity delegate framework hook for foreground app information.
-// QTI_BEGIN: 2020-02-24: Data: Update logic to obtain xlat property
         final String realProviderPath = Environment.getSystemExtDirectory().
-// QTI_END: 2020-02-24: Data: Update logic to obtain xlat property
-// QTI_BEGIN: 2019-04-11: Data: Add back activity delegate framework hook for foreground app information.
             getAbsolutePath() + "/framework/ActivityExt.jar";
 
         if (activityServiceClass != null && activityServiceObj != null) {
@@ -172,13 +167,8 @@ public class ActivityPluginDelegate {
         }
         isEnabled = ((Settings.Global.getInt(ActivityThread.currentApplication().
                                              getApplicationContext().getContentResolver(),
-// QTI_END: 2019-04-11: Data: Add back activity delegate framework hook for foreground app information.
-// QTI_BEGIN: 2021-05-26: Data: Enable ActivityExt by default
                                              FOREGROUND_ACTIVITY_TRIGGER, 1)) == 1);
-// QTI_END: 2021-05-26: Data: Enable ActivityExt by default
-// QTI_BEGIN: 2019-04-11: Data: Add back activity delegate framework hook for foreground app information.
         --mGetFeatureEnableRetryCount;
         return isEnabled;
     }
 }
-// QTI_END: 2019-04-11: Data: Add back activity delegate framework hook for foreground app information.

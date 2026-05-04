@@ -145,9 +145,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import android.os.SystemProperties;
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import android.os.SELinux;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -197,9 +195,7 @@ import com.android.server.pm.pkg.PackageStateInternal;
 import com.android.server.pm.pkg.PackageUserStateInternal;
 import com.android.server.pm.pkg.SharedLibraryWrapper;
 import com.android.server.rollback.RollbackManagerInternal;
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import com.android.server.utils.TimingsTraceAndSlog;
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import com.android.server.utils.WatchedArrayMap;
 import com.android.server.utils.WatchedLongSparseArray;
 
@@ -207,10 +203,8 @@ import dalvik.system.VMRuntime;
 
 import java.io.File;
 import java.io.FileInputStream;
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import java.io.FileNotFoundException;
 import java.io.FileReader;
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import java.io.IOException;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -220,9 +214,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import java.util.HashMap;
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -234,11 +226,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 
 final class InstallPackageHelper {
     // One minute over PM WATCHDOG_TIMEOUT
@@ -270,20 +260,14 @@ final class InstallPackageHelper {
     private final SharedLibrariesImpl mSharedLibraries;
     private final PackageManagerServiceInjector mInjector;
     private final UpdateOwnershipHelper mUpdateOwnershipHelper;
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     private static final String PROPERTY_NO_RIL = "ro.radio.noril";
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 
     private static final String PROPERTY_QSPA_Enabled = "ro.boot.vendor.qspa";
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     /**
      * Tracks packages that need to be disabled.
      * Map of package name to its path on the file system.
      */
     final private HashMap<String, String> mPackagesToBeDisabled = new HashMap<>();
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 
     private final Object mInternalLock = new Object();
     @GuardedBy("mInternalLock")
@@ -4091,7 +4075,6 @@ final class InstallPackageHelper {
                 Log.w(TAG, "Dropping cache of " + file.getAbsolutePath());
                 cacher.cleanCachedResult(file);
             }
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
 
             if (mPackagesToBeDisabled.values() != null &&
                     (mPackagesToBeDisabled.values().contains(file.toString()) ||
@@ -4101,7 +4084,6 @@ final class InstallPackageHelper {
                 continue;
             }
 
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
             parallelPackageParser.submit(file, scanParams);
             fileCount++;
         }
@@ -4141,7 +4123,6 @@ final class InstallPackageHelper {
                 Log.w(TAG, "Dropping cache of " + file.getAbsolutePath());
                 cacher.cleanCachedResult(file);
             }
-// QTI_BEGIN: 2025-07-23: Telephony: Add provision to prevent installation of some apps
 
             if (mPackagesToBeDisabled.values() != null &&
                     (mPackagesToBeDisabled.values().contains(file.toString()) ||
@@ -4151,7 +4132,6 @@ final class InstallPackageHelper {
                 continue;
             }
 
-// QTI_END: 2025-07-23: Telephony: Add provision to prevent installation of some apps
             orderedResults.add(parallelPackageParser.orderedSubmit(file, scanParams));
         }
         return orderedResults;
@@ -4199,24 +4179,15 @@ final class InstallPackageHelper {
         }
     }
 
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
     /**
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
      * Read the list of telephony packages that need to be disabled.
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
      *
      * For wifi-only devices (modem-less), telephony related applications do not need to run.
      * This method will read the list of packages from a predefined file in the file system,
      * and store it in {@link #mPackagesToBeDisabled}. These applications will be skipped when
      * directories are scanned later.
      */
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
     protected void readListOfTelephonyPackagesToBeDisabled() {
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
-// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         boolean wifiOnly = SystemProperties.getBoolean(PROPERTY_NO_RIL, false);
         if (!wifiOnly) {
             // Apps need to be disabled only for modem-less devices
@@ -4277,8 +4248,6 @@ final class InstallPackageHelper {
         }
     }
 
-// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 
     /**
      * Read the list of packages that need to be disabled.
@@ -4400,7 +4369,6 @@ final class InstallPackageHelper {
         }
     }
 
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
     /**
      * Make sure all system apps that we expected to appear on
      * the userdata partition actually showed up. If they never

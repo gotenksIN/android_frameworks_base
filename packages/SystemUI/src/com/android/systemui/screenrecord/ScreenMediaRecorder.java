@@ -231,18 +231,14 @@ public class ScreenMediaRecorder {
             throws IOException {
         String videoType = MediaFormat.MIMETYPE_VIDEO_AVC;
 
-// QTI_BEGIN: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         // Get max size from the encoder,
         // implicitly decoder supports this size and
         // ensure recordings will be playable on device
         MediaCodec encoder = MediaCodec.createEncoderByType(videoType);
-// QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         MediaCodecInfo.VideoCapabilities vc = encoder.getCodecInfo().getCapabilitiesForType(
                         videoType)
                 .getVideoCapabilities();
-// QTI_BEGIN: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         encoder.release();
-// QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
 
         // Check if we can support screen size as-is
         int width = vc.getSupportedWidths().getUpper();

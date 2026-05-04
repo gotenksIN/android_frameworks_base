@@ -30,9 +30,7 @@ import com.android.systemui.kairos.util.nameTag
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.statusbar.pipeline.mobile.StatusBarMobileIconKairos
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
@@ -57,9 +55,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.stateIn
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import kotlinx.coroutines.flow.MutableStateFlow
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 @SysUISingleton
 class MobileIconsInteractorKairosAdapter
 @Inject
@@ -210,7 +206,6 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val isDeviceInEmergencyCallsOnlyMode: Flow<Boolean>
         get() = repo.isDeviceEmergencyCallCapable
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
     override val showVowifiIcon = MutableStateFlow(false)
     override val showVolteIcon = MutableStateFlow(false)
@@ -218,7 +213,6 @@ constructor(
     override val hideNoInternetState = MutableStateFlow(false)
     override val alwaysUseRsrpLevelForLte = MutableStateFlow(false)
 
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     override fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor =
         object : MobileIconInteractor {
             override val subscriptionId = subId
@@ -242,7 +236,6 @@ constructor(
             override val isSingleCarrier: Flow<Boolean> = latest { isSingleCarrier }
             override val isRoaming: Flow<Boolean> = latest { isRoaming }
             override val isForceHidden: Flow<Boolean> = latest { isForceHidden }
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
             override val isConnectionFailed = latest { isConnectionFailed }
             override val customizedNetworkName = latest { customizedNetworkName }
@@ -256,7 +249,6 @@ constructor(
             override val hideNoInternetState = latest { hideNoInternetState }
             override val alwaysUseRsrpLevelForLte = latest { alwaysUseRsrpLevelForLte }
 
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             override val isAllowedDuringAirplaneMode: Flow<Boolean> = latest {
                 isAllowedDuringAirplaneMode
             }

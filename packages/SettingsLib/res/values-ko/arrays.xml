@@ -62,11 +62,7 @@
     <item msgid="695678520785580527">"사용 중지됨"</item>
     <item msgid="6336372935919715515">"필터링 사용 설정됨"</item>
     <item msgid="2779123106632690576">"사용 설정됨"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"헤더 필터링 사용 설정됨"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"미디어 패킷 필터링 사용 설정됨"</item>
     <item>"활성화됨(프로필 필터링됨)"</item>
   </string-array>

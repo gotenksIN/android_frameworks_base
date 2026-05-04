@@ -559,7 +559,6 @@ public final class PhoneAccount implements Parcelable {
     @FlaggedApi(android.telecom.flags.Flags.FLAG_CHANGE_RTT_TO_AUDIO)
     public static final int CAPABILITY_CHANGE_RTT_CALL_TO_AUDIO_CALL = 0x100000;
 
-// QTI_BEGIN: 2023-01-17: Telephony: IMS : Add RTT downgrade capability to phone account
     /**
      * Flag indicating that this {@link PhoneAccount} is capable of downgrading a call to voice
      * from an RTT (Real-time text) session.
@@ -570,7 +569,6 @@ public final class PhoneAccount implements Parcelable {
      */
     public static final int CAPABILITY_DOWNGRADE_RTT = 0x40000000;
 
-// QTI_END: 2023-01-17: Telephony: IMS : Add RTT downgrade capability to phone account
     /**
      * Flag indicating that this {@link PhoneAccount} should be opted out of automatic requests for
      * premium network capabilities.

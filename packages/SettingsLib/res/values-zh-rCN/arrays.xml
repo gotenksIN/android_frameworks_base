@@ -62,11 +62,7 @@
     <item msgid="695678520785580527">"已停用"</item>
     <item msgid="6336372935919715515">"已启用“已过滤”"</item>
     <item msgid="2779123106632690576">"已启用"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"已过滤已启用的标题"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"已过滤已启用的媒体包"</item>
     <item>"已启用（已过滤配置文件）"</item>
   </string-array>
@@ -284,12 +280,8 @@
     <item msgid="3753634915787796632">"2"</item>
     <item msgid="4779928470672877922">"3"</item>
   </string-array>
-<!-- QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization-->
-<!-- QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization-->
   <string-array name="origin_carrier_names"></string-array>
 
-<!-- QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization-->
-<!-- QTI_END: 2024-03-10: Android_UI: SystemUI: Readapt the ShadeCarrier SPN display customization-->
   <string-array name="locale_carrier_names"></string-array>
   <string-array name="shade_display_awareness_entries">
     <item msgid="816770658383209617">"仅设备显示屏（默认）"</item>

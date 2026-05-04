@@ -508,7 +508,6 @@ public abstract class PowerManagerInternal {
      * Notifies PowerManager that settings have changed and that it should refresh its state.
      */
     public abstract void updateSettings();
-// QTI_BEGIN: 2025-03-20: Snapdragon_IoT/Wearables: Adding adpation for deepsleep and hibernate state.
 
     /**
      * Forces the device to go to sleep, even if there are currently wakelocks being held.
@@ -521,7 +520,6 @@ public abstract class PowerManagerInternal {
      * Note: only used for wearables
      */
     public abstract void wakeupFromForceDisplaySleep();
-// QTI_END: 2025-03-20: Snapdragon_IoT/Wearables: Adding adpation for deepsleep and hibernate state.
 
     /**
      * A proxy for {@link PowerManagerInternal} that batches UID state change notifications and

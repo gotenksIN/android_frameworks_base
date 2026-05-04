@@ -75,7 +75,7 @@ class MobileIconInteractorTest : MobileIconInteractorTestBase() {
             connectionRepository,
             context,
             overrides,
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
             mock(),
             mock(),
             mock(),
@@ -85,7 +85,7 @@ class MobileIconInteractorTest : MobileIconInteractorTestBase() {
             mock(),
             mock(),
             mock(),
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
         )
 }
 

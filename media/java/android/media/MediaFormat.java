@@ -187,13 +187,11 @@ public final class MediaFormat {
     public static final String MIMETYPE_VIDEO_SCRAMBLED = "video/scrambled";
     @FlaggedApi(FLAG_VVC_SUPPORT)
     public static final String MIMETYPE_VIDEO_VVC = "video/vvc";
-// QTI_BEGIN: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
     /**
     * MV-HEVC mimetype
     * @hide
     */
     public static final String MIMETYPE_VIDEO_MVHEVC = "video/x-mvhevc";
-// QTI_END: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
 
     public static final String MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
     public static final String MIMETYPE_AUDIO_AMR_WB = "audio/amr-wb";

@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 
 #include "ImageDecoder.h"
 
@@ -59,17 +57,11 @@
 #include "NinePatchPeeker.h"
 #include "Utils.h"
 
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 #include <cutils/properties.h>
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
-// QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
 #include <sys/types.h>
 #include <unistd.h>
-// QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 using namespace android;
 
 jclass gImageDecoder_class;
@@ -273,7 +265,6 @@ static jobject ImageDecoder_nCreateByteBuffer(JNIEnv* env, jobject /*clazz*/,
 static jobject ImageDecoder_nCreateByteArray(JNIEnv* env, jobject /*clazz*/,
         jbyteArray byteArray, jint offset, jint length,
         jboolean preferAnimation, jobject source) {
-// QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
     int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
     if (ui_perfmode > 0 && ui_perfmode == getpid()) {
         AutoJavaByteArray ar(env, byteArray);
@@ -281,7 +272,6 @@ static jobject ImageDecoder_nCreateByteArray(JNIEnv* env, jobject /*clazz*/,
             std::make_unique<SkMemoryStream>(ar.ptr() + offset, length, false);
         return native_create(env, std::move(stream), source, preferAnimation);
     }
-// QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
     std::unique_ptr<SkStream> stream(CreateByteArrayStreamAdaptor(env, byteArray, offset, length));
     return native_create(env, std::move(stream), source, preferAnimation);
 }
@@ -343,18 +333,12 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         colorType = decoder->mCodec->computeOutputColorType(colorType);
     }
 
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     bool should_use_sw = false;
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
-// QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
     int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
     if (ui_perfmode > 0 && ui_perfmode == getpid()) {
         should_use_sw = true;
-// QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     }
 
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
     const bool isHardware = !requireMutable
         && (allocator == kDefault_Allocator ||
             allocator == kHardware_Allocator)

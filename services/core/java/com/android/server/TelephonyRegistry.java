@@ -2893,9 +2893,7 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
             }
             handleRemoveListLocked();
         }
-// QTI_BEGIN: 2021-02-23: Telephony: Broadcast radio power state changes
         broadcastRadioPowerStateChanged(state, phoneId, subId);
-// QTI_END: 2021-02-23: Telephony: Broadcast radio power state changes
     }
 
     @Override
@@ -4372,14 +4370,12 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
      */
     public static final String ACTION_SIGNAL_STRENGTH_CHANGED = "android.intent.action.SIG_STR";
 
-// QTI_BEGIN: 2021-02-23: Telephony: Broadcast radio power state changes
     /**
      * Broadcast Action: The radio power state has changed.
      */
     private static final String ACTION_RADIO_POWER_STATE_CHANGED =
             "org.codeaurora.intent.action.RADIO_POWER_STATE";
 
-// QTI_END: 2021-02-23: Telephony: Broadcast radio power state changes
     private void broadcastServiceStateChanged(ServiceState state, int phoneId, int subId) {
         try {
             mBatteryStats.notePhoneState(state.getState());
@@ -4502,7 +4498,6 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
                 .setDeferralPolicy(BroadcastOptions.DEFERRAL_POLICY_UNTIL_ACTIVE);
     }
 
-// QTI_BEGIN: 2021-02-23: Telephony: Broadcast radio power state changes
     private void broadcastRadioPowerStateChanged(int state, int phoneId, int subId) {
         Intent intent = new Intent(ACTION_RADIO_POWER_STATE_CHANGED);
         intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
@@ -4516,7 +4511,6 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
                 Manifest.permission.READ_PRIVILEGED_PHONE_STATE);
     }
 
-// QTI_END: 2021-02-23: Telephony: Broadcast radio power state changes
     private void broadcastSignalStrengthChanged(SignalStrength signalStrength, int phoneId,
             int subId) {
         final long ident = Binder.clearCallingIdentity();

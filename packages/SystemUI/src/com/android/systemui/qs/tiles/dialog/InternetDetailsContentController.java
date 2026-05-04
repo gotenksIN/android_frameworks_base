@@ -14,27 +14,19 @@
  * limitations under the License.
  */
 
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 /**
  * Changes from Qualcomm Innovation Center are provided under the following license:
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-04-23: Android_UI: Fix callback registering issue
  * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
-// QTI_END: 2024-04-23: Android_UI: Fix callback registering issue
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 package com.android.systemui.qs.tiles.dialog;
 
 import static android.telephony.SubscriptionManager.PROFILE_CLASS_PROVISIONING;
 
 import static com.android.settingslib.mobile.MobileMappings.getIconKey;
 import static com.android.settingslib.mobile.MobileMappings.mapIconSets;
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
 import static com.android.settingslib.mobile.MobileMappings.toIconKey;
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
 import static com.android.settingslib.wifi.WifiUtils.getHotspotIconResource;
 import static com.android.wifitrackerlib.WifiEntry.CONNECTED_STATE_CONNECTED;
 
@@ -47,9 +39,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.database.ContentObserver;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
@@ -59,15 +49,11 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiConfiguration;
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.net.Uri;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import android.os.RemoteException;
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
@@ -120,11 +106,9 @@ import com.android.systemui.shade.ShadeDisplayAware;
 import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.core.NewStatusBarIcons;
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener;
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.toast.SystemUIToast;
@@ -132,27 +116,19 @@ import com.android.systemui.toast.ToastFactory;
 import com.android.systemui.user.data.repository.UserRepository;
 import com.android.systemui.util.CarrierConfigTracker;
 import com.android.systemui.util.kotlin.JavaAdapterKt;
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.CarrierNameCustomization;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.wifitrackerlib.HotspotNetworkEntry;
 import com.android.wifitrackerlib.MergedCarrierEntry;
 import com.android.wifitrackerlib.WifiEntry;
 
 import kotlinx.coroutines.CoroutineScope;
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import com.qti.extphone.ExtTelephonyManager;
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import com.qti.extphone.RadioIconType;
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import com.qti.extphone.ServiceCallback;
 
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import java.util.ArrayList;
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
 import java.util.HashMap;
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -210,11 +186,9 @@ public class InternetDetailsContentController implements AccessPointController.A
     static final int SATELLITE_STARTED = 1;
     static final int SATELLITE_NOT_STARTED = 0;
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private static final String DUAL_DATA_PREFERENCE = "dual_data_preference";
     private static final Uri DUAL_DATA_USER_PREFERENCE = Settings
             .Global.getUriFor(DUAL_DATA_PREFERENCE);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private final FeatureFlags mFeatureFlags;
 
     //Should be accessible only to the main thread.
@@ -263,12 +237,8 @@ public class InternetDetailsContentController implements AccessPointController.A
     private boolean mHasWifiEntries;
     private WifiStateWorker mWifiStateWorker;
     private boolean mHasActiveSubIdOnDds;
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     private int mNonDdsCallState = TelephonyManager.CALL_STATE_IDLE;
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     private int mActiveDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     private boolean mIsMobileDataEnabled = false;
     private UserRepository mUserRepository;
     private boolean mHasMultipleFullUsers = false;
@@ -296,28 +266,17 @@ public class InternetDetailsContentController implements AccessPointController.A
     protected ConnectedWifiInternetMonitor mConnectedWifiInternetMonitor;
     @VisibleForTesting
     protected boolean mCarrierNetworkChangeMode;
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     private CarrierNameCustomization mCarrierNameCustomization;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
     private boolean mIsSmartDdsSwitchFeatureAvailable;
     private boolean mIsExtTelServiceConnected = false;
     private ExtTelephonyManager mExtTelephonyManager;
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean mHasDualDataCapability = false;
     private ContentObserver mDualDataContentObserver;
     private int mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
     private boolean mIsNddsDataEnabled = false;
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
     private FiveGServiceClient mFiveGServiceClient;
     private final Map<Integer, FiveGStateMonitor> mSubIdFiveGStateMonitorMap = new HashMap<>();
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 
     private ServiceCallback mExtTelServiceCallback = new ServiceCallback() {
         @Override
@@ -327,42 +286,25 @@ public class InternetDetailsContentController implements AccessPointController.A
             try {
                 mIsSmartDdsSwitchFeatureAvailable =
                         mExtTelephonyManager.isSmartDdsSwitchFeatureAvailable();
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 mHasDualDataCapability = mExtTelephonyManager.getDualDataCapability();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
                 Log.d(TAG, "isSmartDdsSwitchFeatureAvailable: " +
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                         mIsSmartDdsSwitchFeatureAvailable +
                         " mHasDualDataCapability: " + mHasDualDataCapability);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             } catch (RemoteException ex) {
                 Log.e(TAG, "isSmartDdsSwitchFeatureAvailable exception " + ex);
             }
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             handleDualDataUserPerferenceListener();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         }
 
         @Override
         public void onDisconnected() {
             Log.d(TAG, "ExtTelephony service disconnected");
             mIsExtTelServiceConnected = false;
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             mHasDualDataCapability = false;
             handleDualDataUserPerferenceListener();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         }
     };
 
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
     int mCurrentSatelliteState = SATELLITE_NOT_STARTED;
 
     final SatelliteModemStateCallback mSatelliteModemStateCallback =
@@ -423,14 +365,10 @@ public class InternetDetailsContentController implements AccessPointController.A
             LocationController locationController,
             DialogTransitionAnimator dialogTransitionAnimator,
             WifiStateWorker wifiStateWorker,
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             FeatureFlags featureFlags,
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             ShadeDialogContextInteractor shadeDialogContextInteractor,
             UserRepository userRepository,
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             CarrierNameCustomization carrierNameCustomization
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     ) {
         if (DEBUG) {
             Log.d(TAG, "Init InternetDetailsContentController");
@@ -466,17 +404,11 @@ public class InternetDetailsContentController implements AccessPointController.A
         mConnectedWifiInternetMonitor = new ConnectedWifiInternetMonitor();
         mWifiStateWorker = wifiStateWorker;
         mFeatureFlags = featureFlags;
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mCarrierNameCustomization = carrierNameCustomization;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mShadeDialogContextInteractor = shadeDialogContextInteractor;
         mUserRepository = userRepository;
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         mFiveGServiceClient = FiveGServiceClient.getInstance(context);
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     }
 
     void onStart(@NonNull InternetDialogCallback callback,
@@ -495,9 +427,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         mSubscriptionManager.addOnSubscriptionsChangedListener(mExecutor,
                 mOnSubscriptionsChangedListener);
         mDefaultDataSubId = getDefaultDataSubscriptionId();
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
         mActiveDataSubId = mSubscriptionManager.getActiveDataSubscriptionId();
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
         if (DEBUG) {
             Log.d(TAG, "Init, SubId: " + mDefaultDataSubId);
         }
@@ -526,23 +456,13 @@ public class InternetDetailsContentController implements AccessPointController.A
                     scanWifiAccessPoints();
                 }
         );
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         if (!mIsExtTelServiceConnected) {
             mExtTelephonyManager.connectService(mExtTelServiceCallback);
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         } else {
             notifyDualDataEnabledStateChanged();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         }
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
         mIsNddsDataEnabled = mTelephonyManager.createForSubscriptionId(mNddsSubId).isDataEnabled();
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         registerFiveGStateMonitor();
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     }
 
     void onStop() {
@@ -574,9 +494,7 @@ public class InternetDetailsContentController implements AccessPointController.A
                 Log.w(TAG, "Unable to unregister callback for modem state changes : " + e);
             }
         }
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         unregisterFiveGStateMonitor();
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     }
 
     /**
@@ -692,9 +610,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             return mContext.getText(SUBTITLE_TEXT_ALL_CARRIER_NETWORK_UNAVAILABLE);
         }
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (mCanConfigWifi && !isMobileDataEnabled(mDefaultDataSubId)) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             if (DEBUG) {
                 Log.d(TAG, "Mobile data off");
             }
@@ -784,9 +700,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         final SignalStrength strength = tm.getSignalStrength();
         int level = (strength == null) ? 0 : strength.getLevel();
         int numLevels = SignalStrength.NUM_SIGNAL_STRENGTH_BINS;
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
         boolean hideNoInternetState = mConfig.hideNoInternetState;
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
         if (isCarrierNetworkActive) {
             level = getCarrierNetworkLevel();
             numLevels = WifiEntry.WIFI_LEVEL_MAX + 1;
@@ -798,13 +712,9 @@ public class InternetDetailsContentController implements AccessPointController.A
             level += 1;
             numLevels += 1;
         }
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
         Log.i(TAG, "hideNoInternetState:" + hideNoInternetState);
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
         return getSignalStrengthIcon(subId, mContext, level, numLevels, NO_CELL_DATA_TYPE_ICON,
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
                 !hideNoInternetState && !isMobileDataEnabledWithNddsOverrideConsidered(subId));
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
     }
 
     Drawable getSignalStrengthIcon(int subId, Context context, int level, int numLevels,
@@ -947,9 +857,7 @@ public class InternetDetailsContentController implements AccessPointController.A
                 registerInternetTelephonyCallback(secondaryTm, subId);
                 mSubIdTelephonyManagerMap.put(subId, secondaryTm);
             }
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             Log.d(TAG, "getActiveAutoSwitchNonDdsSubId: " + subId);
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             return subId;
         }
         return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
@@ -990,14 +898,12 @@ public class InternetDetailsContentController implements AccessPointController.A
     }
 
     CharSequence getMobileNetworkTitle(int subId) {
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         if (mCarrierNameCustomization.isRoamingCustomizationEnabled()
                 && mCarrierNameCustomization.isRoaming(subId)) {
             return mCarrierNameCustomization.getRoamingCarrierName(subId);
         } else {
             return getUniqueSubscriptionDisplayName(subId, mContext);
         }
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     }
 
     String getMobileNetworkSummary(int subId) {
@@ -1007,9 +913,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         if ((mCarrierNameCustomization.show5GAIcon() && radioIconType == RadioIconType.TYPE_5G_UWB)
                 || fiveGState.getRadioIconType() == RadioIconType.TYPE_LTE_NB_IOT) {
             networkTypeDescription = mCarrierNameCustomization.getNetworkTypeDescription(subId);
-// QTI_BEGIN: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
         }
-// QTI_END: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
 
         if (TextUtils.isEmpty(networkTypeDescription)) {
             networkTypeDescription = getNetworkTypeDescription(mContext, mConfig, subId);
@@ -1017,9 +921,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         if (DEBUG) {
             Log.d(TAG,
                     "getMobileNetworkSummary(), NetworkTypeDescription:" + networkTypeDescription);
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         }
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
         return getMobileSummary(mContext, networkTypeDescription, subId);
     }
 
@@ -1034,15 +936,12 @@ public class InternetDetailsContentController implements AccessPointController.A
             Log.d(TAG, "getNetworkTypeDescription(), subId:" + subId
                     + ",telephonyDisplayInfo:" + telephonyDisplayInfo);
         }
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         String iconKey = null;
         if (isNsa(telephonyDisplayInfo)) {
             final FiveGServiceState fiveGState = getFiveGServiceState(subId);
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
             // RadioIconType includes NR and NB-IoT, so NB-IoT needs to be filtered out.
             if (!fiveGState.isRadioIconTypeValid()
                     || fiveGState.getRadioIconType() == RadioIconType.TYPE_LTE_NB_IOT) {
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
                 iconKey = toIconKey(telephonyDisplayInfo.getNetworkType());
             } else {
                 iconKey = getIconKey(telephonyDisplayInfo);
@@ -1050,7 +949,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         } else {
             iconKey = getIconKey(telephonyDisplayInfo);
         }
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
 
         if (mapIconSets(config) == null || mapIconSets(config).get(iconKey) == null) {
             if (DEBUG) {
@@ -1073,7 +971,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                 resId) : "";
     }
 
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
     private boolean isNsa(TelephonyDisplayInfo telephonyDisplayInfo) {
         if (telephonyDisplayInfo != null) {
             final int networkType = telephonyDisplayInfo.getOverrideNetworkType();
@@ -1083,7 +980,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return false;
     }
 
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     private String getMobileSummary(Context context, String networkTypeDescription, int subId) {
         // SIM Display Logic for Dual SIM Scenarios
         // There are three case of two SIMs:
@@ -1096,17 +992,13 @@ public class InternetDetailsContentController implements AccessPointController.A
         // 3. CBRS SIMs set (Non-DDS CBRS SIM is active data):
         //    Displays the Active Data SIM only
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (!isMobileDataEnabled(subId)) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             return context.getString(R.string.mobile_data_off_summary);
         }
         String summary = networkTypeDescription;
         
-// QTI_BEGIN: 2023-05-10: Telephony: Adjust string display for smart DDS switch
         boolean isSmartDdsEnabled = Settings.Global.getInt(context.getContentResolver(),
                 Settings.Global.SMART_DDS_SWITCH, 0) == 1;
-// QTI_END: 2023-05-10: Telephony: Adjust string display for smart DDS switch
         int activeDataSubId = getActiveDataSubId();
         int activeAutoSwitchNonDdsSubId = getActiveAutoSwitchNonDdsSubId();
         boolean isDds = subId == mDefaultDataSubId;
@@ -1126,13 +1018,9 @@ public class InternetDetailsContentController implements AccessPointController.A
             summary = context.getString(
                     com.android.settingslib.R.string.preference_summary_default_combination,
                     context.getString(
-// QTI_BEGIN: 2023-05-10: Telephony: Adjust string display for smart DDS switch
                             // if nonDds is active, explains Dds status as poor connection
-// QTI_END: 2023-05-10: Telephony: Adjust string display for smart DDS switch
                             isForVisibleDds || isSmartDdsEnabled
-// QTI_BEGIN: 2023-05-10: Telephony: Adjust string display for smart DDS switch
                                     ? (isOnNonDds && !isSmartDdsEnabled
-// QTI_END: 2023-05-10: Telephony: Adjust string display for smart DDS switch
                                     ? R.string.mobile_data_poor_connection
                                     : R.string.mobile_data_connection_active)
                                     : R.string.mobile_data_temp_connection_active),
@@ -1218,9 +1106,7 @@ public class InternetDetailsContentController implements AccessPointController.A
     void connectCarrierNetwork() {
         String errorLogPrefix = "Fail to connect carrier network : ";
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (!isMobileDataEnabled(mDefaultDataSubId)) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             if (DEBUG) {
                 Log.d(TAG, errorLogPrefix + "settings OFF");
             }
@@ -1345,7 +1231,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         Log.i(TAG, "mHasActiveSubId:" + mHasActiveSubIdOnDds);
     }
 
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     /**
      * Return {@code true} if there is an ongoing call on the non-DDS
      */
@@ -1353,8 +1238,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return mNonDdsCallState == TelephonyManager.CALL_STATE_IDLE;
     }
 
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     /**
      * Return {@code true} if temporary DDS switch happened
      */
@@ -1362,19 +1245,14 @@ public class InternetDetailsContentController implements AccessPointController.A
         return mDefaultDataSubId != mActiveDataSubId;
     }
 
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     /**
      * Return {@code true} if mobile data is enabled
      */
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     boolean isMobileDataEnabled(int subId) {
         if (mTelephonyManager == null) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             return false;
         }
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         return mTelephonyManager.createForSubscriptionId(subId).isDataEnabled();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
         /**
@@ -1384,7 +1262,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return mIsMobileDataEnabled;
     }
 
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
     boolean isMobileDataEnabledWithNddsOverrideConsidered(int subId) {
         if (subId != getDefaultDataSubscriptionId()) {
             Log.i(TAG, "isMobileDataEnabled：mIsNddsDataEnabled = " + mIsNddsDataEnabled);
@@ -1393,7 +1270,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return isMobileDataEnabled(subId);
     }
 
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
     /**
      * Set whether to enable data for {@code subId}, also whether to disable data for other
      * subscription
@@ -1414,9 +1290,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             return;
         }
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         mTelephonyManager.createForSubscriptionId(subId).setDataEnabledForReason(
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 TelephonyManager.DATA_ENABLED_REASON_USER, enabled);
         if (disableOtherSubscriptions) {
             final List<SubscriptionInfo> subInfoList = getActiveSubscriptionInfoList();
@@ -1467,7 +1341,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return serviceState != null && serviceState.getState() == serviceState.STATE_IN_SERVICE;
     }
 
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
     /**
      * Return {@code true} if Smart DDS Switch feature is available
      */
@@ -1475,7 +1348,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return mIsSmartDdsSwitchFeatureAvailable;
     }
 
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
     public boolean isDeviceLocked() {
         return !mKeyguardStateController.isUnlocked();
     }
@@ -1614,13 +1486,8 @@ public class InternetDetailsContentController implements AccessPointController.A
     public void onSettingsActivityTriggered(Intent settingsIntent) {
     }
 
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
     private void registerTelephonyCallbackOnNddsSub(int previousNddsSubId) {
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
         if (SubscriptionManager.isUsableSubscriptionId(mNddsSubId)) {
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
             boolean needUpdateCallback = false;
             if (previousNddsSubId != mNddsSubId) {
                 if (mSubIdTelephonyCallbackMap.containsKey(previousNddsSubId)) {
@@ -1638,17 +1505,11 @@ public class InternetDetailsContentController implements AccessPointController.A
                     Log.d(TAG, "unregister old callback for new Ndds : " + mNddsSubId);
                 }
                 TelephonyCallback telephonyCallback = createNddsSubTelephonyCallback(mNddsSubId);
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
                 TelephonyManager nDdsSubTm = mTelephonyManager.createForSubscriptionId(mNddsSubId);
                 nDdsSubTm.registerTelephonyCallback(mExecutor, telephonyCallback);
                 mSubIdTelephonyCallbackMap.put(mNddsSubId, telephonyCallback);
                 mSubIdTelephonyManagerMap.put(mNddsSubId, nDdsSubTm);
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
                 Log.d(TAG, "register for nDDS: " + mNddsSubId);
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
             }
         } else {
             // Prune stale SUBs
@@ -1673,104 +1534,65 @@ public class InternetDetailsContentController implements AccessPointController.A
                 : new NonDdsCallStateCallback();
     }
 
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     private class NonDdsCallStateCallback extends TelephonyCallback implements
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
             TelephonyCallback.CallStateListener,
             TelephonyCallback.DataEnabledListener {
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
 
         @Override
         public void onCallStateChanged(int callState) {
             Log.d(TAG, "onCallStateChanged: " + callState);
             mNonDdsCallState = callState;
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2024-03-03: Android_UI: Prevent NPE from condition checking
             if (mCallback != null) {
                 mCallback.onNonDdsCallStateChanged(callState);
             }
-// QTI_END: 2024-03-03: Android_UI: Prevent NPE from condition checking
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
         }
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
 
         @Override
         public void onDataEnabledChanged(boolean enabled,
                 @TelephonyManager.DataEnabledChangedReason int reason) {
             mIsNddsDataEnabled = enabled;
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
             if (mCallback != null) {
                 mCallback.onDataEnabledChanged();
             }
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
             Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
        }
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
     }
 
     private class NonDdsInternetTelephonyCallback extends InternetTelephonyCallback
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
             implements TelephonyCallback.CallStateListener,
             TelephonyCallback.DataEnabledListener {
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
         private NonDdsInternetTelephonyCallback(int subId) {
             super(subId);
         }
 
-// QTI_END: 2023-07-11: Telephony: Fix summary of nDDS sub not got refreshed
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
         @Override
         public void onCallStateChanged(int callState) {
             Log.d(TAG, "onCallStateChanged: " + callState);
             mNonDdsCallState = callState;
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2024-03-03: Android_UI: Prevent NPE from condition checking
             if (mCallback != null) {
                 mCallback.onNonDdsCallStateChanged(callState);
             }
-// QTI_END: 2024-03-03: Android_UI: Prevent NPE from condition checking
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
         }
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
 
         @Override
         public void onDataEnabledChanged(boolean enabled,
                 @TelephonyManager.DataEnabledChangedReason int reason) {
             mIsNddsDataEnabled = enabled;
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
             if (mCallback != null) {
                 mCallback.onDataEnabledChanged();
             }
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2024-03-11: Telephony: Fix exclamation show issue
             Log.d(TAG, "mIsNddsDataEnabled: " + mIsNddsDataEnabled);
        }
-// QTI_END: 2024-03-11: Telephony: Fix exclamation show issue
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     }
 
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     @Override
     public void onWifiScan(boolean isScan) {
-// QTI_BEGIN: 2024-03-03: Android_UI: Prevent NPE from condition checking
         if (mCallback != null) {
             if (!isWifiEnabled() || isDeviceLocked()) {
                 mCallback.onWifiScan(false);
                 return;
             }
             mCallback.onWifiScan(isScan);
-// QTI_END: 2024-03-03: Android_UI: Prevent NPE from condition checking
         }
     }
 
@@ -1778,13 +1600,9 @@ public class InternetDetailsContentController implements AccessPointController.A
             TelephonyCallback.DataEnabledListener, TelephonyCallback.DataConnectionStateListener,
             TelephonyCallback.DisplayInfoListener, TelephonyCallback.ServiceStateListener,
             TelephonyCallback.SignalStrengthsListener,
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
             TelephonyCallback.UserMobileDataStateListener,
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
             TelephonyCallback.CarrierNetworkListener,
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
             TelephonyCallback.ActiveDataSubscriptionIdListener {
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
 
         private final int mSubId;
 
@@ -1837,30 +1655,22 @@ public class InternetDetailsContentController implements AccessPointController.A
             }
         }
 
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
         @Override
         public void onActiveDataSubscriptionIdChanged(int subId) {
             mActiveDataSubId = subId;
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
-// QTI_BEGIN: 2024-03-03: Android_UI: Prevent NPE from condition checking
             if (mCallback != null) {
                 mCallback.onTempDdsSwitchHappened();
             }
-// QTI_END: 2024-03-03: Android_UI: Prevent NPE from condition checking
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
         }
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
 
         @Override
         public void onDataEnabledChanged(boolean b, int i) {
             if (mSubId == mDefaultDataSubId) {
                 mIsMobileDataEnabled = b;
             }
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
             if (mCallback != null) {
                 mCallback.onDataEnabledChanged();
             }
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
         }
     }
 
@@ -1990,25 +1800,17 @@ public class InternetDetailsContentController implements AccessPointController.A
     };
 
     private void updateListener() {
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         updateFiveGStateMonitor();
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
         int defaultDataSubId = getDefaultDataSubscriptionId();
         if (mDefaultDataSubId == getDefaultDataSubscriptionId()) {
             if (DEBUG) {
                 Log.d(TAG, "DDS: no change");
             }
-// QTI_BEGIN: 2024-12-25: Android_UI: SystemUI: Fix nDDS layout display issue
             int lastNddsSubId = mNddsSubId;
-// QTI_END: 2024-12-25: Android_UI: SystemUI: Fix nDDS layout display issue
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             updateNddsSubId(defaultDataSubId);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-12-25: Android_UI: SystemUI: Fix nDDS layout display issue
             if (lastNddsSubId != mNddsSubId && mCallback != null) {
                 mCallback.onSubscriptionsChanged(defaultDataSubId);
             }
-// QTI_END: 2024-12-25: Android_UI: SystemUI: Fix nDDS layout display issue
             return;
         }
         if (DEBUG) {
@@ -2027,23 +1829,18 @@ public class InternetDetailsContentController implements AccessPointController.A
             mSubIdTelephonyDisplayInfoMap.remove(mDefaultDataSubId);
             mSubIdTelephonyManagerMap.remove(mDefaultDataSubId);
 
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
             updateNddsSubId(defaultDataSubId);
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
             // create for new defaultDataSubId
             mTelephonyManager = mTelephonyManager.createForSubscriptionId(defaultDataSubId);
             mSubIdTelephonyManagerMap.put(defaultDataSubId, mTelephonyManager);
             registerInternetTelephonyCallback(mTelephonyManager, defaultDataSubId);
-// QTI_BEGIN: 2024-03-03: Android_UI: Prevent NPE from condition checking
             if (mCallback != null) {
                 mCallback.onSubscriptionsChanged(defaultDataSubId);
             }
-// QTI_END: 2024-03-03: Android_UI: Prevent NPE from condition checking
         }
         mDefaultDataSubId = defaultDataSubId;
     }
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     public int getNddsSubId() {
         return mNddsSubId;
     }
@@ -2075,22 +1872,14 @@ public class InternetDetailsContentController implements AccessPointController.A
         updateNddsSubId(mDefaultDataSubId);
         final boolean isDualDataEnabled = isDualDataEnabled();
         Log.d(TAG, "Ndds sub ID: " + mNddsSubId + " isDualDataEnabled: " + isDualDataEnabled);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-03-03: Android_UI: Prevent NPE from condition checking
         if (mCallback != null) {
             mCallback.onDualDataEnabledStateChanged();
         }
-// QTI_END: 2024-03-03: Android_UI: Prevent NPE from condition checking
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
     private void updateNddsSubId(int defaultDataSubId) {
         // update mNddsSubId
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
         int previousNddsSubId = mNddsSubId;
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         List<SubscriptionInfo> subInfos =
                 mSubscriptionManager.getActiveSubscriptionInfoList();
@@ -2101,11 +1890,7 @@ public class InternetDetailsContentController implements AccessPointController.A
                 }
             }
         }
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
         registerTelephonyCallbackOnNddsSub(previousNddsSubId);
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
     public boolean isDualDataEnabled() {
@@ -2113,7 +1898,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                 DUAL_DATA_PREFERENCE, 0) == 1;
     }
 
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     boolean mayLaunchShareWifiSettings(WifiEntry wifiEntry, View view) {
         Intent intent = getConfiguratorQrCodeGeneratorIntentOrNull(wifiEntry);
         if (intent == null) {
@@ -2123,7 +1907,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return true;
     }
 
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
     private void registerFiveGStateMonitor() {
         List<SubscriptionInfo> subInfos =
                 mSubscriptionManager.getActiveSubscriptionInfoList();
@@ -2176,7 +1959,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         return new FiveGServiceState();
     }
 
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
     interface InternetDialogCallback {
 
         void onRefreshCarrierInfo();
@@ -2205,31 +1987,20 @@ public class InternetDetailsContentController implements AccessPointController.A
 
         void onAccessPointsChanged(@Nullable List<WifiEntry> wifiEntries,
                 @Nullable WifiEntry connectedEntry, boolean hasMoreWifiEntries);
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
 
         void onNonDdsCallStateChanged(int callState);
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
 
         void onTempDdsSwitchHappened();
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 
         void onDualDataEnabledStateChanged();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 
         void onWifiScan(boolean isScan);
 
         void onSatelliteModemStateChanged(int state);
 
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
         void onFiveGStateOverride();
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
 
         default void onDataEnabledChanged() {}
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
     }
 
     private class FiveGStateMonitor implements IFiveGStateListener {
@@ -2271,7 +2042,6 @@ public class InternetDetailsContentController implements AccessPointController.A
                 mCallback.onFiveGStateOverride();
             }
         }
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
 
 
     }
@@ -2377,7 +2147,6 @@ public class InternetDetailsContentController implements AccessPointController.A
         WifiDppIntentHelper.setConfiguratorIntentExtra(intent, mWifiManager, wifiConfiguration);
         return intent;
     }
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
 
     private void unRegisterCallback (int subId) {
         TelephonyCallback callback = mSubIdTelephonyCallbackMap.get(subId);
@@ -2397,5 +2166,4 @@ public class InternetDetailsContentController implements AccessPointController.A
         }
         return true;
     }
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
 }

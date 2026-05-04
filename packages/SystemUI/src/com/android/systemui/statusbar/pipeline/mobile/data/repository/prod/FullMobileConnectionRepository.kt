@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.data.repository.prod
 
 import android.util.IndentingPrintWriter
@@ -67,9 +67,9 @@ class FullMobileConnectionRepository(
     @Background scope: CoroutineScope,
     private val mobileRepoFactory: MobileConnectionRepositoryImpl.Factory,
     private val carrierMergedRepoFactory: CarrierMergedConnectionRepository.Factory,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     slotIndexForSubId:  Flow<Int>? = null,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
 ) : MobileConnectionRepository {
     /**
      * Sets whether this connection is a typical mobile connection or a carrier merged connection.
@@ -100,9 +100,9 @@ class FullMobileConnectionRepository(
             subscriptionModel,
             defaultNetworkName,
             networkNameSeparator,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
             slotIndexForSubId,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
         )
     }
 
@@ -362,7 +362,7 @@ class FullMobileConnectionRepository(
             )
             .stateIn(scope, SharingStarted.WhileSubscribed(), activeRepo.value.carrierName.value)
 
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     override val lteRsrpLevel =
         activeRepo
             .flatMapLatest { it.lteRsrpLevel }
@@ -404,28 +404,28 @@ class FullMobileConnectionRepository(
                 activeRepo.value.dataNetworkType.value
             )
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     override val radioIconType =
         activeRepo.flatMapLatest { it.radioIconType }
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
             .logDiffsForTable(
                 tableLogBuffer,
                 columnPrefix = "",
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
                 columnName = "radioIconType",
                 initialValue = activeRepo.value.radioIconType.value,
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
             )
             .stateIn(
                 scope,
                 SharingStarted.WhileSubscribed(),
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
                 activeRepo.value.radioIconType.value
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
             )
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx =
         activeRepo.flatMapLatest { it.is6Rx }
             .logDiffsForTable(
@@ -440,8 +440,8 @@ class FullMobileConnectionRepository(
                 activeRepo.value.is6Rx.value
             )
 
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
     override val dataRoamingEnabled =
         activeRepo
             .flatMapLatest { it.dataRoamingEnabled }
@@ -451,8 +451,8 @@ class FullMobileConnectionRepository(
                 activeRepo.value.dataRoamingEnabled.value
             )
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
     override val originNetworkType =
         activeRepo.flatMapLatest { it.originNetworkType }
             .logDiffsForTable(
@@ -509,8 +509,8 @@ class FullMobileConnectionRepository(
                 activeRepo.value.imsRegistered.value
             )
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     override val imsRegistrationTech =
         activeRepo.flatMapLatest { it.imsRegistrationTech }
             .logDiffsForTable(
@@ -525,8 +525,8 @@ class FullMobileConnectionRepository(
                 activeRepo.value.imsRegistrationTech.value
             )
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
-// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-26: Data: Separate exclamation mark display for mobile network
     override val isConnectionFailed =
         activeRepo.flatMapLatest { it.isConnectionFailed }
             .logDiffsForTable(
@@ -541,8 +541,8 @@ class FullMobileConnectionRepository(
                 activeRepo.value.isConnectionFailed.value
             )
 
-// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2023-06-26: Data: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     override val ciwlanAvailable =
         activeRepo.flatMapLatest { it.ciwlanAvailable }
             .logDiffsForTable(
@@ -557,7 +557,7 @@ class FullMobileConnectionRepository(
                 activeRepo.value.ciwlanAvailable.value
             )
 
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     override val isAllowedDuringAirplaneMode =
         activeRepo
             .flatMapLatest { it.isAllowedDuringAirplaneMode }
@@ -613,9 +613,9 @@ class FullMobileConnectionRepository(
             subscriptionModel: Flow<SubscriptionModel?>,
             defaultNetworkName: NetworkNameModel,
             networkNameSeparator: String,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
             slotIndexForSubId:  Flow<Int>? = null,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
         ): FullMobileConnectionRepository {
             val mobileLogger =
                 logFactory.getOrCreate(tableBufferLogName(subId), MOBILE_CONNECTION_BUFFER_SIZE)
@@ -630,9 +630,9 @@ class FullMobileConnectionRepository(
                 scope,
                 mobileRepoFactory,
                 carrierMergedRepoFactory,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
                 slotIndexForSubId,
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
             )
         }
 

@@ -806,7 +806,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public final IntentFirewall mIntentFirewall;
 
-    private final MemoryLimiter mMemoryLimiter = MemoryLimiter.getDefaultMemoryLimiter();
+    private MemoryLimiter mMemoryLimiter;
 
     /**
      * The global lock for AMS, it's de-facto the ActivityManagerService object as of now.
@@ -2674,6 +2674,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mComponentAliasResolver = new ComponentAliasResolver(this);
         mApplicationSharedMemoryReadOnlyFd = null;
         sCreatorTokenCacheCleaner = new Handler(mHandlerThread.getLooper());
+        mMemoryLimiter = MemoryLimiter.getDefaultMemoryLimiter(mContext);
     }
 
     // Note: This method is invoked on the main thread but may need to attach various
@@ -2755,6 +2756,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mHandlerThread.getLooper(), mUserController, mConstants);
 
         mAppRestrictionController = new AppRestrictionController(mContext, this);
+
+        mMemoryLimiter = MemoryLimiter.getDefaultMemoryLimiter(mContext);
 
         mUseFifoUiScheduling = SystemProperties.getInt("sys.use_fifo_ui", 0) != 0;
 
@@ -2964,6 +2967,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             PackageAssociationInfo associationsOfPkg1 = mAllowedAssociations.get(pkg1);
             PackageAssociationInfo associationsOfPkg2 = mAllowedAssociations.get(pkg2);
 
+            // TODO(b/496974676): Extract sysconfig allow association checks into a common method
+            // and reuse in isPccAssociationAllowedBySysConfig()
             if (isPccFrameworkSupportEnabled && callerOrTargetIsPcc) {
                 // Framework requires explicit allow associations in sysconfig from PCC
                 // with non-PCC packages.
@@ -3017,6 +3022,54 @@ public class ActivityManagerService extends IActivityManager.Stub
                 Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
             }
         }
+    }
+
+    /**
+     * Checks whether an association between a caller and a target package is explicitly allowed
+     * by the device's SysConfig {@code <allow-association>} rules for Private Compute Core (PCC).
+     *
+     * <p>This method enforces a strict mutual consent policy for PCC connections:
+     * <ul>
+     *   <li>At least one of the packages must explicitly define an allowlist containing the
+     *     other.</li>
+     *   <li>If a package defines an allowlist, the other package <b>must</b> be included in it.
+     *       If it is omitted, the association is immediately denied.</li>
+     * </ul>
+     *
+     * @param callerPackage The package name of the client initiating the connection.
+     * @param targetPackage The package name of the target service being connected to.
+     * @return {@code true} if the association is mutually allowed by the SysConfig rules,
+     *         {@code false} if either package explicitly denies the other, if any input is null,
+     *         or if no explicit association rules are defined for either package.
+     */
+    @GuardedBy("this")
+    boolean isPccAssociationAllowedBySysConfigLocked(String callerPackage, String targetPackage) {
+        ensureAllowedAssociations();
+        if (mAllowedAssociations == null || callerPackage == null || targetPackage == null) {
+            return false;
+        }
+
+        PackageAssociationInfo callerAssoc = mAllowedAssociations.get(callerPackage);
+        PackageAssociationInfo targetAssoc = mAllowedAssociations.get(targetPackage);
+
+        // PCC requires an explicit allow association from at least one side.
+        if (callerAssoc == null && targetAssoc == null) {
+            return false;
+        }
+
+        // If the caller defines rules, it MUST explicitly allow the target.
+        if (callerAssoc != null && !callerAssoc.isPackageAssociationAllowed(targetPackage)) {
+            return false;
+        }
+
+        // If the target defines rules, it MUST explicitly allow the caller.
+        if (targetAssoc != null && !targetAssoc.isPackageAssociationAllowed(callerPackage)) {
+            return false;
+        }
+
+        // If we reach here, at least one side explicitly allowed the association,
+        // and neither side explicitly denied it.
+        return true;
     }
 
     /**
@@ -5098,8 +5151,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (didSomething && subReason == ApplicationExitInfo.SUBREASON_FORCE_STOP
                     && android.os.profiling.Flags.profiling25q4()
                     && packageName != null) {
+                // We must calculate uid using the specified userId. If the base uid was
+                // queried on USER_SYSTEM (0), passing it as-is would send an incorrect uid to the
+                // profiling service if the targeted user was different (e.g. User 10 in HSUM).
                 sendProfilingTrigger(
-                        uid,
+                        (userId >= 0)
+                                ? UserHandle.getUid(userId, appId)
+                                : uid,
                         packageName,
                         ProfilingTrigger.TRIGGER_TYPE_KILL_FORCE_STOP);
             }
@@ -14906,7 +14964,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     boolean isValidSingletonCall(int callingUid, int componentUid) {
         int componentAppId = UserHandle.getAppId(componentUid);
-        return UserHandle.isSameApp(callingUid, componentUid)
+        return UserHandle.isSameAppIdWithPcc(callingUid, componentUid)
                 || componentAppId == SYSTEM_UID
                 || componentAppId == PHONE_UID
                 || ActivityManager.checkUidPermission(INTERACT_ACROSS_USERS_FULL, componentUid)

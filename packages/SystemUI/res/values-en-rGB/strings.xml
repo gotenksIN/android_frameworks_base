@@ -660,8 +660,7 @@
     <string name="keyguard_indication_charging_time_slowly" msgid="301936949731705417">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Charging slowly • Full in <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_dock" msgid="3149328898931741271">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Charging • Full in <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="accessibility_action_open_communal_hub" msgid="3081702792413787849">"Widgets on lock screen"</string>
-    <!-- no translation found for accessibility_action_customize_lock_screen (1998560311105362696) -->
-    <skip />
+    <string name="accessibility_action_customize_lock_screen" msgid="1998560311105362696">"Customise lock screen"</string>
     <string name="accessibility_announcement_communal_widget_added" msgid="6911593106099328271">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> widget added to lock screen"</string>
     <string name="communal_tutorial_indicator_text" msgid="4503010353591430123">"Swipe left to start the communal tutorial"</string>
     <string name="cta_tile_button_to_open_widget_editor" msgid="3871562362382963878">"Customise"</string>
@@ -708,7 +707,7 @@
     <string name="hub_onboarding_bottom_sheet_action_button" msgid="6161983690157872829">"Let\'s go"</string>
     <string name="glanceable_hub_to_dream_button_tooltip" msgid="9018287673822335829">"Show your favourite screensavers while charging"</string>
     <string name="dream_switcher_select_dream_title" msgid="2784437029616150736">"Select dream"</string>
-    <string name="dream_switcher_choose_screensaver" msgid="3073471555365511227">"Choose a screensaver"</string>
+    <string name="dream_switcher_choose_screensaver" msgid="3073471555365511227">"Choose a screen saver"</string>
     <string name="dream_switcher_edit_button_text" msgid="2152516873780618659">"Edit <xliff:g id="DREAM_NAME">%1$s</xliff:g>"</string>
     <string name="dream_switcher_go_to_app_button_text" msgid="6043693674135654080">"Go to <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="dream_switcher_more_screensavers" msgid="6672017768044989604">"More screensavers"</string>

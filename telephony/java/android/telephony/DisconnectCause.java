@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 package android.telephony;
 
 import android.annotation.FlaggedApi;
@@ -476,6 +482,9 @@ public final class DisconnectCause {
     /** @hide */
     public static final int INCOMING_CALLS_BARRED_WITHIN_CUG = 129;
 
+    /** @hide */
+    public static final int NARROWBAND_TERRESTRIAL_NETWORK = 130;
+
 // QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     //*********************************************************************************************
     // When adding a disconnect type:
@@ -486,7 +495,7 @@ public final class DisconnectCause {
     // 5) Update android.telecom.DisconnectCauseUtil with any mappings to a telecom.DisconnectCause.
     //
 // QTI_END: 2018-04-10: Telephony: Add DisconnectCause values for clear code
-    // NextId: 130
+    // NextId: 131
 // QTI_BEGIN: 2018-04-10: Telephony: Add DisconnectCause values for clear code
     //*********************************************************************************************
 
@@ -503,7 +512,7 @@ public final class DisconnectCause {
      * Largest valid value for call disconnect codes.
      * @hide
      */
-    public static final int MAXIMUM_VALID_VALUE = INCOMING_CALLS_BARRED_WITHIN_CUG;
+    public static final int MAXIMUM_VALID_VALUE = NARROWBAND_TERRESTRIAL_NETWORK;
 
     /** Private constructor to avoid class instantiation. */
     private DisconnectCause() {
@@ -773,6 +782,8 @@ public final class DisconnectCause {
                 return "SECURE_MODE";
             case SATELLITE_ENABLED:
                 return "SATELLITE_ENABLED";
+            case NARROWBAND_TERRESTRIAL_NETWORK:
+                return "NARROWBAND_TERRESTRIAL_NETWORK";
             default:
                 return "INVALID: " + cause;
         }

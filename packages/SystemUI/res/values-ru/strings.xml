@@ -160,7 +160,7 @@
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Вы записываете экран приложения \"<xliff:g id="APP_NAME">%1$s</xliff:g>\"."</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Остановить запись"</string>
     <string name="screen_record_entire_screen" msgid="66944996337928170">"Весь экран"</string>
-    <string name="screen_record_single_app" msgid="7355880948574569290">"Отдельное приложение"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"Одно приложение"</string>
     <string name="screen_record_single_app_hint" msgid="8404332826093639170">"Выбрать приложение"</string>
     <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Отдельное приложение (откройте его)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Записывать звук с устройства"</string>
@@ -168,7 +168,7 @@
     <string name="screen_record_record_audio_during_recording_warning" msgid="1240590393919102946">"Сейчас нельзя менять настройки."</string>
     <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Показывать селфи-камеру"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Показывать нажатия"</string>
-    <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Выберите приложение для записи"</string>
+    <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Какое приложение записать?"</string>
     <string name="screen_record_accessibility_label_show_next" msgid="6733148530962728100">"Показать следующее"</string>
     <string name="screen_record_accessibility_label_show_previous" msgid="5202414285722078012">"Показать предыдущее"</string>
     <string name="screen_record_settings" msgid="2377267679200139285">"Настройки записи экрана"</string>
@@ -320,7 +320,7 @@
     <string name="biometric_dialog_fallback_button" msgid="7808939083554391449">"Подтвердить другим способом"</string>
     <string name="biometric_dialog_manage_identity_check" msgid="6283423571297422689">"Настроить проверку личности"</string>
     <string name="biometric_dialog_identity_check_footer_link_text" msgid="5445804502968287214">"Подробнее о проверке личности…"</string>
-    <string name="biometric_dialog_identity_check_footer" msgid="4176895548458429932">"Проверка личности включена. Для нее можно использовать только отпечаток пальца или распознавание лица. %1$s"</string>
+    <string name="biometric_dialog_identity_check_footer" msgid="4176895548458429932">"Проверка личности включена. Для нее можно использовать только отпечаток пальца или фейсконтроль. %1$s"</string>
     <string name="biometric_dialog_identity_check_watch_ranging" msgid="2994378079915744485">"Оценка риска…"</string>
     <string name="biometric_dialog_unavailable" msgid="8242160331783709764">"Недоступно"</string>
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"PIN-код"</string>
@@ -660,8 +660,7 @@
     <string name="keyguard_indication_charging_time_slowly" msgid="301936949731705417">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Медленная зарядка • Осталось <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_dock" msgid="3149328898931741271">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Зарядка • Осталось <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="accessibility_action_open_communal_hub" msgid="3081702792413787849">"Виджеты на заблокированном экране"</string>
-    <!-- no translation found for accessibility_action_customize_lock_screen (1998560311105362696) -->
-    <skip />
+    <string name="accessibility_action_customize_lock_screen" msgid="1998560311105362696">"Настроить заблокированный экран"</string>
     <string name="accessibility_announcement_communal_widget_added" msgid="6911593106099328271">"Виджет \"<xliff:g id="WIDGET_NAME">%1$s</xliff:g>\" добавлен на заблокированный экран."</string>
     <string name="communal_tutorial_indicator_text" msgid="4503010353591430123">"Чтобы ознакомиться с руководством, проведите по экрану влево"</string>
     <string name="cta_tile_button_to_open_widget_editor" msgid="3871562362382963878">"Настроить"</string>
@@ -1647,7 +1646,7 @@
     <string name="stylus_battery_low_percentage" msgid="2564243323894629626">"Батарея стилуса: <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="stylus_battery_low_subtitle" msgid="3583843128908823273">"Поставьте стилус на зарядку."</string>
     <string name="stylus_battery_low" msgid="7134370101603167096">"Низкий заряд батареи стилуса"</string>
-    <string name="video_camera" msgid="7654002575156149298">"Видеокамера"</string>
+    <string name="video_camera" msgid="7654002575156149298">"Видео­камера"</string>
     <string name="call_from_work_profile_title" msgid="5418253516453177114">"Нельзя звонить из личного приложения"</string>
     <string name="call_from_work_profile_text" msgid="2856337395968118274">"В вашей организации разрешено звонить только из рабочих приложений."</string>
     <string name="call_from_work_profile_action" msgid="2937701298133010724">"Перейти в рабочий профиль"</string>

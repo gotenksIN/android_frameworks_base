@@ -105,6 +105,7 @@ enum class AnonSwapState {
     kCold,
     kOkay,
     kHot,
+    kTriggered,
 };
 
 /**
@@ -124,11 +125,11 @@ static_assert(LIMIT_IS_IGNORED < LIMIT_IS_DISABLED, "LIMIT_IS_IGNORED must be th
 static_assert(LIMIT_IS_IGNORED < 0 && LIMIT_IS_DISABLED < 0, "Limit specials must be negative");
 
 // The margin for anonymous memory.  The cgroup memory.high limit is set to memHigh plus the
-// margin.  This lets a process run even when anon is at the memHigh limit.
+// margin once swap is full.  This lets a process run even when anon is at the memHigh limit.
 const int64_t mMemHighMargin = 100 * (1024 * 1024); // 100MB
 
 // Hysteresis for memory.high.  If a process is in the red zone (both memory.high and
-// memory.swap.max have fired events), cgroup events are disabled and the process is polled for
+// memory.swap.high have fired events), cgroup events are disabled and the process is polled for
 // limit violations.  However, if the process memory drops <hysteresis> below the memory.high
 // limit, polling stops and cgroup events are re-enabled.  The value is 10MB.  There is nothing
 // magical about this value, except that 10MB is small enough to be useful for testing.
@@ -177,35 +178,9 @@ struct MemoryEvents {
     // success.
     bool scan(std::string const& data) {
         return sscanf(data.c_str(),
-                      "low %" PRId64 " high %" PRId64 " max %" PRId64 " oom %" PRId64
-                      " oom_kill %" PRId64 " oom_group_kill %" PRId64,
+                      "low %" SCNd64 " high %" SCNd64 " max %" SCNd64 " oom %" SCNd64
+                      " oom_kill %" SCNd64 " oom_group_kill %" SCNd64,
                       &low, &high, &max, &oom, &oom_kill, &oom_group_kill) == 6;
-    }
-};
-
-/**
- * The struct for memory.swap.events.  Member names match the strings defined by the kernel.
- */
-struct MemorySwapEvents {
-    int64_t high = 0;
-    int64_t max = 0;
-    int64_t fail = 0;
-
-    MemorySwapEvents() {}
-
-    MemorySwapEvents(std::string const& data) {
-        scan(data);
-    }
-
-    MemorySwapEvents(std::optional<std::string> const& data) {
-        if (data) scan(*data);
-    }
-
-    // Populate the object from a string that is the contents of the file.  Return true on
-    // success.
-    bool scan(std::string const& data) {
-        return sscanf(data.c_str(), "high %" PRId64 " max %" PRId64 " fail %" PRId64, &high, &max,
-                      &fail) == 3;
     }
 };
 
@@ -215,7 +190,7 @@ struct MemorySwapEvents {
  */
 struct MemoryStat {
     int64_t anon = 0;
-    int64_t file = 0;
+    int64_t shmem = 0;
 
     MemoryStat() {}
 
@@ -230,7 +205,17 @@ struct MemoryStat {
     // Populate the object from a string that is the contents of the file.  Return true on
     // success.
     bool scan(std::string const& data) {
-        return sscanf(data.c_str(), "anon %" PRId64 " file %" PRId64, &anon, &file) == 2;
+        if (sscanf(data.c_str(), " anon %" SCNd64, &anon) != 1) return false;
+        char const* s = strstr(data.c_str(), "\nshmem ");
+        if (s == nullptr) return false;
+        if (sscanf(s, " shmem %" SCNd64, &shmem) != 1) return false;
+        return true;
+    }
+
+    // A convenience function to extract the metric for total anonymous memory from a single
+    // MemoryStat instance.
+    int64_t anonMetric() const {
+        return anon + shmem;
     }
 };
 
@@ -284,11 +269,10 @@ class Process {
     enum class CgroupFile {
         kUnknown,
         kMemoryStat,  // The source of the current value for anon memory.
-        kMemoryEvent, // The event count for memory.high violations
-        kMemoryHigh,  // The limit for memory.high
-        kSwapCurrent, // The current value for swap
-        kSwapEvent,   // The event count for memory.swap.max violations
-        kSwapMax,     // The limit for memory.swap.max
+        kMemoryEvent, // The event count for memory.high violations.
+        kMemoryHigh,  // The limit for memory.high.
+        kSwapCurrent, // The current value for swap.
+        kSwapMax,     // The absolute maximum for swap.
     };
 
     // A class that encapsulates the data for a single limit type.
@@ -306,12 +290,6 @@ class Process {
 
         // The baseline event count.
         int64_t mBaseline = 0;
-
-        // True if the watcher is supposed to be enabled.
-        bool mEnabled = true;
-
-        // The last configured limit value.
-        int64_t mConfiguredLimit = LIMIT_IS_DISABLED;
 
         // True if an event has ever been see on this limit.
         bool mTriggered = false;
@@ -349,7 +327,7 @@ public:
     }
 
     // Watch the events files.  Once the call succeeds, further calls quietly do nothing.
-    void watch(int inotify_fd, wdmap_t& wdmap, bool monitorSwap, Statistics& stats) {
+    void watch(int inotify_fd, wdmap_t& wdmap, Statistics& stats) {
         if (mMemWatcher.mWd == UNSET) {
             std::string cpath = cgroupPath(CgroupFile::kMemoryEvent);
             char const* path = cpath.c_str();
@@ -361,25 +339,7 @@ public:
                 mMemWatcher.mWd = memWd;
                 wdmap[mMemWatcher.mWd] = mPid;
                 mMemWatcher.mBaseline = getEventCount(MonitoredLimit::kMemoryHigh);
-                mMemWatcher.mEnabled = true;
                 mMemWatcher.mTriggered = false;
-                stats.mWatched++;
-            }
-        }
-
-        if (monitorSwap && mSwapWatcher.mWd == UNSET) {
-            std::string cpath = cgroupPath(CgroupFile::kSwapEvent);
-            char const* path = cpath.c_str();
-            int swapWd = inotify_add_watch(inotify_fd, path, IN_MODIFY);
-            if (swapWd < 0) {
-                ALOGE_IF(DEBUG, "add_watch(%s) failed: %s", path, strerror(errno));
-                stats.mWatchFailed++;
-            } else {
-                mSwapWatcher.mWd = swapWd;
-                wdmap[mSwapWatcher.mWd] = mPid;
-                mSwapWatcher.mBaseline = getEventCount(MonitoredLimit::kSwapMax);
-                mSwapWatcher.mEnabled = true;
-                mSwapWatcher.mTriggered = false;
                 stats.mWatched++;
             }
         }
@@ -394,7 +354,6 @@ public:
                 mMemWatcher.mWd = unwatch(inotify_fd, wdmap, mMemWatcher.mWd);
                 break;
             case MonitoredLimit::kSwapMax:
-                mSwapWatcher.mWd = unwatch(inotify_fd, wdmap, mSwapWatcher.mWd);
                 break;
             case MonitoredLimit::kAnonSwap:
                 break;
@@ -410,8 +369,7 @@ public:
 
     // Return a string that identifies this process.
     std::string toString() const {
-        return android::base::StringPrintf("pid=%d uid=%d mem=%d swap=%d", mPid, mUid,
-                                           mMemWatcher.mWd, mSwapWatcher.mWd);
+        return android::base::StringPrintf("pid=%d uid=%d mem=%d", mPid, mUid, mMemWatcher.mWd);
     }
 
     // Return true if the process is alive.  If the process is privileged (meaning, it's
@@ -430,8 +388,6 @@ public:
     MonitoredLimit getLimitType(int wd) const {
         if (wd == mMemWatcher.mWd) {
             return MonitoredLimit::kMemoryHigh;
-        } else if (wd == mSwapWatcher.mWd) {
-            return MonitoredLimit::kSwapMax;
         } else {
             return MonitoredLimit::kUnknown;
         }
@@ -442,11 +398,13 @@ public:
     // another system process is also modifying cgroup files.
     int64_t getLimitValue(MonitoredLimit type) const {
         switch (type) {
+            case MonitoredLimit::kUnknown:
+                return 0;
             case MonitoredLimit::kMemoryHigh:
-                return mMemWatcher.mConfiguredLimit;
+                return mMemoryHighLimit;
             case MonitoredLimit::kSwapMax:
-                return mSwapWatcher.mConfiguredLimit;
-            default:
+                return mSwapMaxLimit;
+            case MonitoredLimit::kAnonSwap:
                 return mAnonSwapLimit;
         }
     }
@@ -459,7 +417,7 @@ public:
             case MonitoredLimit::kMemoryHigh:
                 return readMemoryEvents().high;
             case MonitoredLimit::kSwapMax:
-                return readSwapEvents().max;
+                return 0;
             case MonitoredLimit::kAnonSwap:
                 return 0;
         }
@@ -474,7 +432,7 @@ public:
             case MonitoredLimit::kMemoryHigh:
                 return mMemWatcher.mBaseline;
             case MonitoredLimit::kSwapMax:
-                return mSwapWatcher.mBaseline;
+                return 0;
             case MonitoredLimit::kAnonSwap:
                 return 0;
         }
@@ -490,37 +448,36 @@ public:
             case MonitoredLimit::kSwapMax:
                 return readMetric(CgroupFile::kSwapCurrent);
             case MonitoredLimit::kAnonSwap:
-                return readMemoryStat().anon + readMetric(CgroupFile::kSwapCurrent);
+                return readMemoryStat().anonMetric() + readMetric(CgroupFile::kSwapCurrent);
         }
+    }
+
+    // Add the second operand to the limit value. What is special about this is that a limit
+    // value of DISABLED is never altered.
+    static int64_t incrLimit(int64_t limit, int64_t incr) {
+        return (limit == LIMIT_IS_DISABLED) ? limit : (limit + incr);
     }
 
     // Set the value for the specified limit.  There are two special cases for limits: the
     // "disabled" value is converted to "max" and the "ignored" value is skipped completely.
     void setLimit(MonitoredLimit type, int64_t limit) {
         if (limit <= LIMIT_IS_IGNORED) return;
-        std::string path;
-        int64_t value = limit;
+
         switch (type) {
             case MonitoredLimit::kUnknown:
                 break;
             case MonitoredLimit::kMemoryHigh:
-                if (!mMemWatcher.mEnabled) return;
-                if (mSwapWatcher.mTriggered && limit != LIMIT_IS_DISABLED) {
-                    // Swap is full.  Add some margin to memHigh so that the CPU can run and
-                    // perhaps shed anon memory before hitting the limit.
-                    value += mMemWatcher.mMargin;
+                mMemoryHighLimit = limit;
+                if (mMemWatcher.mTriggered) {
+                    // Add some margin to memHigh so that the CPU can run and perhaps shed anon
+                    // memory before hitting the limit.
+                    limit = incrLimit(limit, mMemWatcher.mMargin);
                 }
-                if (writeLimit(cgroupPath(CgroupFile::kMemoryHigh), value)) {
-                    // The configured limit is the value supplied to this function.  The
-                    // operational limit may include the margin.
-                    mMemWatcher.mConfiguredLimit = limit;
-                }
+                writeLimit(cgroupPath(CgroupFile::kMemoryHigh), limit);
                 break;
             case MonitoredLimit::kSwapMax:
-                if (!mSwapWatcher.mEnabled) return;
-                if (writeLimit(cgroupPath(CgroupFile::kSwapMax), value)) {
-                    mSwapWatcher.mConfiguredLimit = limit;
-                }
+                mSwapMaxLimit = limit;
+                writeLimit(cgroupPath(CgroupFile::kSwapMax), limit);
                 break;
             case MonitoredLimit::kAnonSwap:
                 mAnonSwapLimit = limit;
@@ -539,7 +496,7 @@ public:
     // swap event has fired.  This is only called when either the memory.high or swap.max events
     // have just fired.
     void resetLimits() {
-        setLimits(mMemWatcher.mConfiguredLimit, mSwapWatcher.mConfiguredLimit);
+        setLimits(mMemoryHighLimit, mSwapMaxLimit);
     }
 
     // Set the "event" flag based on the limit.  If limitMode is false, the limit is set to
@@ -552,40 +509,38 @@ public:
                 if (!limitMode) {
                     setLimits(LIMIT_IS_DISABLED, LIMIT_IS_IGNORED);
                 }
-                mMemWatcher.mEnabled = limitMode;
                 mMemWatcher.mTriggered = true;
                 break;
             case MonitoredLimit::kSwapMax:
-                if (!limitMode) {
-                    setLimits(LIMIT_IS_IGNORED, LIMIT_IS_DISABLED);
-                }
-                mSwapWatcher.mEnabled = limitMode;
-                mSwapWatcher.mTriggered = true;
                 break;
             case MonitoredLimit::kAnonSwap:
+                mAnonSwapTriggered = true;
                 break;
         }
     }
 
     // Return true if the process is in the red zone.  A process is in the red zone if
-    // memory.high and memory.swap.max have both hit their configured limits.  Once in the red
+    // memory.high and memory.swap.high have both hit their configured limits.  Once in the red
     // zone, the process is granted a margin of extra memory over the anon limit so that it can
     // continue to run.  MemoryLimiter cannot rely on cgroup events at this point, and resorts
     // to a periodic poll to see if any process is is overlimit.
     bool isRed() const {
-        return mMemWatcher.mTriggered && mSwapWatcher.mTriggered;
+        return mMemWatcher.mTriggered && !mAnonSwapTriggered;
     }
 
     // Check the AnonSwap metric against its limit.  There are three possible returns: Hot,
     // Okay, and Cold.  Hot means the limit has been exceeded.  Okay means the limit has not
     // been exceeded but the metric is high enough that polling is required.  Cold means the
     // metric is low enough that we can rely on cgroup events.
-    // from the cgroup files and compares them to the configured maximum.
     AnonSwapState testAnonSwap() const {
+        if (mAnonSwapTriggered) return AnonSwapState::kTriggered;
         int64_t metric = getMetric(MonitoredLimit::kAnonSwap);
-        if (metric > mAnonSwapLimit) {
+        if (mAnonSwapLimit < 0) {
+            // The limit is disabled.
+            return AnonSwapState::kOkay;
+        } else if (metric > mAnonSwapLimit) {
             return AnonSwapState::kHot;
-        } else if (metric < (mMemWatcher.mConfiguredLimit - mMemHighHysteresis)) {
+        } else if (metric < (mMemoryHighLimit - mMemHighHysteresis)) {
             return AnonSwapState::kCold;
         } else {
             return AnonSwapState::kOkay;
@@ -607,11 +562,18 @@ private:
     // The memory watcher.
     Watcher mMemWatcher = Watcher(MonitoredLimit::kMemoryHigh, mMemHighMargin);
 
-    // The swap watcher.
-    Watcher mSwapWatcher = Watcher(MonitoredLimit::kSwapMax, 0);
+    // The configured limit for memory high.  This is not necessarily the limit programmed into
+    // the cgroup files.
+    int64_t mMemoryHighLimit = LIMIT_IS_DISABLED;
+
+    // The configured limit for swap max.
+    int64_t mSwapMaxLimit = LIMIT_IS_DISABLED;
 
     // The limit of anon+swap.
     int64_t mAnonSwapLimit = LIMIT_IS_DISABLED;
+
+    // True if the anon+swap has triggered.
+    bool mAnonSwapTriggered = false;
 
     // A simple wrapper to stop watching a watch descriptor.  This does nothing if the watch
     // descriptor is unset.   The wrapper returns UNSET so that it can be used in an assignment.
@@ -636,8 +598,6 @@ private:
                 return (mCgroupRoot / "memory.high").string();
             case CgroupFile::kSwapCurrent:
                 return (mCgroupRoot / "memory.swap.current").string();
-            case CgroupFile::kSwapEvent:
-                return (mCgroupRoot / "memory.swap.events").string();
             case CgroupFile::kSwapMax:
                 return (mCgroupRoot / "memory.swap.max").string();
         }
@@ -667,10 +627,6 @@ private:
 
     MemoryEvents readMemoryEvents() const {
         return MemoryEvents(cgroupData(CgroupFile::kMemoryEvent));
-    }
-
-    MemorySwapEvents readSwapEvents() const {
-        return MemorySwapEvents(cgroupData(CgroupFile::kSwapEvent));
     }
 
     // Return a limit string, suitable for writing to a cgroup limit file.  The key new behavior
@@ -708,7 +664,7 @@ public:
             // OutOfMemoryError
             return;
         }
-        mFunc = env->GetMethodID(service, "onLimitExceeded", "(IIIJ)V");
+        mFunc = env->GetMethodID(service, "onLimitExceeded", "(IIIJJ)V");
         if (mFunc == nullptr) {
             // Throws NoSuchMethodError, ExceptionInInitializerError, or OutOfMemoryError
             return;
@@ -740,7 +696,8 @@ public:
         JNIEnv* env;
         if (mVm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
             env->CallVoidMethod(mLimiter, mFunc, process.getPid(), process.getUid(), type,
-                                process.getLimitValue(type));
+                                process.getLimitValue(MonitoredLimit::kMemoryHigh),
+                                process.getLimitValue(MonitoredLimit::kSwapMax));
         } else {
             ALOGE("GetEnv() failed");
         }
@@ -934,7 +891,7 @@ private:
                 // This is a startling failure.
                 return std::nullopt;
             } else {
-                j->second.watch(mInotifyFd, mWdMap, mMonitorSwap, mStatistics);
+                j->second.watch(mInotifyFd, mWdMap, mStatistics);
                 i = j;
                 mStatistics.mProcesses = mTargets.size();
                 mStatistics.mProcessesHwm.store(
@@ -952,11 +909,6 @@ private:
     struct PollStatus {
         bool running = true;
         bool anyRed = false;
-
-        void reset() {
-            running = true;
-            anyRed = false;
-        }
     };
 
     // The main monitoring loop.
@@ -1005,7 +957,6 @@ private:
             } else {
                 timeout = PID_POLL_PERIOD_MS;
             }
-            status.reset();
         }
 
         mVm->DetachCurrentThread();
@@ -1017,6 +968,7 @@ private:
     void handle_timeout(PollStatus& status) {
         std::vector<Process> red;
         int count = 0;
+        status.anyRed = false;
         {
             const std::lock_guard _l(mLock);
             for (auto i = mTargets.begin(); i != mTargets.end();) {
@@ -1032,11 +984,14 @@ private:
                     switch (p.testAnonSwap()) {
                         case AnonSwapState::kHot:
                             red.push_back(p);
+                            p.setExceeded(MonitoredLimit::kAnonSwap, mLimitMode);
                             break;
                         case AnonSwapState::kOkay:
                             break;
+                        case AnonSwapState::kTriggered:
+                            break;
                         case AnonSwapState::kCold:
-                            p.watch(mInotifyFd, mWdMap, mMonitorSwap, mStatistics);
+                            p.watch(mInotifyFd, mWdMap, mStatistics);
                             break;
                     }
                     mStatistics.mRedProcess++;
@@ -1270,7 +1225,7 @@ jlongArray testParseCgroup(JNIEnv* env, jclass, jstring jfile, jstring jdata) {
             return nullptr;
         }
         fields.push_back(stat.anon);
-        fields.push_back(stat.file);
+        fields.push_back(stat.shmem);
     } else if (strcmp(file.c_str(), "memory.events") == 0) {
         MemoryEvents events;
         if (!events.scan(data.c_str())) {
@@ -1282,14 +1237,6 @@ jlongArray testParseCgroup(JNIEnv* env, jclass, jstring jfile, jstring jdata) {
         fields.push_back(events.oom);
         fields.push_back(events.oom_kill);
         fields.push_back(events.oom_group_kill);
-    } else if (strcmp(file.c_str(), "memory.swap.events") == 0) {
-        MemorySwapEvents events;
-        if (!events.scan(data.c_str())) {
-            return nullptr;
-        }
-        fields.push_back(events.high);
-        fields.push_back(events.max);
-        fields.push_back(events.fail);
     } else {
         return nullptr;
     }

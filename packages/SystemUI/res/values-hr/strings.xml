@@ -134,7 +134,7 @@
     <string name="screenrecord_permission_dialog_option_text_single_app" msgid="1996450687814647583">"Snimanje jedne aplikacije"</string>
     <string name="screenrecord_permission_dialog_option_text_entire_screen" msgid="4882406311415082016">"Snimanje ovog zaslona"</string>
     <string name="screenrecord_permission_dialog_option_text_entire_screen_for_display" msgid="4169494703993148253">"Snimi %s"</string>
-    <string name="screenrecord_permission_dialog_warning_entire_screen" msgid="1321758636709366068">"Kad snimate cijeli zaslon, snima se sve što se prikazuje na zaslonu. Stoga pazite na stvari kao što su zaporke, podaci o plaćanju, poruke, fotografije te audio i videozapisi."</string>
+    <string name="screenrecord_permission_dialog_warning_entire_screen" msgid="1321758636709366068">"Kad snimate cijeli zaslon, snima se sve što se prikazuje na zaslonu. Stoga pazite na stvari kao što su zaporke, podaci o plaćanju, poruke, fotografije te audiozapisi i videozapisi."</string>
     <string name="screenrecord_permission_dialog_warning_single_app" msgid="3738199712880063924">"Kad snimate aplikaciju, snima se sve što se prikazuje ili reproducira u toj aplikaciji. Stoga pazite na stvari kao što su zaporke, podaci o plaćanju, poruke, fotografije te audiozapisi i videozapisi."</string>
     <string name="screenrecord_permission_dialog_continue_entire_screen" msgid="5557974446773486600">"Pokreni snimanje"</string>
     <string name="screenrecord_app_selector_title" msgid="3854492366333954736">"Odaberite aplikaciju za snimanje"</string>
@@ -660,8 +660,7 @@
     <string name="keyguard_indication_charging_time_slowly" msgid="301936949731705417">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • sporo punjenje • <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> do napunjenosti"</string>
     <string name="keyguard_indication_charging_time_dock" msgid="3149328898931741271">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • punjenje • <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g> do napunjenosti"</string>
     <string name="accessibility_action_open_communal_hub" msgid="3081702792413787849">"Widgeti na zaključanom zaslonu"</string>
-    <!-- no translation found for accessibility_action_customize_lock_screen (1998560311105362696) -->
-    <skip />
+    <string name="accessibility_action_customize_lock_screen" msgid="1998560311105362696">"Prilagodite zaključavanje zaslona"</string>
     <string name="accessibility_announcement_communal_widget_added" msgid="6911593106099328271">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g> dodan je na zaključani zaslon"</string>
     <string name="communal_tutorial_indicator_text" msgid="4503010353591430123">"Prijeđite prstom ulijevo da biste pokrenuli zajednički vodič"</string>
     <string name="cta_tile_button_to_open_widget_editor" msgid="3871562362382963878">"Prilagodi"</string>
@@ -1119,7 +1118,7 @@
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"Maksimiziranje prozora"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"Minimiziranje prozora"</string>
     <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"Zatvaranje trenutačnog prozora"</string>
-    <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Premještanje s jedne radne površine na drugu"</string>
+    <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Premještanje između radnih površina"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Unos"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Prelazak na sljedeći jezik"</string>
     <string name="input_switch_input_language_previous" msgid="6043341362202336623">"Prelazak na prethodni jezik"</string>

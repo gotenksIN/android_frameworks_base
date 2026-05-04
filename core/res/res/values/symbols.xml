@@ -874,9 +874,6 @@
   <java-symbol type="string" name="supervision_blocked_app_title" />
   <java-symbol type="string" name="supervision_blocked_app_content" />
   <java-symbol type="string" name="supervision_unblocked_app_content" />
-  <java-symbol type="string" name="tv_watchdog_notification_channel_name" />
-  <java-symbol type="string" name="tv_watchdog_notification_title" />
-  <java-symbol type="string" name="tv_watchdog_notification_content" />
   <java-symbol type="integer" name="config_turnOffTvToastSuppressionDelayMs" />
   <java-symbol type="integer" name="config_turnOffTvToastPostDelayMs" />
   <java-symbol type="string" name="low_memory" />
@@ -6590,9 +6587,6 @@
   <!-- Whether to force color fade. -->
   <java-symbol type="bool" name="config_forceColorFade" />
 
-  <!-- The locale lauguages that force camera shutter sound -->
-  <java-symbol type="array" name="config_cameraSoundForcedLanguage" />
-
   <!-- The location button render service component name -->
   <java-symbol type="string" name="config_locationButtonRenderService" />
 
@@ -6668,4 +6662,6 @@
   <java-symbol type="string" name="do_not_disturb_sync_notification_title" />
   <java-symbol type="string" name="do_not_disturb_sync_notification_content" />
   <java-symbol type="drawable" name="ic_cross_device_sync_airplane" />
+  <!-- Disable the Video Capability over IWLAN when Wi-Fi Calling is turned off  -->
+  <java-symbol type="bool" name="config_disable_video_capability_when_wfc_off" />
   </resources>

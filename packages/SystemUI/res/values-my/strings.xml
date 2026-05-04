@@ -167,8 +167,8 @@
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"မိုက်ခရိုဖုန်း အသံဖမ်းရန်"</string>
     <string name="screen_record_record_audio_during_recording_warning" msgid="1240590393919102946">"ရိုက်ကူးနေစဉ် အသံဆက်တင်ပြောင်း၍မရပါ"</string>
     <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"ဆယ်လ်ဖီ ကင်မရာ ပြပါ"</string>
-    <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"ထိတွေ့ခြင်းများကို ပြပါ"</string>
-    <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"ရိုက်ကူးရန် အက်ပ်ရွေးခြင်း"</string>
+    <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"ထိတွေ့မှုများ ပြရန်"</string>
+    <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"ရိုက်ကူးရန် အက်ပ်ရွေးပါ"</string>
     <string name="screen_record_accessibility_label_show_next" msgid="6733148530962728100">"နောက်တစ်ခု ပြပါ"</string>
     <string name="screen_record_accessibility_label_show_previous" msgid="5202414285722078012">"ယခင်တစ်ခု ပြပါ"</string>
     <string name="screen_record_settings" msgid="2377267679200139285">"ဖန်သားပြင်ရိုက်ကူးခြင်း ဆက်တင်များ"</string>
@@ -1136,7 +1136,7 @@
     <string name="keyboard_shortcut_group_applications_maps" msgid="7312554713993114342">"Maps"</string>
     <string name="group_accessibility_toggle_bounce_keys" msgid="4183584952493519179">"ကြိမ်ထပ်နှိပ်ခြင်းများ ပြောင်းရန်"</string>
     <string name="group_accessibility_toggle_mouse_keys" msgid="534757719357514361">"မောက်စ်ကီးများ ပြောင်းရန်"</string>
-    <string name="group_accessibility_toggle_sticky_keys" msgid="7722214637652104184">"Sticky ကီးများ ပြောင်းရန်"</string>
+    <string name="group_accessibility_toggle_sticky_keys" msgid="7722214637652104184">"ခလုတ်တွဲကီးများ ပြောင်းရန်"</string>
     <string name="group_accessibility_toggle_slow_keys" msgid="8569881436531795062">"အနှေးကီးများ ပြောင်းရန်"</string>
     <string name="group_accessibility_toggle_voice_access" msgid="5436708239015479017">"အသံဖြင့်ထိန်းချုပ်ခြင်း ပြောင်းရန်"</string>
     <string name="group_accessibility_toggle_talkback" msgid="5017967056006325713">"Talkback ခလုတ်ပြောင်းရန်"</string>

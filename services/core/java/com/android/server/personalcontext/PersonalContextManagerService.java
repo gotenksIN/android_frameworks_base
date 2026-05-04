@@ -193,12 +193,18 @@ public class PersonalContextManagerService extends SystemService {
     public interface EmbeddedInsightRendererFactory {
         /**
          * Create an {@link EmbeddedInsightRenderer} instance.
+         *
          * @param userContext the context for the user
+         * @param operatingModeProvider operating mode provider for the user
+         * @param accessController access controller for checking permissions
          * @param executor the executor to use to execute embedded renderer tasks
          * @return A new {@link EmbeddedInsightRenderer} instance.
          */
         EmbeddedInsightRenderer createEmbeddedInsightRenderer(
-                Context userContext, AccessController accessController, Executor executor);
+                Context userContext,
+                OperatingModeProvider operatingModeProvider,
+                AccessController accessController,
+                Executor executor);
     }
 
     /** Factory interface for creating {@link AccessController} instances. */
@@ -217,20 +223,29 @@ public class PersonalContextManagerService extends SystemService {
     private final ContentCaptureManagerInternal mContentCaptureManagerInternal;
     private final EmbeddedInsightRendererFactory mEmbeddedInsightRendererFactory;
     private final AccessControllerFactory mAccessControllerFactory;
+
+    private final PackageMonitorProxy mPackageMonitorProxy;
     private final PersonalContextManagerInternal mInternalService = new LocalService();
     private @PersonalContextManager.OperatingMode int mCurrentOperatingMode =
             PersonalContextManager.OPERATING_MODE_DEFAULT;
 
+    private final PackageMonitorProxy.PackageMonitorProvider mPackageMonitorProxyProvider = uid -> {
+        final int userId = UserHandle.getUserId(uid);
+        return mUserStates.contains(userId) ? Set.of(mUserStates.get(userId).monitor) : Set.of();
+    };
+
     private final SparseArray<OperatingModeProvider> mOperatingModeProviders = new SparseArray<>();
 
     public PersonalContextManagerService(Context context) {
-        this(context, EmbeddedInsightRenderer::new, AccessController::new);
+        this(context, EmbeddedInsightRenderer::new, AccessController::new,
+                new PackageMonitorProxy(context));
     }
 
     protected PersonalContextManagerService(
             Context context,
             EmbeddedInsightRendererFactory embeddedInsightRendererFactory,
-            AccessControllerFactory accessControllerFactory) {
+            AccessControllerFactory accessControllerFactory,
+            PackageMonitorProxy packageMonitorProxy) {
         super(context);
 
         mRoleManager = context.getSystemService(RoleManager.class);
@@ -238,6 +253,7 @@ public class PersonalContextManagerService extends SystemService {
         mContentCaptureManagerInternal = getLocalService(ContentCaptureManagerInternal.class);
         mEmbeddedInsightRendererFactory = embeddedInsightRendererFactory;
         mAccessControllerFactory = accessControllerFactory;
+        mPackageMonitorProxy = packageMonitorProxy;
     }
 
     private boolean areOperatingModePropertyFlagsPresentForUser(int userId,
@@ -261,6 +277,7 @@ public class PersonalContextManagerService extends SystemService {
                 new BinderService(this, mPackageManager));
         publishLocalService(PersonalContextManagerInternal.class, mInternalService);
         Slog.i(TAG, "Personal Context Service started");
+        mPackageMonitorProxy.addProvider(mPackageMonitorProxyProvider);
     }
 
     @Override
@@ -297,7 +314,10 @@ public class PersonalContextManagerService extends SystemService {
                                     new ContextActionResolver(userContext)));
             final EmbeddedInsightRenderer embeddedInsightRenderer =
                     mEmbeddedInsightRendererFactory.createEmbeddedInsightRenderer(
-                            userContext, accessController, Executors.newSingleThreadExecutor());
+                            userContext,
+                            operatingModeProvider,
+                            accessController,
+                            Executors.newSingleThreadExecutor());
 
             TextClassificationActionRenderer textClassificationActionRenderer;
             PersonalContextBridge tcPersonalContextBridge =
@@ -417,14 +437,6 @@ public class PersonalContextManagerService extends SystemService {
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Slog.d(TAG, "Starting package monitor for user " + userId);
         }
-        final UserHandle userHandle = UserHandle.getUserHandleForUid(userId);
-        userState
-                .monitor()
-                .register(
-                        getContext().createContextAsUser(userHandle, 0),
-                        /* looper= */ null,
-                        userHandle,
-                        /* externalStorage= */ false);
     }
 
     private void unregisterComponentsForCurrentUser(int userId, String reason) {
@@ -439,7 +451,6 @@ public class PersonalContextManagerService extends SystemService {
         }
 
         final ContextComponentManager componentManager = userState.componentManager();
-        userState.monitor().unregister();
         componentManager.unregisterAllComponents(reason);
         userState.embeddedInsightRenderer().onUnregistered();
     }

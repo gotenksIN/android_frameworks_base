@@ -1411,7 +1411,6 @@ public class WindowManagerService extends IWindowManager.Stub
         mAnimator = new WindowAnimator(this);
         mRoot = new RootWindowContainer(this);
         mAppCompatCameraPolicy = new AppCompatCameraPolicy(this);
-        mAppCompatCameraPolicy.start();
 
         final ContentResolver resolver = context.getContentResolver();
 
@@ -6105,6 +6104,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mPolicy.systemReady();
         mRoot.forAllDisplayPolicies(DisplayPolicy::systemReady);
         mSnapshotController.systemReady();
+        mAppCompatCameraPolicy.start();
         UiThread.getHandler().post(mSettingsObserver::loadSettings);
         IVrManager vrManager = IVrManager.Stub.asInterface(
                 ServiceManager.getService(Context.VR_SERVICE));
@@ -10728,7 +10728,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    void setOnBackInvokedCallbackInfoToEmbedded(Session session,
+    void setOnBackInvokedCallbackInfoToEmbedded(Session session, int callingUid,
             InputTransferToken inputTransferToken, OnBackInvokedCallbackInfo callbackInfo) {
         synchronized (mGlobalLock) {
             final EmbeddedWindowController.EmbeddedWindow embeddedWindow =
@@ -10736,6 +10736,10 @@ public class WindowManagerService extends IWindowManager.Stub
             if (embeddedWindow == null) {
                 Slog.e(TAG, "Embedded window not found");
                 return;
+            }
+            if (callingUid != embeddedWindow.mOwnerUid) {
+                throw new SecurityException("Register BackInvokedCallback request must originate "
+                        + "from owner of inputTransferToken");
             }
             if (embeddedWindow.mSession != session) {
                 Slog.e(TAG, "Window not in session:" + session);

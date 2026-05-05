@@ -62,11 +62,7 @@
     <item msgid="695678520785580527">"已停用"</item>
     <item msgid="6336372935919715515">"已啟用篩選"</item>
     <item msgid="2779123106632690576">"已啟用"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"已過濾已啟用的標題"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>"已過濾已啟用的媒體包"</item>
     <item>"已啟用（已過濾配置文件）"</item>
   </string-array>

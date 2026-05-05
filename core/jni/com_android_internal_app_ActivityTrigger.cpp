@@ -1,4 +1,4 @@
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 /* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,11 +52,11 @@ namespace android
 typedef struct dlLibHandler {
     void *dlhandle;
     void (*startActivity)(const char *, int *);
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
     void (*startApp)(const char *, int *);
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     void (*resumeActivity)(const char *);
     void (*pauseActivity)(const char *);
     void (*stopActivity)(const char *);
@@ -71,11 +71,11 @@ typedef struct dlLibHandler {
  */
 static dlLibHandler mDlLibHandler = {
     NULL, NULL, NULL, NULL, NULL, NULL,
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
     NULL, NULL, NULL, "libqti-at.so"
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 };
 
 // ----------------------------------------------------------------------------
@@ -85,87 +85,73 @@ com_android_internal_app_ActivityTrigger_native_at_init()
 {
     bool errored = false;
 
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     mDlLibHandler.dlhandle = dlopen(mDlLibHandler.dlname, RTLD_NOW | RTLD_LOCAL);
-// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     if (mDlLibHandler.dlhandle == NULL) {
         return;
     }
 
     *(void **) (&mDlLibHandler.startActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_start");
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     if (mDlLibHandler.startActivity == NULL) {
-// QTI_END: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         errored = true;
     }
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
 
     *(void **) (&mDlLibHandler.startApp) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_qspm_start");
 
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     if (!errored) {
         *(void **) (&mDlLibHandler.resumeActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_resume");
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         if (mDlLibHandler.resumeActivity == NULL) {
-// QTI_END: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
     }
     if (!errored) {
         *(void **) (&mDlLibHandler.pauseActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_pause");
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         if (mDlLibHandler.pauseActivity == NULL) {
-// QTI_END: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
     }
     if (!errored) {
         *(void **) (&mDlLibHandler.stopActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_stop");
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         if (mDlLibHandler.stopActivity == NULL) {
-// QTI_END: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
     }
     if (!errored) {
         *(void **) (&mDlLibHandler.init) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_init");
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         if (mDlLibHandler.init == NULL) {
-// QTI_END: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
     }
     if (!errored) {
         *(void **) (&mDlLibHandler.miscActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_misc");
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
-// QTI_BEGIN: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         if (mDlLibHandler.miscActivity == NULL) {
-// QTI_END: 2018-03-27: Performance: Activity Trigger: Check return value of dlsym
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
     }
     if (errored) {
         mDlLibHandler.startActivity  = NULL;
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
         mDlLibHandler.startApp = NULL;
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         mDlLibHandler.resumeActivity = NULL;
         mDlLibHandler.pauseActivity  = NULL;
         mDlLibHandler.stopActivity = NULL;
@@ -184,11 +170,11 @@ com_android_internal_app_ActivityTrigger_native_at_deinit(JNIEnv *env, jobject c
 {
     if (mDlLibHandler.dlhandle) {
         mDlLibHandler.startActivity  = NULL;
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
         mDlLibHandler.startApp = NULL;
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         mDlLibHandler.resumeActivity = NULL;
         mDlLibHandler.pauseActivity  = NULL;
         mDlLibHandler.stopActivity = NULL;
@@ -218,7 +204,7 @@ com_android_internal_app_ActivityTrigger_native_at_startActivity(JNIEnv *env, jo
     return activiyFlags;
 }
 
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
 static jint
 com_android_internal_app_ActivityTrigger_native_at_startApp(JNIEnv *env, jobject clazz, jstring activity, jint flags)
@@ -235,7 +221,7 @@ com_android_internal_app_ActivityTrigger_native_at_startApp(JNIEnv *env, jobject
 }
 
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 static void
 com_android_internal_app_ActivityTrigger_native_at_resumeActivity(JNIEnv *env, jobject clazz, jstring activity)
 {
@@ -290,11 +276,11 @@ com_android_internal_app_ActivityTrigger_native_at_miscActivity(JNIEnv *env, job
 
 static JNINativeMethod gMethods[] = {
     {"native_at_startActivity",  "(Ljava/lang/String;I)I", (void *)com_android_internal_app_ActivityTrigger_native_at_startActivity},
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 // QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
     {"native_at_startApp", "(Ljava/lang/String;I)I", (void *)com_android_internal_app_ActivityTrigger_native_at_startApp},
 // QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     {"native_at_resumeActivity", "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_resumeActivity},
     {"native_at_pauseActivity", "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_pauseActivity},
     {"native_at_stopActivity", "(Ljava/lang/String;)V", (void *)com_android_internal_app_ActivityTrigger_native_at_stopActivity},
@@ -311,4 +297,4 @@ int register_com_android_internal_app_ActivityTrigger(JNIEnv *env)
 }
 
 }   // namespace android
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support

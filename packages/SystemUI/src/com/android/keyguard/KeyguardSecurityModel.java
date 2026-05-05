@@ -24,9 +24,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 
 import com.android.internal.widget.LockPatternUtils;
-// QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
 import com.android.systemui.keyguard.KeyguardViewMediator;
-// QTI_END: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.securelockdevice.domain.interactor.SecureLockDeviceInteractor;

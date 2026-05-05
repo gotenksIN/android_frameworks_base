@@ -1,4 +1,3 @@
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 /*
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
@@ -6,36 +5,22 @@
 package com.android.systemui.util;
 
 import android.content.Context;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 import android.telephony.ServiceState;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import android.telephony.SubscriptionInfo;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.dagger.SysUISingleton;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.res.R;
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.google.android.collect.Lists;
 import com.qti.extphone.NrIconType;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 import com.qti.extphone.RadioIconType;
 
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 import java.util.ArrayList;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import java.util.HashMap;
 import javax.inject.Inject;
 
@@ -55,60 +40,34 @@ public class CarrierNameCustomization {
     private String mConnector;
     private TelephonyManager mTelephonyManager;
 
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
 
     private Context mContext;
     private String mSeparator;
     private FiveGServiceClient mFiveGServiceClient;
     private boolean mShowCustomizeName;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
     private boolean mShow5GAIcon;
-// QTI_END: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
     private final ArrayList<KeyguardUpdateMonitorCallback>
             mCallbacks = Lists.newArrayList();
 
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     @Inject
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
     public CarrierNameCustomization(Context context, KeyguardUpdateMonitor keyguardUpdateMonitor,
                                     FiveGServiceClient fiveGServiceClient) {
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mCarrierMap = new HashMap<String, String>();
 
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mContext = context;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mRoamingCustomizationCarrierNameEnabled = context.getResources().getBoolean(
                 R.bool.config_show_roaming_customization_carrier_name);
         mConnector = context.getResources().getString(R.string.connector);
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         mSeparator = context.getResources().getString(
                 com.android.internal.R.string.kg_text_message_separator);
         mShowCustomizeName = context.getResources().getBoolean(
                 com.android.settingslib.R.bool.config_show_customize_carrier_name);
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
         mShow5GAIcon = context.getResources().getBoolean(
                 com.android.settingslib.R.bool.config_display_5g_a);
-// QTI_END: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mTelephonyManager = context.getSystemService(TelephonyManager.class);
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         mFiveGServiceClient = fiveGServiceClient;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 
         if (mRoamingCustomizationCarrierNameEnabled) {
             loadCarrierMap(context);
@@ -163,11 +122,7 @@ public class CarrierNameCustomization {
         return combinedCarrierName.toString();
     }
 
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
     public void loadCarrierMap(Context context) {
-// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         String customizationConfigs[] =
                 context.getResources().getStringArray(R.array.customization_carrier_name_list);
         for(String config : customizationConfigs ) {
@@ -179,8 +134,6 @@ public class CarrierNameCustomization {
             mCarrierMap.put(kv[0], kv[1]);
         }
     }
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 
     public void registerCallback(KeyguardUpdateMonitorCallback callback) {
         if (!mCallbacks.contains(callback)) {
@@ -195,60 +148,36 @@ public class CarrierNameCustomization {
     }
 
     public String getCustomizeCarrierNameOld(CharSequence originCarrierName, SubscriptionInfo sub) {
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
         String networkClass = getNetworkTypeDescription(sub.getSubscriptionId());
         return getCustomizeCarrierNameInternal(originCarrierName, networkClass);
     }
 
     public String getNetworkTypeDescription(int subId) {
-// QTI_END: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         int dataNetworkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
         int voiceNetworkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
         boolean isInService = false;
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
         ServiceState ss = mKeyguardUpdateMonitor.getServiceState(subId);
-// QTI_END: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         if (ss != null) {
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
             dataNetworkType = ss.getDataNetworkType();
             voiceNetworkType = ss.getVoiceNetworkType();
-// QTI_END: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
             isInService = (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
                     || ss.getVoiceRegState() == ServiceState.STATE_IN_SERVICE);
         }
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
         SubscriptionInfo sub = mKeyguardUpdateMonitor.getSubscriptionInfoForSubId(subId);
-// QTI_END: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
-// QTI_BEGIN: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
         if (sub == null) {
             return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-// QTI_END: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
                     RadioIconType.TYPE_NONE);
-// QTI_BEGIN: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
         } else {
             FiveGServiceClient.FiveGServiceState fiveGServiceState =
                     mFiveGServiceClient.getCurrentServiceState(sub.getSimSlotIndex());
             return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-// QTI_END: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
                     fiveGServiceState.getRadioIconType());
-// QTI_BEGIN: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
         }
-// QTI_END: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
     }
 
     public String getCustomizeCarrierNameModern(int subId, String originCarrierName,
                                                 boolean showNetworkType,
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                                                 int radioIconType,
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                                                 int dataNetworkType,
                                                 int voiceNetworkType,
                                                 boolean isInService) {
@@ -257,9 +186,7 @@ public class CarrierNameCustomization {
                 originCarrierName = getRoamingCarrierName(subId);
             } else if (showNetworkType) {
                 String networkClass = getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                         radioIconType);
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                 originCarrierName = getCustomizeCarrierNameInternal(originCarrierName,
                         networkClass);
             } else {
@@ -298,14 +225,10 @@ public class CarrierNameCustomization {
 
     private String getNetWorkName(int dataNetworkType,
                                   int voiceNetworkType,
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                                   boolean isInService, int radioIconType) {
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         int networkType = getNetworkType(dataNetworkType, voiceNetworkType, isInService);
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         String radioNetworkClass = getRadioNetworkClass(dataNetworkType, networkType, radioIconType);
         return (radioNetworkClass != null) ? radioNetworkClass : networkTypeToString(networkType);
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
     }
 
     private int getNetworkType(int dataNetworkType,
@@ -334,31 +257,21 @@ public class CarrierNameCustomization {
         return mContext.getResources().getString(classId);
     }
 
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
     private String getRadioNetworkClass(int dataType, int networkType, int radioIconType) {
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         if ((networkType == TelephonyManager.NETWORK_TYPE_NR)
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                 || (radioIconType != NrIconType.INVALID
                 && radioIconType != RadioIconType.TYPE_NONE
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
                 && isDataRegisteredOnLte(dataType))) {
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
             if (radioIconType == RadioIconType.TYPE_5G_UWB
-// QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
                     && mShow5GAIcon) {
-// QTI_END: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_BEGIN: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
                 return mContext.getResources().getString(
                         com.android.settingslib.R.string.data_connection_5g_a);
             }
-// QTI_END: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
             if (radioIconType == RadioIconType.TYPE_LTE_NB_IOT) {
                 return mContext.getResources().getString(
                         com.android.settingslib.R.string.data_connection_nb_iot);
             }
 
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
             return mContext.getResources().getString(
                     com.android.settingslib.R.string.data_connection_5g);
         }
@@ -381,19 +294,12 @@ public class CarrierNameCustomization {
         }
         return originalString;
     }
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
 
     public boolean showCustomizeName() {
         return mShowCustomizeName;
     }
-// QTI_END: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
-// QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
 
     public boolean show5GAIcon() {
         return mShow5GAIcon;
     }
-// QTI_END: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
 }
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog

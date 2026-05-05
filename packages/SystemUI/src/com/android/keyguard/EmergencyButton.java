@@ -33,10 +33,8 @@ import com.android.systemui.FontStyles;
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.res.R;
 
-// QTI_BEGIN: 2020-09-10: Android_UI: SystemUI: show emergency button on lock screen
 import java.util.List;
 
-// QTI_END: 2020-09-10: Android_UI: SystemUI: show emergency button on lock screen
 /**
  * This class implements a smart emergency button that updates itself based
  * on telephony state.  When the phone is idle, it is an emergency call button.
@@ -135,9 +133,7 @@ public class EmergencyButton extends Button {
                 }
 
                 if (mContext.getResources().getBoolean(com.android.settingslib.R.bool.kg_hide_emgcy_btn_when_oos)) {
-// QTI_BEGIN: 2021-05-10: Android_UI: SystemUI: Fix emergency call button no response issue
                     visible = visible && isEmergencyCapable;
-// QTI_END: 2021-05-10: Android_UI: SystemUI: Fix emergency call button no response issue
                 }
             }
         }

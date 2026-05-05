@@ -38,9 +38,9 @@ import android.view.InsetsState;
 import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 import android.util.Log;
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 
 import com.android.internal.util.ArrayUtils;
 
@@ -60,9 +60,9 @@ public class CompatibilityInfo implements Parcelable {
     public static final CompatibilityInfo DEFAULT_COMPATIBILITY_INFO = new CompatibilityInfo() {
     };
 
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     static final String TAG = "CompatibilityInfo";
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     /**
      * This is the number of pixels we would like to have along the
      * short axis of an app that needs to run on a normal size screen.
@@ -250,7 +250,7 @@ public class CompatibilityInfo implements Parcelable {
                 // Let the user decide.
                 compatFlags |= NEEDS_SCREEN_COMPAT;
             }
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             int density = appInfo.getOverrideDensity();
             if(density != 0) {
                 applicationDensity = density;
@@ -263,7 +263,7 @@ public class CompatibilityInfo implements Parcelable {
                 applicationScale = 1.0f;
                 applicationInvertedScale = 1.0f;
             }
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             applicationDensityScale = 1.0f;
             applicationDensityInvertedScale = 1.0f;
 
@@ -352,9 +352,9 @@ public class CompatibilityInfo implements Parcelable {
                 compatFlags |= NEVER_NEEDS_COMPAT;
             }
 
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             int density = appInfo.getOverrideDensity();
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             if ((appInfo.flags & ApplicationInfo.FLAG_SUPPORTS_SCREEN_DENSITIES) != 0) {
                 applicationDensity = DisplayMetrics.DENSITY_DEVICE;
                 applicationScale = 1.0f;
@@ -374,12 +374,12 @@ public class CompatibilityInfo implements Parcelable {
         }
 
         mCompatibilityFlags = compatFlags;
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 
         Log.d(TAG, "mCompatibilityFlags - " + Integer.toHexString(mCompatibilityFlags));
         Log.d(TAG, "applicationDensity - " + applicationDensity);
         Log.d(TAG, "applicationScale - " + applicationScale);
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     }
 
     private CompatibilityInfo(int compFlags,

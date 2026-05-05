@@ -62,11 +62,7 @@
     <item msgid="695678520785580527">"Disabled"</item>
     <item msgid="6336372935919715515">"Enabled Filtered"</item>
     <item msgid="2779123106632690576">"Enabled"</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>Enabled Headers Filtered</item>
-<!-- QTI_BEGIN: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
-<!-- QTI_END: 2019-10-18: Bluetooth: Change order of BT snoop dev UI options[2/2]-->
     <item>Enabled Media Pkts Filtered</item>
     <item>Enabled Profiles Filtered</item>
   </string-array>

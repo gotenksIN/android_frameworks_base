@@ -463,11 +463,9 @@ class SystemGesturesPointerEventListener implements PointerEventListener {
             if(Math.abs(velocityY) >= Math.abs(velocityX))
                 mCallbacks.onVerticalFling(duration);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
             else
                 mCallbacks.onHorizontalFling(duration);
 
-// QTI_END: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
             mLastFlingTime = now;
             mCallbacks.onFling(duration);
             return true;
@@ -495,9 +493,7 @@ class SystemGesturesPointerEventListener implements PointerEventListener {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         void onVerticalFling(int durationMs);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
         void onHorizontalFling(int durationMs);
-// QTI_END: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         void onScroll(boolean started);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"

@@ -1141,17 +1141,13 @@ public class ServiceState implements Parcelable {
 
     /**
      * Initialize the service state. Set everything to the default value.
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
      *
      * @param legacyMode {@code true} if the device is on IWLAN legacy mode, where IWLAN is
      * considered as a RAT on WWAN {@link NetworkRegistrationInfo}. {@code false} if the device
      * is on AP-assisted mode, where IWLAN should be reported through WLAN.
      * {@link NetworkRegistrationInfo}.
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
      */
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
     private void init(boolean legacyMode) {
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
         if (DBG) Rlog.d(LOG_TAG, "init");
         mVoiceRegState = STATE_OUT_OF_SERVICE;
         mDataRegState = STATE_OUT_OF_SERVICE;
@@ -1177,7 +1173,6 @@ public class ServiceState implements Parcelable {
                     .setTransportType(AccessNetworkConstants.TRANSPORT_TYPE_WWAN)
                     .setRegistrationState(NetworkRegistrationInfo.REGISTRATION_STATE_UNKNOWN)
                     .build());
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
             if (!legacyMode) {
                 addNetworkRegistrationInfo(new NetworkRegistrationInfo.Builder()
                         .setDomain(NetworkRegistrationInfo.DOMAIN_PS)
@@ -1185,7 +1180,6 @@ public class ServiceState implements Parcelable {
                         .setRegistrationState(NetworkRegistrationInfo.REGISTRATION_STATE_UNKNOWN)
                         .build());
             }
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
         }
         mOperatorAlphaLongRaw = null;
         mOperatorAlphaShortRaw = null;
@@ -1194,15 +1188,11 @@ public class ServiceState implements Parcelable {
     }
 
     public void setStateOutOfService() {
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
         init(true);
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
     }
 
     public void setStateOff() {
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
         init(true);
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
         mVoiceRegState = STATE_POWER_OFF;
         mDataRegState = STATE_POWER_OFF;
     }
@@ -1210,18 +1200,14 @@ public class ServiceState implements Parcelable {
     /**
      * Set the service state to out-of-service
      *
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
      * @param legacyMode {@code true} if the device is on IWLAN legacy mode, where IWLAN is
      * considered as a RAT on WWAN {@link NetworkRegistrationInfo}. {@code false} if the device
      * is on AP-assisted mode, where IWLAN should be reported through WLAN.
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
      * @param powerOff {@code true} if this is a power off case (i.e. Airplane mode on).
      * @hide
      */
-// QTI_BEGIN: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
     public void setOutOfService(boolean legacyMode, boolean powerOff) {
         init(legacyMode);
-// QTI_END: 2023-06-02: Telephony: Revert "Removed IWLAN legacy mode support"
         if (powerOff) {
             mVoiceRegState = STATE_POWER_OFF;
             mDataRegState = STATE_POWER_OFF;
@@ -1767,9 +1753,7 @@ public class ServiceState implements Parcelable {
                 || radioTechnology == RIL_RADIO_TECHNOLOGY_GSM
                 || radioTechnology == RIL_RADIO_TECHNOLOGY_TD_SCDMA
                 || radioTechnology == RIL_RADIO_TECHNOLOGY_IWLAN
-// QTI_BEGIN: 2019-05-03: Telephony: Support for radio technology NR
                 || radioTechnology == RIL_RADIO_TECHNOLOGY_LTE_CA
-// QTI_END: 2019-05-03: Telephony: Support for radio technology NR
                 || radioTechnology == RIL_RADIO_TECHNOLOGY_NR;
 
     }
@@ -1793,7 +1777,6 @@ public class ServiceState implements Parcelable {
                 || radioTechnology == RIL_RADIO_TECHNOLOGY_NR;
     }
 
-// QTI_BEGIN: 2019-05-03: Telephony: Support for radio technology NR
     /** @hide */
     public static boolean isPsTech(int radioTechnology) {
         return radioTechnology == RIL_RADIO_TECHNOLOGY_LTE ||
@@ -1801,7 +1784,6 @@ public class ServiceState implements Parcelable {
                 radioTechnology == RIL_RADIO_TECHNOLOGY_NR;
     }
 
-// QTI_END: 2019-05-03: Telephony: Support for radio technology NR
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public static boolean bitmaskHasTech(int bearerBitmask, int radioTech) {

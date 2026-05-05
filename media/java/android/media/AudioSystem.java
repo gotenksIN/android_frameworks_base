@@ -280,17 +280,11 @@ public class AudioSystem
     public static final int AUDIO_FORMAT_OPUS_HI_RES    = 0x08000001;
     /** @hide */
 
-// QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
     public static final int AUDIO_FORMAT_CELT           = 0x26000000;
-// QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
     /** @hide */
-// QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
     public static final int AUDIO_FORMAT_APTX_ADAPTIVE  = 0x27000000;
-// QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
     /** @hide */
-// QTI_BEGIN: 2019-04-30: Audio: Add support for APTX TWSP audio codec
     public static final int AUDIO_FORMAT_APTX_TWSP      = 0x2A000000;
-// QTI_END: 2019-04-30: Audio: Add support for APTX TWSP audio codec
     /** @hide */
     public static final int VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA       = 0x30000000;
 
@@ -353,15 +347,11 @@ public class AudioSystem
             case AUDIO_FORMAT_APTX_HD: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD;
             case AUDIO_FORMAT_LDAC: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC;
             case AUDIO_FORMAT_LHDC: return BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC;
-// QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
             case AUDIO_FORMAT_CELT: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT;
             case AUDIO_FORMAT_APTX_ADAPTIVE:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE;
-// QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
-// QTI_BEGIN: 2019-04-30: Audio: Add support for APTX TWSP audio codec
             case AUDIO_FORMAT_APTX_TWSP:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP;
-// QTI_END: 2019-04-30: Audio: Add support for APTX TWSP audio codec
             case AUDIO_FORMAT_OPUS: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS;
             case VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA:
                  return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE_LE;

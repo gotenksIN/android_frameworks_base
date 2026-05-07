@@ -147,17 +147,27 @@ constructor(
             }
         }
 
+    private val isTempDds: Flow<Boolean> =
+        combine(
+            mobileIconsInteractor.defaultDataSubId,
+            mobileIconsInteractor.activeMobileDataSubscriptionId,
+        ) { defaultSubId, activeSubId ->
+            defaultSubId != null && activeSubId != null && defaultSubId != activeSubId
+        }
+
     fun tileData(): Flow<MobileDataTileModel> =
         combine(
             mobileIconsInteractor.defaultDataIconInteractor,
             airplaneModeInteractor.isAirplaneMode,
-        ) { default, isAirplaneMode ->
+            isTempDds,
+        ) { default, isAirplaneMode, isTempDds ->
             if (default == null) {
                 flowOf(
                     MobileDataTileModel(
                         isSimActive = false,
                         isEnabled = false,
                         isAirplaneModeEnabled = isAirplaneMode,
+                        isTempDds = isTempDds,
                     )
                 )
             } else {
@@ -170,6 +180,7 @@ constructor(
                         isEnabled = isDataEnabled,
                         isAirplaneModeEnabled = isAirplaneMode,
                         secondaryLabel = description ?: defaultName.name,
+                        isTempDds = isTempDds,
                     )
                 }
             }

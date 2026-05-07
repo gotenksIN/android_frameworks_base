@@ -70,6 +70,7 @@ import com.android.server.LocalServices;
 import com.android.server.am.psc.OomAdjuster;
 
 import dalvik.annotation.optimization.NeverCompile;
+import com.android.qcomfeatureconfig.QcomLowRamConfig;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -195,7 +196,8 @@ final class ActivityManagerConstants extends ContentObserver {
      */
     static final String KEY_FREEZER_CUTOFF_ADJ = "freezer_cutoff_adj";
 
-    private static final int DEFAULT_MAX_CACHED_PROCESSES = 1024;
+    private static final int DEFAULT_MAX_CACHED_PROCESSES = QcomLowRamConfig.TARGET_IS_QLMD ? 10 : 1024;
+
     private static final boolean DEFAULT_PRIORITIZE_ALARM_BROADCASTS = true;
     private static final long DEFAULT_FGSERVICE_MIN_SHOWN_TIME = 2*1000;
     private static final long DEFAULT_FGSERVICE_MIN_REPORT_TIME = 3*1000;

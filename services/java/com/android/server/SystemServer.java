@@ -352,6 +352,8 @@ import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
+import com.android.qcomfeatureconfig.QcomLowRamConfig;
+
 /**
  * Entry point to {@code system_server}.
  */
@@ -1733,10 +1735,12 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(SupervisionService.Lifecycle.class);
             t.traceEnd();
 
-            if (!isTv) {
-                t.traceBegin("StartVibratorManagerService");
-                mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
-                t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (!isTv) {
+                    t.traceBegin("StartVibratorManagerService");
+                    mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
+                    t.traceEnd();
+                }
             }
 
             if (!isTv && android.os.multisensory.Flags.enableMultisensoryFeedback()) {
@@ -1842,9 +1846,11 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(NetworkWatchlistService.Lifecycle.class);
             t.traceEnd();
 
-            t.traceBegin("PinnerService");
-            mSystemServiceManager.startService(PinnerService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("PinnerService");
+                mSystemServiceManager.startService(PinnerService.class);
+                t.traceEnd();
+            }
 
 // QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
             mSystemServiceManager.startService(ActivityTriggerService.class);
@@ -2092,9 +2098,11 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            t.traceBegin("StartTestHarnessMode");
-            mSystemServiceManager.startService(TestHarnessModeService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("StartTestHarnessMode");
+                mSystemServiceManager.startService(TestHarnessModeService.class);
+                t.traceEnd();
+            }
 
             if (hasPdb || OemLockService.isHalPresent()) {
                 // Implementation depends on pdb or the OemLock HAL
@@ -2558,10 +2566,12 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (!isTv) {
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (!isTv) {
                 t.traceBegin("StartDockObserver");
                 mSystemServiceManager.startService(DockObserver.class);
                 t.traceEnd();
+                }
             }
 
             if (isWatch) {
@@ -2574,7 +2584,8 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (!isWatch) {
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (!isWatch) {
                 t.traceBegin("StartWiredAccessoryManager");
                 try {
                     // Listen for wired headset changes
@@ -2584,6 +2595,7 @@ public final class SystemServer implements Dumpable {
                     reportWtf("starting WiredAccessoryManager", e);
                 }
                 t.traceEnd();
+                }
             }
 
             if (!QcomLowRamConfig.TARGET_IS_QLMD) {
@@ -2880,13 +2892,15 @@ public final class SystemServer implements Dumpable {
             }
 
             // Start this service after all biometric sensor services are started.
-            t.traceBegin("StartBiometricService");
-            mSystemServiceManager.startService(BiometricService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("StartBiometricService");
+                mSystemServiceManager.startService(BiometricService.class);
+                t.traceEnd();
 
-            t.traceBegin("StartAuthService");
-            mSystemServiceManager.startService(AuthService.class);
-            t.traceEnd();
+                t.traceBegin("StartAuthService");
+                mSystemServiceManager.startService(AuthService.class);
+                t.traceEnd();
+            }
 
             if (!isWatch && !isTv && !isAutomotive) {
                 if (android.security.Flags.secureLockdown()) {
@@ -3223,9 +3237,11 @@ public final class SystemServer implements Dumpable {
         }
 
         // NOTE: ClipboardService depends on ContentCapture and Autofill
-        t.traceBegin("StartClipboardService");
-        mSystemServiceManager.startService(ClipboardService.class);
-        t.traceEnd();
+        if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+            t.traceBegin("StartClipboardService");
+            mSystemServiceManager.startService(ClipboardService.class);
+            t.traceEnd();
+        }
 
         if (!isTv && !isWatch) {
             // Selection toolbar service

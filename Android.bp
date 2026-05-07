@@ -281,6 +281,7 @@ java_defaults {
         "framework-aidl-export-defaults",
         "latest_android_hardware_soundtrigger3_java_static",
         "framework-minus-apex-aconfig-libraries",
+        "qcomfeatureconfig_java_defaults",
     ],
     srcs: [
         ":framework-non-updatable-sources",

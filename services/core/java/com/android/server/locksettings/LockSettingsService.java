@@ -4141,10 +4141,6 @@ public class LockSettingsService extends ILockSettings.Stub {
                         && !isUseOneLockSettingEnabledInternal(userId)) {
                     setDeviceUnlockedForUser(userId);
                 }
-            } else {
-                // If secure lock mode is disabled while two factor authentication is incomplete,
-                // lock the user.
-                lockUser(userId);
             }
         }
 

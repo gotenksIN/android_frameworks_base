@@ -463,6 +463,11 @@ public class SecureLockDeviceService extends SecureLockDeviceServiceInternal {
             return ERROR_UNSUPPORTED;
         }
 
+        //TODO (b/506185486): Revisit SLD support for multi-user
+        if (!user.isSystem()) {
+            return ERROR_UNSUPPORTED;
+        }
+
         if (mBiometricManager == null) {
             Slog.w(TAG, "BiometricManager not available: secure lock device is unsupported.");
             return ERROR_UNSUPPORTED;
@@ -938,6 +943,7 @@ public class SecureLockDeviceService extends SecureLockDeviceServiceInternal {
             if (secureLockDevice() && isSecureLockDeviceEnabled()
                     && containsFlag(getStrongAuthForUser(userId),
                     PRIMARY_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE)
+                    && userId == mStore.retrieveSecureLockDeviceClientId()
             ) {
                 Slog.d(TAG, "Primary auth is required for secure lock device; reset pending "
                         + "biometric auth success state for user id " + userId);

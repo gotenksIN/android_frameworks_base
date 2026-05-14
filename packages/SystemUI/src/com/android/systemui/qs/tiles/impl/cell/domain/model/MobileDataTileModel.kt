@@ -29,4 +29,5 @@ data class MobileDataTileModel(
     val isEnabled: Boolean,
     val isAirplaneModeEnabled: Boolean,
     val secondaryLabel: CharSequence? = null,
+    val isTempDds: Boolean = false,
 )

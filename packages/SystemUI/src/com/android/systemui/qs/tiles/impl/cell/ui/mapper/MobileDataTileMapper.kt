@@ -68,7 +68,8 @@ constructor(
             supportedActions = buildSet {
                 add(QSTileState.UserAction.CLICK)
                 add(QSTileState.UserAction.LONG_CLICK)
-                if (data.isSimActive && !data.isAirplaneModeEnabled) {
+                if (data.isSimActive && !data.isAirplaneModeEnabled
+                    && !(data.isEnabled && data.isTempDds)) {
                     add(QSTileState.UserAction.TOGGLE_CLICK)
                 }
             }

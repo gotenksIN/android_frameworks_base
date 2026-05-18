@@ -104,8 +104,6 @@
     <item msgid="3517061573669307965">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_HD">aptX™ HD</xliff:g> ਆਡੀਓ"</item>
     <item msgid="2553206901068987657">"LDAC"</item>
     <item msgid="3026476115049855657">"Opus"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="102988075927343894">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_ADAPTIVE">aptX™ Adaptive</xliff:g> ਆਡੀਓ"</item>
     <item msgid="6486050771049481">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_TWSP">aptX™ TWS+</xliff:g> ਆਡੀਓ"</item>  
   </string-array>

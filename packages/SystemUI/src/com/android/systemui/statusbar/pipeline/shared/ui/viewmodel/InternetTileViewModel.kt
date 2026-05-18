@@ -140,13 +140,11 @@ constructor(
             if (it == null) {
                 notConnectedFlow
             } else {
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 combine(
                     it.customizedNetworkName,
                     it.signalLevelIcon,
                     mobileDataContentName,
                 ) { networkNameModel, signalIcon, dataContentDescription ->
-// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                     when (signalIcon) {
                         is SignalIconModel.CellularTypeIconModel -> {
                             val secondary =

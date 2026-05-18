@@ -555,11 +555,9 @@ public interface RILConstants {
     int RIL_REQUEST_STOP_PRIORITIZED_NETWORK_SCAN = 263;
     int RIL_REQUEST_REBOOT_MODEM = 264;
 
-// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* RIL Request to get newly supported radio
        capabilities include 5G SA*/
     int RIL_REQUEST_GET_ENHANCED_RADIO_CAPABILITY = 600;
-// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* Responses begin */
     int RIL_RESPONSE_ACKNOWLEDGEMENT = 800;
 

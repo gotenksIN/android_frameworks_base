@@ -804,9 +804,7 @@ public abstract class InfoMediaManager {
                 if (mCurrentConnectedDevice == null) {
                     // First device on the list is always the first selected route.
                     mCurrentConnectedDevice = mMediaDevices.get(0);
-// QTI_BEGIN: 2024-07-04: Bluetooth: Use first selected route device as current connected device
                 }
-// QTI_END: 2024-07-04: Bluetooth: Use first selected route device as current connected device
             }
         }
     }

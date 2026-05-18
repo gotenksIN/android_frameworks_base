@@ -29,9 +29,7 @@ import android.content.Context;
 import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Handler;
-// QTI_BEGIN: 2020-09-25: Android_UI: Fix the deadlock when device bootup
 import android.os.Looper;
-// QTI_END: 2020-09-25: Android_UI: Fix the deadlock when device bootup
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -40,10 +38,8 @@ import android.util.Log;
 import android.view.Display;
 import android.view.DisplayInfo;
 
-// QTI_BEGIN: 2020-09-25: Android_UI: Fix the deadlock when device bootup
 import com.android.server.UiThread;
 
-// QTI_END: 2020-09-25: Android_UI: Fix the deadlock when device bootup
 /**
  * A list for packages that should force the display out of high refresh rate.
  */
@@ -55,22 +51,16 @@ class ForceRefreshRatePackageList {
 
     private final ArrayMap<String, Float> mForcedPackageList = new ArrayMap<>();
     private final Object mLock = new Object();
-// QTI_BEGIN: 2020-09-25: Android_UI: Fix the deadlock when device bootup
     private final Handler mHandler;
-// QTI_END: 2020-09-25: Android_UI: Fix the deadlock when device bootup
     private DisplayInfo mDisplayInfo;
     private SettingsObserver mSettingsObserver;
 
-// QTI_BEGIN: 2020-09-25: Android_UI: Fix the deadlock when device bootup
     ForceRefreshRatePackageList(WindowManagerService wmService, DisplayInfo displayInfo) {
         mDisplayInfo = displayInfo;
         final Looper looper = UiThread.getHandler().getLooper();
         mHandler = new Handler(looper);
-// QTI_END: 2020-09-25: Android_UI: Fix the deadlock when device bootup
         mSettingsObserver = new SettingsObserver(wmService.mContext);
-// QTI_BEGIN: 2020-09-25: Android_UI: Fix the deadlock when device bootup
         mHandler.post(mSettingsObserver::observe);
-// QTI_END: 2020-09-25: Android_UI: Fix the deadlock when device bootup
     }
 
     private void updateForcedPackagelist(String forcePackagesStr) {
@@ -100,18 +90,15 @@ class ForceRefreshRatePackageList {
     int getForceRefreshRateId(String packageName) {
         synchronized (mLock) {
             if(mForcedPackageList.containsKey(packageName)) {
-// QTI_BEGIN: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
                 float refreshRate = mForcedPackageList.get(packageName).floatValue();
                 Display.Mode mode = findModeByRefreshRate(refreshRate);
                 return mode != null ? mode.getModeId() : 0;
-// QTI_END: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
             }else {
                 return 0;
             }
         }
     }
 
-// QTI_BEGIN: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
     float getForceRefreshRate(String packageName) {
         synchronized (mLock) {
             if(mForcedPackageList.containsKey(packageName)) {
@@ -125,18 +112,13 @@ class ForceRefreshRatePackageList {
     }
 
     private Display.Mode findModeByRefreshRate(float refreshRate) {
-// QTI_END: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
         Display.Mode[] modes = mDisplayInfo.supportedModes;
         for (int i = 0; i < modes.length; i++) {
             if (Math.abs(modes[i].getRefreshRate() - refreshRate) < REFRESH_RATE_EPSILON) {
-// QTI_BEGIN: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
                 return modes[i];
-// QTI_END: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
             }
         }
-// QTI_BEGIN: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
         return null;
-// QTI_END: 2022-03-21: Android_UI: Enable force app refresh rate for frame rate override
     }
 
     private class SettingsObserver extends ContentObserver {

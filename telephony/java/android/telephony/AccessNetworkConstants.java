@@ -20,9 +20,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
 import android.hardware.radio.AccessNetwork;
-// QTI_BEGIN: 2020-04-08: Telephony: Add API to convert RAN to ANT
 import android.hardware.radio.V1_5.RadioAccessNetworks;
-// QTI_END: 2020-04-08: Telephony: Add API to convert RAN to ANT
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -131,7 +129,6 @@ public final class AccessNetworkConstants {
             }
         }
 
-// QTI_BEGIN: 2020-04-08: Telephony: Add API to convert RAN to ANT
         /**
          * Converts from RadioAccessNetworks in HAL to AccessNetworkType in frameworks.
          * @hide
@@ -153,7 +150,6 @@ public final class AccessNetworkConstants {
                     return AccessNetworkType.UNKNOWN;
            }
         }
-// QTI_END: 2020-04-08: Telephony: Add API to convert RAN to ANT
     }
 
     /**

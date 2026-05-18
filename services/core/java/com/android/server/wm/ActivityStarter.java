@@ -170,6 +170,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Objects;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
@@ -2887,9 +2888,9 @@ class ActivityStarter {
             mLaunchFlags |= FLAG_ACTIVITY_NEW_TASK;
         }
 
-        if (r.info.requiredDisplayCategory != null && mSourceRecord != null
-                && !r.info.requiredDisplayCategory.equals(
-                        mSourceRecord.info.requiredDisplayCategory)) {
+        if (mSourceRecord != null
+                && !Objects.equals(r.info.requiredDisplayCategory,
+                mSourceRecord.info.requiredDisplayCategory)) {
             // Adding NEW_TASK flag for activity with display category attribute if the display
             // category of the source record is different, so that the activity won't be launched
             // in source record's task.
@@ -3372,9 +3373,9 @@ class ActivityStarter {
 
     /** Places {@link #mStartActivity} in {@code task} or an embedded {@link TaskFragment}. */
     private void addOrReparentStartingActivity(@NonNull Task task, String reason) {
-// QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
         mStartActivity.acquireActivityBoost();
-// QTI_END: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
         TaskFragment newParent = task;
         if (mInTaskFragment != null) {
             int embeddingCheckResult = canEmbedActivity(mInTaskFragment, mStartActivity, task);

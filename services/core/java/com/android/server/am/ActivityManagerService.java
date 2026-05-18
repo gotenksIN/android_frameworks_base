@@ -757,9 +757,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     /* UX perf event object */
     public static BoostFramework mUxPerf = new BoostFramework();
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
     public static boolean mForceStopKill = false;
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
 
     private static final DateTimeFormatter DROPBOX_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSZ");
@@ -3914,9 +3912,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         return mActivityTaskManager.startActivityFromRecents(taskId, bOptions);
     }
 
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     public int startActivityAsUserEmpty(Bundle options) {
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         ArrayList<String> pApps = options.getStringArrayList("start_empty_apps");
         if (pApps != null && pApps.size() > 0) {
@@ -4199,9 +4197,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, app.processName, 0);
                 }
-// QTI_BEGIN: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
-// QTI_END: 2021-09-23: Performance: BoostFramework: Replace PerfHint with PerfEvent.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 
@@ -5123,9 +5119,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             mAppErrors.resetProcessCrashTime(packageName == null, appId, userId);
         }
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
         mForceStopKill = true;
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
 
         synchronized (mProcLock) {
             // Notify first that the package is stopped, so its process won't be restarted
@@ -5418,7 +5412,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         if (mUxPerf != null && app.getHostingRecord() != null && app.getHostingRecord().isTopApp()) {
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
             if (mUxPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mUxPerf.perfGetFeedback(
                                     BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE, app.processName);
@@ -5429,7 +5422,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mUxPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName,
                     pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
             }
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
         }
 
         synchronized (mProcLock) {
@@ -6127,19 +6119,19 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 String data, Bundle extras, boolean ordered,
                                 boolean sticky, int sendingUser) {
                             mBootCompletedTimestamp = SystemClock.uptimeMillis();
-// QTI_BEGIN: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             // Defer the compaction as system is currently busy
-// QTI_END: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
                                     mCachedAppOptimizer.compactAllSystem();
-// QTI_BEGIN: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                                 }
                             }, mConstants.COMPACTION_DELAY_MS);
                             // Defer the full Pss collection as the system is really busy now.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
-// QTI_END: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                                     mAppProfiler.requestPssAllProcsLPr(
                                             SystemClock.uptimeMillis(), true, false);
                                 }
@@ -13135,7 +13127,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         return stringifySize(size * 1024, 1024);
     }
 
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     private void dumpProcessDmaBufInfo(FileDescriptor fd, PrintWriter pw) {
         List<Debug.DmaBuffer> dmabufs = new ArrayList<>();
         if (!Debug.getProcfsDmaBuffer(dmabufs)) {
@@ -13187,7 +13179,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 kernelRss / 1024, totalRss / 1024, totalPss / 1024));
     }
 
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     // Update this version number if you change the 'compact' format.
     private static final int MEMINFO_COMPACT_VERSION = 1;
 
@@ -13206,9 +13198,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         boolean dumpProto;
         boolean mDumpPrivateDirty;
         boolean mDumpAllocatorStats;
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         boolean mDumpDmaBufInfo;
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     }
 
     @NeverCompile // Avoid size overhead of debugging code.
@@ -13267,10 +13259,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                 opts.dumpProto = true;
             } else if ("--logstats".equals(opt)) {
                 opts.mDumpAllocatorStats = true;
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
             } else if ("--dmabuf".equals(opt)) {
                 opts.mDumpDmaBufInfo = true;
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
             } else if ("-h".equals(opt) || "--help".equals(opt)) {
                 pw.println("meminfo dump options: [-a] [-d] [-c] [-s] [--oom] [process]");
                 pw.println("  -a: include all available information for each process.");
@@ -13289,22 +13281,22 @@ public class ActivityManagerService extends IActivityManager.Stub
                 pw.println("  --logstats: log native allocator statistics.");
                 pw.println(
                         "  --unreachable: dump unreachable native memory with libmemunreachable.");
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
                 pw.println("  --dmabuf: dump dma buffer information.");
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
                 pw.println("If [process] is specified it can be the name or ");
                 pw.println("pid of a specific process to dump.");
                 return;
             } else {
                 pw.println("Unknown argument: " + opt + "; use -h for help");
             }
-// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         }
 
         if (opts.mDumpDmaBufInfo) {
             dumpProcessDmaBufInfo(fd, pw);
             return;
-// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         }
 
         String[] innerArgs = new String[args.length-opti];
@@ -14632,15 +14624,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             app.setPid(0);
         }
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
 
         // Call Preferred App
         if (app != null) {
             ArrayList<ApplicationExitInfo> results = new ArrayList<ApplicationExitInfo>();
             mProcessList.mAppExitInfoTracker.getExitInfo(
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
                     app.processName, app.uid, app.getPid(), 0, results);
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
             if (results != null) {
                 boolean recentAppClose = false;
                 for (int i=0; i<results.size();i++) {
@@ -14653,13 +14642,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
                 }
                 if (recentAppClose) {
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
                     mTaskSupervisor.startPreferredApps();
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
                 }
             }
         }
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
         return false;
     }
 
@@ -17976,13 +17962,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public int startActivityAsUserEmpty(Bundle options) {
             return ActivityManagerService.this.startActivityAsUserEmpty(options);
         }
 
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public void onUserRemoved(int userId) {
             // Clean up UserController state

@@ -832,9 +832,7 @@ android_library {
         "android.test.mock.stubs.system",
         "keepanno-annotations",
         "ims-common",
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         "extphonelib",
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     ],
     associates: [
         "SystemUI-core",
@@ -1108,9 +1106,7 @@ android_app {
     libs: [
         "android.car",
         "ims-common",
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         "extphonelib",
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     ],
     enforce_uses_libs: false,
 

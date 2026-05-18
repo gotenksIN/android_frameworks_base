@@ -1,4 +1,3 @@
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 /*
  * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
@@ -28,21 +27,15 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2023-12-17: Data: SystemUI: Enhanced 5g icon
 /*
   Changes from Qualcomm Innovation Center are provided under the following license:
 
-// QTI_END: 2023-12-17: Data: SystemUI: Enhanced 5g icon
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
   Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-12-17: Data: SystemUI: Enhanced 5g icon
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
   SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
-// QTI_END: 2023-12-17: Data: SystemUI: Enhanced 5g icon
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 package com.android.systemui.statusbar.policy;
 
 import android.content.Context;
@@ -53,102 +46,64 @@ import android.os.RemoteException;
 import android.util.Log;
 import android.util.SparseArray;
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 import com.google.android.collect.Lists;
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
-// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
 import com.android.internal.annotations.VisibleForTesting;
 
-// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 import java.lang.Exception;
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 import java.util.ArrayList;
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
-// QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
 import java.util.concurrent.CopyOnWriteArrayList;
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 import java.lang.ref.WeakReference;
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import javax.inject.Inject;
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 import com.android.settingslib.mobile.TelephonyIcons;
 import com.android.settingslib.SignalIcon.MobileIconGroup;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
 import com.android.settingslib.R;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import com.android.systemui.dagger.SysUISingleton;
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 
 import com.qti.extphone.AuxiliaryRadioIconInfo;
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
 import com.qti.extphone.Client;
 import com.qti.extphone.ExtTelephonyManager;
 import com.qti.extphone.IExtPhoneCallback;
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
 import com.qti.extphone.ExtPhoneCallbackListener;
-// QTI_END: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
 import com.qti.extphone.NrIcon;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
 import com.qti.extphone.NrIconType;
 import com.qti.extphone.RadioIcon;
 import com.qti.extphone.RadioIconType;
 import com.qti.extphone.RxCountType;
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
 import com.qti.extphone.Status;
 import com.qti.extphone.ServiceCallback;
 import com.qti.extphone.Token;
 
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 @SysUISingleton
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 public class FiveGServiceClient {
     private static final String TAG = "FiveGServiceClient";
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)||true;
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     private static final int MESSAGE_REBIND = 1024;
     private static final int MESSAGE_REINIT = MESSAGE_REBIND+1;
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
     private static final int MESSAGE_NOTIFIY_MONITOR_CALLBACK = MESSAGE_REBIND+2;
-// QTI_END: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     private static final int MAX_RETRY = 4;
     private static final int DELAY_MILLISECOND = 3000;
     private static final int DELAY_INCREMENT = 2000;
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     private static FiveGServiceClient sInstance;
     private final ArrayList<WeakReference<KeyguardUpdateMonitorCallback>>
             mKeyguardUpdateMonitorCallbacks = Lists.newArrayList();
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
-// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
     @VisibleForTesting
-// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
-// QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
     final SparseArray<CopyOnWriteArrayList<IFiveGStateListener>> mStatesListeners =
             new SparseArray<>();
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
     final ArrayList<AuxiliaryListener> mAuxiliaryListeners =
             Lists.newArrayList();
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     private final SparseArray<FiveGServiceState> mCurrentServiceStates = new SparseArray<>();
     private final SparseArray<FiveGServiceState> mLastServiceStates = new SparseArray<>();
 
@@ -157,152 +112,102 @@ public class FiveGServiceClient {
     private String mPackageName;
     private Client mClient;
     private int mInitRetryTimes = 0;
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     private ExtTelephonyManager mExtTelephonyManager;
     private boolean mIsConnectInProgress = false;
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     private boolean mIsSupportRadioIcon = false;
     private boolean mIsAuxiliaryRadioIconSupported = false;
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
     public static class FiveGServiceState{
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
         private static final String COL_Radio_ICON_TYPE = "RadioIconType";
         private int mRadioIconType;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         private boolean mIs6Rx;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         private MobileIconGroup mIconGroup;
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
         public FiveGServiceState(){
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
             mRadioIconType = RadioIconType.TYPE_NONE;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIs6Rx = false;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIconGroup = TelephonyIcons.UNKNOWN;
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         @VisibleForTesting
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         public FiveGServiceState(int radioIconType, boolean is6Rx, Context context) {
             mRadioIconType = radioIconType;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIs6Rx = is6Rx;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIconGroup = getRadioIconGroup(radioIconType, is6Rx, context);
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         }
 
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         public boolean isRadioIconTypeValid() {
             return mRadioIconType != NrIconType.INVALID
                     && mRadioIconType != RadioIconType.TYPE_NONE;
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
         @VisibleForTesting
-// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         public MobileIconGroup getIconGroup() {
             return mIconGroup;
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Upgrade the logic of 5G NSA icons
         @VisibleForTesting
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Upgrade the logic of 5G NSA icons
         public int getRadioIconType() {
             return mRadioIconType;
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Upgrade the logic of 5G NSA icons
         }
 
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Upgrade the logic of 5G NSA icons
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         @VisibleForTesting
         public boolean getIs6Rx() {
             return mIs6Rx;
         }
 
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         public void copyFrom(FiveGServiceState state) {
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             this.mIconGroup = state.mIconGroup;
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             this.mRadioIconType = state.mRadioIconType;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             this.mIs6Rx = state.mIs6Rx;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         public boolean equals(FiveGServiceState state) {
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
-// QTI_BEGIN: 2020-07-09: Android_UI: SystemUI: Remove deprecated code
             return this.mIconGroup == state.mIconGroup
-// QTI_END: 2020-07-09: Android_UI: SystemUI: Remove deprecated code
                     && this.mRadioIconType == state.mRadioIconType
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     && this.mIs6Rx == state.mIs6Rx;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         }
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
 
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
             builder.append("mRadioIconType=").append(mRadioIconType).append(", ").
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     append("is6Rx=").append(mIs6Rx).append(", ").
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     append("mIconGroup=").append(mIconGroup);
-// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
             return builder.toString();
         }
     }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
     @Inject
-// QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
     public FiveGServiceClient(Context context) {
         mContext = context;
         mPackageName = mContext.getPackageName();
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         if (mExtTelephonyManager == null) {
             mExtTelephonyManager = ExtTelephonyManager.getInstance(mContext);
         }
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     public static FiveGServiceClient getInstance(Context context) {
         if ( sInstance == null ) {
             sInstance = new FiveGServiceClient(context);
@@ -312,8 +217,6 @@ public class FiveGServiceClient {
     }
 
     public void registerCallback(KeyguardUpdateMonitorCallback callback) {
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
-// QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
         for (int i = 0; i < mKeyguardUpdateMonitorCallbacks.size(); i++) {
             if (mKeyguardUpdateMonitorCallbacks.get(i).get() == callback) {
                 return;
@@ -324,11 +227,8 @@ public class FiveGServiceClient {
 
     public void removeCallback(KeyguardUpdateMonitorCallback callback) {
         mKeyguardUpdateMonitorCallbacks.removeIf(el -> el.get() == callback);
-// QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     }
 
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     public void registerAuxiliaryListener(AuxiliaryListener listener) {
         for (int i = 0; i < mAuxiliaryListeners.size(); i++) {
             if (mAuxiliaryListeners.get(i) == listener) {
@@ -352,76 +252,45 @@ public class FiveGServiceClient {
         mAuxiliaryListeners.remove(listener);
     }
 
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     public void registerListener(int phoneId, IFiveGStateListener listener) {
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
         Log.d(TAG, "registerListener phoneId=" + phoneId + "  listener: " + listener);
-// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
-// QTI_BEGIN: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
         resetState(phoneId);
-// QTI_END: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
-// QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
         CopyOnWriteArrayList<IFiveGStateListener> statesListenersForPhone =
                 mStatesListeners.get(phoneId);
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
-// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
         if (statesListenersForPhone == null) {
-// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
-// QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
             statesListenersForPhone = new CopyOnWriteArrayList<>();
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
-// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
             mStatesListeners.put(phoneId, statesListenersForPhone);
         }
         statesListenersForPhone.add(listener);
 
-// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         if ( !isServiceConnected() ) {
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             connectService();
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         }else{
             initFiveGServiceState(phoneId);
         }
     }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
     private void resetState(int phoneId) {
         Log.d(TAG, "resetState phoneId=" + phoneId);
         FiveGServiceState currentState = getCurrentServiceState(phoneId);
-// QTI_END: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
         currentState.mRadioIconType = RadioIconType.TYPE_NONE;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIs6Rx = false;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIconGroup = TelephonyIcons.UNKNOWN;
 
         FiveGServiceState lastState = getLastServiceState(phoneId);
-// QTI_END: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
         lastState.mRadioIconType = RadioIconType.TYPE_NONE;
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         lastState.mIs6Rx = false;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         lastState.mIconGroup = TelephonyIcons.UNKNOWN;
     }
 
-// QTI_END: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
-// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
     public void unregisterListener(int phoneId, IFiveGStateListener fiveGStateListener) {
         Log.d(TAG, "unregisterListener phoneId=" + phoneId + " listener: " + fiveGStateListener);
-// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
-// QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
         CopyOnWriteArrayList<IFiveGStateListener> statesListenersForPhone =
                 mStatesListeners.get(phoneId);
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
-// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
         if (statesListenersForPhone != null) {
             statesListenersForPhone.remove(fiveGStateListener);
             if (statesListenersForPhone.size() == 0) {
@@ -430,16 +299,12 @@ public class FiveGServiceClient {
                 mLastServiceStates.remove(phoneId);
             }
         }
-// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     }
 
     public boolean isServiceConnected() {
         return mServiceConnected;
     }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     private void connectService() {
         if (!isServiceConnected() && !mIsConnectInProgress) {
             mIsConnectInProgress = true;
@@ -452,7 +317,6 @@ public class FiveGServiceClient {
         @Override
         public void onConnected() {
             Log.d(TAG, "ExtTelephony Service connected");
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             mIsSupportRadioIcon =
                     mExtTelephonyManager.isFeatureSupported(ExtTelephonyManager.FEATURE_RADIO_ICON);
             mIsAuxiliaryRadioIconSupported =
@@ -485,34 +349,23 @@ public class FiveGServiceClient {
                 events[i] = eventsList.get(i);
             }
 
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             mServiceConnected = true;
             mIsConnectInProgress = false;
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
             mClient = mExtTelephonyManager.registerCallbackWithEvents(
                     mPackageName, mExtPhoneCallbackListener, events);
-// QTI_END: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             initFiveGServiceState();
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             try {
                 mExtTelephonyManager.getAuxiliaryRadioIconInfo(mClient);
             } catch (RemoteException e) {
                 Log.d(TAG, "registerAuxiliaryListener: Exception = " + e);
             }
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             Log.d(TAG, "Client = " + mClient);
         }
         @Override
         public void onDisconnected() {
             Log.d(TAG, "ExtTelephony Service disconnected...");
             if (mServiceConnected) {
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
                 mExtTelephonyManager.unregisterCallback(mExtPhoneCallbackListener);
-// QTI_END: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             }
             mServiceConnected = false;
             mClient = null;
@@ -522,14 +375,8 @@ public class FiveGServiceClient {
         }
     };
 
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
     @VisibleForTesting
-// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
-// QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     public FiveGServiceState getCurrentServiceState(int phoneId) {
-// QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         return getServiceState(phoneId, mCurrentServiceStates);
     }
 
@@ -553,36 +400,22 @@ public class FiveGServiceClient {
         if ( !currentState.equals(lastState) ) {
 
             if ( DEBUG ) {
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
                 Log.d(TAG, "phoneId(" + phoneId + ") Change in state from " + lastState + " \n"+
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
                         "\tto " + currentState);
 
             }
 
             lastState.copyFrom(currentState);
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
             CopyOnWriteArrayList<IFiveGStateListener> statesListenersForPhone =
                     mStatesListeners.get(phoneId);
-// QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
-// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
             if (statesListenersForPhone != null) {
                 for (IFiveGStateListener listener: statesListenersForPhone) {
                     if (listener != null) {
                         listener.onStateChanged(currentState);
                     }
                 }
-// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
             }
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
             mHandler.sendEmptyMessage(MESSAGE_NOTIFIY_MONITOR_CALLBACK);
-// QTI_END: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         }
     }
 
@@ -595,15 +428,10 @@ public class FiveGServiceClient {
     }
 
     private void initFiveGServiceState(int phoneId) {
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         Log.d(TAG, "mServiceConnected=" + mServiceConnected + " mClient=" + mClient);
         if ( mServiceConnected && mClient != null) {
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
             Log.d(TAG, "query 5G service state for phoneId " + phoneId);
             try {
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
                 // Choose whether to query to RadioIcon based on whether the RadioIcon
                 // feature is supported.
                 if (mIsSupportRadioIcon) {
@@ -614,10 +442,7 @@ public class FiveGServiceClient {
                     Token token = mExtTelephonyManager.queryNrIcon(phoneId, mClient);
                     Log.d(TAG, "queryNrIconType result:" + token);
                 }
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             } catch (Exception e) {
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
                 Log.d(TAG, "initFiveGServiceState: Exception = " + e);
                 if ( mInitRetryTimes < MAX_RETRY && !mHandler.hasMessages(MESSAGE_REINIT) ) {
                     mHandler.sendEmptyMessageDelayed(MESSAGE_REINIT,
@@ -625,8 +450,7 @@ public class FiveGServiceClient {
                     mInitRetryTimes +=1;
                 }
             }
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
+// QTI_BEGIN: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
 
             boolean ciWlanAvailable = mExtTelephonyManager.isCiwlanAvailable(phoneId);
             try {
@@ -634,77 +458,56 @@ public class FiveGServiceClient {
             } catch (RemoteException e) {
                 Log.d(TAG, "onCiwlanAvailable: Exception = " + e);
             }
-// QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_END: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
         }
     }
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
     @VisibleForTesting
-// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
     void updateRadioIcon(FiveGServiceState state) {
         state.mIconGroup = getRadioIconGroup(state.mRadioIconType, state.mIs6Rx, mContext);
-// QTI_BEGIN: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
     }
 
-// QTI_END: 2018-12-18: Android_UI: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
     private static MobileIconGroup getRadioIconGroup(int radioIconType, boolean is6Rx,
                                                      Context context) {
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         boolean show6RxConfig = context.getResources().getBoolean(R.bool.config_display_6Rx);
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         boolean show5Ga = context.getResources().getBoolean(R.bool.config_display_5g_a);
-// QTI_END: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
         Log.d(TAG, "getNrIconGroup radioIconType:" + radioIconType +
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             "; is6Rx:" + is6Rx + "; show6RxConfig:" + show6RxConfig);
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         MobileIconGroup iconGroup = TelephonyIcons.UNKNOWN;
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
         switch (radioIconType){
             case RadioIconType.TYPE_5G_BASIC:
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 iconGroup = (show6RxConfig && is6Rx) ?
                         TelephonyIcons.FIVE_G_BASIC_6RX : TelephonyIcons.FIVE_G_BASIC;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 break;
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
             case RadioIconType.TYPE_5G_UWB:
-// QTI_BEGIN: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
                 if (show5Ga) {
                     iconGroup = TelephonyIcons.FIVE_G_A;
                 } else {
                     iconGroup = (show6RxConfig && is6Rx) ?
                             TelephonyIcons.FIVE_G_UWB_6RX : TelephonyIcons.FIVE_G_UWB;
                 }
-// QTI_END: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
                 break;
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
             case RadioIconType.TYPE_5G_PLUS_PLUS:
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 iconGroup = (show6RxConfig && is6Rx) ?
                         TelephonyIcons.FIVE_G_PLUS_PLUS_6RX : TelephonyIcons.FIVE_G_PLUS_PLUS;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-12-17: Data: SystemUI: Enhanced 5g icon
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 break;
-// QTI_END: 2023-12-17: Data: SystemUI: Enhanced 5g icon
 
             case RadioIconType.TYPE_LTE_NB_IOT:
                 iconGroup = TelephonyIcons.FOURG_LTE_NB_IOT;
                 break;
 
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
         }
         return iconGroup;
     }
 
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
-// QTI_BEGIN: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
     private void notifyMonitorCallback() {
         for (int i = 0; i < mKeyguardUpdateMonitorCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mKeyguardUpdateMonitorCallbacks.get(i).get();
@@ -721,39 +524,25 @@ public class FiveGServiceClient {
             int what = msg.what;
             switch ( msg.what ) {
                 case MESSAGE_REBIND:
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
                     connectService();
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
                     break;
 
                 case MESSAGE_REINIT:
                     initFiveGServiceState();
                     break;
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
 
                 case MESSAGE_NOTIFIY_MONITOR_CALLBACK:
                     notifyMonitorCallback();
                     break;
-// QTI_END: 2019-06-12: Android_UI: SystemUI: Don't display 5G in carrier name when data type is not LTE
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
             }
 
         }
     };
 
 
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
     @VisibleForTesting
-// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
-// QTI_BEGIN: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
     protected ExtPhoneCallbackListener mExtPhoneCallbackListener = new ExtPhoneCallbackListener() {
-// QTI_END: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
 
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
         @Override
         public void onNrIconType(int slotId, Token token, Status status, NrIconType
                 nrIconType) throws RemoteException {
@@ -762,16 +551,13 @@ public class FiveGServiceClient {
                             + status + " NrIconType = " + nrIconType);
             if (status.get() == Status.SUCCESS) {
                 FiveGServiceState state = getCurrentServiceState(slotId);
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
                 state.mRadioIconType = nrIconType.get();
                 updateRadioIcon(state);
-// QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
                 notifyListenersIfNecessary(slotId);
             }
         }
-// QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
 
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         @Override
         public void onNrIconResponse(int slotId, Token token, Status status, NrIcon
                 icon) throws RemoteException {
@@ -780,13 +566,13 @@ public class FiveGServiceClient {
                             + status + " NrIcon = " + icon);
             if (status.get() == Status.SUCCESS) {
                 FiveGServiceState state = getCurrentServiceState(slotId);
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 state.mRadioIconType = icon.getType();
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 state.mIs6Rx = icon.getRxCount() > 0;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 updateRadioIcon(state);
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 notifyListenersIfNecessary(slotId);
             }
         }
@@ -796,18 +582,18 @@ public class FiveGServiceClient {
             Log.d(TAG,
                     "onNrIconChange: slotId = " + slotId + " icon = " + icon);
             FiveGServiceState state = getCurrentServiceState(slotId);
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             state.mRadioIconType = icon.getType();
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             state.mIs6Rx = icon.getRxCount() > 0;
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             updateRadioIcon(state);
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             notifyListenersIfNecessary(slotId);
         }
 
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         @Override
         public void onCiwlanAvailable(int slotId, boolean available)  throws RemoteException {
             Log.d(TAG,
@@ -822,7 +608,7 @@ public class FiveGServiceClient {
                 }
             }
         }
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         @Override
         public void onRadioIconResponse(int slotId, Token token, Status status, RadioIcon
                 icon) throws RemoteException {
@@ -868,22 +654,16 @@ public class FiveGServiceClient {
                 }
             }
         }
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     };
 
     public interface IFiveGStateListener {
         public void onStateChanged(FiveGServiceState state);
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         public default void onCiwlanAvailableChanged(boolean available) {}
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     }
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
     public interface AuxiliaryListener {
         default void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {}
     }
-// QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 }
-// QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information

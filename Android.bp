@@ -267,7 +267,6 @@ filegroup {
     visibility: ["//visibility:public"],
 }
 
-// QTI_BEGIN: 2021-03-11: Bluetooth: BT fwk: Changes to compile only when bt_adv_audio present
 soong_config_module_type_import {
     from: "device/qcom/qssi/Android.bp",
     module_types: [
@@ -275,7 +274,6 @@ soong_config_module_type_import {
     ],
 }
 
-// QTI_END: 2021-03-11: Bluetooth: BT fwk: Changes to compile only when bt_adv_audio present
 java_defaults {
     name: "framework-minus-apex-defaults",
     defaults: [
@@ -283,6 +281,7 @@ java_defaults {
         "framework-aidl-export-defaults",
         "latest_android_hardware_soundtrigger3_java_static",
         "framework-minus-apex-aconfig-libraries",
+        "qcomfeatureconfig_java_defaults",
     ],
     srcs: [
         ":framework-non-updatable-sources",

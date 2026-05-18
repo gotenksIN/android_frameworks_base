@@ -12,24 +12,18 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
  */
 
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 /* Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 // QTI_BEGIN: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
  * SPDX-License-Identifier: BSD-3-Clause-Clear
 // QTI_END: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
  */
 package com.android.systemui.qs.tiles.dialog;
 
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
 import static android.telephony.AccessNetworkConstants.TRANSPORT_TYPE_WWAN;
 import static android.telephony.NetworkRegistrationInfo.DOMAIN_PS;
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
 // QTI_BEGIN: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
 import static android.telephony.ims.feature.ImsFeature.FEATURE_MMTEL;
 import static android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM;
@@ -41,10 +35,8 @@ import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentControl
 import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.SATELLITE_NOT_STARTED;
 import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.SATELLITE_STARTED;
 
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 import static com.qti.extphone.ExtPhoneCallbackListener.EVENT_ON_CIWLAN_CONFIG_CHANGE;
 
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
@@ -59,9 +51,7 @@ import android.telephony.ims.aidl.IImsRegistration;
 import android.telephony.ims.ImsException;
 import android.telephony.ims.ImsManager;
 import android.telephony.ims.ImsMmTelManager;
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
 import android.telephony.NetworkRegistrationInfo;
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.SubscriptionManager;
@@ -72,9 +62,7 @@ import android.text.Layout;
 import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 import android.util.SparseBooleanArray;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -120,18 +108,12 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.user.data.repository.UserRepository;
 import com.android.wifitrackerlib.WifiEntry;
 
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
 import com.qti.extphone.CiwlanConfig;
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
 import com.qti.extphone.Client;
 import com.qti.extphone.ExtPhoneCallbackListener;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
 import com.qti.extphone.ExtTelephonyManager;
 import com.qti.extphone.ServiceCallback;
 
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
@@ -179,9 +161,7 @@ public class InternetDialogDelegateLegacy implements
     protected boolean mCanConfigWifi;
 
     private final InternetDialogManager mInternetDialogManager;
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private ImsManager mImsManager;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private TelephonyManager mTelephonyManager;
     @Nullable
     private AlertDialog mAlertDialog;
@@ -210,9 +190,7 @@ public class InternetDialogDelegateLegacy implements
     private TextView mMobileSummaryText;
     private TextView mAirplaneModeSummaryText;
     private Switch mMobileDataToggle;
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private Switch mSecondaryMobileDataToggle;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private View mMobileToggleDivider;
     private Switch mWiFiToggle;
     private Button mDoneButton;
@@ -221,16 +199,12 @@ public class InternetDialogDelegateLegacy implements
     protected Button mShareWifiButton;
     private Button mAirplaneModeButton;
     private Drawable mBackgroundOn;
-// QTI_BEGIN: 2024-06-26: Android_UI: SystemUI: Fixed Internet dialog background display issue
     private Drawable mSecondaryBackgroundOn;
-// QTI_END: 2024-06-26: Android_UI: SystemUI: Fixed Internet dialog background display issue
     private final KeyguardStateController mKeyguard;
     @Nullable
     private Drawable mBackgroundOff = null;
     private int mDefaultDataSubId;
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private int mNddsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean mCanConfigMobileData;
     private boolean mCanChangeWifiState;
     // Wi-Fi entries
@@ -250,53 +224,32 @@ public class InternetDialogDelegateLegacy implements
     @Nullable
     private Job mClickJob;
 
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private static String mPackageName;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
     private ExtTelephonyManager mExtTelephonyManager;
     private boolean mExtTelServiceConnected = false;
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private Client mClient;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
     private CiwlanConfig mCiwlanConfig = null;
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private CiwlanConfig mNddsCiwlanConfig = null;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private SparseBooleanArray mIsSubInCall;
     private SparseBooleanArray mIsCiwlanModeSupported;
     private SparseBooleanArray mIsCiwlanEnabled;
     private SparseBooleanArray mIsInCiwlanOnlyMode;
     private SparseBooleanArray mIsImsRegisteredOnCiwlan;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
     private ServiceCallback mExtTelServiceCallback = new ServiceCallback() {
         @Override
         public void onConnected() {
             Log.d(TAG, "ExtTelephony service connected");
             mExtTelServiceConnected = true;
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
             int[] events = new int[] {EVENT_ON_CIWLAN_CONFIG_CHANGE};
             mClient = mExtTelephonyManager.registerCallbackWithEvents(mPackageName,
                     mExtPhoneCallbackListener, events);
             Log.d(TAG, "Client = " + mClient);
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
             // Query the C_IWLAN config
             try {
                 mCiwlanConfig = mExtTelephonyManager.getCiwlanConfig(
                         SubscriptionManager.getSlotIndex(mDefaultDataSubId));
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 mNddsCiwlanConfig = mExtTelephonyManager.getCiwlanConfig(
                         SubscriptionManager.getSlotIndex(mNddsSubId));
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
             } catch (RemoteException ex) {
                 Log.e(TAG, "getCiwlanConfig exception", ex);
             }
@@ -306,8 +259,6 @@ public class InternetDialogDelegateLegacy implements
         public void onDisconnected() {
             Log.d(TAG, "ExtTelephony service disconnected");
             mExtTelServiceConnected = false;
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
             mClient = null;
         }
     };
@@ -321,11 +272,8 @@ public class InternetDialogDelegateLegacy implements
             } else {
                 mNddsCiwlanConfig = ciwlanConfig;
             }
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         }
     };
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
 
     // These are to reduce the UI janky frame duration. b/323286540
     private LifecycleRegistry mLifecycleRegistry;
@@ -382,28 +330,20 @@ public class InternetDialogDelegateLegacy implements
         mInternetDialogManager = internetDialogManager;
         mInternetDetailsContentController = internetDetailsContentController;
         mDefaultDataSubId = mInternetDetailsContentController.getDefaultDataSubscriptionId();
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         mNddsSubId = getNddsSubId();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         mCanConfigMobileData = canConfigMobileData;
         mCanConfigWifi = canConfigWifi;
         mCanChangeWifiState = WifiEnterpriseRestrictionUtils.isChangeWifiStateAllowed(context);
         mKeyguard = keyguardStateController;
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         mImsManager = context.getSystemService(ImsManager.class);
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         mTelephonyManager = mInternetDetailsContentController.getTelephonyManager();
         mCoroutineScope = coroutineScope;
         mUiEventLogger = uiEventLogger;
         mDialogTransitionAnimator = dialogTransitionAnimator;
         mAdapter = new InternetAdapter(
                 mInternetDetailsContentController, coroutineScope, false, userRepository);
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         mPackageName = this.getClass().getPackage().toString();
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
     }
 
     @Override
@@ -482,9 +422,7 @@ public class InternetDialogDelegateLegacy implements
         mInternetDialogTitle.setText(getDialogTitleText());
         mInternetDialogTitle.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         mBackgroundOff = context.getDrawable(R.drawable.internet_dialog_selected_effect);
-// QTI_BEGIN: 2024-06-26: Android_UI: SystemUI: Fixed Internet dialog background display issue
         mSecondaryBackgroundOn = mBackgroundOn.getConstantState().newDrawable().mutate();
-// QTI_END: 2024-06-26: Android_UI: SystemUI: Fixed Internet dialog background display issue
         setOnClickListener(dialog);
         mTurnWifiOnLayout.setBackground(null);
         mAirplaneModeButton.setVisibility(
@@ -501,11 +439,9 @@ public class InternetDialogDelegateLegacy implements
         if (DEBUG) {
             Log.d(TAG, "onStart");
         }
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         if (!mExtTelServiceConnected) {
             mExtTelephonyManager.connectService(mExtTelServiceCallback);
         }
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
 
         mLifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
 
@@ -530,11 +466,9 @@ public class InternetDialogDelegateLegacy implements
         if (DEBUG) {
             Log.d(TAG, "onStop");
         }
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         if (mExtTelServiceConnected) {
             mExtTelephonyManager.disconnectService(mExtTelServiceCallback);
         }
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         mLifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
         mMobileNetworkLayout.setOnClickListener(null);
         mConnectedWifListLayout.setOnClickListener(null);
@@ -548,11 +482,9 @@ public class InternetDialogDelegateLegacy implements
         mAirplaneModeButton.setOnClickListener(null);
         mInternetDetailsContentController.onStop();
         mInternetDialogManager.destroyDialog();
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (mSecondaryMobileDataToggle != null) {
             mSecondaryMobileDataToggle.setOnCheckedChangeListener(null);
         }
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
     @Override
@@ -646,31 +578,23 @@ public class InternetDialogDelegateLegacy implements
 
     private void setOnClickListener(SystemUIDialog dialog) {
         mMobileNetworkLayout.setOnClickListener(v -> {
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             // Do not show auto data switch dialog if Smart DDS Switch feature is available
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             if (!mInternetDetailsContentController.isSmartDdsSwitchFeatureAvailable()) {
                 int autoSwitchNonDdsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
                 if (mDataInternetContent.getValue() != null) {
                     autoSwitchNonDdsSubId =
                             mDataInternetContent.getValue().mActiveAutoSwitchNonDdsSubId;
                 }
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
                 if (autoSwitchNonDdsSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
                     showTurnOffAutoDataSwitchDialog(dialog, autoSwitchNonDdsSubId);
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
                 }
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             }
             mInternetDetailsContentController.connectCarrierNetwork();
         });
         mMobileDataToggle.setOnClickListener(v -> {
             boolean isChecked = mMobileDataToggle.isChecked();
             if (!isChecked && shouldShowMobileDialog(mDefaultDataSubId)) {
-// QTI_BEGIN: 2024-12-23: Android_UI: SystemUI: Fix mobile data toggle status not correct
                 mMobileDataToggle.setChecked(true);
-// QTI_END: 2024-12-23: Android_UI: SystemUI: Fix mobile data toggle status not correct
                 showTurnOffMobileDialog(mDefaultDataSubId);
             } else if (mInternetDetailsContentController.isMobileDataEnabled(mDefaultDataSubId) != isChecked) {
                 mInternetDetailsContentController.setMobileDataEnabled(
@@ -722,28 +646,18 @@ public class InternetDialogDelegateLegacy implements
                 internetContent.mHasEthernet ? View.VISIBLE : View.GONE);
     }
 
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     /**
      * Do not allow the user to disable mobile data of DDS while there is an active
      * call on the nDDS.
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
      * Whether device works under DSDA or DSDS mode, if temp DDS switch has happened,
      * disabling mobile data won't be allowed.
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
      */
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
     private boolean shouldDisallowUserToDisableDdsMobileData() {
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         return mInternetDetailsContentController.isMobileDataEnabled(mDefaultDataSubId)
                 && !mInternetDetailsContentController.isNonDdsCallStateIdle()
                 && mInternetDetailsContentController.isTempDdsHappened();
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     }
 
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     private void setMobileDataLayout(InternetContent internetContent) {
         if (!internetContent.mShouldUpdateMobileNetwork || mDialog == null) {
             return;
@@ -773,16 +687,12 @@ public class InternetDialogDelegateLegacy implements
                 mSecondaryMobileNetworkLayout.setVisibility(View.GONE);
             }
         } else {
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             if (shouldDisallowUserToDisableDdsMobileData()) {
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
                 Log.d(TAG, "Do not allow mobile data switch to be turned off");
                 mMobileDataToggle.setEnabled(false);
             } else {
                 mMobileDataToggle.setEnabled(true);
             }
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
             mMobileNetworkLayout.setVisibility(View.VISIBLE);
             if (internetContent.mCurrentSatelliteState > SATELLITE_NOT_STARTED) {
                 mMobileTitleText.setText(R.string.satellite_network_title_text);
@@ -796,9 +706,7 @@ public class InternetDialogDelegateLegacy implements
                     mMobileSummaryText.setVisibility(View.VISIBLE);
                 } else {
                     mMobileSummaryText.setVisibility(View.GONE);
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 }
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 Drawable drawable = context.getResources()
                         .getDrawable(internetContent.mCurrentSatelliteState > SATELLITE_STARTED
                                 ? R.drawable.ic_satellite_connected_2
@@ -846,13 +754,9 @@ public class InternetDialogDelegateLegacy implements
                 mSignalIcon.setImageDrawable(internetContent.mDefaultSubSignalStrengthIcon);
 
                 mMobileDataToggle.setVisibility(
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                         mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 mMobileToggleDivider.setVisibility(
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                         mCanConfigMobileData ? View.VISIBLE : View.INVISIBLE);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 mNddsSubId = getNddsSubId();
                 boolean nonDdsVisibleForDualData = SubscriptionManager
                         .isUsableSubscriptionId(mNddsSubId) && isDualDataEnabled();
@@ -1158,13 +1062,9 @@ public class InternetDialogDelegateLegacy implements
     }
 
     String getMobileNetworkSummary(int subId) {
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
         if (subId == mDefaultDataSubId && shouldDisallowUserToDisableDdsMobileData()) {
-// QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
             return mDialog.getContext().getString(R.string.mobile_data_summary_not_allowed_to_disable_data);
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
         }
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
         return mInternetDetailsContentController.getMobileNetworkSummary(subId);
     }
 
@@ -1179,32 +1079,23 @@ public class InternetDialogDelegateLegacy implements
         mInternetDialogSubTitle.setText(getSubtitleText());
     }
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean shouldShowMobileDialog(int subId) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (mDialog == null) {
             return false;
         }
         if (mInternetDetailsContentController.isMobileDataEnabled(subId)) {
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             if (isCiwlanWarningConditionSatisfied(subId)) {
                 return true;
             }
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             boolean flag = Prefs.getBoolean(mDialog.getContext(), QS_HAS_TURNED_OFF_MOBILE_DATA, false);
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
             if (!flag) {
                 return true;
             }
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         }
         return false;
     }
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean isCiwlanWarningConditionSatisfied(int subId) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-05-29: Telephony: Fix mobile data warning dialog showing for nDDS
         // For targets that support MSIM C_IWLAN, the warning is to be shown only for the DDS when
         // either sub is in a call. For other targets, it will be shown only when there is a call on
         // the DDS.
@@ -1213,8 +1104,6 @@ public class InternetDialogDelegateLegacy implements
         }
         int[] activeSubIdList = SubscriptionManager.from(
                 mDialog.getContext()).getActiveSubscriptionIdList();
-// QTI_END: 2024-05-29: Telephony: Fix mobile data warning dialog showing for nDDS
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         mIsSubInCall = new SparseBooleanArray(activeSubIdList.length);
         mIsCiwlanModeSupported = new SparseBooleanArray(activeSubIdList.length);
         mIsCiwlanEnabled = new SparseBooleanArray(activeSubIdList.length);
@@ -1234,16 +1123,12 @@ public class InternetDialogDelegateLegacy implements
                 ExtTelephonyManager.FEATURE_CIWLAN_MODE_PREFERENCE);
         int subToCheck = mDefaultDataSubId;
         if (isMsimCiwlanSupported) {
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2024-05-29: Telephony: Fix mobile data warning dialog showing for nDDS
             // The user is trying to toggle the mobile data of the DDS. In this case, we need to
             // check if the nDDS is in a C_IWLAN call. If it is, we will check the C_IWLAN related
             // settings of the nDDS. Otherwise, we will check those of the DDS.
             subToCheck = subToCheckForCiwlanWarningDialog();
             Log.d(TAG, "isCiwlanWarningConditionSatisfied DDS = " + mDefaultDataSubId +
                     ", subToCheck = " + subToCheck);
-// QTI_END: 2024-05-29: Telephony: Fix mobile data warning dialog showing for nDDS
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         }
         if (mIsSubInCall.get(subToCheck)) {
             boolean isCiwlanModeSupported = mIsCiwlanModeSupported.get(subToCheck);
@@ -1271,9 +1156,7 @@ public class InternetDialogDelegateLegacy implements
     private boolean isImsRegisteredOnCiwlan(int subId) {
         TelephonyManager tm = mTelephonyManager.createForSubscriptionId(subId);
         IImsRegistration imsRegistrationImpl = tm.getImsRegistration(
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
                 SubscriptionManager.from(mDialog.getContext()).getSlotIndex(subId), FEATURE_MMTEL);
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         if (imsRegistrationImpl != null) {
             try {
                 return imsRegistrationImpl.getRegistrationTechnology() ==
@@ -1295,63 +1178,42 @@ public class InternetDialogDelegateLegacy implements
             subToCheck = mDefaultDataSubId;
         }
         return subToCheck;
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
     private void showTurnOffMobileDialog(int subId) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         Context context = mDialog.getContext();
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         CharSequence carrierName = getMobileNetworkTitle(subId);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         boolean isInService = mInternetDetailsContentController.isVoiceStateInService(subId);
         if (TextUtils.isEmpty(carrierName) || !isInService) {
             carrierName = context.getString(R.string.mobile_data_disable_message_default_carrier);
         }
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         String mobileDataDisableDialogMessage = isDualDataEnabled() ?
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                 context.getString(R.string.mobile_data_disable_message_on_dual_data, carrierName) :
                 context.getString(R.string.mobile_data_disable_message, carrierName);
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 
         // Adjust the dialog message for CIWLAN
         if (isCiwlanWarningConditionSatisfied(subId)) {
             mobileDataDisableDialogMessage = isCiwlanModeSupported(subId) ?
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                     context.getString(R.string.data_disable_ciwlan_call_will_drop_message) :
                     context.getString(R.string.data_disable_ciwlan_call_might_drop_message);
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
         }
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 
         final Switch mobileDataToggle = (subId == mDefaultDataSubId)
                 ? mMobileDataToggle : mSecondaryMobileDataToggle;
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         mAlertDialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.mobile_data_disable_title)
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
                 .setMessage(mobileDataDisableDialogMessage)
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
                 .setNegativeButton(android.R.string.cancel, (d, w) -> {
-// QTI_BEGIN: 2024-04-09: Android_UI: Fix toggle checked status issue
                     // toggle has already been set to off before dialog is shown,
                     // it shall be set back to true if negative button is selected
                     mobileDataToggle.setChecked(true);
-// QTI_END: 2024-04-09: Android_UI: Fix toggle checked status issue
                 })
                 .setPositiveButton(
                         com.android.internal.R.string.alert_windows_notification_turn_off_action,
                         (d, w) -> {
                             mInternetDetailsContentController.setMobileDataEnabled(context,
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
                                     subId, false, false);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-04-09: Android_UI: Fix toggle checked status issue
                             mobileDataToggle.setChecked(false);
-// QTI_END: 2024-04-09: Android_UI: Fix toggle checked status issue
                             Prefs.putBoolean(context, QS_HAS_TURNED_OFF_MOBILE_DATA, true);
                         })
                 .create();
@@ -1390,7 +1252,6 @@ public class InternetDialogDelegateLegacy implements
         mDialogTransitionAnimator.showFromDialog(mAlertDialog, dialog, null, false);
     }
 
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private boolean isCiwlanEnabled(int subId) {
         ImsMmTelManager imsMmTelMgr = getImsMmTelManager(subId);
         if (imsMmTelMgr == null) {
@@ -1400,14 +1261,10 @@ public class InternetDialogDelegateLegacy implements
             return imsMmTelMgr.isCrossSimCallingEnabled();
         } catch (ImsException exception) {
             Log.e(TAG, "Failed to get C_IWLAN toggle status", exception);
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         }
         return false;
     }
 
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
     private ImsMmTelManager getImsMmTelManager(int subId) {
         if (!SubscriptionManager.isUsableSubscriptionId(subId)) {
             Log.d(TAG, "getImsMmTelManager: subId unusable");
@@ -1420,64 +1277,36 @@ public class InternetDialogDelegateLegacy implements
         return mImsManager.getImsMmTelManager(subId);
     }
 
-// QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean isInCiwlanOnlyMode(TelephonyManager tm, int subId) {
         CiwlanConfig ciwlanConfig =
                 (subId == mDefaultDataSubId) ? mCiwlanConfig : mNddsCiwlanConfig;
         if (ciwlanConfig == null) {
             Log.d(TAG, "isInCiwlanOnlyMode: C_IWLAN config null on SUB " + subId);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
             return false;
         }
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         if (isRoaming(tm)) {
             return ciwlanConfig.isCiwlanOnlyInRoam();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
         }
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         return ciwlanConfig.isCiwlanOnlyInHome();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
     }
 
-// QTI_END: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean isCiwlanModeSupported(int subId) {
         CiwlanConfig ciwlanConfig =
                 (subId == mDefaultDataSubId) ? mCiwlanConfig : mNddsCiwlanConfig;
         if (ciwlanConfig == null) {
             Log.d(TAG, "isCiwlanModeSupported: C_IWLAN config null on SUB " + subId);
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
             return false;
         }
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         return ciwlanConfig.isCiwlanModeSupported();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
     }
 
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean isRoaming(TelephonyManager tm) {
         if (tm == null) {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
             Log.d(TAG, "isRoaming: TelephonyManager null");
             return false;
         }
         boolean nriRoaming = false;
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         ServiceState serviceState = tm.getServiceState();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2023-04-28: Telephony: Use the new API to check if the device is roaming
         if (serviceState != null) {
             NetworkRegistrationInfo nri =
                     serviceState.getNetworkRegistrationInfo(DOMAIN_PS, TRANSPORT_TYPE_WWAN);
@@ -1492,7 +1321,6 @@ public class InternetDialogDelegateLegacy implements
         return nriRoaming;
     }
 
-// QTI_END: 2023-04-28: Telephony: Use the new API to check if the device is roaming
     @Override
     public void onRefreshCarrierInfo() {
         updateDialog(true /* shouldUpdateMobileNetwork */);
@@ -1518,10 +1346,8 @@ public class InternetDialogDelegateLegacy implements
     @Override
     public void onSubscriptionsChanged(int defaultDataSubId) {
         mDefaultDataSubId = defaultDataSubId;
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         mNddsSubId = getNddsSubId();
         updateCiwlanConfigs();
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         updateDialog(true /* shouldUpdateMobileNetwork */);
     }
 
@@ -1557,20 +1383,16 @@ public class InternetDialogDelegateLegacy implements
         updateDialog(true /* shouldUpdateMobileNetwork */);
     }
 
-// QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
     @Override
     public void onNonDdsCallStateChanged(int callState) {
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
     }
 
-// QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data
-// QTI_BEGIN: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     @Override
     public void onTempDdsSwitchHappened() {
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
     }
 
-// QTI_END: 2022-11-22: Telephony: Add DDS cases's handling for DSDA
     @Override
     @WorkerThread
     public void onAccessPointsChanged(@Nullable List<WifiEntry> wifiEntries,
@@ -1615,11 +1437,8 @@ public class InternetDialogDelegateLegacy implements
         }
     }
 
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private boolean isDualDataEnabled() {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         return mInternetDetailsContentController.isDualDataEnabled();
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
     @Override
@@ -1629,24 +1448,16 @@ public class InternetDialogDelegateLegacy implements
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
     }
 
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
     @Override
     public void onFiveGStateOverride() {
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
-// QTI_BEGIN: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
     }
 
     @Override
     public void onDataEnabledChanged() {
         mHandler.post(() -> updateDialog(true /* shouldUpdateMobileNetwork */));
-// QTI_END: 2025-02-27: Android_UI: SystemUI: Fixed Internet dialog UI issue.
-// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
     }
 
-// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     private void updateCiwlanConfigs() {
         if (mExtTelephonyManager != null) {
             try {
@@ -1665,12 +1476,9 @@ public class InternetDialogDelegateLegacy implements
     }
 
     private int getNddsSubId() {
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
         return mInternetDetailsContentController.getNddsSubId();
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     }
 
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
     public enum InternetDialogEvent implements UiEventLogger.UiEventEnum {
         @UiEvent(doc = "The Internet dialog became visible on the screen.")
         INTERNET_DIALOG_SHOW(843),

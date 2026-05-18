@@ -4583,9 +4583,9 @@ public final class Settings {
         @UnsupportedAppUsage
         public static String getStringForUser(ContentResolver resolver, String name,
                 @CanBeCURRENT @UserIdInt int userId) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -4673,9 +4673,9 @@ public final class Settings {
                 Log.v(TAG, "System.putString(name=" + name + ", value=" + value + ") for "
                         + userId);
             }
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -7462,9 +7462,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.NITZ_UPDATE_SPACING);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_TIMEOUT);
-// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER_2);
-// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_ERROR_POLL_COUNT);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_LONG_POLL_INTERVAL_MS);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_MAX_PDP_RESET_FAIL_COUNT);
@@ -15253,7 +15251,6 @@ public final class Settings {
         @Readable
         public static final String MOBILE_DATA_ALWAYS_ON = "mobile_data_always_on";
 
-// QTI_BEGIN: 2021-05-03: Telephony: Add smart DDS switch to Developer options
         /**
         * Whether to allow modem to intelligently switch DDS without user direction
         *
@@ -15263,7 +15260,6 @@ public final class Settings {
         @Readable
         public static final String SMART_DDS_SWITCH = "smart_dds_switch";
 
-// QTI_END: 2021-05-03: Telephony: Add smart DDS switch to Developer options
         /**
          * The duration in milliseconds of each action, separated by commas. Ex:
          *

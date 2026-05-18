@@ -352,6 +352,7 @@ import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
+import com.android.qcomfeatureconfig.QcomLowRamConfig;
 import vendor.qti.applauncher.AppLauncherService;
 
 /**
@@ -1352,21 +1353,17 @@ public final class SystemServer implements Dumpable {
         if (SystemProperties.getBoolean("config.enable_display_offload", false)) {
             mSystemServiceManager.startService(WEAR_DISPLAYOFFLOAD_SERVICE_CLASS);
         }
-// QTI_BEGIN: 2024-11-22: Wearables: Adding QTI display offload service
         // start the OffloadManagerService
         if (SystemProperties.getBoolean("config.enable_qti_display_offload", false)) {
             mSystemServiceManager.startService("com.qualcomm.qti.server.offloadservice.OffloadManagerService");
         }
-// QTI_END: 2024-11-22: Wearables: Adding QTI display offload service
         t.traceEnd();
 
-// QTI_BEGIN: 2024-11-27: Wearables: Adding QTI suspend manager service
         // Start the suspend manager
         t.traceBegin("StartSuspendManagerService");
         if (SystemProperties.getBoolean("config.enable_qti_suspend_manager", false)) {
             mSystemServiceManager.startService("com.qualcomm.qti.server.suspendservice.SuspendManagerService");
         }
-// QTI_END: 2024-11-27: Wearables: Adding QTI suspend manager service
         t.traceEnd();
 
         // Display manager is needed to provide display metrics before package manager
@@ -1739,10 +1736,12 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(SupervisionService.Lifecycle.class);
             t.traceEnd();
 
-            if (!isTv) {
-                t.traceBegin("StartVibratorManagerService");
-                mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
-                t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (!isTv) {
+                    t.traceBegin("StartVibratorManagerService");
+                    mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
+                    t.traceEnd();
+                }
             }
 
             if (!isTv && android.os.multisensory.Flags.enableMultisensoryFeedback()) {
@@ -1848,9 +1847,11 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(NetworkWatchlistService.Lifecycle.class);
             t.traceEnd();
 
-            t.traceBegin("PinnerService");
-            mSystemServiceManager.startService(PinnerService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("PinnerService");
+                mSystemServiceManager.startService(PinnerService.class);
+                t.traceEnd();
+            }
 
 // QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
             mSystemServiceManager.startService(ActivityTriggerService.class);
@@ -2107,9 +2108,11 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            t.traceBegin("StartTestHarnessMode");
-            mSystemServiceManager.startService(TestHarnessModeService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("StartTestHarnessMode");
+                mSystemServiceManager.startService(TestHarnessModeService.class);
+                t.traceEnd();
+            }
 
             if (hasPdb || OemLockService.isHalPresent()) {
                 // Implementation depends on pdb or the OemLock HAL
@@ -2132,9 +2135,11 @@ public final class SystemServer implements Dumpable {
             // FEATURE_VOICE_RECOGNIZERS feature is set, because it needs to take care
             // of initializing various settings.  It will internally modify its behavior
             // based on that feature.
-            t.traceBegin("StartVoiceRecognitionManager");
-            mSystemServiceManager.startService(VoiceInteractionManagerService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("StartVoiceRecognitionManager");
+                mSystemServiceManager.startService(VoiceInteractionManagerService.class);
+                t.traceEnd();
+            }
 
             t.traceBegin("StartStatusBarManagerService");
             try {
@@ -2390,21 +2395,14 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "Not starting VpnManagerService");
             }
 
-// QTI_BEGIN: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
             if (enableWigig) {
                 try {
                     Slog.i(TAG, "Wigig Service");
                     String wigigClassPath =
-// QTI_END: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
-// QTI_BEGIN: 2020-02-12: WIGIG: Update wigig-service path
                         "/system/system_ext/framework/wigig-service.jar" + ":" +
-// QTI_END: 2020-02-12: WIGIG: Update wigig-service path
-// QTI_BEGIN: 2020-01-20: WIGIG: Service: Update path location for Wigig service binaries
                         "/system/system_ext/framework/vendor.qti.hardware.wigig.supptunnel-V1.0-java.jar" + ":" +
                         "/system/system_ext/framework/vendor.qti.hardware.wigig.netperftuner-V1.0-java.jar" + ":" +
                         "/system/system_ext/framework/vendor.qti.hardware.capabilityconfigstore-V1.0-java.jar";
-// QTI_END: 2020-01-20: WIGIG: Service: Update path location for Wigig service binaries
-// QTI_BEGIN: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
                     PathClassLoader wigigClassLoader =
                             new PathClassLoader(wigigClassPath, getClass().getClassLoader());
                     Class wigigP2pClass = wigigClassLoader.loadClass(
@@ -2424,7 +2422,6 @@ public final class SystemServer implements Dumpable {
                     reportWtf("starting WigigService", e);
                 }
             }
-// QTI_END: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
             t.traceBegin("StartSystemUpdateManagerService");
             try {
                 ServiceManager.addService(Context.SYSTEM_UPDATE_SERVICE,
@@ -2579,25 +2576,26 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (!isTv) {
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (!isTv) {
                 t.traceBegin("StartDockObserver");
                 mSystemServiceManager.startService(DockObserver.class);
                 t.traceEnd();
+                }
             }
 
             if (isWatch) {
                 t.traceBegin("StartThermalObserver");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 try {
                     mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
                 } catch (Throwable e) {
                     reportWtf("starting StartThermalObserver", e);
                 }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 t.traceEnd();
             }
 
-            if (!isWatch) {
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (!isWatch) {
                 t.traceBegin("StartWiredAccessoryManager");
                 try {
                     // Listen for wired headset changes
@@ -2607,13 +2605,16 @@ public final class SystemServer implements Dumpable {
                     reportWtf("starting WiredAccessoryManager", e);
                 }
                 t.traceEnd();
+                }
             }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
-                // Start MIDI Manager service
-                t.traceBegin("StartMidiManager");
-                mSystemServiceManager.startService(MidiService.Lifecycle.class);
-                t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_MIDI)) {
+                    // Start MIDI Manager service
+                    t.traceBegin("StartMidiManager");
+                    mSystemServiceManager.startService(MidiService.Lifecycle.class);
+                    t.traceEnd();
+                }
             }
 
             // Start ADB Debugging Service
@@ -2776,10 +2777,12 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
-                t.traceBegin("StartPrintManager");
-                mSystemServiceManager.startService(PrintManagerService.class);
-                t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
+                    t.traceBegin("StartPrintManager");
+                    mSystemServiceManager.startService(PrintManagerService.class);
+                    t.traceEnd();
+                }
             }
 
             t.traceBegin("StartAttestationVerificationService");
@@ -2818,10 +2821,12 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(MediaSessionService.class);
             t.traceEnd();
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
-                t.traceBegin("StartHdmiControlService");
-                mSystemServiceManager.startService(HdmiControlService.class);
-                t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_HDMI_CEC)) {
+                    t.traceBegin("StartHdmiControlService");
+                    mSystemServiceManager.startService(HdmiControlService.class);
+                    t.traceEnd();
+                }
             }
 
             if (isTv || mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
@@ -2874,34 +2879,38 @@ public final class SystemServer implements Dumpable {
             final boolean hasFeatureFingerprint
                     = mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT);
 
-            if (hasFeatureFace) {
-                t.traceBegin("StartFaceSensor");
-                final FaceService faceService =
-                        mSystemServiceManager.startService(FaceService.class);
-                t.traceEnd();
-            }
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                if (hasFeatureFace) {
+                    t.traceBegin("StartFaceSensor");
+                    final FaceService faceService =
+                            mSystemServiceManager.startService(FaceService.class);
+                    t.traceEnd();
+                }
 
-            if (hasFeatureIris) {
-                t.traceBegin("StartIrisSensor");
-                mSystemServiceManager.startService(IrisService.class);
-                t.traceEnd();
-            }
+                if (hasFeatureIris) {
+                    t.traceBegin("StartIrisSensor");
+                    mSystemServiceManager.startService(IrisService.class);
+                    t.traceEnd();
+                }
 
-            if (hasFeatureFingerprint) {
-                t.traceBegin("StartFingerprintSensor");
-                final FingerprintService fingerprintService =
-                        mSystemServiceManager.startService(FingerprintService.class);
-                t.traceEnd();
+                if (hasFeatureFingerprint) {
+                    t.traceBegin("StartFingerprintSensor");
+                    final FingerprintService fingerprintService =
+                            mSystemServiceManager.startService(FingerprintService.class);
+                    t.traceEnd();
+                }
             }
 
             // Start this service after all biometric sensor services are started.
-            t.traceBegin("StartBiometricService");
-            mSystemServiceManager.startService(BiometricService.class);
-            t.traceEnd();
+            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+                t.traceBegin("StartBiometricService");
+                mSystemServiceManager.startService(BiometricService.class);
+                t.traceEnd();
 
-            t.traceBegin("StartAuthService");
-            mSystemServiceManager.startService(AuthService.class);
-            t.traceEnd();
+                t.traceBegin("StartAuthService");
+                mSystemServiceManager.startService(AuthService.class);
+                t.traceEnd();
+            }
 
             if (!isWatch && !isTv && !isAutomotive) {
                 if (android.security.Flags.secureLockdown()) {
@@ -2979,95 +2988,77 @@ public final class SystemServer implements Dumpable {
         if (isWatch) {
             // Must be started before services that depend it, e.g. WearConnectivityService
             t.traceBegin("StartWearPowerService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_POWER_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearPowerService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartHealthService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(HEALTH_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartHealthService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartSystemStateDisplayService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(SYSTEM_STATE_DISPLAY_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartSystemStateDisplayService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearConnectivityService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearConnectivityService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearDisplayService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearDisplayService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             if (Build.IS_DEBUGGABLE) {
                 t.traceBegin("StartWearDebugService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 try {
                     mSystemServiceManager.startService(WEAR_DEBUG_SERVICE_CLASS);
                 } catch (Throwable e) {
                     reportWtf("starting StartWearDebugService", e);
                 }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 t.traceEnd();
             }
 
             t.traceBegin("StartWearTimeService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearTimeService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearSettingsService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_SETTINGS_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearSettingsService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearModeService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_MODE_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearModeService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             if (android.server.Flags.wearGestureApi()
@@ -3256,9 +3247,11 @@ public final class SystemServer implements Dumpable {
         }
 
         // NOTE: ClipboardService depends on ContentCapture and Autofill
-        t.traceBegin("StartClipboardService");
-        mSystemServiceManager.startService(ClipboardService.class);
-        t.traceEnd();
+        if (!QcomLowRamConfig.TARGET_IS_QLMD) {
+            t.traceBegin("StartClipboardService");
+            mSystemServiceManager.startService(ClipboardService.class);
+            t.traceEnd();
+        }
 
         if (!isTv && !isWatch) {
             // Selection toolbar service

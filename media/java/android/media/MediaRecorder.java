@@ -700,14 +700,10 @@ public class MediaRecorder implements AudioRouting,
         /** @hide Linear PCM audio codec */
         public static final int LPCM = 12;
 // QTI_END: 2018-02-19: Audio: add support for extended formats
-// QTI_BEGIN: 2019-05-15: Audio: media: Define MPEG-H Encoder Format
         /** @hide MPEGH audio codec */
         public static final int MPEGH = 13;
-// QTI_END: 2019-05-15: Audio: media: Define MPEG-H Encoder Format
-// QTI_BEGIN: 2023-02-28: Audio: base: add new enum for HE-AAC V2
         /** @hide High Efficiency AAC V2 (HE-AAC V2) audio codec */
         public static final int HE_AAC_V2 = 14;
-// QTI_END: 2023-02-28: Audio: base: add new enum for HE-AAC V2
 
     }
 
@@ -758,9 +754,7 @@ public class MediaRecorder implements AudioRouting,
         /** APV video codec */
         @FlaggedApi(FLAG_APV_RECORDING_SUPPORT)
         public static final int APV = 9;
-// QTI_BEGIN: 2025-08-14: Video: base: Media Recorder changes for MVHEVC mime type
         public static final int MVHEVC = 15;
-// QTI_END: 2025-08-14: Video: base: Media Recorder changes for MVHEVC mime type
     }
 
     /**
@@ -777,9 +771,7 @@ public class MediaRecorder implements AudioRouting,
         VideoEncoder.DOLBY_VISION,
         VideoEncoder.AV1,
         VideoEncoder.APV,
-// QTI_BEGIN: 2024-09-12: Video: base: Media Recorder changes for MVHEVC mime type
         VideoEncoder.MVHEVC,
-// QTI_END: 2024-09-12: Video: base: Media Recorder changes for MVHEVC mime type
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface VideoEncoderValues {}

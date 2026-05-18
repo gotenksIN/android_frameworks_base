@@ -2439,6 +2439,7 @@ public class CachedAppOptimizer {
                     break;
                 }
                 case COMPACT_SYSTEM_MSG: {
+                    QtiBackgroundManager.getInstance().requestIdleProcessMallocPurge();
                     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "compactSystem");
                     long memFreedBefore = getMemoryFreedCompaction();
                     if (Flags.useMemcgForCompaction()) {
@@ -2453,6 +2454,7 @@ public class CachedAppOptimizer {
                     break;
                 }
                 case VENDOR_COMPACT_ALL_MSG: {
+                    QtiBackgroundManager.getInstance().requestIdleProcessMallocPurge();
                     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "vendorCompactAll");
                     long memFreedBefore = getMemoryFreedCompaction();
                     vendorCompactAll();

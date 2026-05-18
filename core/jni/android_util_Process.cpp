@@ -71,6 +71,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <mutex>
+#include <malloc.h>
 
 using namespace android;
 
@@ -1572,6 +1573,92 @@ jboolean android_os_Process_setPerfCoreAffinity(
     return JNI_TRUE;
 }
 
+static void malloc_purge_on_sigusr2(int) {
+    mallopt(M_DECAY_TIME, 0);
+    mallopt(M_PURGE_ALL, 0);
+    mallopt(M_DECAY_TIME, 1);
+}
+
+// Bit mask for SIGUSR2 in the SigCgt field of /proc/<pid>/status.
+// SigCgt is a 64-bit hex bitmask; bit N-1 corresponds to signal N.
+static constexpr unsigned long long kSigUsr2Bit = 1ULL << (SIGUSR2 - 1);
+
+static bool hasMallocPurgeHandler(int pid) {
+    char path[PATH_MAX];
+
+    int n = snprintf(path, sizeof(path), "/proc/%d/status", pid);
+    if (n < 0 || static_cast<size_t>(n) >= sizeof(path)) {
+        ALOGW("hasMallocPurgeHandler: path truncated for pid=%d", pid);
+        return false;
+    }
+
+    FILE* f = fopen(path, "re");
+    if (!f) {
+        return false;
+    }
+
+    bool has_handler = false;
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        unsigned long long sigcgt = 0;
+        if (sscanf(line, "SigCgt: %llx", &sigcgt) == 1) {
+            has_handler = (sigcgt & kSigUsr2Bit) != 0;
+            break;
+        }
+    }
+    fclose(f);
+    return has_handler;
+}
+
+
+static bool sendMallocPurgeSignalToPid(int pid) {
+    if (pid <= 0) return false;
+
+    if (!hasMallocPurgeHandler(pid)) {
+        return false;
+    }
+
+    if (kill(pid, SIGUSR2) != 0) {
+        ALOGW("sendMallocPurgeSignalToPid: failed to send SIGUSR2 "
+                "to pid=%d: %s", pid, strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+static jboolean android_os_Process_sendMallocPurgeSignalToPid(
+        JNIEnv* /*env*/, jobject /*clazz*/, jint pid) {
+    return sendMallocPurgeSignalToPid(static_cast<int>(pid))
+           ? JNI_TRUE : JNI_FALSE;
+}
+
+static void android_os_Process_sendMallocPurgeSignalToAll(JNIEnv* /*env*/,
+                                                           jobject /*clazz*/) {
+    std::unique_ptr<DIR, decltype(&closedir)> proc(opendir("/proc"), closedir);
+    if (!proc) {
+        ALOGE("sendMallocPurgeSignalToAll: failed to open /proc: %s",
+              strerror(errno));
+        return;
+    }
+
+    const int self_pid = getpid();
+    int count = 0;
+    struct dirent* entry;
+
+    while ((entry = readdir(proc.get())) != nullptr) {
+        int pid = atoi(entry->d_name);
+        if (pid <= 0 || pid == self_pid) {
+            continue;
+        }
+
+        if (sendMallocPurgeSignalToPid(pid)) {
+            ++count;
+        }
+    }
+
+    ALOGI("sendMallocPurgeSignalToAll: sent SIGUSR2 to %d processes", count);
+}
+
 static const JNINativeMethod methods[] = {
         {"getUidForName", "(Ljava/lang/String;)I", (void*)android_os_Process_getUidForName},
         {"getGidForName", "(Ljava/lang/String;)I", (void*)android_os_Process_getGidForName},
@@ -1624,9 +1711,20 @@ static const JNINativeMethod methods[] = {
         {"nativePidFdOpen", "(II)I", (void*)android_os_Process_nativePidFdOpen},
         {"freezeCgroupUid", "(IZ)V", (void*)android_os_Process_freezeCgroupUID},
         {"setPerfCoreAffinity", "(IZ)Z", (void*)android_os_Process_setPerfCoreAffinity},
+        {"sendMallocPurgeSignalToAll", "()V", (void*)android_os_Process_sendMallocPurgeSignalToAll},
+        {"sendMallocPurgeSignalToPid", "(I)Z", (void*)android_os_Process_sendMallocPurgeSignalToPid},
 };
 
 int register_android_os_Process(JNIEnv* env)
 {
+    struct sigaction sa = {};
+    sa.sa_handler = malloc_purge_on_sigusr2;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGUSR2, &sa, nullptr) != 0) {
+        ALOGW("register_android_os_Process: "
+              "failed to register SIGUSR2 handler: %s", strerror(errno));
+    }
+
     return RegisterMethodsOrDie(env, "android/os/Process", methods, NELEM(methods));
 }

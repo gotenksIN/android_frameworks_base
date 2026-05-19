@@ -40,6 +40,7 @@ package com.android.systemui.statusbar.policy;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.util.Log;
@@ -516,7 +517,7 @@ public class FiveGServiceClient {
         }
     }
 
-    private Handler mHandler = new Handler() {
+    private Handler mHandler = new Handler(Looper.getMainLooper()) {
         public void handleMessage(Message msg) {
             int what = msg.what;
             switch ( msg.what ) {

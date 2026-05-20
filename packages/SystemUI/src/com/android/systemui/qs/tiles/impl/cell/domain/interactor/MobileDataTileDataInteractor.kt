@@ -124,7 +124,7 @@ constructor(
                     if (!isConnected) {
                         flowOf(null)
                     } else {
-                        combine(it.networkName, it.signalLevelIcon, mobileDataContentName) {
+                        combine(it.customizedNetworkName, it.signalLevelIcon, mobileDataContentName) {
                             networkNameModel,
                             signalIcon,
                             dataContentDescription ->
@@ -171,7 +171,7 @@ constructor(
                     )
                 )
             } else {
-                combine(default.isDataEnabled, mobileDescriptionFlow, default.networkName) {
+                combine(default.isDataEnabled, mobileDescriptionFlow, default.customizedNetworkName) {
                     isDataEnabled,
                     description,
                     defaultName ->

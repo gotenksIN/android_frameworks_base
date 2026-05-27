@@ -207,6 +207,14 @@ public class BoostFramework {
     public static final int MPCTLV3_GPU_IS_APP_FG = 0X42820000;
     public static final int MPCTLV3_GPU_IS_APP_BG = 0X42824000;
 
+    public static final int VENDOR_EVENT_ACTIVITY_WINDOW_MODE_UPDATE = 0x00001066;
+
+    public class ActivityWindowMode {
+        public static int STANDARD = 0;
+        public static int MULTI_WINDOW = 1;
+        public static int PIP = 2;
+    };
+
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class Scroll {
         public static final int VERTICAL = 1;

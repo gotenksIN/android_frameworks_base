@@ -68,6 +68,7 @@ public class QtiBackgroundManager {
     private static final String LOG_PREFIX_UI_RT = "[UI RT]";
     private static final String LOG_PREFIX_UI = "[UI]";
     private static final String LOG_PREFIX_CONFIG = "[CONFIG]";
+    private static final String LOG_PREFIX_MALLOC_PURGE = "[MALLOC PURGE]";
 
     private static final long DEFAULT_LAUNCH_TIMEOUT = 2000;
     private static final long DEFAULT_DELAY_UNFREEZER_TIMEOUT = 1000;
@@ -118,6 +119,8 @@ public class QtiBackgroundManager {
     private boolean mUseUIRTSettings = false;
     private boolean mUseUIAffinitySettings = false;
     private boolean mUsePerfCoreAffinity = false;
+    private boolean mUseBgMallocPurge = false;
+    private boolean mUseIdleMallocPurge = false;
 
     private Freezer mFreezer;
     private Handler mHandler;
@@ -129,6 +132,14 @@ public class QtiBackgroundManager {
     private AppKeepaliveManagement mAppKeepaliveManager;
     private UiFluencyModeMonitor mUiFluencyModeMonitor;
     private ActivityManagerService mAm;
+
+    public void requestIdleProcessMallocPurge() {
+        if (mUseIdleMallocPurge) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "idleMallocPurge");
+            Process.sendMallocPurgeSignalToAll();
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+        }
+    }
 
     private void syncAppFreezerStateWithUiFluencyMode() {
         final String targetState = mUseUiFluencyMode ? "disabled" : "enabled";
@@ -517,7 +528,11 @@ public class QtiBackgroundManager {
         mUsePerfCoreAffinity =
                 Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.perf.affinity","false"));
         mUseDebug = Boolean.valueOf(mPerf.perfGetProp(
-                "ro.vendor.perf.qti_bg_manager.enable_debug", "true"));
+                "ro.vendor.perf.qti_bg_manager.enable_debug", "false"));
+        mUseBgMallocPurge = Boolean.valueOf(mPerf.perfGetProp(
+                "ro.vendor.perf.qti_bg_manager.enable_bg_malloc_purge", "true"));
+        mUseIdleMallocPurge = Boolean.valueOf(mPerf.perfGetProp(
+                "ro.vendor.perf.qti_bg_manager.enable_idle_malloc_purge", "false"));
     }
 
     public class CpuLoadMonitor {
@@ -2142,6 +2157,39 @@ public class QtiBackgroundManager {
         mPackageFreezerManager.unfreezeAllFrozenPackages();
     }
 
+    private void sendMallocPurgeToApp(String packageName) {
+        if (mAm == null) {
+            return;
+        }
+
+        synchronized (mAm.mProcLock) {
+            final ArrayList<ProcessRecord> lruList = mAm.mProcessList.getLruProcessesLOSP();
+            for (int i = lruList.size() - 1; i >= 0; i--) {
+                final ProcessRecord app = lruList.get(i);
+
+                if (app.info != null && packageName.equals(app.info.packageName)) {
+                    int pid = app.getPid();
+                    if (pid <= 0) {
+                        continue;
+                    }
+
+                    try {
+                        Process.sendMallocPurgeSignalToPid(pid);
+                        if (mUseDebug) {
+                            Slog.d(TAG, String.format(
+                                "%s Sent malloc purge signal to %s (pid=%d)",
+                                LOG_PREFIX_MALLOC_PURGE, app.processName, pid));
+                        }
+                    } catch (Exception e) {
+                        Slog.e(TAG, String.format(
+                            "%s Failed to send malloc purge signal to %s (pid=%d): %s",
+                            LOG_PREFIX_MALLOC_PURGE, app.processName, pid, e.getMessage()));
+                    }
+                }
+            }
+        }
+    }
+
     public ArrayList<Integer> getProcsKeepaliveWeight(ArrayList<ProcessRecordInternal> Procs) {
         return mAppKeepaliveManager.getProcsKeepaliveWeight(Procs);
     }
@@ -2248,6 +2296,10 @@ public class QtiBackgroundManager {
                 mAutoStartManager.setPackageAutoStartBlocked(packageName);
             }
         }
+
+        if (mUseBgMallocPurge) {
+            sendMallocPurgeToApp(packageName);
+        }
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -2265,6 +2317,8 @@ public class QtiBackgroundManager {
         // Configuration dump
         pw.println("CONFIGURATION:");
         pw.println("  qti_bg_manager.enable: " + mUseAppBgManager);
+        pw.println("  qti_bg_manager.enable_bg_malloc_purge: " + mUseBgMallocPurge);
+        pw.println("  qti_bg_manager.enable_idle_malloc_purge: " + mUseIdleMallocPurge);
         pw.println("  qti_bg_manager.enable_restrict_auto_start: " + mUseRestrictBgAutoStart);
         pw.println("  qti_bg_manager.enable_process_level_freezer: " + mUseProcessLevelFreezer);
         pw.println("  qti_bg_manager.enable_package_level_freezer: " + mUsePackageLevelFreezer);

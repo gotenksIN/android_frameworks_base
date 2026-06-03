@@ -124,7 +124,7 @@ constructor(
                     if (!isConnected) {
                         flowOf(null)
                     } else {
-                        combine(it.networkName, it.signalLevelIcon, mobileDataContentName) {
+                        combine(it.customizedNetworkName, it.signalLevelIcon, mobileDataContentName) {
                             networkNameModel,
                             signalIcon,
                             dataContentDescription ->
@@ -147,21 +147,31 @@ constructor(
             }
         }
 
+    private val isTempDds: Flow<Boolean> =
+        combine(
+            mobileIconsInteractor.defaultDataSubId,
+            mobileIconsInteractor.activeMobileDataSubscriptionId,
+        ) { defaultSubId, activeSubId ->
+            defaultSubId != null && activeSubId != null && defaultSubId != activeSubId
+        }
+
     fun tileData(): Flow<MobileDataTileModel> =
         combine(
             mobileIconsInteractor.defaultDataIconInteractor,
             airplaneModeInteractor.isAirplaneMode,
-        ) { default, isAirplaneMode ->
+            isTempDds,
+        ) { default, isAirplaneMode, isTempDds ->
             if (default == null) {
                 flowOf(
                     MobileDataTileModel(
                         isSimActive = false,
                         isEnabled = false,
                         isAirplaneModeEnabled = isAirplaneMode,
+                        isTempDds = isTempDds,
                     )
                 )
             } else {
-                combine(default.isDataEnabled, mobileDescriptionFlow, default.networkName) {
+                combine(default.isDataEnabled, mobileDescriptionFlow, default.customizedNetworkName) {
                     isDataEnabled,
                     description,
                     defaultName ->
@@ -170,6 +180,7 @@ constructor(
                         isEnabled = isDataEnabled,
                         isAirplaneModeEnabled = isAirplaneMode,
                         secondaryLabel = description ?: defaultName.name,
+                        isTempDds = isTempDds,
                     )
                 }
             }

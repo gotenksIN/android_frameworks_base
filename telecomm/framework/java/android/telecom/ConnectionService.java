@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package android.telecom;
@@ -468,6 +472,8 @@ public abstract class ConnectionService extends Service {
     private Conference sNullConference;
     private Object mIdSyncRoot = new Object();
     private int mId = 0;
+
+    private VendorExt mVendorExt;
 
     private final IBinder mBinder = new IConnectionService.Stub() {
         @Override
@@ -1421,7 +1427,12 @@ public abstract class ConnectionService extends Service {
                     SomeArgs args = (SomeArgs) msg.obj;
                     Log.continueSession((Session) args.arg2, SESSION_HANDLER + SESSION_ANSWER);
                     try {
-                        answer((String) args.arg1);
+                        String callId = (String) args.arg1;
+                        if (mVendorExt != null) {
+                            mVendorExt.answer(callId);
+                        } else {
+                            answer(callId);
+                        }
                     } finally {
                         args.recycle();
                         Log.endSession();
@@ -1435,7 +1446,11 @@ public abstract class ConnectionService extends Service {
                     try {
                         String callId = (String) args.arg1;
                         int videoState = args.argi1;
-                        answerVideo(callId, videoState);
+                        if (mVendorExt != null) {
+                            mVendorExt.answerVideo(callId, videoState);
+                        } else {
+                            answerVideo(callId, videoState);
+                        }
                     } finally {
                         args.recycle();
                         Log.endSession();
@@ -2593,7 +2608,7 @@ public abstract class ConnectionService extends Service {
         findConnectionForAction(callId, "abort").onAbort();
     }
 
-    protected void answerVideo(String callId, int videoState) {
+    private void answerVideo(String callId, int videoState) {
         Log.i(this, "answerVideo %s", callId);
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "answer").onAnswer(videoState);
@@ -2602,7 +2617,7 @@ public abstract class ConnectionService extends Service {
         }
     }
 
-    protected void answer(String callId) {
+    private void answer(String callId) {
         Log.i(this, "answer %s", callId);
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "answer").onAnswer();
@@ -2944,7 +2959,10 @@ public abstract class ConnectionService extends Service {
      */
     public void onStartRtt(@NonNull Conference conference,
             @NonNull Connection.RttTextStream rttTextStream) {
-        Log.w(this, "startRtt called on a conference.");
+        Log.i(this, "startRtt called on a conference.");
+        if (mVendorExt != null) {
+            mVendorExt.onStartRtt(conference, rttTextStream);
+        }
     }
 
     private void stopRtt(String callId) {
@@ -2964,7 +2982,10 @@ public abstract class ConnectionService extends Service {
      * @hide
      */
     public void onStopRtt(@NonNull Conference conference) {
-        Log.w(this, "stopRtt called on a conference.");
+        Log.i(this, "stopRtt called on a conference.");
+        if (mVendorExt != null) {
+            mVendorExt.onStopRtt(conference);
+        }
     }
 
     private void handleRttUpgradeResponse(String callId, Connection.RttTextStream rttTextStream) {
@@ -3989,5 +4010,31 @@ public abstract class ConnectionService extends Service {
     @VisibleForTesting
     public void setReadyForTest() {
         mAreAccountsInitialized = true;
+    }
+
+    /** @hide */
+    public interface VendorExt {
+        void answer(@NonNull String callId);
+        void answerVideo(@NonNull String callId, int videoState);
+        void onStartRtt(@NonNull Conference conference,
+                @NonNull Connection.RttTextStream rttTextStream);
+        void onStopRtt(@NonNull Conference conference);
+    }
+
+    /** @hide */
+    public void setVendorExt(@NonNull VendorExt hook) {
+        mVendorExt = hook;
+    }
+
+    /** @hide */
+    public void answerBase(String callId) {
+        Log.i(this, "answerBase %s", callId);
+        answer(callId);
+    }
+
+    /** @hide */
+    public void answerVideoBase(String callId, int videoState) {
+        Log.i(this, "answerVideoBase %s, videoState: %s", callId, videoState);
+        answerVideo(callId, videoState);
     }
 }

@@ -153,6 +153,7 @@ public class BtHelper {
     interface ScoHelper {
         boolean isBluetoothScoOn();
         boolean isBluetoothScoRequestedInternally();
+        boolean isAudioConnected();
         boolean startBluetoothSco(AttributionSource client);
         boolean stopBluetoothSco();
         void onBroadcastScoConnectionState(int state);
@@ -209,6 +210,11 @@ public class BtHelper {
 
         @Override
         public boolean isBluetoothScoRequestedInternally() {
+            throw new UnsupportedOperationException("Does not make sense on this code path");
+        }
+
+        @Override
+        public boolean isAudioConnected() {
             throw new UnsupportedOperationException("Does not make sense on this code path");
         }
 
@@ -377,6 +383,15 @@ public class BtHelper {
         public boolean isBluetoothScoRequestedInternally() {
             return mScoAudioState == SCO_STATE_ACTIVE_INTERNAL
                   || mScoAudioState == SCO_STATE_ACTIVATE_REQ;
+        }
+
+        @GuardedBy("mDeviceBroker.mDeviceStateLock")
+        @Override
+        public boolean isAudioConnected() {
+            if (mBluetoothHeadset == null || mBluetoothHeadsetDevice == null) {
+                return false;
+            }
+            return mBluetoothHeadset.isAudioConnected(mBluetoothHeadsetDevice);
         }
 
         @GuardedBy("mDeviceBroker.mDeviceStateLock")
@@ -763,6 +778,14 @@ public class BtHelper {
     /*package*/ boolean isBluetoothScoRequestedInternally() {
         if (mScoHelper != null) {
             return mScoHelper.isBluetoothScoRequestedInternally();
+        } else {
+            return false;
+        }
+    }
+
+    /*package*/ boolean isAudioConnected() {
+        if (mScoHelper != null) {
+            return mScoHelper.isAudioConnected();
         } else {
             return false;
         }

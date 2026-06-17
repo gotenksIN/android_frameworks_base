@@ -1477,6 +1477,14 @@ public final class ActivityRecord extends WindowToken {
             } else {
                 mLastReportedMultiWindowMode = inMultiWindowMode;
                 ensureActivityConfiguration();
+                if (mPerf != null) {
+                    int mode = BoostFramework.ActivityWindowMode.STANDARD;
+                    if (inMultiWindowMode) {
+                        mode = BoostFramework.ActivityWindowMode.MULTI_WINDOW;
+                    }
+                    mPerf.perfEvent(BoostFramework.VENDOR_EVENT_ACTIVITY_WINDOW_MODE_UPDATE,
+                                    packageName, 1, mode);
+                }
             }
         }
     }
@@ -1507,6 +1515,14 @@ public final class ActivityRecord extends WindowToken {
                 // result a non-touchable PiP window since the InputConsumer for PiP requires it.
                 EventLog.writeEvent(0x534e4554, "265293293", -1, "");
                 removeImmediately();
+            }
+            if (inPictureInPictureMode != mLastReportedPictureInPictureMode && mPerf != null) {
+                int mode = BoostFramework.ActivityWindowMode.STANDARD;
+                if (inPictureInPictureMode) {
+                    mode = BoostFramework.ActivityWindowMode.PIP;
+                }
+                mPerf.perfEvent(BoostFramework.VENDOR_EVENT_ACTIVITY_WINDOW_MODE_UPDATE,
+                                packageName, 1, mode);
             }
         }
     }

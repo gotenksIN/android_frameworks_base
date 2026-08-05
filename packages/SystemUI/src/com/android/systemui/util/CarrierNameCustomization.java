@@ -166,7 +166,7 @@ public class CarrierNameCustomization {
         SubscriptionInfo sub = mKeyguardUpdateMonitor.getSubscriptionInfoForSubId(subId);
         if (sub == null) {
             return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-                    RadioIconType.TYPE_NONE);
+                    NrIconType.INVALID);
         } else {
             FiveGServiceClient.FiveGServiceState fiveGServiceState =
                     mFiveGServiceClient.getCurrentServiceState(sub.getSimSlotIndex());

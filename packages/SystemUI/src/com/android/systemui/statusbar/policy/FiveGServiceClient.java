@@ -126,7 +126,7 @@ public class FiveGServiceClient {
         private MobileIconGroup mIconGroup;
 
         public FiveGServiceState(){
-            mRadioIconType = RadioIconType.TYPE_NONE;
+            mRadioIconType = NrIconType.INVALID;
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIs6Rx = false;
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
@@ -273,14 +273,14 @@ public class FiveGServiceClient {
     private void resetState(int phoneId) {
         Log.d(TAG, "resetState phoneId=" + phoneId);
         FiveGServiceState currentState = getCurrentServiceState(phoneId);
-        currentState.mRadioIconType = RadioIconType.TYPE_NONE;
+        currentState.mRadioIconType = NrIconType.INVALID;
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIs6Rx = false;
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIconGroup = TelephonyIcons.UNKNOWN;
 
         FiveGServiceState lastState = getLastServiceState(phoneId);
-        lastState.mRadioIconType = RadioIconType.TYPE_NONE;
+        lastState.mRadioIconType = NrIconType.INVALID;
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         lastState.mIs6Rx = false;
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons

@@ -15,6 +15,11 @@
   ~ limitations under the License
   -->
 <resources>
+    <!-- The position of the volume dialog on the screen.
+         See com.android.systemui.volume.dialog.VolumeDialog.
+         Value 21 corresponds to RIGHT|CENTER_VERTICAL. -->
+    <integer name="volume_dialog_gravity">21</integer>
+
     <integer name="biometric_dialog_text_gravity">8388611</integer> <!-- gravity start -->
     <integer name="biometric_prompt_content_list_item_max_lines_if_two_column">3</integer>
 

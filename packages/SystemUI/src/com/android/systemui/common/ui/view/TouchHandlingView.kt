@@ -24,7 +24,6 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
-import com.android.systemui.Flags.doubleTapToSleep
 import com.android.systemui.log.TouchHandlingViewLogger
 import com.android.systemui.shade.TouchLogger
 import kotlinx.coroutines.DisposableHandle
@@ -88,7 +87,7 @@ open class TouchHandlingView(
                 listener?.onSingleTapDetected(this@TouchHandlingView, x = x, y = y)
             },
             onDoubleTapDetected = {
-                if (doubleTapToSleep()) listener?.onDoubleTapDetected(this@TouchHandlingView)
+                listener?.onDoubleTapDetected(this@TouchHandlingView)
             },
             longPressDuration = longPressDuration,
             allowedTouchSlop = allowedTouchSlop,

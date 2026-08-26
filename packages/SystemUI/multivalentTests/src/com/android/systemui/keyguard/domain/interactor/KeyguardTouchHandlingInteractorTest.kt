@@ -20,8 +20,6 @@ package com.android.systemui.keyguard.domain.interactor
 import android.content.Intent
 import android.graphics.Point
 import android.os.PowerManager
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
 import android.provider.Settings
 import android.view.accessibility.accessibilityManagerWrapper
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,7 +27,6 @@ import androidx.test.filters.SmallTest
 import com.android.internal.logging.UiEventLogger
 import com.android.internal.logging.testing.UiEventLoggerFake
 import com.android.internal.logging.uiEventLogger
-import com.android.systemui.Flags.FLAG_DOUBLE_TAP_TO_SLEEP
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryFaceAuthInteractor
@@ -113,7 +110,6 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
 
         MockitoAnnotations.initMocks(this)
         overrideResource(R.bool.long_press_keyguard_customize_lockscreen_enabled, true)
-        overrideResource(com.android.internal.R.bool.config_supportDoubleTapSleep, true)
         whenever(kosmos.accessibilityManagerWrapper.getRecommendedTimeoutMillis(anyInt(), anyInt()))
             .thenAnswer { it.arguments[0] }
 
@@ -124,7 +120,6 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
     fun tearDown() {
         val testableResource = mContext.getOrCreateTestableResources()
         testableResource.removeOverride(R.bool.long_press_keyguard_customize_lockscreen_enabled)
-        testableResource.removeOverride(com.android.internal.R.bool.config_supportDoubleTapSleep)
     }
 
     @Test
@@ -312,8 +307,7 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
-    fun isDoubleTapEnabled_flagEnabled_userSettingEnabled_onlyTrueInLockScreenState() {
+    fun isDoubleTapEnabled_userSettingEnabled_onlyTrueInLockScreenState() {
         testScope.runTest {
             secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, true)
 
@@ -331,8 +325,7 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
-    fun isDoubleTapEnabled_flagEnabled_userSettingDisabled_alwaysFalse() {
+    fun isDoubleTapEnabled_userSettingDisabled_alwaysFalse() {
         testScope.runTest {
             secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, false)
 
@@ -346,39 +339,6 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
-    fun isDoubleTapEnabled_flagDisabled_userSettingEnabled_alwaysFalse() {
-        testScope.runTest {
-            secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, true)
-
-            val isEnabled = collectLastValue(underTest.isDoubleTapHandlingEnabled)
-            KeyguardState.entries.forEach { keyguardState ->
-                setUpState(keyguardState = keyguardState)
-
-                assertThat(isEnabled()).isFalse()
-            }
-        }
-    }
-
-    @Test
-    @EnableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
-    fun isDoubleTapEnabled_flagEnabledAndConfigDisabled_alwaysFalse() {
-        testScope.runTest {
-            secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, true)
-            overrideResource(com.android.internal.R.bool.config_supportDoubleTapSleep, false)
-            createUnderTest()
-
-            val isEnabled = collectLastValue(underTest.isDoubleTapHandlingEnabled)
-            KeyguardState.entries.forEach { keyguardState ->
-                setUpState(keyguardState = keyguardState)
-
-                assertThat(isEnabled()).isFalse()
-            }
-        }
-    }
-
-    @Test
-    @EnableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
     fun isDoubleTapEnabled_quickSettingsVisible_alwaysFalse() {
         testScope.runTest {
             secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, true)
@@ -393,7 +353,6 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
     fun onDoubleClick_doubleTapEnabled() {
         testScope.runTest {
             secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, true)
@@ -408,7 +367,6 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_DOUBLE_TAP_TO_SLEEP)
     fun onDoubleClick_doubleTapDisabled() {
         testScope.runTest {
             secureSettingsRepository.setBoolean(Settings.Secure.DOUBLE_TAP_TO_SLEEP, false)

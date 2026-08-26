@@ -30,7 +30,6 @@ import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.internal.logging.UiEvent
 import com.android.internal.logging.UiEventLogger
-import com.android.systemui.Flags.doubleTapToSleep
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -128,30 +127,26 @@ constructor(
 
     /** Whether the double tap handling handling feature should be enabled. */
     val isDoubleTapHandlingEnabled: StateFlow<Boolean> =
-        if (isDoubleTapFeatureEnabled()) {
-                combine(
-                    transitionInteractor.transitionValue(KeyguardState.LOCKSCREEN),
-                    repository.isQuickSettingsVisible,
-                    isDoubleTapSettingEnabled(),
-                    secureLockDeviceInteractor.get().isSecureLockDeviceEnabled,
-                ) {
-                    isFullyTransitionedToLockScreen,
-                    isQuickSettingsVisible,
-                    isDoubleTapSettingEnabled,
-                    isSecureLockDeviceEnabled ->
-                    isFullyTransitionedToLockScreen == 1f &&
-                        !isQuickSettingsVisible &&
-                        isDoubleTapSettingEnabled &&
-                        !isSecureLockDeviceEnabled
-                }
-            } else {
-                flowOf(false)
-            }
-            .stateIn(
-                scope = scope,
-                started = SharingStarted.WhileSubscribed(),
-                initialValue = false,
-            )
+        combine(
+            transitionInteractor.transitionValue(KeyguardState.LOCKSCREEN),
+            repository.isQuickSettingsVisible,
+            isDoubleTapSettingEnabled(),
+            secureLockDeviceInteractor.get().isSecureLockDeviceEnabled,
+        ) {
+            isFullyTransitionedToLockScreen,
+            isQuickSettingsVisible,
+            isDoubleTapSettingEnabled,
+            isSecureLockDeviceEnabled ->
+            isFullyTransitionedToLockScreen == 1f &&
+                !isQuickSettingsVisible &&
+                isDoubleTapSettingEnabled &&
+                !isSecureLockDeviceEnabled
+        }
+        .stateIn(
+            scope = scope,
+            started = SharingStarted.WhileSubscribed(),
+            initialValue = false,
+        )
 
     /* Cache value of `isAnyPointerDeviceConnected` so it can
      * be easily checked. */
@@ -283,11 +278,6 @@ constructor(
 
     private fun isLongPressFeatureEnabled(): Boolean {
         return context.resources.getBoolean(R.bool.long_press_keyguard_customize_lockscreen_enabled)
-    }
-
-    private fun isDoubleTapFeatureEnabled(): Boolean {
-        return doubleTapToSleep() &&
-            context.resources.getBoolean(com.android.internal.R.bool.config_supportDoubleTapSleep)
     }
 
     /** Updates application state to ask to show the menu. */

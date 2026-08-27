@@ -19,10 +19,13 @@ package com.android.systemui.statusbar.pipeline.wifi.ui.compose
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.ActivityIndicators
 import com.android.systemui.statusbar.shared.ui.compose.StatusBarIcon
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconViewModel
@@ -31,6 +34,7 @@ import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatu
 @Composable
 fun WifiIcon(viewModel: SystemStatusIconViewModel.Wifi, modifier: Modifier = Modifier) {
     val icon = viewModel.icon ?: return
+    val standardIcon = viewModel.wifiStandardIcon
     Box(modifier = modifier) {
         if (viewModel.isActivityContainerVisible) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -41,10 +45,27 @@ fun WifiIcon(viewModel: SystemStatusIconViewModel.Wifi, modifier: Modifier = Mod
                         color = LocalContentColor.current,
                     )
                 }
-                StatusBarIcon(icon = icon)
+                WifiSignalWithStandard(icon = icon, standardIcon = standardIcon)
             }
         } else {
-            StatusBarIcon(icon = icon)
+            WifiSignalWithStandard(icon = icon, standardIcon = standardIcon)
+        }
+    }
+}
+
+@Composable
+private fun WifiSignalWithStandard(
+    icon: Icon,
+    standardIcon: Icon?,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        StatusBarIcon(icon = icon)
+        standardIcon?.let {
+            StatusBarIcon(
+                icon = it,
+                modifier = Modifier.offset(y = 1.5.dp),
+            )
         }
     }
 }

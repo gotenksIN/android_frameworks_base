@@ -21,6 +21,8 @@
     android:id="@+id/wifi_combo"
     android:layout_width="wrap_content"
     android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:gravity="center_vertical" >
 
     <include layout="@layout/status_bar_wifi_group_inner" />

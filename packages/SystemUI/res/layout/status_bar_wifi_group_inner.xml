@@ -24,6 +24,8 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:gravity="center_vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:layout_marginStart="2.5sp"
     >
 
@@ -61,15 +63,19 @@
             android:id="@+id/wifi_combo"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:gravity="center_vertical" >
             <com.android.systemui.statusbar.AlphaOptimizedImageView
                 android:id="@+id/wifi_signal"
                 android:layout_height="@dimen/status_bar_wifi_signal_size"
                 android:layout_width="@dimen/status_bar_wifi_signal_size" />
-            <com.android.systemui.statusbar.WifiStandardImageView
+            <com.android.systemui.statusbar.AlphaOptimizedImageView
                 android:id="@+id/wifi_standard"
                 android:layout_height="@dimen/status_bar_wifi_signal_size"
-                android:layout_width="@dimen/status_bar_wifi_signal_size" />
+                android:layout_width="@dimen/status_bar_wifi_signal_size"
+                android:translationY="1.5dp"
+                android:visibility="gone" />
         </FrameLayout>
 
         <View

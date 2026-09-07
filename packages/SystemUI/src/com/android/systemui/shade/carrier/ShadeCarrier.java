@@ -45,6 +45,11 @@ public class ShadeCarrier extends LinearLayout {
     private ImageView mMobileSignal;
     private ImageView mMobileRoaming;
     private ModernShadeCarrierGroupMobileView mModernMobileView;
+    private boolean mHasModernMobileViewStyleAndTint;
+    @StyleRes
+    private int mModernMobileViewStyleResId;
+    private int mModernMobileViewFgColor;
+    private int mModernMobileViewBgColor;
     private View mSpacer;
     @Nullable
     private CellSignalState mLastSignalState;
@@ -93,6 +98,10 @@ public class ShadeCarrier extends LinearLayout {
         mSpacer.setVisibility(View.GONE);
         mCarrierText.setVisibility(View.GONE);
         addView(mobileView);
+        if (mHasModernMobileViewStyleAndTint) {
+            mobileView.setStyleAndTint(mModernMobileViewStyleResId, mModernMobileViewFgColor,
+                    mModernMobileViewBgColor);
+        }
     }
 
     /**
@@ -163,6 +172,10 @@ public class ShadeCarrier extends LinearLayout {
     /** Update the text appearance of the text and the tint of the icon */
     public void updateTextAppearanceAndTint(@StyleRes int resId, int fgColor, int bgColor) {
         mCarrierText.setTextAppearance(resId);
+        mHasModernMobileViewStyleAndTint = true;
+        mModernMobileViewStyleResId = resId;
+        mModernMobileViewFgColor = fgColor;
+        mModernMobileViewBgColor = bgColor;
         if (mModernMobileView != null) {
             mModernMobileView.setStyleAndTint(resId, fgColor, bgColor);
         }

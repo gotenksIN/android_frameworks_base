@@ -243,7 +243,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     @NonNull
     private final DisplayRotationCoordinator mDisplayRotationCoordinator;
 
-    public static boolean mPerfSendTapHint = false;
     public static boolean mIsPerfBoostAcquired = false;
     public static int mPerfHandle = -1;
     public BoostFramework mPerfBoost = null;
@@ -2498,7 +2497,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                        r.packageName, -1, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
-                   mPerfSendTapHint = true;
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                        r.packageName, -1, BoostFramework.Launch.BOOST_V2, 2, pkgType, wpcPid);
                    if (wpcPid != -1) {
@@ -2521,7 +2519,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                } else {
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                                        -1, BoostFramework.Launch.BOOST_V1);
-                   mPerfSendTapHint = true;
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                        r.packageName, -1, BoostFramework.Launch.BOOST_V2);
                    if (wpcPid != -1) {

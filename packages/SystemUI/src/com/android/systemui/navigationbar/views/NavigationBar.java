@@ -74,6 +74,9 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.RemoteException;
+// QTI_BEGIN
+import android.os.SystemProperties;
+// QTI_END
 import android.os.Trace;
 import android.provider.DeviceConfig;
 import android.telecom.TelecomManager;
@@ -195,6 +198,10 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     private static final int LOCK_TO_APP_GESTURE_TOLERANCE = 200;
     private static final long AUTODIM_TIMEOUT_MS = 2250;
     private static final float QUICKSTEP_TOUCH_SLOP_RATIO_TWO_BUTTON = 3f;
+    // QTI_BEGIN
+    private static final boolean QTI_RENDER_SYSUI_AS_SRGB =
+            SystemProperties.getBoolean("vendor.display.render_sysui_as_srgb", false);
+    // QTI_END
 
     private final Context mContext;
     private final Bundle mSavedState;
@@ -1848,6 +1855,12 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         lp.accessibilityTitle = userContext.getString(R.string.nav_bar);
         lp.privateFlags |= WindowManager.LayoutParams.PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC
                 | WindowManager.LayoutParams.PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT;
+        // QTI_BEGIN
+        if (QTI_RENDER_SYSUI_AS_SRGB) {
+            // Render the nav bar in sRGB instead of treating it as colorspace-agnostic
+            lp.privateFlags &= ~WindowManager.LayoutParams.PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC;
+        }
+        // QTI_END
         lp.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         lp.windowAnimations = 0;
         lp.setTitle("NavigationBar" + userContext.getDisplayId());

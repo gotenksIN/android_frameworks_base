@@ -96,6 +96,7 @@ import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTE
 import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_SUB_PANEL;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_PRESENTATION;
@@ -498,7 +499,9 @@ public class WindowManagerService extends IWindowManager.Stub
     private final DisplayAreaPolicy.Provider mDisplayAreaPolicyProvider;
 
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-    private BoostFramework mPerf = null;
+    private BoostFramework mPerf = new BoostFramework();
+    @GuardedBy("mGlobalLock")
+    private boolean mInMultiWindowLikeMode;
 
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     final private KeyguardDisableHandler mKeyguardDisableHandler;
@@ -2412,6 +2415,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         dc.getInputMonitor().updateInputWindowsLw(true /*force*/);
+        notifyMultiWindowModeChangedIfNeeded();
     }
 
     private void updateHiddenWhileSuspendedState(ArraySet<String> packages, boolean suspended) {
@@ -2959,6 +2963,9 @@ public class WindowManagerService extends IWindowManager.Stub
             win.mInRelayout = false;
 
             final boolean winVisibleChanged = win.isVisible() != wasVisible;
+            if (winVisibleChanged) {
+                notifyMultiWindowModeChangedIfNeededLocked();
+            }
             if (win.isImeOverlayLayeringTarget() && winVisibleChanged) {
                 dispatchImeOverlayLayeringTargetVisibilityChanged(client.asBinder(),
                         win.mAttrs.type, win.isVisible(), false /* removed */, win.getDisplayId());
@@ -8125,6 +8132,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 mDisplayWindowSettings.setWindowingModeLocked(displayContent, mode);
 
                 displayContent.reconfigureDisplayLocked();
+                notifyMultiWindowModeChangedIfNeededLocked();
 
                 if (lastWindowingMode != displayContent.getWindowingMode()) {
                     // reconfigure won't detect this change in isolation because the windowing mode
@@ -11539,6 +11547,62 @@ public class WindowManagerService extends IWindowManager.Stub
                         uid);
             }
         }
+    }
+
+    private void notifyMultiWindowModeChangedIfNeeded() {
+        synchronized(mGlobalLock) {
+            notifyMultiWindowModeChangedIfNeededLocked();
+        }
+    }
+
+    @GuardedBy("mGlobalLock")
+    private void notifyMultiWindowModeChangedIfNeededLocked() {
+        final boolean inMultiWindowLikeMode = mRoot.forAllWindows(w -> {
+            if (!w.isVisibleNow()) {
+                return false;
+            }
+
+            if (w.mAttrs.type == TYPE_APPLICATION_OVERLAY) {
+                return true;
+            }
+
+             // Check visible app windows.
+            if (!w.isActivityWindow()) {
+                return false;
+            }
+
+            final Task task = w.getTask();
+            if (task == null) {
+                return false;
+            }
+
+            final int windowingMode = task.getWindowingMode();
+            if (windowingMode != WindowConfiguration.WINDOWING_MODE_UNDEFINED
+                    && windowingMode != WindowConfiguration.WINDOWING_MODE_FULLSCREEN) {
+                return true;
+            }
+            return false;
+        }, true /* traverseTopToBottom */);
+
+        if (mInMultiWindowLikeMode == inMultiWindowLikeMode) {
+            return;
+        }
+
+        mInMultiWindowLikeMode = inMultiWindowLikeMode;
+        final boolean capturedMode = inMultiWindowLikeMode;
+        final WindowProcessController topApp = mAtmService.mTopApp;
+        final String pkgName = (topApp != null && topApp.mInfo != null
+                && topApp.mInfo.packageName != null)
+                ? topApp.mInfo.packageName : "android";
+        mH.post(() -> {
+            int mode = capturedMode
+                    ? BoostFramework.ActivityWindowMode.MULTI_WINDOW
+                    : BoostFramework.ActivityWindowMode.STANDARD;
+            if (mPerf != null) {
+                mPerf.perfEvent(BoostFramework.VENDOR_EVENT_DEVICE_WINDOW_MODE_UPDATE,
+                                pkgName, 1, mode);
+            }
+        });
     }
 
     /**

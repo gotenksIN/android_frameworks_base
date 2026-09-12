@@ -34,6 +34,9 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Binder;
 import android.os.RemoteException;
+// QTI_BEGIN
+import android.os.SystemProperties;
+// QTI_END
 import android.os.Trace;
 import android.util.Log;
 import android.view.Display;
@@ -75,6 +78,10 @@ import java.util.Optional;
 public class StatusBarWindowControllerImpl implements StatusBarWindowController {
     private static final String TAG = "StatusBarWindowController";
     private static final boolean DEBUG = false;
+    // QTI_BEGIN
+    private static final boolean QTI_RENDER_SYSUI_AS_SRGB =
+            SystemProperties.getBoolean("vendor.display.render_sysui_as_srgb", false);
+    // QTI_END
 
     private final Context mContext;
     private final WindowManager mWindowManager;
@@ -268,6 +275,14 @@ public class StatusBarWindowControllerImpl implements StatusBarWindowController 
                         | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS,
                 PixelFormat.TRANSLUCENT);
         lp.privateFlags |= PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC;
+
+        // QTI_BEGIN
+        if (QTI_RENDER_SYSUI_AS_SRGB) {
+            // Render the status bar in sRGB instead of treating it as colorspace-agnostic
+            lp.privateFlags &= ~PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC;
+        }
+        // QTI_END
+
         lp.token = new Binder();
         lp.gravity = Gravity.TOP;
         lp.setFitInsetsTypes(0 /* types */);

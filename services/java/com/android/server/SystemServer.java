@@ -2924,15 +2924,13 @@ public final class SystemServer implements Dumpable {
             }
 
             // Start this service after all biometric sensor services are started.
-            if (!QcomLowRamConfig.TARGET_IS_QLMD) {
-                t.traceBegin("StartBiometricService");
-                mSystemServiceManager.startService(BiometricService.class);
-                t.traceEnd();
+            t.traceBegin("StartBiometricService");
+            mSystemServiceManager.startService(BiometricService.class);
+            t.traceEnd();
 
-                t.traceBegin("StartAuthService");
-                mSystemServiceManager.startService(AuthService.class);
-                t.traceEnd();
-            }
+            t.traceBegin("StartAuthService");
+            mSystemServiceManager.startService(AuthService.class);
+            t.traceEnd();
 
             if (!isWatch && !isTv && !isAutomotive) {
                 if (android.security.Flags.secureLockdown()) {
@@ -3284,11 +3282,9 @@ public final class SystemServer implements Dumpable {
         }
 
         // NOTE: ClipboardService depends on ContentCapture and Autofill
-        if (!QcomLowRamConfig.TARGET_IS_QLMD) {
-            t.traceBegin("StartClipboardService");
-            mSystemServiceManager.startService(ClipboardService.class);
-            t.traceEnd();
-        }
+        t.traceBegin("StartClipboardService");
+        mSystemServiceManager.startService(ClipboardService.class);
+        t.traceEnd();
 
         if (!isTv && !isWatch) {
             // Selection toolbar service

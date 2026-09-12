@@ -728,9 +728,9 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
                         + " to " + mNumPhones);
             }
             mCallState = copyOf(mCallState, mNumPhones);
-            mDataActivity = copyOf(mCallState, mNumPhones);
-            mDataConnectionState = copyOf(mCallState, mNumPhones);
-            mDataConnectionNetworkType = copyOf(mCallState, mNumPhones);
+            mDataActivity = copyOf(mDataActivity, mNumPhones);
+            mDataConnectionState = copyOf(mDataConnectionState, mNumPhones);
+            mDataConnectionNetworkType = copyOf(mDataConnectionNetworkType, mNumPhones);
             mCallIncomingNumber = copyOf(mCallIncomingNumber, mNumPhones);
             mServiceState = copyOf(mServiceState, mNumPhones);
             mVoiceActivationState = copyOf(mVoiceActivationState, mNumPhones);
@@ -3384,7 +3384,8 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
 
         synchronized (mRecords) {
             if (!validatePhoneId(phoneId)) {
-                throw new IllegalArgumentException("Invalid slot index: " + phoneId);
+                loge("Invalid phone ID " + phoneId);
+                return;
             }
             Record r = add(
                     callback.asBinder(), Binder.getCallingUid(), Binder.getCallingPid(), false);
@@ -3452,7 +3453,8 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
 
         synchronized (mRecords) {
             if (!validatePhoneId(phoneId)) {
-                throw new IllegalArgumentException("Invalid slot index: " + phoneId);
+                loge("Invalid phone ID " + phoneId);
+                return;
             }
             mCarrierPrivilegeStates.set(
                     phoneId, new Pair<>(privilegedPackageNames, privilegedUids));
@@ -3556,7 +3558,8 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
     public void notifyCarrierConfigChanged(int phoneId, int subId, int carrierId,
             int specificCarrierId) {
         if (!validatePhoneId(phoneId)) {
-            throw new IllegalArgumentException("Invalid phoneId: " + phoneId);
+            loge("Invalid phone ID " + phoneId + " for " + subId);
+            return;
         }
         if (!checkNotifyPermission("notifyCarrierConfigChanged")) {
             loge("Caller has no notify permission!");
@@ -4010,6 +4013,7 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
         synchronized (mRecords) {
             int phoneId = getPhoneIdFromSubId(subId);
             if (!validatePhoneId(phoneId)) {
+                loge("Invalid phone ID " + phoneId);
                 return;
             }
             mIsPurchaseModeActive[phoneId] = isEnabled;
@@ -4204,13 +4208,6 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
                     return;
                 }
                 mNetworkSecurityEvents.set(phoneId, events);
-                if (events.isEmpty()) {
-                    loge(
-                            "NetworkSecurityEvent is empty, subId=" + subId
-                            + ", phoneId=" + phoneId);
-                    // Listeners shouldn't be updated for empty events.
-                    return;
-                }
 
                 for (Record r : mRecords) {
                     if (r.matchTelephonyCallbackEvent(
@@ -4785,8 +4782,10 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
     }
 
     private boolean validatePhoneId(int phoneId) {
-        // Call getActiveModemCount to get the latest value instead of depending on mNumPhone
-        boolean valid = (phoneId >= 0) && (phoneId < getTelephonyManager().getActiveModemCount());
+        // Use mNumPhones (kept in sync with the arrays under synchronized(mRecords)) rather than
+        // calling getActiveModemCount() live. During the SSSS->DSDS transition window, modem
+        // count may already return 2 while the arrays are still length=1, causing AIOOBE.
+        boolean valid = (phoneId >= 0) && (phoneId < mNumPhones);
         if (VDBG) log("validatePhoneId: " + valid);
         return valid;
     }

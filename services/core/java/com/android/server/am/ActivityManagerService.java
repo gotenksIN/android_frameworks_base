@@ -4199,6 +4199,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+            } else if (mUxPerf != null) {
+                mUxPerf.perfEvent(BoostFramework.VENDOR_EVENT_KILL_ABNORMAL, app.processName, 2, 0, pid);
             }
 
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"

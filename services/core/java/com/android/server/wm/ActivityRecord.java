@@ -6916,7 +6916,7 @@ public final class ActivityRecord extends WindowToken {
     void onWindowsVisible() {
         if (mPerf != null && mPerf.shouldUseUiPerf(mWmService.mContext, packageName)
                           && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
-
+            mPerf.handleUiPerfFullTest(mWmService.mContext, info.name);
             int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
             if (hint != -1) {
                 int timeout_ms = 5 * 60 * 1000;

@@ -223,7 +223,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     private static final int LAUNCH_TIMEOUT = 10 * 1000 * Build.HW_TIMEOUT_MULTIPLIER;
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
-    public static boolean mPerfSendTapHint = false;
     public static boolean mIsPerfBoostAcquired = false;
     public static int mPerfHandle = -1;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -2325,7 +2324,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
 // QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
                            r.packageName, -1, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
-                   mPerfSendTapHint = true;
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                            r.packageName, -1, BoostFramework.Launch.BOOST_V2, 2, pkgType, wpcPid);
                    if (wpcPid != -1) {
@@ -2347,7 +2345,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                } else {
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                                        -1, BoostFramework.Launch.BOOST_V1);
-                   mPerfSendTapHint = true;
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                        -1, BoostFramework.Launch.BOOST_V2);
                    if (wpcPid != -1) {

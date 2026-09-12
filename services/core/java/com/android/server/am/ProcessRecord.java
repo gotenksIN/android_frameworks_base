@@ -1461,6 +1461,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                     BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
 // QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             } else {
+                if (mService.mUxPerf != null) {
+                    mService.mUxPerf.perfEvent(
+                        BoostFramework.VENDOR_EVENT_KILL_ABNORMAL,this.processName, 2, 0,getPid());
+                }
                 mService.mForceStopKill = false;
 // QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"

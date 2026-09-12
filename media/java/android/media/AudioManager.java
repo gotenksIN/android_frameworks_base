@@ -9054,11 +9054,24 @@ public class AudioManager {
         }
 
         for (Integer format : formatsList) {
-            int btLeAudioCodec = AudioSystem.audioFormatToBluetoothLeAudioSourceCodec(format);
-            if (btLeAudioCodec != BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_INVALID) {
-                leAudioCodecConfigList.add(new BluetoothLeAudioCodecConfig.Builder()
-                                            .setCodecType(btLeAudioCodec)
-                                            .build());
+            if (com.android.bluetooth.flags.Flags.leaudioCodecIdSupport()) {
+                // Use codec ID only — setCodecId() infers mCodecType automatically.
+                // Vendor codecs (AptxLe, AptxLeX) arrive from the stack as
+                // SOURCE_CODEC_TYPE_VENDOR_SPECIFIC; setCodecId() is the only
+                // way to distinguish them.
+                long codecId = AudioSystem.audioFormatToBluetoothLeAudioCodecId(format);
+                if (codecId != -1L) {
+                    leAudioCodecConfigList.add(new BluetoothLeAudioCodecConfig.Builder()
+                                                .setCodecId(codecId)
+                                                .build());
+                }
+            } else {
+                int btLeAudioCodec = AudioSystem.audioFormatToBluetoothLeAudioSourceCodec(format);
+                if (btLeAudioCodec != BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_INVALID) {
+                    leAudioCodecConfigList.add(new BluetoothLeAudioCodecConfig.Builder()
+                                                .setCodecType(btLeAudioCodec)
+                                                .build());
+                }
             }
         }
         return leAudioCodecConfigList;

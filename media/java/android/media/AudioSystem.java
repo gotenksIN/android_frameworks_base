@@ -287,6 +287,20 @@ public class AudioSystem
     public static final int AUDIO_FORMAT_APTX_TWSP      = 0x2A000000;
     /** @hide */
     public static final int VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA       = 0x30000000;
+    /** @hide */
+    public static final int AUDIO_FORMAT_APTX_ADAPTIVE_R4            = 0x31000000;
+
+    // 40-bit Bluetooth ASCS codec IDs for LE audio (Coding_Format | Company_ID | Vendor_Codec_ID)
+    // Bit layout from LeAudioCodecId::getCodecIdRaw():
+    //   bits [7:0]  = coding_format
+    //   bits [23:8] = vendor_company_id
+    //   bits [39:24]= vendor_codec_id
+    private static final long BLUETOOTH_LE_AUDIO_CODEC_ID_LC3              = 0x0000_0000_06L;
+    private static final long BLUETOOTH_LE_AUDIO_CODEC_ID_OPUS             = 0x0001_00e0_ffL;
+    // Qualcomm vendor: coding_format=0xFF, company_id=0x000A, vendor_codec_id=0x0001 (AptxLe/R3)
+    private static final long BLUETOOTH_LE_AUDIO_CODEC_ID_APTX_ADAPTIVE_LE = 0x0001_000a_ffL;
+    // Qualcomm vendor: coding_format=0xFF, company_id=0x000A, vendor_codec_id=0x01AD (AptxLeX/R4)
+    private static final long BLUETOOTH_LE_AUDIO_CODEC_ID_APTX_ADAPTIVE_R4 = 0x01ad_000a_ffL;
 
     /** @hide */
     @IntDef(
@@ -330,7 +344,6 @@ public class AudioSystem
 
     //TODO b/396350294 : remove when BluetoothLeCodecConfig.SOURCE_CODEC_TYPE_OPUS_HI_RES is public
     private static final int BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES = 2;
-
     //TODO b/415848542: replace with BluetoothCodecType.CODEC_ID_LHDC
     //Remove with a2dpCreateCodecTypeFromIdApi flag
     private static final int BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC = 9;
@@ -411,6 +424,26 @@ public class AudioSystem
                 Log.e(TAG, "Unknown audio format 0x" + Integer.toHexString(audioFormat)
                         + " for conversion to BT LE audio codec");
                 return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_INVALID;
+        }
+    }
+
+    /**
+     * @hide
+     * Convert audio format enum value to the 40-bit Bluetooth ASCS codec ID.
+     * Returns -1 if the format is unknown or has no codec ID representation.
+     */
+    public static long audioFormatToBluetoothLeAudioCodecId(
+            @AudioFormatNativeEnumForBtLeAudioCodec int audioFormat) {
+        switch (audioFormat) {
+            case AUDIO_FORMAT_LC3:                   return BLUETOOTH_LE_AUDIO_CODEC_ID_LC3;
+            case AUDIO_FORMAT_OPUS:                  return BLUETOOTH_LE_AUDIO_CODEC_ID_OPUS;
+            case AUDIO_FORMAT_OPUS_HI_RES:           return BLUETOOTH_LE_AUDIO_CODEC_ID_OPUS;
+            case VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA: return BLUETOOTH_LE_AUDIO_CODEC_ID_APTX_ADAPTIVE_LE;
+            case AUDIO_FORMAT_APTX_ADAPTIVE_R4:      return BLUETOOTH_LE_AUDIO_CODEC_ID_APTX_ADAPTIVE_R4;
+            default:
+                Log.e(TAG, "Unknown audio format 0x" + Integer.toHexString(audioFormat)
+                        + " for conversion to BT LE audio codec ID");
+                return -1L;
         }
     }
 

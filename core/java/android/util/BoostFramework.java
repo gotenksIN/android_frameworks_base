@@ -42,6 +42,8 @@ import android.graphics.BLASTBufferQueue;
 import android.hardware.display.DisplayManager;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.os.SystemProperties;
 import android.provider.Settings;
@@ -57,6 +59,10 @@ import java.lang.reflect.Method;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+
 import android.view.Display;
 
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
@@ -91,6 +97,7 @@ public class BoostFramework {
     public static final String KEY_IGNORE_PKGS = "UI_PERF_IGNORE_PKGS";
     public static final String KEY_LOW_FPS_PREFER = "UI_PERF_LOW_FPS_PREFER";
     public static final String KEY_FPS_BY_DEFAULT = "UI_PERF_FPS_BY_DEFAULT";
+    public static final String KEY_FULL_SEQUENCE = "UI_FULL_SEQUENCE";
     //ui perf mode controller in android space
     public static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
     public static final String UI_LEGACY_PERF_PROP = "sys.ui.legacy_perfmode.enable";
@@ -203,11 +210,15 @@ public class BoostFramework {
     public static final int VENDOR_HINT_PKG_INSTALL = 0x000010A3;
     public static final int VENDOR_HINT_PKG_UNINSTALL = 0x000010A4;
 
+    public static final int VENDOR_HINT_BM_CPU_CORECTL_L = 0x000010B1;
+    public static final int VENDOR_HINT_BM_THP_UPDATE = 0x000010B2;
     //perf opcodes
     public static final int MPCTLV3_GPU_IS_APP_FG = 0X42820000;
     public static final int MPCTLV3_GPU_IS_APP_BG = 0X42824000;
 
     public static final int VENDOR_EVENT_ACTIVITY_WINDOW_MODE_UPDATE = 0x00001066;
+    public static final int VENDOR_EVENT_KILL_ABNORMAL = 0x00001068;
+    public static final int VENDOR_EVENT_DEVICE_WINDOW_MODE_UPDATE = 0x00001069;
 
     public class ActivityWindowMode {
         public static int STANDARD = 0;
@@ -1055,6 +1066,13 @@ public class BoostFramework {
         private static String UI_PERF_ENABLE = "sys.ui.perfmode.enable";
         private static String UI_PERF_ENHANCEMENT = "ro.vendor.ui.perfmode_enhance";
         private static String UI_PERF_DYNAMIC_FPS = "sys.ui.perfmode_dynamic_fps";
+        private static String UI_PERF_SCENE_DETECT_ENABLE =
+                        "ro.vendor.perfmode_scene_detect.enable";
+        private static String UI_PERF_CPU_CORE_L_CONFIG =
+                        "ro.vendor.perfmode_scene_detect.cpu_core_l_config";
+        private static String UI_PERF_THP_16K_CONFIG =
+                        "ro.vendor.perfmode_scene_detect.thp_16k_config";
+        private static final int TEST_START_ACTIVITY = 0;
         private Context mContext;
         private String[] mUIPerfProcs = null;
         private String[] mLegacyUIPerfProcs = null;
@@ -1065,6 +1083,7 @@ public class BoostFramework {
         private String[] mUIPerfCpuAggressive = null;
         private String[] mUIPerfLowFpsActivities = null;
         private String[] mUIPerfDefFpsActivities = null;
+        private String[] mUIPerfFullSequenceActivities = null;
         private boolean mUiPerfInited = false;
         private UiPerfProcsObserver observer = null;
         private boolean mUIPerfEnhance = false;
@@ -1075,6 +1094,16 @@ public class BoostFramework {
         private Float mDefaultMin = null;
         private Float mDefaultPeak = null;
         private Float mCurrentRefresh = null;
+        private boolean mSceneDetectEnabled = false;
+        private HandlerTaskScheduler mOptTaskScheduler = new HandlerTaskScheduler();
+        private HandlerTaskScheduler mCpuCheckScheduler = new HandlerTaskScheduler();
+        private SceneDetectConfig mCpuCoreLSceneDetectConfig = new SceneDetectConfig();
+        private SceneDetectConfig mTHPSceneDetectConfig = new SceneDetectConfig();
+        private volatile boolean mInSceneDetecting = false;
+        private volatile int mNextActivityStage = 0;
+        private volatile String mPreviousActivityName = "";
+        private PerfHintExecutor mTHPHintExecutor = new PerfHintExecutor(mPerf);
+        private PerfHintExecutor mCpuCoreLHintExecutor = new PerfHintExecutor(mPerf);
 
         private class UiPerfProcsObserver extends ContentObserver {
             private Context mContext = null;
@@ -1136,6 +1165,13 @@ public class BoostFramework {
                         mUIPerfEnhance =
                             Boolean.parseBoolean(mPerf.perfGetProp(UI_PERF_ENHANCEMENT,
                                                                    "false"));
+                        mSceneDetectEnabled =
+                            Boolean.parseBoolean(mPerf.perfGetProp(UI_PERF_SCENE_DETECT_ENABLE,
+                                                                    "false"));
+                        mCpuCoreLSceneDetectConfig.loadConfig(mPerf.perfGetProp(
+                                                UI_PERF_CPU_CORE_L_CONFIG, ""));
+                        mTHPSceneDetectConfig.loadConfig(mPerf.perfGetProp(
+                                                UI_PERF_THP_16K_CONFIG, ""));
                     }
                 }
             } catch (Exception e) {
@@ -1201,6 +1237,7 @@ public class BoostFramework {
                                      KEY_IGNORE_PKGS);
                     if (str != null && !str.isEmpty()) {
                         mIgnoreProcs = str.split(";");
+                    }
                     str = Settings.Global.getString(mContext.getContentResolver(),
                                      KEY_LOW_FPS_PREFER);
                     if (str != null && !str.isEmpty()) {
@@ -1211,6 +1248,10 @@ public class BoostFramework {
                     if (str != null && !str.isEmpty()) {
                         mUIPerfDefFpsActivities = str.split(";");
                     }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_FULL_SEQUENCE);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfFullSequenceActivities = str.split(";");
                     }
                 }
             } catch (Exception e) {
@@ -1219,6 +1260,8 @@ public class BoostFramework {
 
         /** @hide */
         public void clean() {
+            mOptTaskScheduler.cancel();
+            mCpuCheckScheduler.cancel();
             if (mContext != null && observer != null) {
                 try {
                     mContext.getContentResolver().unregisterContentObserver(observer);
@@ -1373,6 +1416,89 @@ public class BoostFramework {
             }
             return hint;
         }
+
+        private void handleUiPerfFullTest (String activityName) {
+            if (!mSceneDetectEnabled) {
+                return;
+            }
+            synchronized (this) {
+                if (activityName == null || activityName.isEmpty()) {
+                    if (mInSceneDetecting) {
+                        exitFullTest();
+                    }
+                    return;
+                }
+                if (!activityName.equals(mPreviousActivityName)) {
+                    if ((mUIPerfFullSequenceActivities != null) &&
+                        (mNextActivityStage < mUIPerfFullSequenceActivities.length) &&
+                        (activityName.equals(mUIPerfFullSequenceActivities[mNextActivityStage]))) {
+                        if (mNextActivityStage == TEST_START_ACTIVITY) {
+                            mInSceneDetecting = true;
+                        }
+                        if (mNextActivityStage == mCpuCoreLSceneDetectConfig.activitySequence) {
+                            mOptTaskScheduler.schedule(
+                                () -> checkCpuWorkloadForOpts(mCpuCoreLSceneDetectConfig.waitTime,
+                                                    mCpuCoreLSceneDetectConfig.workloadThreshold,
+                                                    VENDOR_HINT_BM_CPU_CORECTL_L,
+                                                    mCpuCoreLSceneDetectConfig.hintDuration),
+                                mCpuCoreLSceneDetectConfig.timer
+                            );
+                        }
+                        if (mNextActivityStage == mTHPSceneDetectConfig.activitySequence) {
+                            mTHPHintExecutor.acquire(VENDOR_HINT_BM_THP_UPDATE,
+                                                    "android",
+                                                    mTHPSceneDetectConfig.hintDuration);
+                        }
+                        mPreviousActivityName = activityName;
+                        mNextActivityStage++;
+                    } else {
+                        if (mInSceneDetecting) {
+                            exitFullTest();
+                        }
+                    }
+                }
+            }
+        }
+
+        private void checkCpuWorkloadForOpts(int duration, int threshold,
+                                            int hint, int hintDuration) {
+            CpuWorkloadReader.CpuSnapshot first = CpuWorkloadReader.readSnapshot();
+            if (first == null) return;
+            scheduleNextCpuCheck(
+                System.currentTimeMillis() + duration, threshold, hint, hintDuration, first);
+        }
+
+        private void scheduleNextCpuCheck(long deadline, int threshold,
+                                        int hint, int hintDuration,
+                                        CpuWorkloadReader.CpuSnapshot prev) {
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) return;
+
+            mCpuCheckScheduler.schedule(() -> {
+                CpuWorkloadReader.CpuSnapshot curr = CpuWorkloadReader.readSnapshot();
+                int workload = curr != null ? CpuWorkloadReader.computeWorkload(prev, curr) : 0;
+                synchronized (UIPerfMode.this) {
+                    if (!mInSceneDetecting) return;
+                    if (curr != null && workload > threshold) {
+                        mCpuCoreLHintExecutor.acquire(hint, "android", hintDuration);
+                        return;
+                    }
+                    scheduleNextCpuCheck(deadline, threshold, hint, hintDuration,
+                            curr != null ? curr : prev);
+                }
+            }, Math.min(500, remaining));
+        }
+
+        private void exitFullTest() {
+            mInSceneDetecting = false;
+            mNextActivityStage = 0;
+            mOptTaskScheduler.cancel();
+            mCpuCheckScheduler.cancel();
+            mPreviousActivityName = "";
+            mTHPHintExecutor.release();
+            mCpuCoreLHintExecutor.release();
+        }
+
         private void usePeakDisplayRefreshRate() {
             if (mContext == null) {
                 return;
@@ -1482,6 +1608,44 @@ public class BoostFramework {
                 }
             }
         }
+
+        private class SceneDetectConfig {
+            public int activitySequence;
+            public int waitTime;
+            public int workloadThreshold;
+            public int timer;
+            public int hintDuration;
+
+            SceneDetectConfig() {
+                activitySequence = -1;
+                waitTime = 0;
+                workloadThreshold = 0;
+                timer = 0;
+                hintDuration = 0;
+            }
+
+            public void loadConfig(String config) {
+                if (config == null || config.isEmpty()) {
+                    return;
+                }
+                int[] vals = new int[5];
+                String[] parts = config.split("_");
+                for (int i = 0; i < vals.length; i++) {
+                    if (i < parts.length) {
+                        try {
+                            vals[i] = Integer.parseInt(parts[i]);
+                        } catch (NumberFormatException e) {
+                            vals[i] = -1;
+                        }
+                    }
+                }
+                activitySequence = vals[0];
+                waitTime = vals[1];
+                workloadThreshold = vals[2];
+                timer = vals[3];
+                hintDuration = vals[4];
+            }
+        }
     }
 
     public void pickDisplayRefreshRate(Context context, String activityName) {
@@ -1536,12 +1700,148 @@ public class BoostFramework {
     }
 
     /** @hide */
+    public void handleUiPerfFullTest(Context context, String activityName) {
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            uiPerf.handleUiPerfFullTest(activityName);
+        }
+    }
+
+    /** @hide */
     public static boolean shouldUseUiPerf() {
         if (SystemProperties.getInt(UI_PERF_PROP, 0) == Process.myPid()) {
             return true;
         }
         return false;
     }
+
+    /** @hide */
+    private static class CpuWorkloadReader {
+        private static final String PROC_STAT = "/proc/stat";
+        private static final int TICK_FIELDS = 8;
+        private static final int NUM_CORES = 8;
+
+        /** @hide */
+        public static class CpuSnapshot {
+            public final long busyTicks;
+            public final long totalTicks;
+
+            CpuSnapshot(long busyTicks, long totalTicks) {
+                this.busyTicks  = busyTicks;
+                this.totalTicks = totalTicks;
+            }
+        }
+
+        public static CpuSnapshot readSnapshot() {
+            try (BufferedReader reader = new BufferedReader(new FileReader(PROC_STAT))) {
+                String line = reader.readLine();
+                if (line == null || !line.startsWith("cpu ")) {
+                    Log.e(TAG, "CpuWorkloadReader: unexpected first line in " + PROC_STAT);
+                    return null;
+                }
+                String[] parts = line.substring("cpu ".length()).trim().split("\\s+");
+                long busyTicks = 0, totalTicks = 0;
+                for (int j = 0; j < TICK_FIELDS && j < parts.length; j++) {
+                    long val;
+                    try {
+                        val = Long.parseLong(parts[j]);
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "CpuWorkloadReader: invalid tick value: " + parts[j]);
+                        val = 0;
+                    }
+                    totalTicks += val;
+                    if (j != 3 && j != 4) {
+                        busyTicks += val;
+                    }
+                }
+                return new CpuSnapshot(busyTicks, totalTicks);
+            } catch (IOException e) {
+                Log.e(TAG, "CpuWorkloadReader: failed to read " + PROC_STAT + ": " + e);
+                return null;
+            }
+        }
+
+        public static int computeWorkload(CpuSnapshot prev, CpuSnapshot curr) {
+            if (prev == null || curr == null) return 0;
+            long totalDelta = curr.totalTicks - prev.totalTicks;
+            if (totalDelta <= 0) return 0;
+            long busyDelta = curr.busyTicks - prev.busyTicks;
+            // Returns aggregate utilization scaled by NUM_CORES (0-800% for 8 cores),
+            // where 100 = one core fully loaded. Thresholds must be calibrated accordingly.
+            return (int) (busyDelta * NUM_CORES * 100 / totalDelta);
+        }
+    }
+
+    /** @hide */
+    private static class PerfHintExecutor {
+        private static final int INVALID_HANDLE = -1;
+
+        private final BoostFramework mPerf;
+        private int mHandle = INVALID_HANDLE;
+
+        PerfHintExecutor(BoostFramework perf) {
+            mPerf = perf;
+        }
+
+        public synchronized void acquire(int hint, String pkgName, int duration) {
+            if (mPerf == null) {
+                return;
+            }
+            mHandle = mPerf.perfHintAcqRel(mHandle, hint, pkgName, duration);
+        }
+
+        // Releases the active hint.  No-op if no hint is held.
+        public synchronized boolean release() {
+            if (mPerf == null || mHandle == INVALID_HANDLE) {
+                return false;
+            }
+            mPerf.perfLockReleaseHandler(mHandle);
+            mHandle = INVALID_HANDLE;
+            return true;
+        }
+
+    }
+
+    /** @hide */
+    private static class HandlerTaskScheduler {
+        private Handler mHandler;
+        private Runnable mPendingRunnable;
+
+        private Handler getHandler() {
+            if (mHandler == null) {
+                Looper looper = Looper.getMainLooper();
+                if (looper != null) {
+                    mHandler = new Handler(looper);
+                }
+            }
+            return mHandler;
+        }
+
+        public void schedule(Runnable task, long delayMs) {
+            synchronized (this) {
+                Handler h = getHandler();
+                if (h == null) return;
+                if (mPendingRunnable != null) {
+                    h.removeCallbacks(mPendingRunnable);
+                }
+                mPendingRunnable = task;
+                h.postDelayed(mPendingRunnable, delayMs);
+            }
+        }
+
+        public boolean cancel() {
+            synchronized (this) {
+                Handler h = getHandler();
+                if (mPendingRunnable != null && h != null) {
+                    h.removeCallbacks(mPendingRunnable);
+                    mPendingRunnable = null;
+                    return true;
+                }
+                return false;
+            }
+        }
+    }
+
     //UI PERF END
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 };

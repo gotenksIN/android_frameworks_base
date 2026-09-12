@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2023 ArrowOS
+ * Copyright (C) 2026 Paranoid Android
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +36,8 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Handler;
 import android.os.HandlerExecutor;
-import android.os.Looper;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.telephony.SubscriptionManager;
@@ -55,14 +56,6 @@ public class Smart5gService extends SystemService {
     private static final String TAG = "Smart5gService";
     private static final boolean DEBUG = true;
 
-    // from org.codeaurora.telephony.utils.EnhancedRadioCapabilityResponse
-    private static final int NETWORK_TYPE_NR_NSA = 20; // = TelephonyManager.NETWORK_TYPE_NR
-    private static final int NETWORK_TYPE_NR_SA = 21;
-    private static final long NETWORK_TYPE_BITMASK_NR_NSA = (1 << (NETWORK_TYPE_NR_NSA -1));
-    private static final long NETWORK_TYPE_BITMASK_NR_SA = (1 << (NETWORK_TYPE_NR_SA -1));
-    private static final long NETWORK_TYPE_BITMASK_NR =
-            (NETWORK_TYPE_BITMASK_NR_NSA | NETWORK_TYPE_BITMASK_NR_SA);
-
     private static final NetworkRequest INTERNET_NETWORK_REQUEST =
             new NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -71,9 +64,9 @@ public class Smart5gService extends SystemService {
             .build();
 
     private final Context mContext;
-    private final Object mLock = new Object();
-    private final Handler mHandler = new Handler(Looper.getMainLooper());
-    private final Executor mExecutor = new HandlerExecutor(mHandler);
+    private final ServiceThread mHandlerThread;
+    private final Handler mHandler;
+    private final Executor mHandlerExecutor;
 
     private TelephonyManager mTelephonyManager;
     private SubscriptionManager mSubManager;
@@ -84,13 +77,7 @@ public class Smart5gService extends SystemService {
     private int[] mActiveSubIds = new int[0];
     private int mDefaultDataSubId = INVALID_SUBSCRIPTION_ID;
 
-    private final ContentObserver mSettingObserver = new ContentObserver(mHandler) {
-        @Override
-        public void onChange(boolean selfChange) {
-            dlog("SettingObserver: onChange");
-            update();
-        }
-    };
+    private final ContentObserver mSettingObserver;
 
     private final BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -179,6 +166,17 @@ public class Smart5gService extends SystemService {
     public Smart5gService(Context context) {
         super(context);
         mContext = context;
+        mHandlerThread = new ServiceThread(TAG, Process.THREAD_PRIORITY_BACKGROUND, false);
+        mHandlerThread.start();
+        mHandler = new Handler(mHandlerThread.getLooper());
+        mHandlerExecutor = new HandlerExecutor(mHandler);
+        mSettingObserver = new ContentObserver(mHandler) {
+            @Override
+            public void onChange(boolean selfChange) {
+                dlog("SettingObserver: onChange");
+                update();
+            }
+        };
     }
 
     @Override
@@ -190,20 +188,25 @@ public class Smart5gService extends SystemService {
     @Override
     public void onBootPhase(int phase) {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
-            dlog("onBootPhase PHASE_SYSTEM_SERVICES_READY");
-            mTelephonyManager = mContext.getSystemService(TelephonyManager.class);
-            mSubManager = mContext.getSystemService(SubscriptionManager.class);
-            mConnectivityManager = mContext.getSystemService(ConnectivityManager.class);
-            mPowerManager = mContext.getSystemService(PowerManager.class);
+            mHandler.post(() -> {
+                dlog("onBootPhase PHASE_SYSTEM_SERVICES_READY");
+                mTelephonyManager = mContext.getSystemService(TelephonyManager.class);
+                mSubManager = mContext.getSystemService(SubscriptionManager.class);
+                mConnectivityManager = mContext.getSystemService(ConnectivityManager.class);
+                mPowerManager = mContext.getSystemService(PowerManager.class);
+            });
         } else if (phase == SystemService.PHASE_BOOT_COMPLETED) {
-            dlog("onBootPhase PHASE_BOOT_COMPLETED");
-            mIsPowerSaveMode = mPowerManager.isPowerSaveMode();
-            mDefaultDataSubId = mSubManager.getDefaultDataSubscriptionId();
-            final IntentFilter filter = new IntentFilter(ACTION_POWER_SAVE_MODE_CHANGED);
-            filter.addAction(ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED);
-            mContext.registerReceiver(mIntentReceiver, filter);
-            mConnectivityManager.registerNetworkCallback(INTERNET_NETWORK_REQUEST, mNetworkCallback);
-            mSubManager.addOnSubscriptionsChangedListener(mExecutor, mSubListener);
+            mHandler.post(() -> {
+                dlog("onBootPhase PHASE_BOOT_COMPLETED");
+                mIsPowerSaveMode = mPowerManager.isPowerSaveMode();
+                mDefaultDataSubId = mSubManager.getDefaultDataSubscriptionId();
+                final IntentFilter filter = new IntentFilter(ACTION_POWER_SAVE_MODE_CHANGED);
+                filter.addAction(ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED);
+                mContext.registerReceiver(mIntentReceiver, filter, null, mHandler);
+                mConnectivityManager.registerNetworkCallback(
+                        INTERNET_NETWORK_REQUEST, mNetworkCallback, mHandler);
+                mSubManager.addOnSubscriptionsChangedListener(mHandlerExecutor, mSubListener);
+            });
         }
     }
 
@@ -216,43 +219,37 @@ public class Smart5gService extends SystemService {
         return Settings.Global.getInt(mContext.getContentResolver(), MOBILE_DATA + subId, 1) == 1;
     }
 
-    private static long getSupportedNrBitmask(TelephonyManager tm, int subId) {
-        if ((tm.getSupportedRadioAccessFamily() & NETWORK_TYPE_BITMASK_NR) != 0) {
-            dlog("subId " + subId + " supports 5g EnhancedRadioCapability");
-            return NETWORK_TYPE_BITMASK_NR;
-        } else if ((tm.getSupportedRadioAccessFamily() & NETWORK_TYPE_BITMASK_NR_NSA) != 0) {
-            dlog("subId " + subId + " supports 5g AOSP");
-            return NETWORK_TYPE_BITMASK_NR_NSA;
-        } else {
-            dlog("subId " + subId + " does not support 5g!");
-            return 0;
-        }
-    }
-
-    private synchronized void update() {
+    private void update() {
         if (mActiveSubIds == null || mActiveSubIds.length == 0) {
             dlog("update: return, no active subs!");
             return;
         }
         for (int subId : mActiveSubIds) {
-            final TelephonyManager tm = mTelephonyManager.createForSubscriptionId(subId);
-            final long supportedNrBitmask = getSupportedNrBitmask(tm, subId);
-            if (supportedNrBitmask == 0) continue;
-            long allowedNetworkTypes = tm.getAllowedNetworkTypesForReason(
-                    ALLOWED_NETWORK_TYPES_REASON_POWER);
-            final boolean is5gAllowed = (allowedNetworkTypes & supportedNrBitmask) != 0;
-            final boolean shouldDisable = shouldDisable5g(subId);
-            dlog("update: subId=" + subId + " is5gAllowed=" + is5gAllowed + " shouldDisable="
-                    + shouldDisable);
-            if (shouldDisable && is5gAllowed) {
-                allowedNetworkTypes &= ~supportedNrBitmask;
-            } else if (!shouldDisable && !is5gAllowed) {
-                allowedNetworkTypes |= supportedNrBitmask;
-            } else {
-                continue;
+            try {
+                final TelephonyManager tm = mTelephonyManager.createForSubscriptionId(subId);
+                if ((tm.getSupportedRadioAccessFamily()
+                        & TelephonyManager.NETWORK_TYPE_BITMASK_NR) == 0) {
+                    continue;
+                }
+                long allowedNetworkTypes = tm.getAllowedNetworkTypesForReason(
+                        ALLOWED_NETWORK_TYPES_REASON_POWER);
+                final boolean is5gAllowed = (allowedNetworkTypes
+                        & TelephonyManager.NETWORK_TYPE_BITMASK_NR) != 0;
+                final boolean shouldDisable = shouldDisable5g(subId);
+                dlog("update: subId=" + subId + " is5gAllowed=" + is5gAllowed
+                        + " shouldDisable=" + shouldDisable);
+                if (shouldDisable && is5gAllowed) {
+                    allowedNetworkTypes &= ~TelephonyManager.NETWORK_TYPE_BITMASK_NR;
+                } else if (!shouldDisable && !is5gAllowed) {
+                    allowedNetworkTypes |= TelephonyManager.NETWORK_TYPE_BITMASK_NR;
+                } else {
+                    continue;
+                }
+                tm.setAllowedNetworkTypesForReason(ALLOWED_NETWORK_TYPES_REASON_POWER,
+                        allowedNetworkTypes);
+            } catch (SecurityException | IllegalStateException | NullPointerException e) {
+                Slog.w(TAG, "Unable to update 5G policy for subId " + subId, e);
             }
-            tm.setAllowedNetworkTypesForReason(ALLOWED_NETWORK_TYPES_REASON_POWER,
-                    allowedNetworkTypes);
         }
     }
 

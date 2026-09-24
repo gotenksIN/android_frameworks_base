@@ -1129,7 +1129,9 @@ public class AudioDeviceBroker {
                 }
                 boolean mVoipLeaWarEnabled =
                         SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
-                boolean isLeVoIPOngoing = mVoipLeaWarEnabled && !mBtHelper.isAudioConnected();
+                // Use isBluetoothScoOn() as it reflects the real HFP SCO state only:
+                // no SCO means call audio is carried over LE Audio.
+                boolean isLeVoIPOngoing = mVoipLeaWarEnabled && !mBtHelper.isBluetoothScoOn();
                 if (isLeVoIPOngoing) {
                     Log.v(TAG, "skip set LeAudioSuspended to true when LEA VoIP was ongoing");
                 } else if (!mBluetoothLeSuspendedApplied) {
